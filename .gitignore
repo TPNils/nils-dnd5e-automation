@@ -1,0 +1,21 @@
+/*
+!/.gitignore
+!/.github
+!/gulpfile.js
+!/package.json
+!/tsconfig.json
+!/LICENSE.MIT
+!/README.md
+!/lib-find-the-path
+!/.gitmodules
+!/.eslintrc.json
+
+!/src
+/src/*
+# Gulp copies these files
+!/src/module.json
+!/src/assets
+!/src/lang
+!/src/packs
+!/src/scripts
+!/src/templates
