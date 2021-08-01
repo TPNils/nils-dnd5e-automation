@@ -35,8 +35,9 @@ const api = new GlobalApi();
 
 export function registerHooks(): void {
   Hooks.on('init', () => {
-    game[staticValues.moduleName] = {
-      api: new GlobalApi()
+    if (!game[staticValues.moduleName]) {
+      game[staticValues.moduleName] = {};
     }
+    game[staticValues.moduleName].api = api;
   });
 }
