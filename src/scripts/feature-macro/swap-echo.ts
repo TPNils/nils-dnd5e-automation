@@ -1,10 +1,12 @@
 import { IMacro } from "../macro";
-import { MacroUtils } from "../macro-utils";
+import { MacroContext } from "../macro-context";
 
 export class SwapEcho implements IMacro {
+  
+  constructor(private context: MacroContext) {}
 
   public async run(): Promise<void> {
-    const actor = MacroUtils.getActorFromContext();
+    const actor = await this.context.actorDocument();
     if (game.paused && !game.user.isGM) {
       return;
     }

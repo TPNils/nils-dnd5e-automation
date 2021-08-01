@@ -1,15 +1,17 @@
 import { AllPermissions } from "../custom-permissions";
 import { IMacro } from "../macro";
-import { MacroUtils } from "../macro-utils";
+import { MacroContext } from "../macro-context";
 
 export class DismissEcho implements IMacro {
 
-  public requirePermissions(): AllPermissions[] {
+  constructor(private context: MacroContext) {}
+
+  public async requirePermissions(): Promise<AllPermissions[]> {
     return ['TOKEN_DELETE'];
   }
 
   public async run(): Promise<void> {
-    const actor = MacroUtils.getActorFromContext();
+    const actor = await this.context.actorDocument();
 
     const isEchoOf = actor.getFlag('world', 'is-echo-of');
     const echoActorId = actor.getFlag('world', 'echo-actor-id');

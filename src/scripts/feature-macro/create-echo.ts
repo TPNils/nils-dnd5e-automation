@@ -1,12 +1,14 @@
 import { AllPermissions } from "../custom-permissions";
 import { IMacro } from "../macro";
-import { MacroUtils } from "../macro-utils";
+import { MacroContext } from "../macro-context";
 
 export class CreateEcho implements IMacro {
 
-  public requirePermissions(): AllPermissions[] {
+  constructor(private context: MacroContext) {}
+
+  public async requirePermissions(): Promise<AllPermissions[]> {
     const permissions: AllPermissions[] = [];
-    const actor = MacroUtils.getActorFromContext();
+    const actor = await this.context.actorDocument();
 
     let shouldCreateEchoActor = true;
     let echoActorId: string;
@@ -43,7 +45,7 @@ export class CreateEcho implements IMacro {
   }
   
   public async run(): Promise<void> {
-    const actor = MacroUtils.getActorFromContext();
+    const actor = await this.context.actorDocument();
 
     const originActor = actor.getFlag('world', 'is-echo-of') ? game.actors.get(actor.getFlag('world', 'is-echo-of')) : actor;
     const scene = game.scenes.get(game.user.viewedScene);
@@ -107,11 +109,10 @@ export class CreateEcho implements IMacro {
           }
         }
       },
-      folder: 'TIDda1pvaOJgA685',
       img: actorData.img,
       items: actorData.items,
       name: `Echo (${actorData.name})`,
-      permissions: actorData.permissions,
+      permission: actorData.permission,
       token: echoTokenData,
       type: actorData.type
     }

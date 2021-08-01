@@ -1,12 +1,16 @@
+import { ChatSpeakerDataProperties } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatSpeakerData";
+import { PropertiesToSource } from "@league-of-foundry-developers/foundry-vtt-types/src/types/helperTypes";
 import { hasPermission } from "./custom-permissions";
 import { CreateEcho } from "./feature-macro/create-echo";
 import { DismissEcho } from "./feature-macro/dismiss-echo";
 import { SwapEcho } from "./feature-macro/swap-echo";
-import { IMacro } from "./macro";
+import { IMacro, IMacroConstructor } from "./macro";
+import { MacroContext, MacroContextData } from "./macro-context";
 import { provider } from "./provider/provider";
 import { staticValues } from "./static-values";
 
-type MacroCollection = {[key: string]: IMacro};
+type MacroCollection = {[key: string]: IMacroConstructor};
+type MacroArguments = [PropertiesToSource<ChatSpeakerDataProperties>, Actor, Token, Actor];
 
 interface CallMacroResponse {
   success: boolean;
@@ -18,9 +22,9 @@ const collections: {[key in ('features' | 'spells' | 'items')]: MacroCollection}
 
   features: {
     // TODO link to an item in compedium
-    createEcho: new CreateEcho(),
-    dismissEcho: new DismissEcho(),
-    swapEcho: new SwapEcho(),
+    createEcho: CreateEcho,
+    dismissEcho: DismissEcho,
+    swapEcho: SwapEcho,
   },
 
   spells: {
@@ -33,30 +37,25 @@ const collections: {[key in ('features' | 'spells' | 'items')]: MacroCollection}
 
 }
 
-
-function validatePermissions(macro: IMacro): boolean {
-  
-
-  return true;
-}
-
-async function callMacroInternal(itemType: keyof typeof collections, macroName: string): Promise<CallMacroResponse> {
-  const macro = collections[itemType]?.[macroName];
-  if (macro == null) {
+async function callMacroInternal(itemType: keyof typeof collections, macroName: string, context: MacroContext): Promise<CallMacroResponse> {
+  const macroConstructor = collections[itemType]?.[macroName];
+  if (macroConstructor == null) {
     return {
       success: false,
       errorPermissions: false,
       errorMessage: `Could not find macro ${itemType}.${macroName}`
     }
   }
+  const macro = new macroConstructor(context);
 
   if (!game.user.isGM && macro.requirePermissions != null) {
-    for (const permission of macro.requirePermissions()) {
+    const permissions = await macro.requirePermissions();
+    for (const permission of permissions) {
       if (!hasPermission(permission)) {
         return {
           success: false,
           errorPermissions: true,
-          errorMessage: `Missing permissions: ${macro.requirePermissions().join(', ')}`
+          errorMessage: `Missing permissions: ${permissions.join(', ')}`
         }
       }
     }
@@ -64,6 +63,10 @@ async function callMacroInternal(itemType: keyof typeof collections, macroName: 
 
   try {
     await macro.run();
+    return {
+      success: true,
+      errorPermissions: false,
+    }
   } catch (err) {
     if (err instanceof Error) {
       err = err.message;
@@ -79,11 +82,12 @@ async function callMacroInternal(itemType: keyof typeof collections, macroName: 
 
 class GlobalApi {
 
-  public async callMacro(itemType: keyof typeof collections, macroName: string): Promise<void> {
-    let response: CallMacroResponse = await callMacroInternal(itemType, macroName);
+  public async callMacro(itemType: keyof typeof collections, macroName: string, macroArguments: MacroArguments): Promise<void> {
+    const context = MacroContext.fromVanillaArguments(macroArguments);
+    let response: CallMacroResponse = await callMacroInternal(itemType, macroName, context);
     if (response.errorPermissions) {
       const socket = await provider.getSocket();
-      response = await socket.executeAsGM('callMacro', {itemType: itemType, macroName: macroName});
+      response = await socket.executeAsGM('callMacro', {itemType: itemType, macroName: macroName, contextData: context.getMactoContextData()});
     } 
 
     if (!response.success) {
@@ -91,8 +95,8 @@ class GlobalApi {
     }
   }
   
-  public callMacroFromSocket(itemType: keyof typeof collections, macroName: string): Promise<any> {
-    return callMacroInternal(itemType, macroName);
+  public callMacroFromSocket(itemType: keyof typeof collections, macroName: string, contextData: MacroContextData): Promise<CallMacroResponse> {
+    return callMacroInternal(itemType, macroName, MacroContext.fromData(contextData));
   }
 
 }
@@ -108,8 +112,8 @@ export function registerHooks(): void {
   });
   
   provider.getSocket().then(socket => {
-    socket.register('callMacro', ({itemType, macroName}) => {
-      return api.callMacroFromSocket(itemType, macroName);
+    socket.register('callMacro', ({itemType, macroName, contextData}) => {
+      return api.callMacroFromSocket(itemType, macroName, contextData);
     })
   });
 }
