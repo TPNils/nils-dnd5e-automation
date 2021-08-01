@@ -4,18 +4,16 @@ import { MacroContext } from "../macro-context";
 
 export class DismissEcho implements IMacro {
 
-  constructor(private context: MacroContext) {}
-
   public async requirePermissions(): Promise<AllPermissions[]> {
     return ['TOKEN_DELETE'];
   }
 
-  public async run(): Promise<void> {
+  public async run(context: MacroContext): Promise<void> {
     if (game.paused && !game.user.isGM) {
       return;
     }
-    
-    const actor = await this.context.actorDocument();
+
+    const actor = await context.actorDocument();
     const isEchoOf = actor.getFlag('world', 'is-echo-of');
     const echoActorId = actor.getFlag('world', 'echo-actor-id');
   

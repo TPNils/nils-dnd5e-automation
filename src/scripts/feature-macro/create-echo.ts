@@ -4,11 +4,9 @@ import { MacroContext } from "../macro-context";
 
 export class CreateEcho implements IMacro {
 
-  constructor(private context: MacroContext) {}
-
-  public async requirePermissions(): Promise<AllPermissions[]> {
+  public async requirePermissions(context: MacroContext): Promise<AllPermissions[]> {
     const permissions: AllPermissions[] = [];
-    const actor = await this.context.actorDocument();
+    const actor = await context.actorDocument();
 
     let shouldCreateEchoActor = true;
     let echoActorId: string;
@@ -44,12 +42,12 @@ export class CreateEcho implements IMacro {
     return permissions;
   }
   
-  public async run(): Promise<void> {
+  public async run(context: MacroContext): Promise<void> {
     if (game.paused && !game.user.isGM) {
       return;
     }
 
-    const actor = await this.context.actorDocument();
+    const actor = await context.actorDocument();
     const originActor = actor.getFlag('world', 'is-echo-of') ? game.actors.get(actor.getFlag('world', 'is-echo-of')) : actor;
     const scene = game.scenes.get(game.user.viewedScene);
     const actorData = JSON.parse(JSON.stringify(originActor.data));

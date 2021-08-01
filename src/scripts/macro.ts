@@ -2,11 +2,13 @@ import { AllPermissions } from "./custom-permissions";
 import { MacroContext } from "./macro-context";
 
 export interface IMacroConstructor {
-  new (context: MacroContext): IMacro;
+  new (): IMacro;
 }
 
-export interface IMacro {
-  requirePermissions?(): Promise<AllPermissions[]>;
-  run(): Promise<void>;
+export interface IMacro<T = any> {
+
+  requirePermissions?(context: MacroContext): Promise<AllPermissions[]>;
+  macroData?(context: MacroContext): Promise<T>;
+  run(context: MacroContext, macroData: T): Promise<void>;
 
 }
