@@ -37,7 +37,7 @@ export class MacroUtils {
       return game.user.character;
     }
 
-    return null;
+    throw new Error("You must select a token first");
   }
 
   public static getSingleSelected<REQ extends Request<Selected>>(request: REQ): Response<Selected, REQ> {
