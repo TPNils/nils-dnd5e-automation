@@ -1,17 +1,19 @@
 import { ChatSpeakerDataProperties } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatSpeakerData";
 import { PropertiesToSource } from "@league-of-foundry-developers/foundry-vtt-types/src/types/helperTypes";
-import { MyActor } from "./types/fixed-types";
+import { MyActor, MyItem } from "./types/fixed-types";
 
 export type VanillaMacroArguments = [
   PropertiesToSource<ChatSpeakerDataProperties>, // Speaker
   Actor, // actor
   Token, // token
   Actor, // character
+  MyItem?, // Item macros called from midi will provide a 5th item argument
 ];
 
 export interface MacroContextData {
   actorUuid: string;
   tokenUuid: string;
+  itemUuid?: string;
   selectedTokenUuids: string[];
   targetTokenUuids: string[];
 }
@@ -24,6 +26,7 @@ export class MacroContext {
     return new MacroContext({
       actorUuid: args[1].uuid,
       tokenUuid: args[2].document.uuid,
+      itemUuid: args.length > 4 && args[4] != null ? args[4].uuid : undefined,
       selectedTokenUuids: canvas.tokens.controlled.map(token => token.document.uuid),
       targetTokenUuids: Array.from(game.user.targets).map(token => token.document.uuid),
     });
@@ -61,8 +64,25 @@ export class MacroContext {
   /**
    * @returns A TokenDocument which is the protagonist of the executed action
    */
-   public tokenDocument(): Promise<TokenDocument> {
+  public tokenDocument(): Promise<TokenDocument> {
     return fromUuid(this.data.tokenUuid) as Promise<TokenDocument>;
+  }
+
+  /**
+   * @returns The Item id which is linked to this macro
+   */
+  public itemUuid(): string | null {
+    return this.data.itemUuid;
+  }
+  
+  /**
+   * @returns The Item which is linked to this macro
+   */
+  public itemDocument(): Promise<MyItem | null> {
+    if (!this.data.itemUuid) {
+      return Promise.resolve(null);
+    }
+    return fromUuid(this.data.actorUuid) as Promise<any> as Promise<MyItem>;
   }
 
   /**

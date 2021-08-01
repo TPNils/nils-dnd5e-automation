@@ -1,5 +1,6 @@
 interface BaseDocument<DATA> {
   id?: string;
+  uuid: string;
   data: DATA;
   getFlag(moduleName: string, key: string): any;
 }
