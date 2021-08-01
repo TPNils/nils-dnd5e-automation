@@ -45,8 +45,11 @@ export class CreateEcho implements IMacro {
   }
   
   public async run(): Promise<void> {
-    const actor = await this.context.actorDocument();
+    if (game.paused && !game.user.isGM) {
+      return;
+    }
 
+    const actor = await this.context.actorDocument();
     const originActor = actor.getFlag('world', 'is-echo-of') ? game.actors.get(actor.getFlag('world', 'is-echo-of')) : actor;
     const scene = game.scenes.get(game.user.viewedScene);
     const actorData = JSON.parse(JSON.stringify(originActor.data));

@@ -6,10 +6,10 @@ export class SwapEcho implements IMacro {
   constructor(private context: MacroContext) {}
 
   public async run(): Promise<void> {
-    const actor = await this.context.actorDocument();
     if (game.paused && !game.user.isGM) {
       return;
     }
+    const actor = await this.context.actorDocument();
     const isEchoOf = actor.getFlag('world', 'is-echo-of');
     const echoActorId = actor.getFlag('world', 'echo-actor-id');
   
