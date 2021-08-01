@@ -1,7 +1,13 @@
+import { AllPermissions } from "../custom-permissions";
 import { IMacro } from "../macro";
 import { MacroUtils } from "../macro-utils";
 
 export class DismissEcho implements IMacro {
+
+  public requirePermissions(): AllPermissions[] {
+    return ['TOKEN_DELETE'];
+  }
+
   public async run(): Promise<void> {
     const actor = MacroUtils.getActorFromContext();
 
@@ -45,4 +51,5 @@ export class DismissEcho implements IMacro {
   
     currentScene.deleteEmbeddedDocuments('Token', deleteTokenIds);
   }
+
 }

@@ -2,6 +2,7 @@ import { IMacro } from "../macro";
 import { MacroUtils } from "../macro-utils";
 
 export class SwapEcho implements IMacro {
+
   public async run(): Promise<void> {
     const actor = MacroUtils.getActorFromContext();
     if (game.paused && !game.user.isGM) {
@@ -69,4 +70,5 @@ export class SwapEcho implements IMacro {
   
     currentScene.updateEmbeddedDocuments('Token', updateTokens, {animate: false} as any)
   }
+
 }

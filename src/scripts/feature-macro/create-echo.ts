@@ -1,7 +1,47 @@
+import { AllPermissions } from "../custom-permissions";
 import { IMacro } from "../macro";
 import { MacroUtils } from "../macro-utils";
 
 export class CreateEcho implements IMacro {
+
+  public requirePermissions(): AllPermissions[] {
+    const permissions: AllPermissions[] = [];
+    const actor = MacroUtils.getActorFromContext();
+
+    let shouldCreateEchoActor = true;
+    let echoActorId: string;
+    if (actor.getFlag('world', 'is-echo-of')) {
+      shouldCreateEchoActor = false;
+      echoActorId = actor.id;
+    } else {
+      const echoIdFlag = actor.getFlag('world', 'echo-actor-id');
+      if (game.actors.has(echoIdFlag)) {
+        shouldCreateEchoActor = false;
+        echoActorId = echoIdFlag;
+      }
+    }
+
+    if (shouldCreateEchoActor) {
+      permissions.push('ACTOR_CREATE');
+    }
+
+    let tokenExists = false;
+    const scene = game.scenes.get(game.user.viewedScene);
+    game.scenes.get(game.user.viewedScene);
+    for (const sceneToken of scene.data.tokens) {
+      if (sceneToken.data.actorId === echoActorId) {
+        tokenExists = true;
+        break;
+      }
+    }
+
+    if (!tokenExists) {
+      permissions.push('TOKEN_CREATE');
+    }
+
+    return permissions;
+  }
+  
   public async run(): Promise<void> {
     const actor = MacroUtils.getActorFromContext();
 
@@ -127,4 +167,5 @@ export class CreateEcho implements IMacro {
       echoCanvasToken.zIndex = actorCanvasToken.zIndex+1;
     }
   }
+
 }

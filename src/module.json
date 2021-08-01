@@ -16,6 +16,9 @@
   "manifest": "",
   "download": "",
   "type": "module",
+  "esmodules": [
+    "scripts/main.js"
+  ],
   "includes": [
     "./assets/**",
     "./lang/**",
