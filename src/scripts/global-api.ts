@@ -90,10 +90,6 @@ async function callMacroFromSocket(itemType: keyof typeof collections, macroName
   }
 
   try {
-    let macroData;
-    if (macro.macroData) {
-      macroData = await macro.macroData(context);
-    }
     await macro.run(context, macroData);
     return {
       success: true
