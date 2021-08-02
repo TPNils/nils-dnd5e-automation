@@ -1,5 +1,6 @@
 import { IMacro } from "../macro";
 import { MacroContext } from "../macro-context";
+import { UtilsDocument } from "../utils-document";
 
 export class SwapEcho implements IMacro {
 
@@ -7,7 +8,7 @@ export class SwapEcho implements IMacro {
     if (game.paused && !game.user.isGM) {
       return;
     }
-    const actor = await context.actorDocument();
+    const actor = await UtilsDocument.actorFromUuid(context.actorUuid);
     const isEchoOf = actor.getFlag('world', 'is-echo-of');
     const echoActorId = actor.getFlag('world', 'echo-actor-id');
   

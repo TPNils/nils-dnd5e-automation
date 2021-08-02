@@ -1,8 +1,8 @@
 import { AllPermissions } from "./custom-permissions";
 import { MacroContext } from "./macro-context";
 
-export interface IMacroConstructor {
-  new (): IMacro;
+export interface IMacroConstructor<T = any> {
+  new (): IMacro<T>;
 }
 
 export interface IMacro<T = any> {

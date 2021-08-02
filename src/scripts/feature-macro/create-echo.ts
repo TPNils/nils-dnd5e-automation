@@ -1,12 +1,14 @@
+
 import { AllPermissions } from "../custom-permissions";
 import { IMacro } from "../macro";
 import { MacroContext } from "../macro-context";
+import { UtilsDocument } from "../utils-document";
 
 export class CreateEcho implements IMacro {
 
   public async requirePermissions(context: MacroContext): Promise<AllPermissions[]> {
     const permissions: AllPermissions[] = [];
-    const actor = await context.actorDocument();
+    const actor = await UtilsDocument.actorFromUuid(context.actorUuid);
 
     let shouldCreateEchoActor = true;
     let echoActorId: string;
@@ -47,7 +49,7 @@ export class CreateEcho implements IMacro {
       return;
     }
 
-    const actor = await context.actorDocument();
+    const actor = await UtilsDocument.actorFromUuid(context.actorUuid);
     const originActor = actor.getFlag('world', 'is-echo-of') ? game.actors.get(actor.getFlag('world', 'is-echo-of')) : actor;
     const scene = game.scenes.get(game.user.viewedScene);
     const actorData = JSON.parse(JSON.stringify(originActor.data));

@@ -4,8 +4,8 @@ import { hasPermission } from "./custom-permissions";
 import { CreateEcho } from "./feature-macro/create-echo";
 import { DismissEcho } from "./feature-macro/dismiss-echo";
 import { SwapEcho } from "./feature-macro/swap-echo";
-import { IMacro, IMacroConstructor } from "./macro";
-import { MacroContext, MacroContextData } from "./macro-context";
+import { IMacroConstructor } from "./macro";
+import { MacroContext, macroContextFromVanillaArguments } from "./macro-context";
 import { provider } from "./provider/provider";
 import { staticValues } from "./static-values";
 
@@ -52,7 +52,7 @@ async function callMacroLocal(itemType: keyof typeof collections, macroName: str
           macroData = await macro.macroData(context);
         }
         const socket = await provider.getSocket();
-        const response: CallMacroResponse = await socket.executeAsGM('callMacro', {itemType: itemType, macroName: macroName, contextData: context.getMactoContextData(), macroData: macroData});
+        const response: CallMacroResponse = await socket.executeAsGM('callMacro', {itemType: itemType, macroName: macroName, contextData: context, macroData: macroData});
         if (!response.success) {
           throw new Error(response.errorMessage);
         }
@@ -90,6 +90,10 @@ async function callMacroFromSocket(itemType: keyof typeof collections, macroName
   }
 
   try {
+    let macroData;
+    if (macro.macroData) {
+      macroData = await macro.macroData(context);
+    }
     await macro.run(context, macroData);
     return {
       success: true
@@ -109,7 +113,7 @@ async function callMacroFromSocket(itemType: keyof typeof collections, macroName
 class GlobalApi {
 
   public async callMacro(itemType: keyof typeof collections, macroName: string, macroArguments: MacroArguments): Promise<void> {
-    const context = MacroContext.fromVanillaArguments(macroArguments);
+    const context = macroContextFromVanillaArguments(macroArguments);
     try {
       await callMacroLocal(itemType, macroName, context)
     } catch (err) {
@@ -134,7 +138,7 @@ export function registerHooks(): void {
   
   provider.getSocket().then(socket => {
     socket.register('callMacro', ({itemType, macroName, contextData, macroData}) => {
-      return callMacroFromSocket(itemType, macroName, MacroContext.fromData(contextData), macroData);
+      return callMacroFromSocket(itemType, macroName, contextData, macroData);
     })
   });
 }

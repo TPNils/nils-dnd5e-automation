@@ -1,6 +1,7 @@
 import { AllPermissions } from "../custom-permissions";
 import { IMacro } from "../macro";
 import { MacroContext } from "../macro-context";
+import { UtilsDocument } from "../utils-document";
 
 export class DismissEcho implements IMacro {
 
@@ -13,7 +14,7 @@ export class DismissEcho implements IMacro {
       return;
     }
 
-    const actor = await context.actorDocument();
+    const actor = await UtilsDocument.actorFromUuid(context.actorUuid);
     const isEchoOf = actor.getFlag('world', 'is-echo-of');
     const echoActorId = actor.getFlag('world', 'echo-actor-id');
   
