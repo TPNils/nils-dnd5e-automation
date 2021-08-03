@@ -40,9 +40,6 @@ type UserInputResponse<T> = {
 export class UtilsInput {
 
   /**
-   * 
-   * @param context 
-   * @param args 
    * @returns an array of token UUIDs of the targeted tokens.
    */
   public static targets(context: MacroContext, args: TargetArgs): Promise<UserInputResponse<string[]>> {
@@ -78,7 +75,7 @@ export class UtilsInput {
         selectedTimes.push({
           index: i,
           name: String(i+1),
-          selected: false // TODO
+          selected: preselectedTargets.length < i ? false : preselectedTargets[i] === possibleTarget.uuid
         });
       }
       const token = targetDocumentMap.get(possibleTarget.uuid);
