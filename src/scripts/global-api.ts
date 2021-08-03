@@ -6,7 +6,7 @@ import { DismissEcho } from "./feature-macro/dismiss-echo";
 import { SwapEcho } from "./feature-macro/swap-echo";
 import { Test } from "./feature-macro/test";
 import { IMacroConstructor } from "./macro";
-import { MacroContext, macroContextFromVanillaArguments } from "./macro-context";
+import { MacroContext, macroContextFromArgs } from "./macro-context";
 import { provider } from "./provider/provider";
 import { staticValues } from "./static-values";
 
@@ -110,8 +110,8 @@ async function callMacroFromSocket(itemType: keyof typeof collections, macroName
 
 class GlobalApi {
 
-  public async callMacro(itemType: keyof typeof collections, macroName: string, macroArguments: MacroArguments): Promise<void> {
-    const context = macroContextFromVanillaArguments(macroArguments);
+  public static async callMacro(itemType: keyof typeof collections, macroName: string, macroArguments: MacroArguments): Promise<void> {
+    const context = macroContextFromArgs(macroArguments);
     try {
       await callMacroLocal(itemType, macroName, context)
     } catch (err) {
@@ -124,14 +124,12 @@ class GlobalApi {
 
 }
 
-const api = new GlobalApi();
-
 export function registerHooks(): void {
   Hooks.on('init', () => {
     if (!game[staticValues.moduleName]) {
       game[staticValues.moduleName] = {};
     }
-    game[staticValues.moduleName].api = api;
+    game[staticValues.moduleName].api = GlobalApi;
   });
   
   provider.getSocket().then(socket => {

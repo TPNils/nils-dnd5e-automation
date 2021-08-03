@@ -4,10 +4,20 @@ import { MyActor, MyItem } from "./types/fixed-types";
 
 export type VanillaMacroArguments = [
   PropertiesToSource<ChatSpeakerDataProperties>, // Speaker
-  Actor, // actor
-  Token, // token
-  Actor, // character
-  MyItem?, // Item macros called from midi will provide a 5th item argument
+  Actor | undefined, // actor
+  Token | undefined, // token
+  Actor | undefined, // character
+];
+
+// module: item-macro
+export type ItemMacroMacroArguments = [
+  MyItem,
+  PropertiesToSource<ChatSpeakerDataProperties>, // Speaker
+  Actor | undefined, // actor
+  Token | undefined, // token
+  Actor | undefined, // character
+  any | undefined, // event (?)
+  any | undefined, // args (?)
 ];
 
 export interface MacroContext {
@@ -21,20 +31,30 @@ export interface MacroContext {
   targetTokenUuids: string[];
 }
 
-export function macroContextFromVanillaArguments(args: VanillaMacroArguments): MacroContext {
+export function macroContextFromArgs(args: VanillaMacroArguments | ItemMacroMacroArguments): MacroContext {
   const context: MacroContext = {
     selectedTokenUuids: canvas.tokens.controlled.map(token => token.document.uuid),
     targetTokenUuids: Array.from(game.user.targets).map(token => token.document.uuid),
   }
-  console.log({args, length: args.length})
-  if (args.length > 1 && args[1] != null) {
-    context.actorUuid = args[1].uuid;
-  }
-  if (args.length > 2 && args[2] != null) {
-    context.tokenUuid = args[2].document.uuid;
-  }
-  if (args.length > 4 && args[4] != null) {
-    context.itemUuid = args[4].uuid;
+  if (args.length === 4) {
+    // Macro called by foundry (from the hotbar)
+    if (args[1] != null) {
+      context.actorUuid = args[1].uuid;
+    }
+    if (args[2] != null) {
+      context.tokenUuid = args[2].document.uuid;
+    }
+  } else if (args.length === 7) {
+    // Macro called by the item-macro module
+    if (args[0] != null) {
+      context.itemUuid = args[0].uuid;
+    }
+    if (args[2] != null) {
+      context.actorUuid = args[2].uuid;
+    }
+    if (args[3] != null) {
+      context.tokenUuid = args[3].document.uuid;
+    }
   }
   return context;
 }
