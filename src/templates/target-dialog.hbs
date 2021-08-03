@@ -4,14 +4,14 @@
       <thead></thead>
       <tbody>
         {{#each targets as |target|}}
-          <tr {{staticValues.moduleName}}-highlight-token="{{target.uuid}}">
+          <tr {{@root.staticValues.moduleName}}-highlight-token="{{target.uuid}}">
             <td><img src="{{target.img}}" style="width: 28px; height: 28px; border: 0;"/></td>
             <td>{{target.name}}</td>
-            {{#each target.selected as |selected targetNr|}}
+            {{#each target.selected as |selectedData|}}
               <td>
                 <label>
-                  <input type="radio" name="{{targetNr}}" value="{{target.uuid}}" {{#if selected}}checked{{/if}}/>
-                  Target {{targetNr}}
+                  <input type="radio" name="{{selectedData.index}}" value="{{target.uuid}}" {{@root.staticValues.moduleName}}-allow-unset {{#if selectedData.selected}}checked{{/if}}/>
+                  Target {{selectedData.name}}
                 </label>
 
               </td>

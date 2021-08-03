@@ -11,19 +11,30 @@ export type VanillaMacroArguments = [
 ];
 
 export interface MacroContext {
-  actorUuid: string;
-  tokenUuid: string;
+  // Actor/Token can be null in the context of a DM (or player without character I guess)
+  actorUuid?: string;
+  tokenUuid?: string;
+  // Item is only provided when the macro is called from an item context
   itemUuid?: string;
+  // Arrays are never null, but can be empty
   selectedTokenUuids: string[];
   targetTokenUuids: string[];
 }
 
 export function macroContextFromVanillaArguments(args: VanillaMacroArguments): MacroContext {
-  return {
-    actorUuid: args[1].uuid,
-    tokenUuid: args[2].document.uuid,
-    itemUuid: args.length > 4 && args[4] != null ? args[4].uuid : undefined,
+  const context: MacroContext = {
     selectedTokenUuids: canvas.tokens.controlled.map(token => token.document.uuid),
     targetTokenUuids: Array.from(game.user.targets).map(token => token.document.uuid),
   }
+  console.log({args, length: args.length})
+  if (args.length > 1 && args[1] != null) {
+    context.actorUuid = args[1].uuid;
+  }
+  if (args.length > 2 && args[2] != null) {
+    context.tokenUuid = args[2].document.uuid;
+  }
+  if (args.length > 4 && args[4] != null) {
+    context.itemUuid = args[4].uuid;
+  }
+  return context;
 }
