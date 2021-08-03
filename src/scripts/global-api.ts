@@ -4,6 +4,7 @@ import { hasPermission } from "./custom-permissions";
 import { CreateEcho } from "./feature-macro/create-echo";
 import { DismissEcho } from "./feature-macro/dismiss-echo";
 import { SwapEcho } from "./feature-macro/swap-echo";
+import { Test } from "./feature-macro/test";
 import { IMacroConstructor } from "./macro";
 import { MacroContext, macroContextFromVanillaArguments } from "./macro-context";
 import { provider } from "./provider/provider";
@@ -24,6 +25,7 @@ const collections: {[key in ('features' | 'spells' | 'items')]: MacroCollection}
     createEcho: CreateEcho,
     dismissEcho: DismissEcho,
     swapEcho: SwapEcho,
+    test: Test
   },
 
   spells: {

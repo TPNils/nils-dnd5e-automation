@@ -1,0 +1,24 @@
+<div style="white-space: nowrap; width: max-content;">
+  <form autocomplete="off">
+    <table>
+      <thead></thead>
+      <tbody>
+        {{#each targets as |target|}}
+          <tr {{staticValues.moduleName}}-highlight-token="{{target.uuid}}">
+            <td><img src="{{target.img}}" style="width: 28px; height: 28px; border: 0;"/></td>
+            <td>{{target.name}}</td>
+            {{#each target.selected as |selected targetNr|}}
+              <td>
+                <label>
+                  <input type="radio" name="{{targetNr}}" value="{{target.uuid}}" {{#if selected}}checked{{/if}}/>
+                  Target {{targetNr}}
+                </label>
+
+              </td>
+            {{/each}}
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </form>
+</div>
