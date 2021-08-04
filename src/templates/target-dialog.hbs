@@ -1,7 +1,13 @@
 <div style="white-space: nowrap; width: max-content;">
   <form autocomplete="off">
     <table>
-      <thead></thead>
+      <thead>
+        <tr>
+          {{#each headers as |header|}}
+            <th>{{header}}</th>
+          {{/each}}
+        </tr>
+      </thead>
       <tbody>
         {{#each targets as |target|}}
           <tr {{@root.staticValues.moduleName}}-highlight-token="{{target.uuid}}">

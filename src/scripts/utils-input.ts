@@ -24,13 +24,23 @@ interface TargetTemplateData extends TargetOption {
   selected: {index: number, name: string, selected: boolean}[]; // true/false if target x is this target
 }
 
-interface TargetArgs {
+export interface TargetRequest {
   nrOfTargets: number; // How many tokens that should be targeted
   allowSameTarget: boolean; // Can the same token be targeted multiple times
+  scaling?: {
+    type: 'linear-spell',
+    startLevel: number;
+    maxLevel: number;
+  };
   allPossibleTargets: TargetOption[];
 }
 
-type UserInputResponse<T> = {
+export interface TargetResponse {
+  tokenUuids: string[];
+  spellLevel: number | null;
+}
+
+export type UserInputResponse<T> = {
   cancelled: true;
 } | {
   cancelled: false;
@@ -42,15 +52,28 @@ export class UtilsInput {
   /**
    * @returns an array of token UUIDs of the targeted tokens.
    */
-  public static targets(context: MacroContext, args: TargetArgs): Promise<UserInputResponse<string[]>> {
-    if (args.nrOfTargets === context.targetTokenUuids.length) {
-      return Promise.resolve({cancelled: false, data: context.targetTokenUuids});
+  public static targets(context: MacroContext, args: TargetRequest): Promise<UserInputResponse<TargetResponse>> {
+    let targetsToAutoResolve = args.nrOfTargets;
+    if (args.scaling) {
+      switch (args.scaling.type) {
+        case 'linear-spell': {
+          targetsToAutoResolve += Math.max(0, args.scaling.maxLevel - args.scaling.startLevel)
+          break;
+        }
+      }
+    }
+
+    if (context.targetTokenUuids.length === targetsToAutoResolve) {
+      return Promise.resolve({cancelled: false, data: {
+        tokenUuids: context.targetTokenUuids,
+        spellLevel: null
+      }});
     }
 
     return UtilsInput.targetDialog(context.targetTokenUuids, args);
   }
 
-  private static async targetDialog(preselectedTargets: string[], args: TargetArgs): Promise<UserInputResponse<string[]>> {
+  private static async targetDialog(preselectedTargets: string[], args: TargetRequest): Promise<UserInputResponse<TargetResponse>> {
     const fetchedTargets = await Promise.all(args.allPossibleTargets.map(target => fromUuid(target.uuid)))
 
     const targetDocumentMap = new Map<string, TokenDocument>();
@@ -68,10 +91,20 @@ export class UtilsInput {
       }
     }
 
+    let maxNrOfTargets = args.nrOfTargets;
+    if (args.scaling) {
+      switch (args.scaling.type) {
+        case 'linear-spell': {
+          maxNrOfTargets += Math.max(0, args.scaling.maxLevel - args.scaling.startLevel)
+          break;
+        }
+      }
+    }
+
     const targets: TargetTemplateData[] = [];
     for (const possibleTarget of args.allPossibleTargets) {
       const selectedTimes: TargetTemplateData['selected'] = [];
-      for (let i = 0; i < args.nrOfTargets; i++) {
+      for (let i = 0; i < maxNrOfTargets; i++) {
         selectedTimes.push({
           index: i,
           name: String(i+1),
@@ -85,16 +118,30 @@ export class UtilsInput {
         img: token.data.img,
         actorName: game.actors.get(token.data.actorId)?.name,
         selected: selectedTimes
+        // TODO visualize (not) within range
       });
     }
-    console.log({targets, targetDocumentMap})
+
+    const headers: string[] = ['', 'Name'];
+    if (args.scaling && args.scaling.startLevel < args.scaling.maxLevel) {
+      for (let i = 0; i < args.nrOfTargets; i++) {
+        headers.push(`Level ${args.scaling.startLevel}`);
+      }
+      for (let i = args.scaling.startLevel+1; i <= args.scaling.maxLevel; i++) {
+        headers.push(`Level ${i}`);
+      }
+    } else {
+      for (let i = 0; i < maxNrOfTargets; i++) {
+        headers.push(``);
+      }
+    }
 
     const dialogHtml = await renderTemplate(`modules/${staticValues.moduleName}/templates/target-dialog.hbs`, {
       staticValues: staticValues,
       allowSameTarget: args.allowSameTarget,
+      headers: headers,
       targets: targets.sort((a, b) => {
         const actorNameCompare = a.actorName.localeCompare(b.actorName);
-        console.log({a: a.actorName, b: b.actorName, r: actorNameCompare})
         if (actorNameCompare !== 0) {
           return actorNameCompare;
         }
@@ -102,7 +149,7 @@ export class UtilsInput {
       }),
     });
 
-    return new Promise<UserInputResponse<string[]>>((resolve, reject) => {
+    return new Promise<UserInputResponse<TargetResponse>>((resolve, reject) => {
       let submitCalled = false;
       const dialog = new Dialog({
         title: 'Select targets',
@@ -116,7 +163,14 @@ export class UtilsInput {
               formData.forEach((value) => {
                 selectedTokenUuids.push(value.toString());
               });
-              resolve({cancelled: false, data: selectedTokenUuids});
+              const response: TargetResponse = {
+                tokenUuids: selectedTokenUuids,
+                spellLevel: 0
+              };
+              if (args.scaling) {
+                response.spellLevel = args.scaling.startLevel + (Math.max(0, selectedTokenUuids.length - args.nrOfTargets))
+              }
+              resolve({cancelled: false, data: response});
             }
           },
           "cancel": {
