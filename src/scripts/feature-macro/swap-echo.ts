@@ -1,6 +1,6 @@
 import { IMacro } from "../macro";
 import { MacroContext } from "../macro-context";
-import { UtilsDocument } from "../utils-document";
+import { UtilsDocument } from "../utils/utils-document";
 
 export class SwapEcho implements IMacro {
 

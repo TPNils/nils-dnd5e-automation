@@ -1,4 +1,4 @@
-import { MyActor, MyItem } from "./types/fixed-types";
+import { MyActor, MyItem } from "../types/fixed-types";
 
 export class UtilsDocument {
 

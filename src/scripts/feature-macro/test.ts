@@ -1,6 +1,6 @@
 import { IMacro } from "../macro";
 import { MacroContext } from "../macro-context";
-import { UtilsInput } from "../utils-input";
+import { UtilsInput } from "../utils/utils-input";
 
 let calls = 0;
 

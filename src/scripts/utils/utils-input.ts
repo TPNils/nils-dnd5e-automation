@@ -9,8 +9,8 @@
  * amount of targets often scale with level, checking more targets auto scales the level?
  */
 
-import { MacroContext } from "./macro-context";
-import { staticValues } from "./static-values";
+import { MacroContext } from "../macro-context";
+import { staticValues } from "../static-values";
 
 interface TargetOption {
   uuid: string; // the UUID of he token which can be targeted
