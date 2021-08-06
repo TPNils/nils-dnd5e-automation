@@ -1,0 +1,60 @@
+<div style="font-style: normal; font-size: 12px;"
+    data-actor-uuid="{{actor.uuid}}"
+    data-item-uuid="{{item.uuid}}"
+    {{#if item.spell}}data-spell-level="{{item.spell.level}}"{{/if}}
+    {{#if token}}data-token-uuid="{{token.uuid}}"{{/if}}
+  >
+  
+    <div class="card-header" style="padding: 3px 0;border-top: 2px groove #FFFFFF;border-bottom: 2px groove #FFFFFF; display: flex;">
+        <img src="{{item.img}}" title="{{item.name}}" width="36" height="36"/>
+        <h3>{{item.name}}</h3>
+    </div>
+
+    <div class="card-content" style="margin: 5px 0;">
+        {{#if item.description}}
+          {{{item.description}}}
+        {{/if}}
+        {{#if item.materials}}
+          <p><strong>{{ localize "DND5E.RequiredMaterials" }}.</strong> {{item.materials}}</p>
+        {{/if}}
+    </div>
+
+    <div class="card-buttons" style="margin: 5px 0;">
+        {{#if hasAttack}}<button data-action="attack">{{ localize "DND5E.Attack" }}</button>{{/if}}
+
+        {{#if hasDamage}}
+        <button data-action="damage">
+            {{#if isHealing}}{{ localize "DND5E.Healing" }}
+            {{else}}{{localize "DND5E.Damage" }}{{/if}}
+        </button>
+        {{/if}}
+
+        {{#if isVersatile}}
+        <button data-action="versatile">{{ localize "DND5E.Versatile" }}</button>
+        {{/if}}
+
+        {{#if hasSave}}
+        <button data-action="save" data-ability="{{data.save.ability}}">
+            {{ localize "DND5E.SavingThrow" }} {{labels.save}}
+        </button>
+        {{/if}}
+
+        {{#if data.formula}}
+        <button data-action="formula">{{ localize "DND5E.OtherFormula"}}</button>
+        {{/if}}
+
+        {{#if hasAreaTarget}}
+        <button data-action="placeTemplate">{{ localize "DND5E.PlaceTemplate" }}</button>
+        {{/if}}
+
+        {{#if isTool}}
+        <button data-action="toolCheck" data-ability="{{data.ability.value}}">{{ localize "DND5E.Use" }} {{item.name}}</button>
+        {{/if}}
+    </div>
+
+    <footer style="padding: 3px 0 0; border-top: 2px groove #FFF;">
+        {{#each item.properties}}
+          <span style="border-right: 2px groove #FFF;padding: 0 3px 0 0;font-size: 10px;">{{this}}</span>
+        {{/each}}
+    </footer>
+</div>
