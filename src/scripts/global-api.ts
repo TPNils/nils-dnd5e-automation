@@ -9,6 +9,7 @@ import { Test } from "./feature-macro/test";
 import { IMacroConstructor } from "./macro";
 import { MacroContext, macroContextFromArgs } from "./macro-context";
 import { provider } from "./provider/provider";
+import { MagicMissile } from "./spell-macro/magic-missile";
 import { staticValues } from "./static-values";
 
 type MacroCollection = {[key: string]: IMacroConstructor};
@@ -30,7 +31,7 @@ const collections: {[key in ('features' | 'spells' | 'items')]: MacroCollection}
   },
 
   spells: {
-
+    magicMissile: MagicMissile
   },
 
   items: {
