@@ -1,6 +1,7 @@
 import { ChatSpeakerDataProperties } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatSpeakerData";
 import { PropertiesToSource } from "@league-of-foundry-developers/foundry-vtt-types/src/types/helperTypes";
 import { hasPermission } from "./custom-permissions";
+import { DevTools } from "./dev-tools";
 import { CreateEcho } from "./feature-macro/create-echo";
 import { DismissEcho } from "./feature-macro/dismiss-echo";
 import { SwapEcho } from "./feature-macro/swap-echo";
@@ -130,6 +131,9 @@ export function registerHooks(): void {
       game[staticValues.moduleName] = {};
     }
     game[staticValues.moduleName].api = GlobalApi;
+    if (location.hostname === 'localhost') {
+      game[staticValues.moduleName].devTools = DevTools;
+    }
   });
   
   provider.getSocket().then(socket => {
