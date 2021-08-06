@@ -7,7 +7,8 @@
     "package": "gulp package",
     "foundry": "gulp link",
     "watch": "gulp watch",
-    "release": "git checkout master && git pull && git merge dev && git push && git checkout dev"
+    "release": "git checkout master && git pull && git merge dev && git push && git checkout dev",
+    "updateSrcPacks": "gulp updateSrcPacks"
   },
   "author": "TPNils",
   "license": "MIT",
