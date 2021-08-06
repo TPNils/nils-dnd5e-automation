@@ -55,7 +55,7 @@ export class DevTools {
     for (const pack of packs) {
       const compendiumDocumentDatas: MyItem[] = await pack.getDocuments();
       for (const documentData of compendiumDocumentDatas) {
-        if (typeof documentData.getFlag('cf', 'name') === 'string') {
+        if (typeof documentData.data?.flags?.cf?.name === 'string') {
           // Don't import folders from the compendium-folders module
           continue;
         }
