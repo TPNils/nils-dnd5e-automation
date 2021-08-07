@@ -8,8 +8,8 @@ export class UtilsDocument {
     if (document.collectionName === 'Token') {
       document = (document as TokenDocument).actor;
     }
-    if (document.collectionName !== 'Actor') {
-      throw new Error(`UUID '${uuid}' is not an Actor. In stead found: ${document.collectionName}`)
+    if (document.documentName !== (Actor as any).documentName) {
+      throw new Error(`UUID '${uuid}' is not an ${(Actor as any).documentName}. In stead found: ${document.documentName}`)
     }
     return document as any as MyActor;
   }
@@ -22,8 +22,8 @@ export class UtilsDocument {
 
   public static async tokenFromUuid(uuid: string): Promise<TokenDocument> {
     let document = await fromUuid(uuid);
-    if (document.collectionName === 'Token') {
-      throw new Error(`UUID '${uuid}' is not a Token. In stead found: ${document.collectionName}`)
+    if (document.documentName !== (TokenDocument as any).documentName) {
+      throw new Error(`UUID '${uuid}' is not a ${(TokenDocument as any).documentName}. In stead found: ${document.documentName}`)
     }
     return document as TokenDocument;
   }
@@ -36,8 +36,8 @@ export class UtilsDocument {
 
   public static async itemFromUuid(uuid: string): Promise<MyItem> {
     let document = await fromUuid(uuid);
-    if (document.collectionName === 'Item') {
-      throw new Error(`UUID '${uuid}' is not an Item. In stead found: ${document.collectionName}`)
+    if (document.documentName !== (Item as any).documentName) {
+      throw new Error(`UUID '${uuid}' is not an ${(Item as any).documentName}. In stead found: ${document.documentName}`)
     }
     return document as any as MyItem;
   }
