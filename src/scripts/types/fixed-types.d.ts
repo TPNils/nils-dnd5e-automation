@@ -23,6 +23,28 @@ export type MyActorData = {
         saveBonus: number; // Not sure what this is?
       }
     };
+    attributes: {
+      [key: string]: any;
+      ac: {​
+        base?: number;
+        bonus?: number;
+        calc: string;
+        cover?: number;
+        flat?: number;
+        formula?: string;
+        min: number;
+        shield?: number;
+        value: number;
+      };
+      hp: {
+        formula?: string;
+        max: number;
+        min: number;
+        temp: number;
+        tempmax: number;
+        value: number;
+      }
+    }
     bonuses: {
       check: {
         check: string;
