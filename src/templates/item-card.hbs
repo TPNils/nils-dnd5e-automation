@@ -1,16 +1,16 @@
 <div class="{{staticValues.moduleName}}-item-card" style="font-style: normal; font-size: 12px;"
-    data-actor-uuid="{{actor.uuid}}"
-    {{#if token}}data-token-uuid="{{token.uuid}}"{{/if}}
+    data-actor-uuid="{{data.actor.uuid}}"
+    {{#if token}}data-token-uuid="{{data.token.uuid}}"{{/if}}
   >
 
-  {{#each items as |item itemIndex|}}
-    <div data-item-index="{{itemIndex}}">
-      <div class="card-header" style="padding: 3px 0;border-top: 2px groove #FFFFFF;border-bottom: 2px groove #FFFFFF; display: flex;">
+  {{#each data.items as |item itemIndex|}}
+    <div data-{{@root.staticValues.moduleName}}-item-index="{{itemIndex}}">
+      <div style="padding: 3px 0;border-top: 2px groove #FFFFFF;border-bottom: 2px groove #FFFFFF; display: flex;">
         <img src="{{item.img}}" title="{{item.name}}" width="36" height="36"/>
         <h3>{{item.name}}</h3>
       </div>
 
-      <div class="card-content" style="margin: 5px 0;">
+      <div style="margin: 5px 0;">
         {{#if item.description}}
           {{{item.description}}}
         {{/if}}
@@ -19,20 +19,20 @@
         {{/if}}
       </div>
 
-      <div class="card-buttons" style="margin: 5px 0;">
+      <div style="margin: 5px 0;">
         {{#if item.attack}}
           <div>
-            <button data-action="item-attack">{{#if item.attack.label}}{{item.attack.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}</button>
-            <button data-action="item-atack-mode">{{item.mode}}</button>
+            <button data-{{@root.staticValues.moduleName}}-action="item-attack">{{#if item.attack.label}}{{item.attack.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}</button>
+            <button data-{{@root.staticValues.moduleName}}-action="item-atack-mode">{{item.mode}}</button>
           </div>
         {{/if}}
         
         {{#each item.damages as |dmg dmgIndex|}}
-          <button data-action="item-damage-{{dmgIndex}}">{{#if dmg.label}}{{dmg.label}}{{else}}{{localize "DND5E.Damage"}}{{/if}}</button>
+          <button data-{{@root.staticValues.moduleName}}-action="item-damage-{{dmgIndex}}">{{#if dmg.label}}{{dmg.label}}{{else}}{{localize "DND5E.Damage"}}{{/if}}</button>
         {{/each}}
         
         {{#each item.checks as |check checkIndex|}}
-          <button data-action="item-check-{{checkIndex}}">
+          <button data-{{@root.staticValues.moduleName}}-action="item-check-{{checkIndex}}">
             {{#if check.label}}
             {{dmg.label}}
             {{else if check.save}}
@@ -44,7 +44,7 @@
         {{/each}}
 
         {{#if item.template}}
-          <button data-action="item-template">{{ localize "DND5E.PlaceTemplate" }}</button>
+          <button data-{{@root.staticValues.moduleName}}-action="item-template">{{ localize "DND5E.PlaceTemplate" }}</button>
         {{/if}}
       </div>
 

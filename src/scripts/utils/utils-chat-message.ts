@@ -1,6 +1,9 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
+import { data } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
+import { MessageData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/foundry.js/roll";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
+import { UtilsDocument } from "./utils-document";
 
 export interface ItemCardActorData {
   uuid: string;
@@ -64,7 +67,21 @@ export interface ItemCardData {
 
 export class UtilsChatMessage {
 
+  private static readonly actionMatches: Array<{regex: RegExp, execute(regexResult: RegExpExecArray, itemIndex: number, messageId: string, messageData: ItemCardData)}> = [
+    {
+      regex: /item-damage-([0-9]+)/,
+      execute: (regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemDamage(Number(regexResult[1]), itemIndex, messageId, messageData),
+    }
+  ];
+
   private static healingDamageTypes: DamageType[] = ['healing', 'temphp'];
+
+  public static registerHooks(): void {
+    Hooks.on('renderChatLog', () => {
+      const chatElement = document.getElementById('chat-log');
+      chatElement.addEventListener('click', event => UtilsChatMessage.onClick(event));
+    });
+  }
 
   public static async createCard(data: ItemCardData): Promise<ChatMessage> {
     // I expect actor & token to sometimes include the whole actor/token document by accident
@@ -80,7 +97,7 @@ export class UtilsChatMessage {
       }
     }
 
-    const template = await renderTemplate(`modules/${staticValues.moduleName}/templates/item-card.hbs`, data);
+    const template = await UtilsChatMessage.generateTemplate(data);
 
     const chatMessageData: ChatMessageDataConstructorData = {
       content: template,
@@ -246,6 +263,108 @@ export class UtilsChatMessage {
     // TODO template
 
     return itemCardData;
+  }
+
+  private static onClick(event: MouseEvent): void {
+    if (!(event.target instanceof HTMLElement) || !event.target.hasAttribute(`data-${staticValues.moduleName}-action`)) {
+      return;
+    }
+
+    let messageId: string;
+    let itemIndex: number;
+    const path = event.composedPath();
+    for (let i = path.length - 1; i >= 0; i--) {
+      const element = path[i];
+      if (!(element instanceof HTMLElement)) {
+        continue;
+      }
+      if (element.dataset.messageId != null) {
+        messageId = element.dataset.messageId;
+      }
+      if (element.hasAttribute(`data-${staticValues.moduleName}-item-index`)) {
+        itemIndex = Number(element.getAttribute(`data-${staticValues.moduleName}-item-index`));
+      }
+      
+      if (messageId != null && itemIndex != null) {
+        break;
+      }
+    }
+
+    if (messageId == null) {
+      console.warn(`pressed a ${staticValues.moduleName} action button but no message was found`);
+      return;
+    }
+    if (itemIndex == null) {
+      console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} but no item index was found`);
+      return;
+    }
+    
+    const messageData = game.messages.get(messageId).getFlag(staticValues.moduleName, 'data') as ItemCardData;
+    if (messageData == null) {
+      console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} but no data was found`);
+      return;
+    }
+
+    const action = event.target.getAttribute(`data-${staticValues.moduleName}-action`);
+    for (const actionMatch of UtilsChatMessage.actionMatches) {
+      const result = actionMatch.regex.exec(action);
+      if (result) {
+        actionMatch.execute(result, itemIndex, messageId, deepClone(messageData));
+        // Don't break, maybe multiple actions need to be taken (though not used at the time of writing)
+      }
+    }
+  }
+
+  private static async processItemDamage(damageIndex: number, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void> {
+    // If damage was already rolled, do nothing
+    // TODO should create a new card (?)
+    if (messageData.items[itemIndex].damages[damageIndex].rollResults) {
+      return;
+    }
+
+    const rollData = messageData.actor == null ? {} : (await UtilsDocument.actorFromUuid(messageData.actor.uuid)).getRollData();
+    const damageInstance = messageData.items[itemIndex].damages[damageIndex];
+    const damageRolls = await Promise.all(damageInstance.rolls.map(dmgRoll => new Roll(dmgRoll.rollFormula, rollData).roll({async: true})));
+
+    const rollResults: ItemCardData['items'][0]['damages'][0]['rollResults'] = [];
+    for (let i = 0; i < damageRolls.length; i++) {
+      // I assume Promise.all() results keep the same order
+      const damageRollRequest = messageData.items[itemIndex].damages[damageIndex].rolls[i];
+      const damageRollResult = damageRolls[i];
+      const parts: number[] = [];
+      for (const term of damageRollResult.terms as any[]) {
+        if (Array.isArray(term.results)) {
+          for (const result of (term as {results: { result: number }[]}).results) {
+            parts.push(result.result);
+          }
+        } else if (typeof term.number === 'number') {
+          parts.push(term.number);
+        }
+      }
+
+      rollResults.push({
+        damageType: damageRollRequest.damageType,
+        total: damageRollResult.total,
+        parts: parts
+      })
+    }
+    messageData.items[itemIndex].damages[damageIndex].rollResults = rollResults;
+    console.log(rollResults);
+
+    const html = await UtilsChatMessage.generateTemplate(messageData);
+    //const message = game.messages.get(messageId);
+    //await message.setFlag(staticValues.moduleName, 'data', messageData);
+    //ChatMessage.updateDocuments([{
+    //  _id: messageId,
+    //  content: html
+    //}])
+  }
+
+  private static generateTemplate(data: ItemCardData): Promise<string> {
+    return renderTemplate(`modules/${staticValues.moduleName}/templates/item-card.hbs`, {
+      staticValues: staticValues,
+      data: data
+    });
   }
 
 }
