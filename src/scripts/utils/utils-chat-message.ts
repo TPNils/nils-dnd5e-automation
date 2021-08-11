@@ -67,6 +67,19 @@ export class UtilsChatMessage {
   private static healingDamageTypes: DamageType[] = ['healing', 'temphp'];
 
   public static async createCard(data: ItemCardData): Promise<ChatMessage> {
+    // I expect actor & token to sometimes include the whole actor/token document by accident
+    // While I would prefer a full type validation, it is the realistic approach
+    if (data.actor) {
+      data.actor = {
+        uuid: data.actor.uuid
+      }
+    }
+    if (data.token) {
+      data.token = {
+        uuid: data.token.uuid
+      }
+    }
+
     const template = await renderTemplate(`modules/${staticValues.moduleName}/templates/item-card.hbs`, data);
 
     const chatMessageData: ChatMessageDataConstructorData = {
