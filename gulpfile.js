@@ -165,29 +165,32 @@ function buildSASS() {
 		.pipe(gulp.dest('dist'));
 }
 
+const staticCopyFiles = [
+	{from: ['src','lang'], to: ['dist','lang']},
+	{from: ['src','fonts'], to: ['dist','fonts']},
+	{from: ['src','assets'], to: ['dist','assets']},
+	{from: ['src','templates'], to: ['dist','templates']},
+	{from: ['src','module.json'], to: ['dist','module.json']},
+	{from: ['src','system.json'], to: ['dist','system.json']},
+	{from: ['src','template.json'], to: ['dist','template.json']},
+];
+
 /**
  * Copy static files
  */
-async function copyFiles() {
-	const statics = [
-		'lang',
-		'packs',
-		'fonts',
-		'assets',
-		'templates',
-		'module.json',
-		'system.json',
-		'template.json',
-	];
-	try {
-		for (const file of statics) {
-			if (fs.existsSync(path.join('src', file))) {
-				await fs.copy(path.join('src', file), path.join('dist', file));
+function createCopyFiles(copyFiles) {
+	return async () => {
+		const promises = [];
+		for (const file of copyFiles) {
+			if (fs.existsSync(path.join(...file.from))) {
+				if (file.options) {
+					promises.push(fs.copy(path.join(...file.from), path.join(...file.to), file.options));
+				} else {
+					promises.push(fs.copy(path.join(...file.from), path.join(...file.to)));
+				}
 			}
 		}
-		return Promise.resolve();
-	} catch (err) {
-		Promise.reject(err);
+		return await Promise.all(promises);
 	}
 }
 
@@ -195,13 +198,14 @@ async function copyFiles() {
  * Watch for changes for each build step
  */
 function buildWatch() {
+	const copyFiles = [...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs'], options: {override: false}}];
 	gulp.watch('src/**/*.ts', { ignoreInitial: false }, buildTS);
 	gulp.watch('src/**/*.less', { ignoreInitial: false }, buildLess);
 	gulp.watch('src/**/*.scss', { ignoreInitial: false }, buildSASS);
 	gulp.watch(
-		['src/fonts', 'src/lang', 'src/templates', 'src/*.json'],
+		[...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
 		{ ignoreInitial: false },
-		copyFiles
+		createCopyFiles(copyFiles)
 	);
 }
 
@@ -490,9 +494,10 @@ function gitTag() {
 
 const execGit = gulp.series(gitAdd, gitCommit, gitTag);
 
-const execBuild = gulp.parallel(buildTS, buildLess, buildSASS, copyFiles);
+const execBuild = gulp.parallel(buildTS, buildLess, buildSASS, createCopyFiles([...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs']}]));
 
 exports.build = gulp.series(clean, execBuild);
+exports.updateSrcPacks = gulp.parallel(createCopyFiles([{from: ['dist','packs'], to: ['src','packs']}]));
 exports.watch = buildWatch;
 exports.clean = clean;
 exports.link = linkUserData;

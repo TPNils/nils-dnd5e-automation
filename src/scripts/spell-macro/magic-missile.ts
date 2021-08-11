@@ -2,6 +2,7 @@ import { IMacro } from "../macro";
 import { MacroContext } from "../macro-context";
 import { staticValues } from "../static-values";
 import { MyItem } from "../types/fixed-types";
+import { UtilsChatMessage } from "../utils/utils-chat-message";
 import { UtilsDocument } from "../utils/utils-document";
 import { TargetRequest, TargetResponse, UserInputResponse, UtilsInput } from "../utils/utils-input";
 
@@ -91,7 +92,17 @@ export class MagicMissile implements IMacro<MagicMissileData> {
     // TODO item data
     const damageResults = await Promise.all(data.targets.data.tokenUuids.map(() => new Roll(baseDamageFormula).roll({async: true})));
     
-
+    const actor = context.actorUuid == null ? null : (await UtilsDocument.actorFromUuid(context.actorUuid));
+    UtilsChatMessage.createCard({
+      actor: context.actorUuid == null ? null : {uuid: context.actorUuid},
+      token: context.tokenUuid == null ? null : {uuid: context.tokenUuid},
+      items: [
+        UtilsChatMessage.createDefaultItemData({
+          actor: actor,
+          item: item,
+        })
+      ],
+    })
   }
 
   private getItem(context: MacroContext): Promise<MyItem> {

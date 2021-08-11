@@ -53,7 +53,7 @@ export class CreateEcho implements IMacro {
     const originActor = actor.getFlag('world', 'is-echo-of') ? game.actors.get(actor.getFlag('world', 'is-echo-of')) : actor;
     const scene = game.scenes.get(game.user.viewedScene);
     const actorData = JSON.parse(JSON.stringify(originActor.data));
-    let currentSceneToken: Token;
+    let currentSceneToken: TokenDocument;
     for (const sceneToken of scene.data.tokens) {
       if (sceneToken.data.actorId === actorData._id) {
         currentSceneToken = sceneToken;
