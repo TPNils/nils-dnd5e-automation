@@ -5,6 +5,9 @@ const validDamageTypes: DamageType[] = ['' /* none */, 'acid', 'bludgeoning', 'c
 export class UtilsRoll {
 
   public static isValidDamageType(value: any): value is DamageType {
+    if (typeof value === 'string') {
+      value = value.toLowerCase();
+    }
     return validDamageTypes.includes(value);
   }
 
@@ -16,7 +19,7 @@ export class UtilsRoll {
     // TODO can be improved when the first formula is a negative number, don't need to join with a +
     return UtilsRoll.damageFormulaToRoll(parts.map(([formula, damageType]) => {
       if (damageType) {
-        return `${formula}[${damageType}]`
+        return `${formula}[${damageType.toLowerCase()}]`
       } else {
         return formula;
       }
@@ -43,7 +46,7 @@ export class UtilsRoll {
       }
     }
     for (let i = terms.length-1; i >= 0; i--) {
-      const flavor = terms[i].options?.flavor;
+      const flavor = terms[i].options?.flavor?.toLowerCase();
       if (UtilsRoll.isValidDamageType(flavor)) {
         convertToParts();
         latestDamageType = flavor;
@@ -61,7 +64,7 @@ export class UtilsRoll {
     const terms = roll.terms;
     let latestDamageType: DamageType = '';
     for (let i = terms.length-1; i >= 0; i--) {
-      const flavor = terms[i].options?.flavor;
+      const flavor = terms[i].options?.flavor?.toLowerCase();
       if (UtilsRoll.isValidDamageType(flavor)) {
         latestDamageType = flavor;
       }
