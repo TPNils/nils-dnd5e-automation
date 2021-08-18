@@ -1,18 +1,18 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import { data } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
 import { MessageData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/foundry.js/roll";
+import { type } from "os";
+import * as path from "path";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { UtilsDocument } from "./utils-document";
+import { UtilsRoll } from "./utils-roll";
 
 export interface ItemCardActorData {
   uuid: string;
 }
 
-export interface ItemCardRollResult {
-  total: number;
-  parts: number[];
-}
+export type RollJson = ReturnType<Roll['toJSON']>
 
 export interface ItemCardItemData {
   uuid: string;
@@ -27,17 +27,14 @@ export interface ItemCardItemData {
   attack?: {
     label?: string;
     mode: 'normal' | 'advantage' | 'disadavantage';
-    rollBonus: string;
-    rollResult?: ItemCardRollResult;
+    rollBonus: RollJson;
   },
   damages?: {
     label?: string;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
-    rolls: {
-      rollFormula: string;
-      damageType: DamageType;
-    }[];
-    rollResults?: Array<ItemCardRollResult & {damageType: string;}>;
+    roll: RollJson;
+    displayDamageTypes?: string;
+    displayFormula?: string;
   }[];
   checks?: {
     label?: string;
@@ -46,7 +43,7 @@ export interface ItemCardItemData {
     save?: boolean;
     dc: number;
     resultsPerTarget?: {
-      [key: string]: ItemCardRollResult;
+      [key: string]: RollJson;
     }[]
   }[];
   template?: any;
@@ -80,6 +77,14 @@ export class UtilsChatMessage {
     Hooks.on('renderChatLog', () => {
       const chatElement = document.getElementById('chat-log');
       chatElement.addEventListener('click', event => UtilsChatMessage.onClick(event));
+    });
+
+    Hooks.on("init", () => {
+      // register templates parts
+      loadTemplates([
+        'modules/nils-automated-compendium/templates/roll/roll.hbs',
+        'modules/nils-automated-compendium/templates/roll/tooltip.hbs'
+      ]);
     });
   }
 
@@ -124,8 +129,9 @@ export class UtilsChatMessage {
       itemCardData.materials = item.data.data.materials.value
     }
 
+    const rollData = actor == null ? {} : actor.getRollData();
     // attack
-    if (['mwak', 'rwak', 'msak', 'rsak'].includes(item.data.data.actionType)) {
+    if (['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
       const bonus = ['@mod'];
 
       // Proficiantie bonus
@@ -161,39 +167,34 @@ export class UtilsChatMessage {
 
       itemCardData.attack = {
         mode: 'normal',
-        rollBonus: bonus.join(' + '),
+        rollBonus: new Roll(bonus.join(' + '), rollData).toJSON(),
       };
     }
 
     // damage    
     {
+      const inputDamages: Array<Omit<ItemCardItemData['damages'][0], 'damageTypes' | 'displayFormula'>> = [];
       // Main damage
       const damageParts = item.data.data.damage?.parts;
-      let mainDamage: ItemCardItemData['damages'][0];
+      let mainDamage: typeof inputDamages[0];
       if (damageParts && damageParts.length > 0) {
-        itemCardData.damages = itemCardData.damages || [];
         mainDamage = {
-          rolls: damageParts.map(part => {
-            return {
-              rollFormula: part[0],
-              damageType: part[1]
-            }
-          }),
+          roll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON()
         }
         // Consider it healing if all damage types are healing
-        const isHealing = mainDamage.rolls.filter(roll => UtilsChatMessage.healingDamageTypes.includes(roll.damageType)).length === mainDamage.rolls.length;
+        const isHealing = damageParts.filter(roll => UtilsChatMessage.healingDamageTypes.includes(roll[1])).length === damageParts.length;
         if (isHealing) {
           mainDamage.label = game.i18n.localize('DND5E.Healing');
         }
-        itemCardData.damages.push(mainDamage);
+        inputDamages.push(mainDamage);
       }
 
       // Versatile damage
       if (mainDamage && item.data.data.damage?.versatile) {
         const versatileDamage = deepClone(mainDamage);
         versatileDamage.label = game.i18n.localize('DND5E.Versatile');
-        versatileDamage.rolls[0].rollFormula = item.data.data.damage?.versatile;
-        itemCardData.damages.push(versatileDamage);
+        versatileDamage.roll = new Roll(item.data.data.damage.versatile, rollData).toJSON();
+        inputDamages.push(versatileDamage);
       }
   
       // Spell scaling
@@ -213,40 +214,58 @@ export class UtilsChatMessage {
         applyScalingXTimes = Math.floor((actorLevel + 1) / 6);
       }
       if (applyScalingXTimes > 0) {
-        const scalingRollFormula = new Roll(scaling.formula).alter(applyScalingXTimes, 0, {multiplyNumeric: true}).formula;
+        const scalingRollFormula = new Roll(scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true}).formula;
   
-        itemCardData.damages = itemCardData.damages || [];
-        if (itemCardData.damages.length === 0) {
+        if (inputDamages.length === 0) {
           // when only dealing damage by upcasting? not sure if that ever happens
-          itemCardData.damages.push({
-            rolls: [{
-              rollFormula: scalingRollFormula,
-              damageType: ''
-            }]
+          inputDamages.push({
+            roll: new Roll(scalingRollFormula, rollData).toJSON()
           });
         } else {
-          for (const damage of itemCardData.damages) {
-            damage.rolls.push({
-              rollFormula: scalingRollFormula,
-              damageType: damage.rolls[0].damageType
-            });
+          for (const damage of inputDamages) {
+            const originalDamageParts = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(damage.roll)));
+            const damageType: DamageType = originalDamageParts.length > 0 ? originalDamageParts[0][1] : ''
+            const scalingParts = UtilsRoll.damageFormulaToDamageParts(scalingRollFormula);
+            for (const part of scalingParts) {
+              if (part[1] === '') {
+                // Copy the first original damage type when a type is missing
+                part[1] = damageType;
+              }
+            }
+            
+            damage.roll = UtilsRoll.damagePartsToRoll([...originalDamageParts, ...scalingParts], rollData).toJSON();
           }
         }
       }
       
       // Add damage bonus formula
-      if (itemCardData.damages) {
+      if (inputDamages.length > 0) {
         const actorBonus = actor.data.data.bonuses?.[item.data.data.actionType];
         if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
-          for (const damage of itemCardData.damages) {
-            damage.rolls.push({
-              rollFormula: actorBonus.damage,
-              damageType: damage.rolls[0].damageType
-            })
+          for (const damage of inputDamages) {
+            const originalDamageParts = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(damage.roll)));
+            const damageType: DamageType = originalDamageParts.length > 0 ? originalDamageParts[0][1] : ''
+            damage.roll = UtilsRoll.damagePartsToRoll([...originalDamageParts, [String(actorBonus.damage), damageType]], rollData).toJSON();
           }
         }
       }
 
+      itemCardData.damages = inputDamages.map(damage => {
+        let displayFormula = damage.roll.formula;
+        const damageTypes: DamageType[] = [];
+        for (const damageType of UtilsRoll.getValidDamageTypes()) {
+          if (displayFormula.match(`\\[${damageType}\\]`)) {
+            damageTypes.push(damageType);
+            displayFormula = displayFormula.replace(new RegExp(`\\[${damageType}\\]`, 'g'), '');
+          }
+        }
+
+        return {
+          ...damage,
+          displayFormula: displayFormula,
+          displayDamageTypes: damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined
+        };
+      })
       
     }
 
@@ -261,6 +280,7 @@ export class UtilsChatMessage {
     }
 
     // TODO template
+    console.log(itemCardData);
 
     return itemCardData;
   }
@@ -318,46 +338,23 @@ export class UtilsChatMessage {
   private static async processItemDamage(damageIndex: number, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void> {
     // If damage was already rolled, do nothing
     // TODO should create a new card (?)
-    if (messageData.items[itemIndex].damages[damageIndex].rollResults) {
+    const roll = messageData.items[itemIndex].damages[damageIndex].roll;
+    if (roll.evaluated) {
       return;
     }
 
-    const rollData = messageData.actor == null ? {} : (await UtilsDocument.actorFromUuid(messageData.actor.uuid)).getRollData();
-    const damageInstance = messageData.items[itemIndex].damages[damageIndex];
-    const damageRolls = await Promise.all(damageInstance.rolls.map(dmgRoll => new Roll(dmgRoll.rollFormula, rollData).roll({async: true})));
-
-    const rollResults: ItemCardData['items'][0]['damages'][0]['rollResults'] = [];
-    for (let i = 0; i < damageRolls.length; i++) {
-      // I assume Promise.all() results keep the same order
-      const damageRollRequest = messageData.items[itemIndex].damages[damageIndex].rolls[i];
-      const damageRollResult = damageRolls[i];
-      const parts: number[] = [];
-      for (const term of damageRollResult.terms as any[]) {
-        if (Array.isArray(term.results)) {
-          for (const result of (term as {results: { result: number }[]}).results) {
-            parts.push(result.result);
-          }
-        } else if (typeof term.number === 'number') {
-          parts.push(term.number);
-        }
-      }
-
-      rollResults.push({
-        damageType: damageRollRequest.damageType,
-        total: damageRollResult.total,
-        parts: parts
-      })
-    }
-    messageData.items[itemIndex].damages[damageIndex].rollResults = rollResults;
-    console.log(rollResults);
+    messageData.items[itemIndex].damages[damageIndex].roll = (await Roll.fromJSON(JSON.stringify(roll)).roll({async: true})).toJSON();
 
     const html = await UtilsChatMessage.generateTemplate(messageData);
-    //const message = game.messages.get(messageId);
-    //await message.setFlag(staticValues.moduleName, 'data', messageData);
-    //ChatMessage.updateDocuments([{
-    //  _id: messageId,
-    //  content: html
-    //}])
+    ChatMessage.updateDocuments([{
+      _id: messageId,
+      content: html,
+      flags: {
+        [staticValues.moduleName]: {
+          data: messageData
+        }
+      }
+    }])
   }
 
   private static generateTemplate(data: ItemCardData): Promise<string> {

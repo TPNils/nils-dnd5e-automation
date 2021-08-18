@@ -1,0 +1,10 @@
+<div class="dice-roll">
+    {{#if flavor}}
+    <div class="dice-flavor" style="text-align: center;">{{flavor}}</div>
+    {{/if}}
+    <div class="dice-result">
+        <div class="dice-formula">{{#if overrideFormula}}{{overrideFormula}}{{else}}{{roll.formula}}{{/if}}</div>
+        {{> modules/nils-automated-compendium/templates/roll/tooltip.hbs terms=roll.terms}}
+        <h4 class="dice-total">{{roll.total}}</h4>
+    </div>
+</div>

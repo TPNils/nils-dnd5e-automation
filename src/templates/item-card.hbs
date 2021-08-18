@@ -28,7 +28,11 @@
         {{/if}}
         
         {{#each item.damages as |dmg dmgIndex|}}
-          <button data-{{@root.staticValues.moduleName}}-action="item-damage-{{dmgIndex}}">{{#if dmg.label}}{{dmg.label}}{{else}}{{localize "DND5E.Damage"}}{{/if}}</button>
+          {{#if dmg.roll.evaluated}}
+            {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=dmg.displayDamageTypes overrideFormula=dmg.displayFormula roll=dmg.roll}}
+          {{else}}
+            <button data-{{@root.staticValues.moduleName}}-action="item-damage-{{dmgIndex}}">{{#if dmg.label}}{{dmg.label}}{{else}}{{localize "DND5E.Damage"}}{{/if}}</button>
+          {{/if}}
         {{/each}}
         
         {{#each item.checks as |check checkIndex|}}
