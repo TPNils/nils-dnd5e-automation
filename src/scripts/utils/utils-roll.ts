@@ -15,7 +15,7 @@ export class UtilsRoll {
     return [...validDamageTypes];
   }
 
-  public static damagePartsToRoll(parts: MyItemData['data']['damage']['parts']): Roll {
+  public static damagePartsToRoll(parts: MyItemData['data']['damage']['parts'], rollData?: any): Roll {
     // TODO can be improved when the first formula is a negative number, don't need to join with a +
     return UtilsRoll.damageFormulaToRoll(parts.map(([formula, damageType]) => {
       if (damageType) {
@@ -23,11 +23,15 @@ export class UtilsRoll {
       } else {
         return formula;
       }
-    }).join(' + '));
+    }).join(' + '), rollData);
   }
 
-  public static damageFormulaToRoll(damageFormula: string): Roll {
-    return new Roll(damageFormula);
+  public static damageFormulaToRoll(damageFormula: string, rollData?: any): Roll {
+    return new Roll(damageFormula, rollData);
+  }
+
+  public static damageFormulaToDamageParts(formula: string): MyItemData['data']['damage']['parts'] {
+    return UtilsRoll.rollToDamageParts(new Roll(formula));
   }
 
   public static rollToDamageParts(roll: Roll): MyItemData['data']['damage']['parts'] {
