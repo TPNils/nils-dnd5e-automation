@@ -64,15 +64,15 @@ export class UtilsChatMessage {
   private static readonly actionMatches: Array<{regex: RegExp, execute(event: MouseEvent, regexResult: RegExpExecArray, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData>}> = [
     {
       regex: /^item-damage-([0-9]+)$/,
-      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemDamage(event, Number(regexResult[1]), itemIndex, messageId, messageData),
+      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemDamage(event, Number(regexResult[1]), itemIndex, messageData),
     },
     {
       regex: /^item-attack$/,
-      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemAttack(event, null, itemIndex, messageId, messageData),
+      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemAttack(event, itemIndex, messageData),
     },
     {
       regex: /^item-attack-mode$/,
-      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemToggleAttackMode(event, null, itemIndex, messageId, messageData),
+      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemToggleAttackMode(event, itemIndex, messageData),
     },
   ];
 
@@ -285,7 +285,6 @@ export class UtilsChatMessage {
     }
 
     // TODO template
-    console.log(itemCardData);
 
     return itemCardData;
   }
@@ -352,9 +351,8 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async processItemAttack(event: MouseEvent, data: any, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttack(event: MouseEvent, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items[itemIndex].attack;
-    console.log(attack)
     // TODO allow to roll adv/disadv after a normal roll was made (?)
     if (attack.evaluatedRoll) {
       // If attack was already rolled, do nothing
@@ -382,12 +380,11 @@ export class UtilsChatMessage {
     }
 
     attack.evaluatedRoll = (await new Roll(parts.join(' + ')).roll({async: true})).toJSON();
-    console.log(attack);
 
     return messageData;
   }
 
-  private static async processItemToggleAttackMode(event: MouseEvent, data: any, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemToggleAttackMode(event: MouseEvent, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items[itemIndex].attack;
     if (attack.evaluatedRoll) {
       return;
@@ -408,7 +405,7 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async processItemDamage(event: MouseEvent, damageIndex: number, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemDamage(event: MouseEvent, damageIndex: number, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     // If damage was already rolled, do nothing
     // TODO should create a new card (?)
     const roll = messageData.items[itemIndex].damages[damageIndex].roll;
