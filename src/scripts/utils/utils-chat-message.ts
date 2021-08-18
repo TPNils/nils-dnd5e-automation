@@ -1,11 +1,7 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
-import { data } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
-import { MessageData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/foundry.js/roll";
-import { type } from "os";
 import * as path from "path";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
-import { UtilsDocument } from "./utils-document";
 import { UtilsRoll } from "./utils-roll";
 
 export interface ItemCardActorData {
@@ -26,8 +22,9 @@ export interface ItemCardItemData {
   }[];
   attack?: {
     label?: string;
-    mode: 'normal' | 'advantage' | 'disadavantage';
-    rollBonus: RollJson;
+    mode: 'normal' | 'advantage' | 'disadvantage';
+    rollBonus?: string;
+    evaluatedRoll?: RollJson
   },
   damages?: {
     label?: string;
@@ -64,11 +61,19 @@ export interface ItemCardData {
 
 export class UtilsChatMessage {
 
-  private static readonly actionMatches: Array<{regex: RegExp, execute(regexResult: RegExpExecArray, itemIndex: number, messageId: string, messageData: ItemCardData)}> = [
+  private static readonly actionMatches: Array<{regex: RegExp, execute(event: MouseEvent, regexResult: RegExpExecArray, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData>}> = [
     {
-      regex: /item-damage-([0-9]+)/,
-      execute: (regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemDamage(Number(regexResult[1]), itemIndex, messageId, messageData),
-    }
+      regex: /^item-damage-([0-9]+)$/,
+      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemDamage(event, Number(regexResult[1]), itemIndex, messageId, messageData),
+    },
+    {
+      regex: /^item-attack$/,
+      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemAttack(event, null, itemIndex, messageId, messageData),
+    },
+    {
+      regex: /^item-attack-mode$/,
+      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemToggleAttackMode(event, null, itemIndex, messageId, messageData),
+    },
   ];
 
   private static healingDamageTypes: DamageType[] = ['healing', 'temphp'];
@@ -134,14 +139,14 @@ export class UtilsChatMessage {
     if (['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
       const bonus = ['@mod'];
 
-      // Proficiantie bonus
+      // Proficienty bonus
       if (item.data.data.proficient) {
         bonus.push('@prof')
       }
 
       // Item bonus
       if (item.data.data.attackBonus) {
-        bonus.push(String(item.data.data.actionBonus));
+        bonus.push(String(item.data.data.attackBonus));
       }
 
       // Actor bonus
@@ -167,7 +172,7 @@ export class UtilsChatMessage {
 
       itemCardData.attack = {
         mode: 'normal',
-        rollBonus: new Roll(bonus.join(' + '), rollData).toJSON(),
+        rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
       };
     }
 
@@ -285,7 +290,7 @@ export class UtilsChatMessage {
     return itemCardData;
   }
 
-  private static onClick(event: MouseEvent): void {
+  private static async onClick(event: MouseEvent): Promise<void> {
     if (!(event.target instanceof HTMLElement) || !event.target.hasAttribute(`data-${staticValues.moduleName}-action`)) {
       return;
     }
@@ -329,13 +334,81 @@ export class UtilsChatMessage {
     for (const actionMatch of UtilsChatMessage.actionMatches) {
       const result = actionMatch.regex.exec(action);
       if (result) {
-        actionMatch.execute(result, itemIndex, messageId, deepClone(messageData));
+        const response = await actionMatch.execute(event, result, itemIndex, messageId, deepClone(messageData));
+        if (response) {
+          const html = await UtilsChatMessage.generateTemplate(response);
+          ChatMessage.updateDocuments([{
+            _id: messageId,
+            content: html,
+            flags: {
+              [staticValues.moduleName]: {
+                data: response
+              }
+            }
+          }])
+        }
         // Don't break, maybe multiple actions need to be taken (though not used at the time of writing)
       }
     }
   }
 
-  private static async processItemDamage(damageIndex: number, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void> {
+  private static async processItemAttack(event: MouseEvent, data: any, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+    const attack = messageData.items[itemIndex].attack;
+    console.log(attack)
+    // TODO allow to roll adv/disadv after a normal roll was made (?)
+    if (attack.evaluatedRoll) {
+      // If attack was already rolled, do nothing
+      // TODO should create a new card (?)
+      return;
+    }
+    
+    let baseRoll: string;
+    switch (attack.mode) {
+      case 'advantage': {
+        baseRoll = '2d20kh';
+        break;
+      }
+      case 'disadvantage': {
+        baseRoll = '2d20dl';
+        break;
+      }
+      default: {
+        baseRoll = '1d20';
+      }
+    }
+    const parts: string[] = [baseRoll];
+    if (attack.rollBonus) {
+      parts.push(attack.rollBonus);
+    }
+
+    attack.evaluatedRoll = (await new Roll(parts.join(' + ')).roll({async: true})).toJSON();
+    console.log(attack);
+
+    return messageData;
+  }
+
+  private static async processItemToggleAttackMode(event: MouseEvent, data: any, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+    const attack = messageData.items[itemIndex].attack;
+    if (attack.evaluatedRoll) {
+      return;
+    }
+    if (event.shiftKey) {
+      attack.mode = 'advantage';
+    } else if (event.ctrlKey) {
+      attack.mode = 'disadvantage';
+    } else {
+      const order: Array<typeof attack.mode> = ['normal', 'advantage', 'disadvantage'];
+      if (order.length === order.indexOf(attack.mode) + 1) {
+        attack.mode = order[0];
+      } else {
+        attack.mode = order[order.indexOf(attack.mode) + 1];
+      }
+    }
+
+    return messageData;
+  }
+
+  private static async processItemDamage(event: MouseEvent, damageIndex: number, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData> {
     // If damage was already rolled, do nothing
     // TODO should create a new card (?)
     const roll = messageData.items[itemIndex].damages[damageIndex].roll;
@@ -345,16 +418,7 @@ export class UtilsChatMessage {
 
     messageData.items[itemIndex].damages[damageIndex].roll = (await Roll.fromJSON(JSON.stringify(roll)).roll({async: true})).toJSON();
 
-    const html = await UtilsChatMessage.generateTemplate(messageData);
-    ChatMessage.updateDocuments([{
-      _id: messageId,
-      content: html,
-      flags: {
-        [staticValues.moduleName]: {
-          data: messageData
-        }
-      }
-    }])
+    return messageData;
   }
 
   private static generateTemplate(data: ItemCardData): Promise<string> {

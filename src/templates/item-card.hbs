@@ -21,10 +21,16 @@
 
       <div style="margin: 5px 0;">
         {{#if item.attack}}
-          <div>
-            <button data-{{@root.staticValues.moduleName}}-action="item-attack">{{#if item.attack.label}}{{item.attack.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}</button>
-            <button data-{{@root.staticValues.moduleName}}-action="item-atack-mode">{{item.mode}}</button>
-          </div>
+          {{#if item.attack.evaluatedRoll}}
+            <div>
+              {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=item.attack.mode roll=item.attack.evaluatedRoll}}
+            </div>
+          {{else}}
+            <div style="display: flex;">
+              <button data-{{@root.staticValues.moduleName}}-action="item-attack">{{#if item.attack.label}}{{item.attack.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}</button>
+              <button data-{{@root.staticValues.moduleName}}-action="item-attack-mode" style="color: {{#if (eq item.attack.mode 'disadvantage')}}red{{else if (eq item.attack.mode 'advantage')}}green{{/if}};">{{item.attack.mode}}</button>
+            </div>
+          {{/if}}
         {{/if}}
         
         {{#each item.damages as |dmg dmgIndex|}}

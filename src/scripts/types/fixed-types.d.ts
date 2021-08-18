@@ -93,7 +93,7 @@ export type MyItemData = {
     [key: string]: any;
     ability: '' /* default */ | keyof MyActorData['data']['abilities'];
     actionType?: 'mwak' | 'rwak' | 'msak' | 'rsak' | 'save' | 'heal' | 'abil' | 'util' | 'other';
-    attackBonus?: number;
+    attackBonus?: number | string;
     consume: {
       type?: 'ammo' | 'attribute' | 'material' | 'charges';
       target?: string;
