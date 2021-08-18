@@ -1,16 +1,16 @@
-<div class="{{staticValues.moduleName}}-item-card" style="font-style: normal; font-size: 12px;"
+<div class="{{@root.staticValues.moduleName}}-item-card"
     data-actor-uuid="{{data.actor.uuid}}"
     {{#if token}}data-token-uuid="{{data.token.uuid}}"{{/if}}
   >
 
   {{#each data.items as |item itemIndex|}}
     <div data-{{@root.staticValues.moduleName}}-item-index="{{itemIndex}}">
-      <div style="padding: 3px 0;border-top: 2px groove #FFFFFF;border-bottom: 2px groove #FFFFFF; display: flex;">
+      <div class="{{@root.staticValues.moduleName}}-header">
         <img src="{{item.img}}" title="{{item.name}}" width="36" height="36"/>
-        <h3>{{item.name}}</h3>
+        <h3 class="{{@root.staticValues.moduleName}}-item-name">{{item.name}}</h3>
       </div>
 
-      <div style="margin: 5px 0;">
+      <div class="{{@root.staticValues.moduleName}}-section">
         {{#if item.description}}
           {{{item.description}}}
         {{/if}}
@@ -19,7 +19,7 @@
         {{/if}}
       </div>
 
-      <div style="margin: 5px 0;">
+      <div class="{{@root.staticValues.moduleName}}-section">
         {{#if item.attack}}
           {{#if item.attack.evaluatedRoll}}
             <div>
@@ -58,11 +58,11 @@
         {{/if}}
       </div>
 
-      <footer style="padding: 3px 0 0; border-top: 2px groove #FFF;">
+      <div class="{{@root.staticValues.moduleName}}-footer">
         {{#each item.properties}}
-          <span style="border-right: 2px groove #FFF;padding: 0 3px 0 0;font-size: 10px;">{{this}}</span>
+          <span>{{this}}</span>
         {{/each}}
-      </footer>
+      </div>
     </div>
   {{/each}}
   

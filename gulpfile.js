@@ -152,7 +152,7 @@ function buildTS() {
  * Build Less
  */
 function buildLess() {
-	return gulp.src('src/*.less').pipe(less()).pipe(gulp.dest('dist'));
+	return gulp.src('src/styles/*.less').pipe(less()).pipe(gulp.dest('dist/styles'));
 }
 
 /**
@@ -160,9 +160,9 @@ function buildLess() {
  */
 function buildSASS() {
 	return gulp
-		.src('src/*.scss')
+		.src('src/styles/*.scss')
 		.pipe(sass().on('error', sass.logError))
-		.pipe(gulp.dest('dist'));
+		.pipe(gulp.dest('dist/styles'));
 }
 
 const staticCopyFiles = [
