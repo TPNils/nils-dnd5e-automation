@@ -72,8 +72,8 @@ export class UtilsChatMessage {
       execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemAttack(event, itemIndex, messageData),
     },
     {
-      regex: /^item-attack-mode$/,
-      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemToggleAttackMode(event, itemIndex, messageData),
+      regex: /^item-attack-mode-(minus|plus)$/,
+      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemNextAttackMode(event, itemIndex, regexResult, messageData),
     },
   ];
 
@@ -296,12 +296,13 @@ export class UtilsChatMessage {
   }
 
   private static async onClick(event: MouseEvent): Promise<void> {
-    if (!(event.target instanceof HTMLElement) || !event.target.hasAttribute(`data-${staticValues.moduleName}-action`)) {
+    if (!(event.target instanceof HTMLElement)) {
       return;
     }
 
     let messageId: string;
     let itemIndex: number;
+    let action: string;
     const path = event.composedPath();
     for (let i = path.length - 1; i >= 0; i--) {
       const element = path[i];
@@ -314,12 +315,18 @@ export class UtilsChatMessage {
       if (element.hasAttribute(`data-${staticValues.moduleName}-item-index`)) {
         itemIndex = Number(element.getAttribute(`data-${staticValues.moduleName}-item-index`));
       }
+      if (element.hasAttribute(`data-${staticValues.moduleName}-action`)) {
+        action = element.getAttribute(`data-${staticValues.moduleName}-action`);
+      }
       
-      if (messageId != null && itemIndex != null) {
+      if (messageId != null && itemIndex != null && action != null) {
         break;
       }
     }
 
+    if (!action) {
+      return;
+    }
     if (messageId == null) {
       console.warn(`pressed a ${staticValues.moduleName} action button but no message was found`);
       return;
@@ -335,7 +342,6 @@ export class UtilsChatMessage {
       return;
     }
 
-    const action = event.target.getAttribute(`data-${staticValues.moduleName}-action`);
     for (const actionMatch of UtilsChatMessage.actionMatches) {
       const result = actionMatch.regex.exec(action);
       if (result) {
@@ -390,24 +396,79 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async processItemToggleAttackMode(event: MouseEvent, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemNextAttackMode(event: MouseEvent, itemIndex: number, regexResult: RegExpExecArray, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items[itemIndex].attack;
     if (attack.evaluatedRoll) {
+      return UtilsChatMessage.processItemPostAttackMode(event, itemIndex, regexResult, messageData);
+    }
+    let modifier = regexResult[1] === 'plus' ? 1 : -1;
+    if (event.shiftKey && modifier > 0) {
+      modifier++;
+    } else if (event.shiftKey && modifier < 0) {
+      modifier--;
+    }
+    
+    const order: Array<typeof attack.mode> = ['disadvantage', 'normal', 'advantage'];
+    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(attack.mode) + modifier));
+    if (attack.mode !== order[newIndex]) {
+      attack.mode = order[newIndex];
+      return messageData;
+    }
+  }
+
+  private static async processItemPostAttackMode(event: MouseEvent, itemIndex: number, regexResult: RegExpExecArray, messageData: ItemCardData): Promise<void | ItemCardData> {
+    const attack = messageData.items[itemIndex].attack;
+    if (!attack.evaluatedRoll) {
       return;
     }
-    if (event.shiftKey) {
-      attack.mode = 'advantage';
-    } else if (event.ctrlKey) {
-      attack.mode = 'disadvantage';
+    // TODO revert back to normal without losing the 2nd roll?
+    attack.mode = regexResult[1] === 'plus' ? 'advantage' : 'disadvantage';
+    const d20 = await new Roll('1d20').roll({async: true});
+    const terms = Roll.fromJSON(JSON.stringify(attack.evaluatedRoll)).terms;
+    const d20Term: any = terms[0];
+    if (d20Term.number < 2) {
+      d20Term.number = 2;
+      d20Term.results.push({result: d20.total, active: true});
+    }
+    
+    if (attack.mode === 'advantage') {
+      d20Term.modifiers = d20Term.modifiers ? [...d20Term.modifiers.filter(mod => mod !== 'kl' && mod !== 'kh'), 'kh'] : ['kh'];
+      let highestResult;
+      for (const result of d20Term.results) {
+        if (!highestResult || highestResult.result <= result.result) {
+          highestResult = result;
+        }
+      }
+
+      delete highestResult.discarded;
+      highestResult.active = true;
+      
+      for (const result of d20Term.results) {
+        if (result !== highestResult) {
+          result.active = false;
+          result.discarded = true;
+        }
+      }
     } else {
-      const order: Array<typeof attack.mode> = ['normal', 'advantage', 'disadvantage'];
-      if (order.length === order.indexOf(attack.mode) + 1) {
-        attack.mode = order[0];
-      } else {
-        attack.mode = order[order.indexOf(attack.mode) + 1];
+      d20Term.modifiers = d20Term.modifiers ? [...d20Term.modifiers.filter(mod => mod !== 'kl' && mod !== 'kh'), 'kl'] : ['kl'];
+      let lowestResult;
+      for (const result of d20Term.results) {
+        if (!lowestResult || lowestResult.result >= result.result) {
+          lowestResult = result;
+        }
+      }
+
+      delete lowestResult.discarded;
+      lowestResult.active = true;
+      
+      for (const result of d20Term.results) {
+        if (result !== lowestResult) {
+          result.active = false;
+          result.discarded = true;
+        }
       }
     }
-
+    attack.evaluatedRoll = Roll.fromTerms(terms).toJSON();
     return messageData;
   }
 
