@@ -2,6 +2,7 @@ import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/fo
 import * as path from "path";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
+import { UtilsDiceSoNice } from "./utils-dice-so-nice";
 import { UtilsRoll } from "./utils-roll";
 
 export interface ItemCardActorData {
@@ -391,7 +392,9 @@ export class UtilsChatMessage {
       parts.push(attack.rollBonus);
     }
 
-    attack.evaluatedRoll = (await new Roll(parts.join(' + ')).roll({async: true})).toJSON();
+    const roll = await new Roll(parts.join(' + ')).roll({async: true});
+    UtilsDiceSoNice.showRoll({roll: roll});
+    attack.evaluatedRoll = roll.toJSON();
 
     return messageData;
   }
@@ -440,6 +443,7 @@ export class UtilsChatMessage {
     const targetDiceNumber = attack.mode === 'normal' ? 1 : 2;
     while (d20Term.number < targetDiceNumber) {
       const d20 = await new Roll('1d20').roll({async: true});
+      UtilsDiceSoNice.showRoll({roll: d20});
       d20Term.number++;
       d20Term.results.push({result: d20.total, active: true});
     }
@@ -502,7 +506,9 @@ export class UtilsChatMessage {
       return;
     }
 
-    messageData.items[itemIndex].damages[damageIndex].roll = (await Roll.fromJSON(JSON.stringify(roll)).roll({async: true})).toJSON();
+    const dmgRoll = await Roll.fromJSON(JSON.stringify(roll)).roll({async: true});
+    UtilsDiceSoNice.showRoll({roll: dmgRoll});
+    messageData.items[itemIndex].damages[damageIndex].roll = dmgRoll.toJSON();
 
     return messageData;
   }
