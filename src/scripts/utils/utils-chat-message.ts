@@ -46,7 +46,8 @@ export interface ItemCardItemData {
   template?: any;
   spell?: {
     level: number;
-  }
+  },
+  properties?: string[];
 }
 
 export interface ItemCardTokenData {
@@ -132,6 +133,11 @@ export class UtilsChatMessage {
     }
     if (item.data.data.materials.value) {
       itemCardData.materials = item.data.data.materials.value
+    }
+
+    {
+      const chatData = item.getChatData();
+      itemCardData.properties = chatData.properties;
     }
 
     const rollData = actor == null ? {} : actor.getRollData();

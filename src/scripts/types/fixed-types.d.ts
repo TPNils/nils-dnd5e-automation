@@ -140,6 +140,7 @@ export type MyItemData = {
 }
 
 export type MyItem = Item & BaseDocument<MyItemData> & {
+  getChatData: () => any;
   pack?: string;
 };
 
