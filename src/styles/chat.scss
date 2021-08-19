@@ -5,7 +5,7 @@
     font-style: normal;
     font-size: 12px;
 
-    .dice-flavor {
+    .#{$module-name}-flavor {
       text-align: center;
     }
 
@@ -27,15 +27,14 @@
       }
     }
     
-    .#{$module-name}-attack-wrapper {
-      position: relative;
+    .#{$module-name}-attack,
+    .#{$module-name}-first-dmg {
       flex-grow: 1;
       flex-basis: 0;
     }
     
-    .#{$module-name}-first-dmg {
-      flex-grow: 1;
-      flex-basis: 0;
+    .#{$module-name}-attack-wrapper {
+      position: relative;
     }
     
     :hover [data-#{$module-name}-action="item-attack-mode-minus"], 
@@ -64,17 +63,17 @@
     [data-#{$module-name}-action="item-attack-mode-minus"],
     [data-#{$module-name}-action="item-post-attack-mode-minus"] {
       color: red;
-      top: 50%;
+      top: 3px;
       left: 0;
-      transform: translate(25%, -50%);
+      transform: translate(25%, 0);
     }
 
     [data-#{$module-name}-action="item-attack-mode-plus"],
     [data-#{$module-name}-action="item-post-attack-mode-plus"] {
       color: green;
-      top: 50%;
+      top: 3px;
       right: 0;
-      transform: translate(-25%, -50%);
+      transform: translate(-25%, 0);
     }
 
     .#{$module-name}-attack-mode-disadvantage [data-#{$module-name}-action="item-attack-mode-minus"],
