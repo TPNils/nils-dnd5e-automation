@@ -74,7 +74,7 @@ export class UtilsChatMessage {
     },
     {
       regex: /^item-attack-mode-(minus|plus)$/,
-      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemNextAttackMode(event, itemIndex, regexResult, messageData),
+      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemAttackMode(event, itemIndex, regexResult, messageData),
     },
   ];
 
@@ -366,7 +366,6 @@ export class UtilsChatMessage {
 
   private static async processItemAttack(event: MouseEvent, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items[itemIndex].attack;
-    // TODO allow to roll adv/disadv after a normal roll was made (?)
     if (attack.evaluatedRoll) {
       // If attack was already rolled, do nothing
       // TODO should create a new card (?)
@@ -399,32 +398,8 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async processItemNextAttackMode(event: MouseEvent, itemIndex: number, regexResult: RegExpExecArray, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttackMode(event: MouseEvent, itemIndex: number, regexResult: RegExpExecArray, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items[itemIndex].attack;
-    if (attack.evaluatedRoll) {
-      return UtilsChatMessage.processItemPostAttackMode(event, itemIndex, regexResult, messageData);
-    }
-    let modifier = regexResult[1] === 'plus' ? 1 : -1;
-    if (event.shiftKey && modifier > 0) {
-      modifier++;
-    } else if (event.shiftKey && modifier < 0) {
-      modifier--;
-    }
-    
-    const order: Array<typeof attack.mode> = ['disadvantage', 'normal', 'advantage'];
-    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(attack.mode) + modifier));
-    if (attack.mode !== order[newIndex]) {
-      attack.mode = order[newIndex];
-      return messageData;
-    }
-  }
-
-  private static async processItemPostAttackMode(event: MouseEvent, itemIndex: number, regexResult: RegExpExecArray, messageData: ItemCardData): Promise<void | ItemCardData> {
-    const attack = messageData.items[itemIndex].attack;
-    if (!attack.evaluatedRoll) {
-      return;
-    }
-    
     let modifier = regexResult[1] === 'plus' ? 1 : -1;
     if (event.shiftKey && modifier > 0) {
       modifier++;
@@ -438,6 +413,10 @@ export class UtilsChatMessage {
       return;
     }
     attack.mode = order[newIndex];
+    if (!attack.evaluatedRoll) {
+      return messageData;
+    }
+
     const terms = Roll.fromJSON(JSON.stringify(attack.evaluatedRoll)).terms;
     const d20Term: any = terms[0];
     const targetDiceNumber = attack.mode === 'normal' ? 1 : 2;
