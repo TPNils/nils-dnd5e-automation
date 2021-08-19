@@ -421,13 +421,26 @@ export class UtilsChatMessage {
     if (!attack.evaluatedRoll) {
       return;
     }
-    // TODO revert back to normal without losing the 2nd roll?
-    attack.mode = regexResult[1] === 'plus' ? 'advantage' : 'disadvantage';
-    const d20 = await new Roll('1d20').roll({async: true});
+    
+    let modifier = regexResult[1] === 'plus' ? 1 : -1;
+    if (event.shiftKey && modifier > 0) {
+      modifier++;
+    } else if (event.shiftKey && modifier < 0) {
+      modifier--;
+    }
+    
+    const order: Array<typeof attack.mode> = ['disadvantage', 'normal', 'advantage'];
+    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(attack.mode) + modifier));
+    if (attack.mode === order[newIndex]) {
+      return;
+    }
+    attack.mode = order[newIndex];
     const terms = Roll.fromJSON(JSON.stringify(attack.evaluatedRoll)).terms;
     const d20Term: any = terms[0];
-    if (d20Term.number < 2) {
-      d20Term.number = 2;
+    const targetDiceNumber = attack.mode === 'normal' ? 1 : 2;
+    while (d20Term.number < targetDiceNumber) {
+      const d20 = await new Roll('1d20').roll({async: true});
+      d20Term.number++;
       d20Term.results.push({result: d20.total, active: true});
     }
     
@@ -449,7 +462,7 @@ export class UtilsChatMessage {
           result.discarded = true;
         }
       }
-    } else {
+    } else if (attack.mode === 'disadvantage') {
       d20Term.modifiers = d20Term.modifiers ? [...d20Term.modifiers.filter(mod => mod !== 'kl' && mod !== 'kh'), 'kl'] : ['kl'];
       let lowestResult;
       for (const result of d20Term.results) {
@@ -466,6 +479,15 @@ export class UtilsChatMessage {
           result.active = false;
           result.discarded = true;
         }
+      }
+    } else {
+      d20Term.modifiers = d20Term.modifiers ? [...d20Term.modifiers.filter(mod => mod !== 'kl' && mod !== 'kh')] : [];
+      delete d20Term.results[0].discarded;
+      d20Term.results[0].active = true;
+
+      for (let i = 1; i < d20Term.results.length; i++) {
+        d20Term.results[i].active = false;
+        d20Term.results[i].discarded = true;
       }
     }
     attack.evaluatedRoll = Roll.fromTerms(terms).toJSON();
