@@ -16,6 +16,7 @@ const sass = require('gulp-sass');
 const git = require('gulp-git');
 const sourcemaps = require('gulp-sourcemaps');
 
+const exec = require('child_process').exec;
 const argv = require('yargs').argv;
 
 sass.compiler = require('sass');
@@ -198,6 +199,7 @@ function createCopyFiles(copyFilesArg) {
  * Watch for changes for each build step
  */
 function buildWatch() {
+	startFoundry();
 	const copyFiles = [...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs'], options: {override: false}}];
 	gulp.watch('src/**/*.ts', { ignoreInitial: false }, buildTS);
 	gulp.watch('src/**/*.less', { ignoreInitial: false }, buildLess);
@@ -495,6 +497,24 @@ function gitTag() {
 const execGit = gulp.series(gitAdd, gitCommit, gitTag);
 
 const execBuild = gulp.parallel(buildTS, buildLess, buildSASS, createCopyFiles([...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs']}]));
+
+function startFoundry() {
+	if (!fs.existsSync('foundryconfig.json')) {
+		console.warn('Could not start foundry: foundryconfig.json not found in project root');
+		return;
+	}
+	const config = fs.readJSONSync('foundryconfig.json');
+	if (!config.dataPath) {
+		console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
+	}
+	if (!config.foundryPath) {
+		console.warn('Could not start foundry: foundryconfig.json is missing the property "foundryPath"');
+	}
+
+	const cmd = `node "${path.join(config.foundryPath, 'resources', 'app', 'main.js')}" --dataPath="${config.dataPath}"`;
+	console.log('starting foundry: ', cmd)
+	exec(cmd);
+}
 
 exports.build = gulp.series(clean, execBuild);
 exports.updateSrcPacks = gulp.parallel(createCopyFiles([{from: ['dist','packs'], to: ['src','packs']}]));
