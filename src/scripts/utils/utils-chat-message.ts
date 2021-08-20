@@ -341,7 +341,11 @@ export class UtilsChatMessage {
       return;
     }
     
-    const messageData = game.messages.get(messageId).getFlag(staticValues.moduleName, 'data') as ItemCardData;
+    const message = game.messages.get(messageId);
+    if (!message.isAuthor && !game.user.isGM) {
+      return;
+    }
+    const messageData = message.getFlag(staticValues.moduleName, 'data') as ItemCardData;
     if (messageData == null) {
       console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} but no data was found`);
       return;
@@ -375,6 +379,8 @@ export class UtilsChatMessage {
       // TODO should create a new card (?)
       return;
     }
+
+    // Re-evaluate the targets, the user may have 
     
     let baseRoll: string;
     switch (attack.mode) {
