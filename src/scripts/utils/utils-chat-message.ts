@@ -394,11 +394,13 @@ export class UtilsChatMessage {
     for (const actionMatch of UtilsChatMessage.actionMatches) {
       const result = actionMatch.regex.exec(action);
       if (result) {
+        const log = document.querySelector("#chat-log");
+        const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
         let response = await actionMatch.execute(event, result, itemIndex, messageId, deepClone(messageData));
         if (response) {
           response = await UtilsChatMessage.calculateTargetResult(response);
           const html = await UtilsChatMessage.generateTemplate(response);
-          ChatMessage.updateDocuments([{
+          await ChatMessage.updateDocuments([{
             _id: messageId,
             content: html,
             flags: {
@@ -406,7 +408,10 @@ export class UtilsChatMessage {
                 data: response
               }
             }
-          }])
+          }]);
+          if (isAtBottom) {
+            (ui.chat as any).scrollBottom();
+          }
         }
         // Don't break, maybe multiple actions need to be taken (though not used at the time of writing)
       }
