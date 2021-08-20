@@ -52,7 +52,7 @@ export class UtilsInput {
   /**
    * @returns an array of token UUIDs of the targeted tokens.
    */
-  public static targets(context: MacroContext, args: TargetRequest): Promise<UserInputResponse<TargetResponse>> {
+  public static targets(targetTokenUuids: string[], args: TargetRequest): Promise<UserInputResponse<TargetResponse>> {
     let targetsToAutoResolve = args.nrOfTargets;
     if (args.scaling) {
       switch (args.scaling.type) {
@@ -63,14 +63,14 @@ export class UtilsInput {
       }
     }
 
-    if (context.targetTokenUuids.length === targetsToAutoResolve) {
+    if (targetTokenUuids.length === targetsToAutoResolve) {
       return Promise.resolve({cancelled: false, data: {
-        tokenUuids: context.targetTokenUuids,
+        tokenUuids: targetTokenUuids,
         spellLevel: null
       }});
     }
 
-    return UtilsInput.targetDialog(context.targetTokenUuids, args);
+    return UtilsInput.targetDialog(targetTokenUuids, args);
   }
 
   private static async targetDialog(preselectedTargets: string[], args: TargetRequest): Promise<UserInputResponse<TargetResponse>> {

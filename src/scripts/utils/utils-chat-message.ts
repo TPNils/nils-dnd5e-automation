@@ -1,8 +1,10 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import * as path from "path";
 import { staticValues } from "../static-values";
-import { DamageType, MyActor, MyItem } from "../types/fixed-types";
+import { DamageType, MyActor, MyActorData, MyItem } from "../types/fixed-types";
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
+import { UtilsDocument } from "./utils-document";
+import { UtilsInput } from "./utils-input";
 import { UtilsRoll } from "./utils-roll";
 
 export interface ItemCardActorData {
@@ -20,9 +22,20 @@ export interface ItemCardItemData {
   targets?: {
     uuid: string;
     ac: number;
+    img?: string;
+    name?: string;
     hpSnapshot: {
       hp: number;
-      temp: number;
+      temp?: number;
+    },
+    result: {
+      hit?: boolean;
+      dmg?: {
+        rawDmg: number;
+        calcDmg: number;
+        calcHp: number;
+        calcTemp: number;
+      },
     }
   }[];
   attack?: {
@@ -300,6 +313,33 @@ export class UtilsChatMessage {
     return itemCardData;
   }
 
+  public static async setTargets(itemCardItemData: ItemCardItemData, targetUuids: string[]): Promise<ItemCardItemData> {
+    const tokenMap = new Map<string, TokenDocument>();
+    for (const token of await UtilsDocument.tokensFromUuid(targetUuids, {deduplciate: true})) {
+      tokenMap.set(token.uuid, token);
+    }
+    
+    itemCardItemData.targets = [];
+    for (const targetUuid of targetUuids) {
+      const token = tokenMap.get(targetUuid);
+      const actor = token.getActor() as MyActor;
+      itemCardItemData.targets.push({
+        uuid: targetUuid,
+        ac: actor.data.data.attributes.ac.value,
+        img: token.data.img,
+        name: token.data.name,
+        hpSnapshot: {
+          hp: actor.data.data.attributes.hp.value,
+          temp: actor.data.data.attributes.hp.temp
+        },
+        result: {}
+      });
+    }
+    itemCardItemData.targets = itemCardItemData.targets.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    return itemCardItemData;
+  }
+
   private static async onClick(event: MouseEvent): Promise<void> {
     if (!(event.target instanceof HTMLElement)) {
       return;
@@ -354,8 +394,9 @@ export class UtilsChatMessage {
     for (const actionMatch of UtilsChatMessage.actionMatches) {
       const result = actionMatch.regex.exec(action);
       if (result) {
-        const response = await actionMatch.execute(event, result, itemIndex, messageId, deepClone(messageData));
+        let response = await actionMatch.execute(event, result, itemIndex, messageId, deepClone(messageData));
         if (response) {
+          response = await UtilsChatMessage.calculateTargetResult(response);
           const html = await UtilsChatMessage.generateTemplate(response);
           ChatMessage.updateDocuments([{
             _id: messageId,
@@ -373,15 +414,55 @@ export class UtilsChatMessage {
   }
 
   private static async processItemAttack(event: MouseEvent, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
-    const attack = messageData.items[itemIndex].attack;
-    if (attack.evaluatedRoll) {
+    if (messageData.items[itemIndex].attack.evaluatedRoll) {
       // If attack was already rolled, do nothing
       // TODO should create a new card (?)
       return;
     }
 
-    // Re-evaluate the targets, the user may have 
+    // Re-evaluate the targets, the user may have changed targets
+    const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
+
+    // Assume targets did not changes when non are selected at this time
+    if (currentTargetUuids.size !== 0) {
+      const itemTargetUuids = new Set<string>();
+      if (messageData.items[itemIndex].targets) {
+        for (const target of messageData.items[itemIndex].targets) {
+          itemTargetUuids.add(target.uuid);
+        }
+      }
+
+      let targetsChanged = itemTargetUuids.size !== currentTargetUuids.size;
+      
+      if (!targetsChanged) {
+        for (const uuid of itemTargetUuids.values()) {
+          if (!currentTargetUuids.has(uuid)) {
+            targetsChanged = true;
+            break;
+          }
+        }
+      }
+
+      if (targetsChanged) {
+        const response = await UtilsInput.targets(Array.from(currentTargetUuids), {
+          nrOfTargets: messageData.items[itemIndex].targets == null ? 0 : messageData.items[itemIndex].targets.length,
+          allowSameTarget: true, // TODO
+          allPossibleTargets: game.scenes.get(game.user.viewedScene).getEmbeddedCollection('Token').map(token => {
+            return {
+              uuid: (token as any).uuid,
+              type: 'within-range'
+            }
+          }),
+        });
+
+        if (response.cancelled == true) {
+          return;
+        }
+        messageData.items[itemIndex] = await UtilsChatMessage.setTargets(messageData.items[itemIndex], response.data.tokenUuids)
+      }
+    }
     
+    const attack = messageData.items[itemIndex].attack;
     let baseRoll: string;
     switch (attack.mode) {
       case 'advantage': {
@@ -484,6 +565,7 @@ export class UtilsChatMessage {
       }
     }
     attack.evaluatedRoll = Roll.fromTerms(terms).toJSON();
+
     return messageData;
   }
 
@@ -498,6 +580,78 @@ export class UtilsChatMessage {
     const dmgRoll = await Roll.fromJSON(JSON.stringify(roll)).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: dmgRoll});
     messageData.items[itemIndex].damages[damageIndex].roll = dmgRoll.toJSON();
+
+    return messageData;
+  }
+
+  private static async calculateTargetResult(messageData: ItemCardData): Promise<ItemCardData> {
+    const items = messageData.items.filter(item => item.targets?.length);
+
+    // Prepare data
+    const rawHealthModByTargetUuid = new Map<string, number>();
+    const calculatedHealthModByTargetUuid = new Map<string, number>();
+    for (const item of items) {
+      for (const target of item.targets) {
+        target.result = {};
+        rawHealthModByTargetUuid.set(target.uuid, 0);
+        calculatedHealthModByTargetUuid.set(target.uuid, 0);
+      }
+    }
+
+    // Calculate
+    for (const item of items) {
+      // Attack
+      if (item.attack?.evaluatedRoll) {
+        const attackResult = item.attack.evaluatedRoll.total;
+        for (const target of item.targets) {
+          target.result.hit = target.ac <= attackResult;
+        }
+      }
+      // Include when no attack has happend (null) and when hit (true)
+      const hitTargets = item.targets.filter(target => target.result.hit !== false);
+
+      // TODO saving throw
+
+      // Damage
+      const evaluatedDamageRolls = item.damages ? item.damages.filter(dmg => dmg.roll.evaluated) : [];
+      if (hitTargets.length > 0 && evaluatedDamageRolls.length > 0) {
+        for (const damage of evaluatedDamageRolls) {
+          const damageResults = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(damage.roll)));
+          for (const target of hitTargets) {
+            for (const [dmgType, dmg] of damageResults.entries()) {
+              if (UtilsChatMessage.healingDamageTypes.includes(dmgType)) {
+                rawHealthModByTargetUuid.set(target.uuid, rawHealthModByTargetUuid.get(target.uuid) + damage.roll.total);
+                calculatedHealthModByTargetUuid.set(target.uuid, calculatedHealthModByTargetUuid.get(target.uuid) + damage.roll.total);
+              } else {
+                rawHealthModByTargetUuid.set(target.uuid, rawHealthModByTargetUuid.get(target.uuid) - damage.roll.total);
+                // TODO resistances
+                calculatedHealthModByTargetUuid.set(target.uuid, calculatedHealthModByTargetUuid.get(target.uuid) - damage.roll.total);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Apply damage
+    for (const item of items) {
+      for (const target of item.targets) {
+        const rawHealthMod = rawHealthModByTargetUuid.get(target.uuid);
+        let calcHealthMod = calculatedHealthModByTargetUuid.get(target.uuid);
+        let calcHp = Number(target.hpSnapshot.hp);
+        let calcTemp = Number(target.hpSnapshot.temp);
+        let calcTempDmg = Math.min(0, calcTemp - calcHealthMod);
+        calcTemp -= calcTempDmg;
+        calcHp = Math.max(0, calcHp + (calcHealthMod - calcTempDmg));
+        
+        target.result.dmg = {
+          rawDmg: -rawHealthMod,
+          calcDmg: -calcHealthMod,
+          calcHp: calcHp,
+          calcTemp: calcTemp,
+        }
+      }
+    }
 
     return messageData;
   }

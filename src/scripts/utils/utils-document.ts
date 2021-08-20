@@ -14,7 +14,10 @@ export class UtilsDocument {
     return document as any as MyActor;
   }
 
-  public static actorsFromUuid(uuids: string[]): Promise<MyActor[]> {
+  public static actorsFromUuid(uuids: string[], options: {deduplciate?: boolean} = {}): Promise<MyActor[]> {
+    if (options.deduplciate) {
+      uuids = Array.from(new Set<string>(uuids));
+    }
     return Promise.all(uuids.map(tokenUuid => {
       return UtilsDocument.actorFromUuid(tokenUuid);
     }));
@@ -28,7 +31,10 @@ export class UtilsDocument {
     return document as TokenDocument;
   }
 
-  public static tokensFromUuid(uuids: string[]): Promise<TokenDocument[]> {
+  public static tokensFromUuid(uuids: string[], options: {deduplciate?: boolean} = {}): Promise<TokenDocument[]> {
+    if (options.deduplciate) {
+      uuids = Array.from(new Set<string>(uuids));
+    }
     return Promise.all(uuids.map(tokenUuid => {
       return UtilsDocument.tokenFromUuid(tokenUuid);
     }));
@@ -42,7 +48,10 @@ export class UtilsDocument {
     return document as any as MyItem;
   }
 
-  public static itemsFromUuid(uuids: string[]): Promise<MyItem[]> {
+  public static itemsFromUuid(uuids: string[], options: {deduplciate?: boolean} = {}): Promise<MyItem[]> {
+    if (options.deduplciate) {
+      uuids = Array.from(new Set<string>(uuids));
+    }
     return Promise.all(uuids.map(tokenUuid => {
       return UtilsDocument.itemFromUuid(tokenUuid);
     }));

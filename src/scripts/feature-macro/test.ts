@@ -7,7 +7,7 @@ let calls = 0;
 export class Test implements IMacro {
 
   public async macroData(context: MacroContext): Promise<any> {
-    return UtilsInput.targets(context, {
+    return UtilsInput.targets(context.targetTokenUuids, {
       nrOfTargets: 3,
       allowSameTarget: calls++ % 2 == 1,
       allPossibleTargets: game.scenes.get(game.user.viewedScene).getEmbeddedCollection('Token').map(token => {

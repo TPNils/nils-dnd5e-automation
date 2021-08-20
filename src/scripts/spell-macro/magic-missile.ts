@@ -66,7 +66,7 @@ export class MagicMissile implements IMacro<MagicMissileData> {
     }
 
     return {
-      targets: await UtilsInput.targets(context, targetRequest)
+      targets: await UtilsInput.targets(context.targetTokenUuids, targetRequest)
     };
   }
   
@@ -93,16 +93,16 @@ export class MagicMissile implements IMacro<MagicMissileData> {
     const damageResults = await Promise.all(data.targets.data.tokenUuids.map(() => new Roll(baseDamageFormula).roll({async: true})));
     
     const actor = context.actorUuid == null ? null : (await UtilsDocument.actorFromUuid(context.actorUuid));
+    const itemCardData = UtilsChatMessage.createDefaultItemData({
+      actor: actor,
+      item: item,
+    });
+    UtilsChatMessage.setTargets(itemCardData, data.targets.data.tokenUuids);
     UtilsChatMessage.createCard({
       actor: context.actorUuid == null ? null : {uuid: context.actorUuid},
       token: context.tokenUuid == null ? null : {uuid: context.tokenUuid},
-      items: [
-        UtilsChatMessage.createDefaultItemData({
-          actor: actor,
-          item: item,
-        })
-      ],
-    })
+      items: [itemCardData],
+    });
   }
 
   private getItem(context: MacroContext): Promise<MyItem> {

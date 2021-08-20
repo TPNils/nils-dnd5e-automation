@@ -31,7 +31,7 @@ export class FireBolt implements IMacro<FireBoltData> {
     };
 
     return {
-      targets: await UtilsInput.targets(context, targetRequest)
+      targets: await UtilsInput.targets(context.targetTokenUuids, targetRequest)
     };
   }
   
@@ -44,16 +44,16 @@ export class FireBolt implements IMacro<FireBoltData> {
     const item = await this.getItem(context);
     
     const actor = context.actorUuid == null ? null : (await UtilsDocument.actorFromUuid(context.actorUuid));
+    const itemCardData = UtilsChatMessage.createDefaultItemData({
+      actor: actor,
+      item: item,
+    });
+    UtilsChatMessage.setTargets(itemCardData, data.targets.data.tokenUuids);
     UtilsChatMessage.createCard({
       actor: context.actorUuid == null ? null : {uuid: context.actorUuid},
       token: context.tokenUuid == null ? null : {uuid: context.tokenUuid},
-      items: [
-        UtilsChatMessage.createDefaultItemData({
-          actor: actor,
-          item: item,
-        })
-      ],
-    })
+      items: [itemCardData],
+    });
   }
 
   private getItem(context: MacroContext): Promise<MyItem> {
