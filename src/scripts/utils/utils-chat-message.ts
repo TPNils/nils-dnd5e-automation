@@ -20,6 +20,10 @@ export interface ItemCardItemData {
   targets?: {
     uuid: string;
     ac: number;
+    hpSnapshot: {
+      hp: number;
+      temp: number;
+    }
   }[];
   attack?: {
     label?: string;
@@ -379,7 +383,7 @@ export class UtilsChatMessage {
         break;
       }
       case 'disadvantage': {
-        baseRoll = '2d20dl';
+        baseRoll = '2d20kl';
         break;
       }
       default: {
