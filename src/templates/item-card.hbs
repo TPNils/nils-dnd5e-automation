@@ -118,7 +118,7 @@
               <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
               <td>{{target.name}}</td>
               <td>{{target.hpSnapshot.hp}}{{#if target.hpSnapshot.temp}}[{{target.hpSnapshot.temp}}]{{/if}}</td>
-              <td>{{target.dmg.calcHp}}{{#if target.dmg.temp}}[{{target.dmg.calcTemp}}]{{/if}}</td>
+              <td>{{target.dmg.calcHp}}{{#if target.hpSnapshot.temp}}{{#if target.dmg.calcTemp}}[{{target.dmg.calcTemp}}]{{/if}}{{/if}}</td>
             </tr>
           {{/each}}
         </tbody>

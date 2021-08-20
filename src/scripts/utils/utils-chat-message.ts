@@ -693,9 +693,15 @@ export class UtilsChatMessage {
         let calcHp = Number(aggregate.hpSnapshot.hp);
         let calcTemp = Number(aggregate.hpSnapshot.temp);
         let calcDmg = Math.min(aggregate.dmg.calcDmg, calcHp + calcTemp);
-        let calcTempDmg = Math.min(0, calcTemp + calcDmg);
+        let calcTempDmg = Math.min(calcTemp, calcDmg);
+        console.log({
+          calcHp,
+          calcTemp,
+          calcDmg,
+          calcTempDmg,
+        })
         calcTemp -= calcTempDmg;
-        calcHp = Math.max(0, calcHp + ((-calcDmg) - calcTempDmg));
+        calcHp = Math.max(0, calcHp - (calcDmg - calcTempDmg));
         
         aggregate.dmg = {
           rawDmg: aggregate.dmg.rawDmg,
