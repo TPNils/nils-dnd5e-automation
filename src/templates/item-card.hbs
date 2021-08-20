@@ -99,7 +99,7 @@
               <tr>
                 <th style="width: 30px;"></th>
                 <th>Name</th>
-                <th style="width: 40px;">HP</th>
+                <th style="width: 30px;">HP</th>
                 {{#if item.attack}}
                 <th style="width: 30px;">Hit</th>
                 {{/if}}
@@ -115,11 +115,11 @@
                   {{#if item.attack}}
                     <td>
                       {{#if item.attack.evaluatedRoll}}
-                      {{#if target.result.hit}}
-                        Hit
-                      {{else}}
-                        MIS
-                      {{/if}}
+                        {{#if target.result.hit}}
+                          <i class="fas fa-check" style="color: green;"></i>
+                        {{else}}
+                          <i class="fas fa-times" style="color: red;"></i>
+                        {{/if}}
                       {{/if}}
                     </td>
                   {{/if}}
