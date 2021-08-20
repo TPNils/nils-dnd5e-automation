@@ -75,7 +75,7 @@ export interface ItemCardData {
   items: ItemCardItemData[];
   token?: ItemCardTokenData;
   targetAggregate?: {
-    targetUuid: string;
+    uuid: string;
     img?: string;
     name?: string;
     hpSnapshot: {
@@ -105,6 +105,14 @@ export class UtilsChatMessage {
     {
       regex: /^item-attack-mode-(minus|plus)$/,
       execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemAttackMode(event, itemIndex, regexResult, messageData),
+    },
+    {
+      regex: /^apply-damage-([a-zA-Z0-9\.]+)$/,
+      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.applyDamage(regexResult[1], messageData, messageId),
+    },
+    {
+      regex: /^undo-damage-([a-zA-Z0-9\.]+)$/,
+      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.undoDamage(regexResult[1], messageData, messageId),
     },
   ];
 
@@ -359,7 +367,7 @@ export class UtilsChatMessage {
     }
 
     let messageId: string;
-    let itemIndex: number;
+    let itemIndex: number | null = null;
     let action: string;
     const path = event.composedPath();
     for (let i = path.length - 1; i >= 0; i--) {
@@ -389,16 +397,12 @@ export class UtilsChatMessage {
       console.warn(`pressed a ${staticValues.moduleName} action button but no message was found`);
       return;
     }
-    if (itemIndex == null) {
-      console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} but no item index was found`);
-      return;
-    }
     
     const message = game.messages.get(messageId);
     if (!message.isAuthor && !game.user.isGM) {
       return;
     }
-    const messageData = message.getFlag(staticValues.moduleName, 'data') as ItemCardData;
+    let messageData = message.getFlag(staticValues.moduleName, 'data') as ItemCardData;
     if (messageData == null) {
       console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} but no data was found`);
       return;
@@ -413,6 +417,7 @@ export class UtilsChatMessage {
         if (response) {
           response = await UtilsChatMessage.calculateTargetResult(response);
           const html = await UtilsChatMessage.generateTemplate(response);
+          messageData = response;
           await ChatMessage.updateDocuments([{
             _id: messageId,
             content: html,
@@ -601,6 +606,72 @@ export class UtilsChatMessage {
 
     return messageData;
   }
+  
+  private static async applyDamage(tokenUuid: string, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
+    if (!messageData.targetAggregate) {
+      return;
+    }
+    let tokenResponse: ItemCardData['targetAggregate'][0];
+    for (const aggregate of messageData.targetAggregate) {
+      if (aggregate.uuid === tokenUuid) {
+        tokenResponse = aggregate;
+      }
+    }
+    if (!tokenResponse) {
+      console.warn(`Could not find an aggregate for token "${tokenUuid}" with messageId "${messageId}"`);
+      return;
+    }
+    const token = await UtilsDocument.tokenFromUuid(tokenUuid);
+    const actor = token.getActor() as MyActor;
+
+    CONFIG.Actor.documentClass.updateDocuments([{
+      _id: actor.id,
+      data: {
+        attributes: {
+          hp: {
+            value: tokenResponse.dmg.calcHp,
+            temp: tokenResponse.dmg.calcTemp,
+          }
+        }
+      }
+    }], {
+      parent: actor.parent,
+      pack: actor.pack,
+    });
+  }
+  
+  private static async undoDamage(tokenUuid: string, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
+    if (!messageData.targetAggregate) {
+      return;
+    }
+    let tokenResponse: ItemCardData['targetAggregate'][0];
+    for (const aggregate of messageData.targetAggregate) {
+      if (aggregate.uuid === tokenUuid) {
+        tokenResponse = aggregate;
+      }
+    }
+    if (!tokenResponse) {
+      console.warn(`Could not find an aggregate for token "${tokenUuid}" with messageId "${messageId}"`);
+      return;
+    }
+    const token = await UtilsDocument.tokenFromUuid(tokenUuid);
+    const actor = token.getActor() as MyActor;
+
+    CONFIG.Actor.documentClass.updateDocuments([{
+      _id: actor.id,
+      data: {
+        attributes: {
+          hp: {
+            value: tokenResponse.hpSnapshot.hp,
+            temp: tokenResponse.hpSnapshot.temp,
+          }
+        }
+      }
+    }], {
+      parent: actor.parent,
+      pack: actor.pack,
+    });
+  }
 
   private static async calculateTargetResult(messageData: ItemCardData): Promise<ItemCardData> {
     const items = messageData.items.filter(item => item.targets?.length);
@@ -664,7 +735,7 @@ export class UtilsChatMessage {
         if (target.result.dmg) {
           if (!aggregates.get(target.uuid)) {
             aggregates.set(target.uuid, {
-              targetUuid: target.uuid,
+              uuid: target.uuid,
               hpSnapshot: target.hpSnapshot,
               name: target.name,
               img: target.img,

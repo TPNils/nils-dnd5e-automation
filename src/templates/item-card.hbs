@@ -110,6 +110,7 @@
             <th>Name</th>
             <th style="width: 30px;">HP</th>
             <th style="width: 40px;">Result</th>
+            <th style="width: 50px;">{{! actions }}</th>
           </tr>
         </thead>
         <tbody>
@@ -119,6 +120,12 @@
               <td>{{target.name}}</td>
               <td>{{target.hpSnapshot.hp}}{{#if target.hpSnapshot.temp}}[{{target.hpSnapshot.temp}}]{{/if}}</td>
               <td>{{target.dmg.calcHp}}{{#if target.hpSnapshot.temp}}{{#if target.dmg.calcTemp}}[{{target.dmg.calcTemp}}]{{/if}}{{/if}}</td>
+              <td class="{{@root.staticValues.moduleName}}-target-actions">
+                <div style="display: flex;">
+                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-{{target.uuid}}"><i class="fas fa-check"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-{{target.uuid}}"><i class="fas fa-undo"></i></button>
+                </div>
+              </td>
             </tr>
           {{/each}}
         </tbody>

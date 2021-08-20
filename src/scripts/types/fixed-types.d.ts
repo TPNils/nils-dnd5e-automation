@@ -146,6 +146,9 @@ export type MyItem = Item & BaseDocument<MyItemData> & {
 
 export type MyActor = Actor & BaseDocument<MyActorData> & {
   items: Map<string, MyItem>;
+  parent: any;
+  pack: any;
+  update(data: any, context?: any);
 }
 
 export type MyCompendiumCollection = CompendiumCollection & BaseDocument<CompendiumCollection.Metadata>;
