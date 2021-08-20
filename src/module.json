@@ -16,7 +16,7 @@
   "manifest": "",
   "download": "",
   "type": "module",
-  "styles": ["styles/chat.css"],
+  "styles": ["styles/chat.css", "styles/global-variables.css"],
   "esmodules": [
     "scripts/main.js"
   ],

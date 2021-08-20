@@ -1,1 +1,12 @@
 $module-name: nils-automated-compendium;
+
+.#{$module-name}-gm-secret {
+  background: rgba(53, 0, 121, 0.05);
+  border-top: 1px solid #666;
+  border-bottom: 1px solid #666;
+}
+
+.#{$module-name}-gm-secret:before {
+  content: "GM Secret";
+  color: #312b31;
+}
