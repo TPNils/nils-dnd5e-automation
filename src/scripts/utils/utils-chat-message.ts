@@ -33,9 +33,7 @@ export interface ItemCardItemData {
       dmg?: {
         rawDmg: number;
         calcDmg: number;
-        calcHp: number;
-        calcTemp: number;
-      },
+      }
     }
   }[];
   attack?: {
@@ -76,6 +74,21 @@ export interface ItemCardData {
   actor?: ItemCardActorData;
   items: ItemCardItemData[];
   token?: ItemCardTokenData;
+  targetAggregate?: {
+    targetUuid: string;
+    img?: string;
+    name?: string;
+    hpSnapshot: {
+      hp: number;
+      temp?: number;
+    },
+    dmg?: {
+      rawDmg: number;
+      calcDmg: number;
+      calcHp: number;
+      calcTemp: number;
+    },
+  }[]
 }
 
 export class UtilsChatMessage {
@@ -593,11 +606,13 @@ export class UtilsChatMessage {
     const items = messageData.items.filter(item => item.targets?.length);
 
     // Prepare data
+    const tokenUuidToName = new Map<string, string>();
     const rawHealthModByTargetUuid = new Map<string, number>();
     const calculatedHealthModByTargetUuid = new Map<string, number>();
     for (const item of items) {
       for (const target of item.targets) {
         target.result = {};
+        tokenUuidToName.set(target.uuid, target.name || '');
         rawHealthModByTargetUuid.set(target.uuid, 0);
         calculatedHealthModByTargetUuid.set(target.uuid, 0);
       }
@@ -625,33 +640,66 @@ export class UtilsChatMessage {
           for (const target of hitTargets) {
             for (const [dmgType, dmg] of damageResults.entries()) {
               if (UtilsChatMessage.healingDamageTypes.includes(dmgType)) {
-                rawHealthModByTargetUuid.set(target.uuid, rawHealthModByTargetUuid.get(target.uuid) + damage.roll.total);
-                calculatedHealthModByTargetUuid.set(target.uuid, calculatedHealthModByTargetUuid.get(target.uuid) + damage.roll.total);
+                target.result.dmg = {
+                  rawDmg: -dmg,
+                  calcDmg: -dmg,
+                }
               } else {
-                rawHealthModByTargetUuid.set(target.uuid, rawHealthModByTargetUuid.get(target.uuid) - damage.roll.total);
                 // TODO resistances
-                calculatedHealthModByTargetUuid.set(target.uuid, calculatedHealthModByTargetUuid.get(target.uuid) - damage.roll.total);
+                target.result.dmg = {
+                  rawDmg: dmg,
+                  calcDmg: dmg,
+                }
               }
             }
           }
         }
       }
     }
-    
-    // Apply damage
+
+    // Aggregate
+    const aggregates = new Map<string, ItemCardData['targetAggregate'][0]>();
     for (const item of items) {
       for (const target of item.targets) {
-        const rawHealthMod = rawHealthModByTargetUuid.get(target.uuid);
-        let calcHealthMod = calculatedHealthModByTargetUuid.get(target.uuid);
-        let calcHp = Number(target.hpSnapshot.hp);
-        let calcTemp = Number(target.hpSnapshot.temp);
-        let calcTempDmg = Math.min(0, calcTemp - calcHealthMod);
+        if (target.result.dmg) {
+          if (!aggregates.get(target.uuid)) {
+            aggregates.set(target.uuid, {
+              targetUuid: target.uuid,
+              hpSnapshot: target.hpSnapshot,
+              name: target.name,
+              img: target.img,
+            })
+          }
+          const aggregate = aggregates.get(target.uuid);
+          if (aggregate.dmg == null) {
+            aggregate.dmg = {
+              rawDmg: target.result.dmg.rawDmg,
+              calcDmg: target.result.dmg.calcDmg,
+              calcHp: 0,
+              calcTemp: 0,
+            }
+          } else {
+            aggregate.dmg.rawDmg = aggregate.dmg.rawDmg + target.result.dmg.rawDmg;
+            aggregate.dmg.calcDmg = aggregate.dmg.calcDmg + target.result.dmg.calcDmg;
+          }
+          console.log(JSON.parse(JSON.stringify(aggregate)));
+        }
+      }
+    }
+
+    messageData.targetAggregate = Array.from(aggregates.values()).sort((a, b) => (a.name || '').localeCompare((b.name || '')));
+    for (const aggregate of messageData.targetAggregate) {
+      if (aggregate.dmg) {
+        let calcHp = Number(aggregate.hpSnapshot.hp);
+        let calcTemp = Number(aggregate.hpSnapshot.temp);
+        let calcDmg = Math.min(aggregate.dmg.calcDmg, calcHp + calcTemp);
+        let calcTempDmg = Math.min(0, calcTemp + calcDmg);
         calcTemp -= calcTempDmg;
-        calcHp = Math.max(0, calcHp + (calcHealthMod - calcTempDmg));
+        calcHp = Math.max(0, calcHp + ((-calcDmg) - calcTempDmg));
         
-        target.result.dmg = {
-          rawDmg: -rawHealthMod,
-          calcDmg: -calcHealthMod,
+        aggregate.dmg = {
+          rawDmg: aggregate.dmg.rawDmg,
+          calcDmg: calcDmg,
           calcHp: calcHp,
           calcTemp: calcTemp,
         }

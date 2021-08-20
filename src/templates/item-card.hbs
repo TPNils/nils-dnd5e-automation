@@ -92,45 +92,6 @@
         {{/if}}
       </div>
 
-      {{#if item.targets.length}}
-        <section class="{{@root.staticValues.moduleName}}-gm-secret">
-          <table class="{{@root.staticValues.moduleName}}-targets">
-            <thead>
-              <tr>
-                <th style="width: 30px;"></th>
-                <th>Name</th>
-                <th style="width: 30px;">HP</th>
-                {{#if item.attack}}
-                <th style="width: 30px;">Hit</th>
-                {{/if}}
-                <th style="width: 40px;">Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {{#each item.targets as |target|}}
-                <tr>
-                  <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
-                  <td>{{target.name}}</td>
-                  <td>{{target.hpSnapshot.hp}}{{#if target.hpSnapshot.temp}}[{{target.hpSnapshot.temp}}]{{/if}}</td>
-                  {{#if item.attack}}
-                    <td>
-                      {{#if item.attack.evaluatedRoll}}
-                        {{#if target.result.hit}}
-                          <i class="fas fa-check" style="color: green;"></i>
-                        {{else}}
-                          <i class="fas fa-times" style="color: red;"></i>
-                        {{/if}}
-                      {{/if}}
-                    </td>
-                  {{/if}}
-                  <td>{{target.result.dmg.calcHp}}{{#if target.result.dmg.temp}}[{{target.result.dmg.calcTemp}}]{{/if}}</td>
-                </tr>
-              {{/each}}
-            </tbody>
-          </table>
-        </section>
-      {{/if}}
-
       <div class="{{@root.staticValues.moduleName}}-footer">
         {{#each item.properties}}
           <span>{{this}}</span>
@@ -139,5 +100,30 @@
     </div>
   {{/each}}
   
+
+  {{#if data.targetAggregate.length}}
+    <section class="{{@root.staticValues.moduleName}}-gm-secret">
+      <table class="{{@root.staticValues.moduleName}}-targets">
+        <thead>
+          <tr>
+            <th style="width: 30px;"></th>
+            <th>Name</th>
+            <th style="width: 30px;">HP</th>
+            <th style="width: 40px;">Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each data.targetAggregate as |target|}}
+            <tr>
+              <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
+              <td>{{target.name}}</td>
+              <td>{{target.hpSnapshot.hp}}{{#if target.hpSnapshot.temp}}[{{target.hpSnapshot.temp}}]{{/if}}</td>
+              <td>{{target.dmg.calcHp}}{{#if target.dmg.temp}}[{{target.dmg.calcTemp}}]{{/if}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </section>
+  {{/if}}
     
 </div>
