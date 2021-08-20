@@ -178,10 +178,10 @@ const staticCopyFiles = [
 /**
  * Copy static files
  */
-function createCopyFiles(copyFiles) {
-	return async () => {
+function createCopyFiles(copyFilesArg) {
+	return async function copyFiles() {
 		const promises = [];
-		for (const file of copyFiles) {
+		for (const file of copyFilesArg) {
 			if (fs.existsSync(path.join(...file.from))) {
 				if (file.options) {
 					promises.push(fs.copy(path.join(...file.from), path.join(...file.to), file.options));
