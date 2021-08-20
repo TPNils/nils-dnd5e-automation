@@ -53,6 +53,12 @@ export class UtilsInput {
    * @returns an array of token UUIDs of the targeted tokens.
    */
   public static targets(targetTokenUuids: string[], args: TargetRequest): Promise<UserInputResponse<TargetResponse>> {
+    if (args.nrOfTargets < 1) {
+      return Promise.resolve({cancelled: false, data: {
+        tokenUuids: [],
+        spellLevel: null
+      }});
+    }
     let targetsToAutoResolve = args.nrOfTargets;
     if (args.scaling) {
       switch (args.scaling.type) {
@@ -74,7 +80,13 @@ export class UtilsInput {
   }
 
   private static async targetDialog(preselectedTargets: string[], args: TargetRequest): Promise<UserInputResponse<TargetResponse>> {
-    const fetchedTargets = await Promise.all(args.allPossibleTargets.map(target => fromUuid(target.uuid)))
+    const fetchedTargets = await Promise.all(args.allPossibleTargets.map(target => fromUuid(target.uuid)));
+    // If exacly 1 target was selected, preselect it for all possible targets
+    if (preselectedTargets.length === 1 && args.nrOfTargets > 1) {
+      for (let i = 1; i < args.nrOfTargets; i++) {
+        preselectedTargets.push(preselectedTargets[0]);
+      }
+    }
 
     const targetDocumentMap = new Map<string, TokenDocument>();
     for (const fetchedTarget of fetchedTargets) {
