@@ -730,6 +730,23 @@ export class UtilsChatMessage {
 
     // Aggregate
     const aggregates = new Map<string, ItemCardData['targetAggregate'][0]>();
+    if (messageData.targetAggregate) {
+      // If an aggregate was shown, make sure it will always be shown to make sure it can be reset back to the original state
+      for (const oldAggregate of messageData.targetAggregate) {
+        aggregates.set(oldAggregate.uuid, {
+          uuid: oldAggregate.uuid,
+          name: oldAggregate.name,
+          img: oldAggregate.img,
+          hpSnapshot: oldAggregate.hpSnapshot,
+          dmg: {
+            rawDmg: 0,
+            calcDmg: 0,
+            calcHp: oldAggregate.hpSnapshot.hp,
+            calcTemp: oldAggregate.hpSnapshot.temp,
+          }
+        })
+      }
+    }
     for (const item of items) {
       for (const target of item.targets) {
         if (target.result.dmg) {
