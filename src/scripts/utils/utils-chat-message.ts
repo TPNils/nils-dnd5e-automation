@@ -537,63 +537,8 @@ export class UtilsChatMessage {
       return messageData;
     }
 
-    const terms = Roll.fromJSON(JSON.stringify(attack.evaluatedRoll)).terms;
-    const d20Term: any = terms[0];
-    const targetDiceNumber = attack.mode === 'normal' ? 1 : 2;
-    while (d20Term.number < targetDiceNumber) {
-      const d20 = await new Roll('1d20').roll({async: true});
-      UtilsDiceSoNice.showRoll({roll: d20});
-      d20Term.number++;
-      d20Term.results.push({result: d20.total, active: true});
-    }
-    
-    if (attack.mode === 'advantage') {
-      d20Term.modifiers = d20Term.modifiers ? [...d20Term.modifiers.filter(mod => mod !== 'kl' && mod !== 'kh'), 'kh'] : ['kh'];
-      let highestResult;
-      for (const result of d20Term.results) {
-        if (!highestResult || highestResult.result <= result.result) {
-          highestResult = result;
-        }
-      }
-
-      delete highestResult.discarded;
-      highestResult.active = true;
-      
-      for (const result of d20Term.results) {
-        if (result !== highestResult) {
-          result.active = false;
-          result.discarded = true;
-        }
-      }
-    } else if (attack.mode === 'disadvantage') {
-      d20Term.modifiers = d20Term.modifiers ? [...d20Term.modifiers.filter(mod => mod !== 'kl' && mod !== 'kh'), 'kl'] : ['kl'];
-      let lowestResult;
-      for (const result of d20Term.results) {
-        if (!lowestResult || lowestResult.result >= result.result) {
-          lowestResult = result;
-        }
-      }
-
-      delete lowestResult.discarded;
-      lowestResult.active = true;
-      
-      for (const result of d20Term.results) {
-        if (result !== lowestResult) {
-          result.active = false;
-          result.discarded = true;
-        }
-      }
-    } else {
-      d20Term.modifiers = d20Term.modifiers ? [...d20Term.modifiers.filter(mod => mod !== 'kl' && mod !== 'kh')] : [];
-      delete d20Term.results[0].discarded;
-      d20Term.results[0].active = true;
-
-      for (let i = 1; i < d20Term.results.length; i++) {
-        d20Term.results[i].active = false;
-        d20Term.results[i].discarded = true;
-      }
-    }
-    attack.evaluatedRoll = Roll.fromTerms(terms).toJSON();
+    const originalRoll = Roll.fromJSON(JSON.stringify(attack.evaluatedRoll));
+    attack.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, attack.mode)).toJSON();
 
     return messageData;
   }
