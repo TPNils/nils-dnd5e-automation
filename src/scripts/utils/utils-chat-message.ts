@@ -28,6 +28,9 @@ export interface ItemCardItemData {
       hp: number;
       temp?: number;
     },
+    immunities: string[];
+    resistances: string[];
+    vulnerabilities: string[];
     result: {
       hit?: boolean;
       dmg?: {
@@ -349,6 +352,9 @@ export class UtilsChatMessage {
         ac: actor.data.data.attributes.ac.value,
         img: token.data.img,
         name: token.data.name,
+        immunities: [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))],
+        resistances: [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))],
+        vulnerabilities: [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))],
         hpSnapshot: {
           hp: actor.data.data.attributes.hp.value,
           temp: actor.data.data.attributes.hp.temp
@@ -710,16 +716,27 @@ export class UtilsChatMessage {
           const damageResults = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(damage.roll)));
           for (const target of hitTargets) {
             for (const [dmgType, dmg] of damageResults.entries()) {
+              let modifier = 1;
+              if (target.immunities.includes(dmgType)) {
+                modifier = 0;
+              } else {
+                if (target.resistances.includes(dmgType)) {
+                  modifier -= .5;
+                }
+                if (target.vulnerabilities.includes(dmgType)) {
+                  modifier += .5;
+                }
+              }
+
               if (UtilsChatMessage.healingDamageTypes.includes(dmgType)) {
                 target.result.dmg = {
                   rawDmg: -dmg,
-                  calcDmg: -dmg,
+                  calcDmg: -Math.floor(dmg * modifier),
                 }
               } else {
-                // TODO resistances
                 target.result.dmg = {
                   rawDmg: dmg,
-                  calcDmg: dmg,
+                  calcDmg: Math.floor(dmg * modifier),
                 }
               }
             }
@@ -770,7 +787,6 @@ export class UtilsChatMessage {
             aggregate.dmg.rawDmg = aggregate.dmg.rawDmg + target.result.dmg.rawDmg;
             aggregate.dmg.calcDmg = aggregate.dmg.calcDmg + target.result.dmg.calcDmg;
           }
-          console.log(JSON.parse(JSON.stringify(aggregate)));
         }
       }
     }
@@ -782,12 +798,6 @@ export class UtilsChatMessage {
         let calcTemp = Number(aggregate.hpSnapshot.temp);
         let calcDmg = Math.min(aggregate.dmg.calcDmg, calcHp + calcTemp);
         let calcTempDmg = Math.min(calcTemp, calcDmg);
-        console.log({
-          calcHp,
-          calcTemp,
-          calcDmg,
-          calcTempDmg,
-        })
         calcTemp -= calcTempDmg;
         calcHp = Math.max(0, calcHp - (calcDmg - calcTempDmg));
         

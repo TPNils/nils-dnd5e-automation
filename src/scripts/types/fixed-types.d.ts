@@ -81,6 +81,32 @@ export type MyActorData = {
     }
     mod: number;
     prof: number;
+    traits: {
+      armorProf: {
+        custom: string;
+        value: string[];
+      };
+      /** condition immunities */
+      ci: {
+        custom: string;
+        value: string[];
+      };
+      /** damage immunities */
+      di: {
+        custom: string;
+        value: string[];
+      };
+      /** damage resistances */
+      dr: {
+        custom: string;
+        value: string[];
+      };
+      /** damage vulnerabilities */
+      dv: {
+        custom: string;
+        value: string[];
+      };
+    }
   }
 }
 
