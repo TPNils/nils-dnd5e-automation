@@ -96,26 +96,26 @@ export interface ItemCardData {
 
 export class UtilsChatMessage {
 
-  private static readonly actionMatches: Array<{regex: RegExp, execute(event: MouseEvent, regexResult: RegExpExecArray, itemIndex: number, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData>}> = [
+  private static readonly actionMatches: Array<{regex: RegExp, execute(event: MouseEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData>}> = [
     {
-      regex: /^item-damage-([0-9]+)$/,
-      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemDamage(event, Number(regexResult[1]), itemIndex, messageData),
+      regex: /^item-([0-9]+)-damage-([0-9]+)$/,
+      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemDamage(event, Number(regexResult[2]), Number(regexResult[1]), messageData),
     },
     {
-      regex: /^item-attack$/,
-      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemAttack(event, itemIndex, messageData),
+      regex: /^item-([0-9]+)-attack$/,
+      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemAttack(event, Number(regexResult[1]), messageData),
     },
     {
-      regex: /^item-attack-mode-(minus|plus)$/,
-      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.processItemAttackMode(event, itemIndex, regexResult, messageData),
+      regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
+      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemAttackMode(event, Number(regexResult[1]), regexResult[2] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^apply-damage-([a-zA-Z0-9\.]+)$/,
-      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.applyDamage(regexResult[1], messageData, messageId),
+      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.applyDamage(regexResult[1], messageData, messageId),
     },
     {
       regex: /^undo-damage-([a-zA-Z0-9\.]+)$/,
-      execute: (event, regexResult, itemIndex, messageId, messageData) => UtilsChatMessage.undoDamage(regexResult[1], messageData, messageId),
+      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.undoDamage(regexResult[1], messageData, messageId),
     },
   ];
 
@@ -373,7 +373,6 @@ export class UtilsChatMessage {
     }
 
     let messageId: string;
-    let itemIndex: number | null = null;
     let action: string;
     const path = event.composedPath();
     for (let i = path.length - 1; i >= 0; i--) {
@@ -384,14 +383,11 @@ export class UtilsChatMessage {
       if (element.dataset.messageId != null) {
         messageId = element.dataset.messageId;
       }
-      if (element.hasAttribute(`data-${staticValues.moduleName}-item-index`)) {
-        itemIndex = Number(element.getAttribute(`data-${staticValues.moduleName}-item-index`));
-      }
       if (element.hasAttribute(`data-${staticValues.moduleName}-action`)) {
         action = element.getAttribute(`data-${staticValues.moduleName}-action`);
       }
       
-      if (messageId != null && itemIndex != null && action != null) {
+      if (messageId != null && action != null) {
         break;
       }
     }
@@ -419,7 +415,7 @@ export class UtilsChatMessage {
       if (result) {
         const log = document.querySelector("#chat-log");
         const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
-        let response = await actionMatch.execute(event, result, itemIndex, messageId, deepClone(messageData));
+        let response = await actionMatch.execute(event, result, messageId, deepClone(messageData));
         if (response) {
           response = await UtilsChatMessage.calculateTargetResult(response);
           const html = await UtilsChatMessage.generateTemplate(response);
@@ -518,9 +514,9 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async processItemAttackMode(event: MouseEvent, itemIndex: number, regexResult: RegExpExecArray, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttackMode(event: MouseEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items[itemIndex].attack;
-    let modifier = regexResult[1] === 'plus' ? 1 : -1;
+    let modifier = modName === 'plus' ? 1 : -1;
     if (event.shiftKey && modifier > 0) {
       modifier++;
     } else if (event.shiftKey && modifier < 0) {
