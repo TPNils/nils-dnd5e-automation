@@ -104,13 +104,13 @@ export class UtilsRoll {
     }
 
     // Modify the term definition
+    const excludeModifiers: Array<keyof Die.Modifiers> = ['d', 'dh', 'dl', 'k', 'kh', 'kl'];
+    d20Term.modifiers = d20Term.modifiers ? d20Term.modifiers.filter((mod: keyof Die.Modifiers) => !excludeModifiers.includes(mod)) : [];
     d20Term.number = Math.max(d20Term.number, mode === 'normal' ? 1 : 2);
     if (mode === 'advantage') {
-      d20Term.modifiers = d20Term.modifiers ? [...d20Term.modifiers.filter(mod => mod !== 'kl' && mod !== 'kh'), 'kh'] : ['kh'];
+      d20Term.modifiers.push('kh');
     } else if (mode === 'disadvantage') {
-      d20Term.modifiers = d20Term.modifiers ? [...d20Term.modifiers.filter(mod => mod !== 'kl' && mod !== 'kh'), 'kl'] : ['kl'];
-    } else {
-      d20Term.modifiers = d20Term.modifiers ? [...d20Term.modifiers.filter(mod => mod !== 'kl' && mod !== 'kh')] : [];
+      d20Term.modifiers.push('kl');
     }
 
     // If the term was already rolled, add potential new rolls and/or calculate new result
