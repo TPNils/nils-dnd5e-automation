@@ -1,4 +1,33 @@
+import { staticValues } from "../static-values";
+
+export type WrappedDie = Die & {
+  [`_nils-automated-compendium-original-reroll`]: Die['reroll'];
+}
+
 export class ReEvaluatableDie extends Die {
+
+  constructor(delegate: Die) {
+    super(delegate as Die.TermData);
+  }
+
+  public static wrap(dice: Die | Die[]): void {
+    dice = Array.isArray(dice) ? dice : [dice as Die];
+
+    for (const die of dice) {
+      (die as WrappedDie)['_nils-automated-compendium-original-reroll'] = die.reroll;
+      die.reroll = ReEvaluatableDie.prototype.reroll;
+    }
+  }
+
+  public static unwrap(dice: Die | Die[]): void {
+    dice = Array.isArray(dice) ? dice : [dice as Die];
+
+    for (const die of (dice as WrappedDie[])) {
+      if (die['_nils-automated-compendium-original-reroll']) {
+        die.reroll = die['_nils-automated-compendium-original-reroll'];
+      }
+    }
+  }
 
   /**
    * Re-roll the Die, rolling additional results for any values which fall within a target set.
@@ -73,7 +102,8 @@ export class ReEvaluatableDie extends Die {
 
 export function registerHooks(): void {
   Hooks.on('ready', () => {
-    // TODO lib wrapper compatibility
-    Die.prototype.reroll = ReEvaluatableDie.prototype.reroll;
+    // TODO lib wrapper compatibility when a complere solution is found
+    // Currently it is solved with the wrap/unwrap methods
+    // Die.prototype.reroll = ReEvaluatableDie.prototype.reroll;
   })
 }

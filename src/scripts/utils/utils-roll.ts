@@ -1,3 +1,4 @@
+import { ReEvaluatableDie } from "../roll/re-evaluatable-die";
 import { DamageType, MyItemData } from "../types/fixed-types";
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
 
@@ -134,7 +135,9 @@ export class UtilsRoll {
         }
       }
       // Evaluate the results
+      ReEvaluatableDie.wrap(d20Term);
       d20Term._evaluateModifiers();
+      ReEvaluatableDie.unwrap(d20Term);
 
       // If new rolled happend (adv, rerolls, exploding, etc...) display them
       if (!options.skipDiceSoNice && originalResultLength < d20Term.results.length) {
