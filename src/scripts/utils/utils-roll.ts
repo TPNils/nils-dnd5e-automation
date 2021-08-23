@@ -104,6 +104,8 @@ export class UtilsRoll {
     }
 
     // Modify the term definition
+    const oldNumber = d20Term.number;
+    const originalResultLength = d20Term.results.length;
     const excludeModifiers: Array<keyof Die.Modifiers> = ['d', 'dh', 'dl', 'k', 'kh', 'kl'];
     d20Term.modifiers = d20Term.modifiers ? d20Term.modifiers.filter((mod: keyof Die.Modifiers) => !excludeModifiers.includes(mod)) : [];
     d20Term.number = Math.max(d20Term.number, mode === 'normal' ? 1 : 2);
@@ -115,12 +117,9 @@ export class UtilsRoll {
 
     // If the term was already rolled, add potential new rolls and/or calculate new result
     if (d20Term._evaluated) {
-      if (d20Term.number > d20Term.results.length) {
-        const missingDice = d20Term.number - d20Term.results.length;
+      if (d20Term.number > oldNumber) {
+        const missingDice = d20Term.number - oldNumber;
         const d20s = await new Roll(`${missingDice}d20`).roll({async: true});
-        if (!options.skipDiceSoNice) {
-          UtilsDiceSoNice.showRoll({roll: d20s});
-        }
         const rolledTerm: typeof d20Term = (d20s.terms[0] as any);
         for (const result of rolledTerm.results) {
           d20Term.results.push(result);
@@ -136,6 +135,28 @@ export class UtilsRoll {
       }
       // Evaluate the results
       d20Term._evaluateModifiers();
+
+      // If new rolled happend (adv, rerolls, exploding, etc...) display them
+      if (!options.skipDiceSoNice && originalResultLength < d20Term.results.length) {
+        const newResults: RollTerm[] = [];
+        for (let i = originalResultLength; i < d20Term.results.length; i++) {
+          const result = new Die({faces: 20, number: 1}) as typeof d20Term;
+          result._evaluated = true;
+          result.results.push({
+            result: d20Term.results[i].result,
+            active: true,
+          });
+          if (newResults.length > 0) {
+            const term = new OperatorTerm({operator: '+'});
+            term.evaluate({async: false});
+            newResults.push(term);
+          }
+          newResults.push(result);
+        }
+        if (newResults.length > 0) {
+          UtilsDiceSoNice.showRoll({roll: Roll.fromTerms(newResults)});
+        }
+      }
 
       // Drop extra rolls. Example, when advantage is rolled and you revert back to normal, discard the most right rolls
       let activeDice = 0;
