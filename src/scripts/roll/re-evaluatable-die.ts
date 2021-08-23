@@ -46,14 +46,14 @@ export class ReEvaluatableDie extends Die {
         break;
       }
 
-      if (r.rerolled) {
-        if (max !== null) {
-          max -= 1;
-        }
-      } else if (DiceTerm.compareResult(r.result, comparison, target) ) {
+      // TODO does not play nice with multiple reroll statements in 1 term
+      if (DiceTerm.compareResult(r.result, comparison, target) ) {
+        const wasRerolled = r.rerolled;
         r.rerolled = true;
         r.active = false;
-        this.roll();
+        if (!wasRerolled) {
+          this.roll();
+        }
         if (max !== null) {
           max -= 1;
         }
