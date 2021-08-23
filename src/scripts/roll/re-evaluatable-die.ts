@@ -46,7 +46,7 @@ export class ReEvaluatableDie extends Die {
         break;
       }
 
-      // TODO does not play nice with multiple reroll statements in 1 term
+      // TODO does not play nice with multiple reroll statements in 1 term when more than 1 reroll statement has a max
       if (DiceTerm.compareResult(r.result, comparison, target) ) {
         const wasRerolled = r.rerolled;
         r.rerolled = true;
