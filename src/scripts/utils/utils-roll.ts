@@ -98,22 +98,10 @@ export class UtilsRoll {
 
   public static async setRollMode(roll: Roll, mode: 'disadvantage' |'normal' | 'advantage', options: {skipDiceSoNice?: boolean} = {}): Promise<Roll> {
     const terms = deepClone(roll.terms);
-    const d20Term: RollTerm & {
-      _evaluated: boolean;
-      faces?: number;
-      number?: number;
-      modifiers: any[];
-      results: {
-        result: number;
-        active: boolean;
-        discarded?: boolean;
-      }[];
-    } = (terms[0] as any);
+    const d20Term = terms[0] as (Die & {_evaluated: boolean, _evaluateModifiers: () => void});
     if (d20Term.faces !== 20) {
       throw new Error(`The first roll term needs to be a d20. Roll formula: ${roll.formula}`)
     }
-
-    console.log('before', JSON.parse(JSON.stringify(terms)));
 
     // Modify the term definition
     d20Term.number = Math.max(d20Term.number, mode === 'normal' ? 1 : 2);
@@ -139,52 +127,23 @@ export class UtilsRoll {
         }
       }
 
-      if (mode === 'advantage') {
-        let highestResult;
-        for (const result of d20Term.results) {
-          if (!highestResult || highestResult.result <= result.result) {
-            highestResult = result;
-          }
-        }
-  
-        delete highestResult.discarded;
-        highestResult.active = true;
-        
-        for (const result of d20Term.results) {
-          if (result !== highestResult) {
-            result.active = false;
+      // Reset the results
+      d20Term.results = d20Term.results.map(r => { return {result: r.result, active: true} });
+      // Evaluate the results
+      d20Term._evaluateModifiers();
+
+      // Drop extra rolls. Example, when advantage is rolled and you revert back to normal, discard the most right rolls
+      let activeDice = 0;
+      for (const result of d20Term.results) {
+        if (result.active) {
+          activeDice++;
+          if (1 < activeDice) {
             result.discarded = true;
-          }
-        }
-      } else if (mode === 'disadvantage') {
-        let lowestResult;
-        for (const result of d20Term.results) {
-          if (!lowestResult || lowestResult.result >= result.result) {
-            lowestResult = result;
-          }
-        }
-  
-        delete lowestResult.discarded;
-        lowestResult.active = true;
-        
-        for (const result of d20Term.results) {
-          if (result !== lowestResult) {
             result.active = false;
-            result.discarded = true;
           }
-        }
-      } else {
-        delete d20Term.results[0].discarded;
-        d20Term.results[0].active = true;
-  
-        for (let i = 1; i < d20Term.results.length; i++) {
-          d20Term.results[i].active = false;
-          d20Term.results[i].discarded = true;
         }
       }
     }
-
-    console.log('after', JSON.parse(JSON.stringify(terms)));
 
     return Roll.fromTerms(terms);
   }
