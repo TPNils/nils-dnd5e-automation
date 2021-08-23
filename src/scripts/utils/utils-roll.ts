@@ -128,7 +128,12 @@ export class UtilsRoll {
       }
 
       // Reset the results
-      d20Term.results = d20Term.results.map(r => { return {result: r.result, active: true} });
+      for (const result of d20Term.results) {
+        if (result.discarded) {
+          result.active = true;
+          delete result.discarded;
+        }
+      }
       // Evaluate the results
       d20Term._evaluateModifiers();
 
