@@ -75,17 +75,40 @@
           {{/if}}
         {{/each}}
         
-        {{#each item.checks as |check checkIndex|}}
-          <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{checkIndex}}">
-            {{#if check.label}}
-            {{dmg.label}}
-            {{else if check.save}}
-            {{localize "DND5E.SavingThrow"}}
-            {{else}}
-            Ability check
-            {{/if}}
-          </button>
-        {{/each}}
+        {{#if item.check}}
+          <table>
+            <thead>
+                <th style="width: 30px;">{{! img}}</th>
+                <th>Name</th>
+                <th>DC: {{item.check.dc}}</th>
+            </thead>
+            <tbody>
+              {{#each item.targets as |target|}}
+                <tr>
+                  <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
+                  <td>{{target.name}}</td>
+                  <td>
+                    {{#if target.check.evaluatedRoll.evaluated}}
+                      <div class="{{@root.staticValues.moduleName}}-check-{{#if target.result.checkPass}}pass{{else}}fail{{/if}}">
+                        {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=target.check.evaluatedRoll compact=true}}
+                      </div>
+                    {{else}}
+                      <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}">
+                        {{#if item.check.label}}
+                        {{item.check.label}}
+                        {{else if item.check.addSaveBonus}}
+                        {{localize "DND5E.SavingThrow"}}
+                        {{else}}
+                        Ability check
+                        {{/if}}
+                      </button>
+                    {{/if}}
+                  </td>
+                </tr>
+              {{/each}}
+            </tbody>
+          </table>
+        {{/if}}
 
         {{#if item.template}}
           <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-template">{{ localize "DND5E.PlaceTemplate" }}</button>

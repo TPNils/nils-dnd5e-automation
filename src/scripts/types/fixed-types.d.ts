@@ -6,22 +6,29 @@ interface BaseDocument<DATA> {
   getFlag(moduleName: string, key: string): any;
 }
 
+export interface ActorAbility {
+  value: number;
+  checkBonus: number;
+  dc: number;
+  mod: number;
+  prof: number; // Flat proficiantie bonus
+  proficient: number; // Proficiantie multiplier
+  save: number; // The bonus on saving throws
+  saveBonus: number; // Not sure what this is?
+}
+
 export type MyActorData = {
   [key: string]: any;
   name: string;
   data: {
     [key: string]: any;
     abilities: {
-      [key: 'str' | 'dex' | 'con' | 'wis' | 'int' | 'cha']: {
-        value: number;
-        checkBonus: number;
-        dc: number;
-        mod: number;
-        prof: number; // Flat proficiantie bonus
-        proficient: number; // Proficiantie multiplier
-        save: number; // The bonus on saving throws
-        saveBonus: number; // Not sure what this is?
-      }
+      str: ActorAbility;
+      dex: ActorAbility;
+      con: ActorAbility;
+      wis: ActorAbility;
+      int: ActorAbility;
+      cha: ActorAbility;
     };
     attributes: {
       [key: string]: any;

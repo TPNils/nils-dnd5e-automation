@@ -1,10 +1,25 @@
 <div class="dice-roll">
-    {{#if flavor}}
+  {{#if flavor}}
     <div class="dice-flavor">{{flavor}}</div>
+  {{/if}}
+  <div class="dice-result">
+    {{#if compact}}
+      <h4 class="dice-total compact">
+        {{roll.total}}
+        {{#each roll.terms as |term|}}
+          {{#each term.results as |result|}}
+            <span class="roll die d{{term.faces}}{{#if result.success}} success{{/if}}{{#if result.failure}} failure{{/if}}{{#if result.rerolled}} rerolled{{/if}}{{#if result.exploded}} exploded{{/if}}{{#if result.discarded}} discarded{{/if}}{{#if (eq result.result term.faces)}} max{{/if}}{{#if (eq result.result 1)}} min{{/if}}">
+              <span class="result">{{result.result}}</span>
+            </span>
+          {{/each}}
+        {{/each}}
+      </h4>
+    {{else}}
+      <div class="dice-formula">
+        {{#if overrideFormula}}{{overrideFormula}}{{else}}{{roll.formula}}{{/if}}
+      </div>
+      {{> modules/nils-automated-compendium/templates/roll/tooltip.hbs terms=roll.terms}}
+      <h4 class="dice-total">{{roll.total}}</h4>
     {{/if}}
-    <div class="dice-result">
-        <div class="dice-formula">{{#if overrideFormula}}{{overrideFormula}}{{else}}{{roll.formula}}{{/if}}</div>
-        {{> modules/nils-automated-compendium/templates/roll/tooltip.hbs terms=roll.terms}}
-        <h4 class="dice-total">{{roll.total}}</h4>
-    </div>
+  </div>
 </div>

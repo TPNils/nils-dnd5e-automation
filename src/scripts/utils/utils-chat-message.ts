@@ -31,12 +31,17 @@ export interface ItemCardItemData {
     immunities: string[];
     resistances: string[];
     vulnerabilities: string[];
+    check?: {
+      evaluatedRoll?: RollJson;
+      mode: 'normal' | 'advantage' | 'disadvantage';
+    }
     result: {
       hit?: boolean;
+      checkPass?: boolean;
       dmg?: {
         rawDmg: number;
         calcDmg: number;
-      }
+      },
     }
   }[];
   attack?: {
@@ -52,16 +57,13 @@ export interface ItemCardItemData {
     displayDamageTypes?: string;
     displayFormula?: string;
   }[];
-  checks?: {
-    label?: string;
+  check?: {
     ability: keyof MyActor['data']['data']['abilities'];
-    skill?: string;
-    save?: boolean;
     dc: number;
-    resultsPerTarget?: {
-      [key: string]: RollJson;
-    }[]
-  }[];
+    label?: string;
+    skill?: string;
+    addSaveBonus?: boolean;
+  };
   template?: any;
   spell?: {
     level: number;
@@ -108,6 +110,10 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
       execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemAttackMode(event, Number(regexResult[1]), regexResult[2] as ('plus' | 'minus'), messageData),
+    },
+    {
+      regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)$/,
+      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemCheck(Number(regexResult[1]), regexResult[2], messageData),
     },
     {
       regex: /^apply-damage-([a-zA-Z0-9\.]+)$/,
@@ -324,12 +330,11 @@ export class UtilsChatMessage {
 
     // Saving throw
     if (item.data.data.save.dc != null && item.data.data.save.ability) {
-      itemCardData.checks = itemCardData.checks || [];
-      itemCardData.checks.push({
+      itemCardData.check = {
         ability: item.data.data.save.ability,
         dc: item.data.data.save.dc,
-        save: true,
-      });
+        addSaveBonus: true,
+      }
     }
 
     // TODO template
@@ -347,7 +352,7 @@ export class UtilsChatMessage {
     for (const targetUuid of targetUuids) {
       const token = tokenMap.get(targetUuid);
       const actor = token.getActor() as MyActor;
-      itemCardItemData.targets.push({
+      const target: ItemCardItemData['targets'][0] = {
         uuid: targetUuid,
         ac: actor.data.data.attributes.ac.value,
         img: token.data.img,
@@ -360,7 +365,12 @@ export class UtilsChatMessage {
           temp: actor.data.data.attributes.hp.temp
         },
         result: {}
-      });
+      };
+      if (itemCardItemData.check) {
+        // Don't prefil the roll, generate that at the moment the roll is made
+        target.check = {mode: 'normal'};
+      }
+      itemCardItemData.targets.push(target);
     }
     itemCardItemData.targets = itemCardItemData.targets.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
@@ -416,6 +426,7 @@ export class UtilsChatMessage {
         const log = document.querySelector("#chat-log");
         const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
         let response = await actionMatch.execute(event, result, messageId, deepClone(messageData));
+        console.log('response')
         if (response) {
           response = await UtilsChatMessage.calculateTargetResult(response);
           const html = await UtilsChatMessage.generateTemplate(response);
@@ -519,6 +530,47 @@ export class UtilsChatMessage {
     UtilsDiceSoNice.showRoll({roll: roll});
     attack.evaluatedRoll = roll.toJSON();
 
+    return messageData;
+  }
+
+  private static async processItemCheck(itemIndex: number, targetUuid: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+    if (!messageData.items?.[itemIndex]?.check) {
+      console.warn('No check found')
+      return;
+    }
+
+    let target: ItemCardItemData['targets'][0];
+    if (messageData.items[itemIndex].targets) {
+      for (const t of messageData.items[itemIndex].targets) {
+        if (t.uuid === targetUuid) {
+          target = t;
+          break;
+        }
+      }
+    }
+    console.log(target);
+    if (!target || target.check?.evaluatedRoll?.evaluated) {
+      // If no target was found or target already rolled, do nothing
+      // TODO should create a new card (?)
+      return;
+    }
+    
+    const check = messageData.items[itemIndex].check;
+    if (!target.check) {
+      target.check = {
+        mode: 'normal'
+      }
+    }
+
+    const targetActor = (await UtilsDocument.tokenFromUuid(targetUuid)).getActor() as MyActor;
+    let roll = UtilsRoll.getAbilityRoll(targetActor, {ability: check.ability, skill: check.skill, addSaveBonus: check.addSaveBonus});
+    roll = await UtilsRoll.setRollMode(roll, target.check.mode);
+    roll = await roll.roll({async: true});
+    UtilsDiceSoNice.showRoll({roll: roll});
+
+    target.check.evaluatedRoll = roll.toJSON();
+
+    console.log(deepClone(messageData));
     return messageData;
   }
 
@@ -653,6 +705,13 @@ export class UtilsChatMessage {
           target.result.hit = target.ac <= attackResult;
         }
       }
+
+      // Check
+      if (item.check) {
+        // TODO
+      }
+
+      // TODO damage should take checks into account
       // Include when no attack has happend (null) and when hit (true)
       const hitTargets = item.targets.filter(target => target.result.hit !== false);
 

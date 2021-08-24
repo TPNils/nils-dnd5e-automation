@@ -1,5 +1,94 @@
 @import 'global-variables';
 
+/* default foundry css */
+#chat {
+  .#{$module-name}-item-card {
+    font-style: normal;
+    font-size: 12px;
+
+    /* default foundry css */
+    .dice-total.compact .roll {
+      position: relative;
+      width: 24px;
+      line-height: 24px;
+      float: left;
+      margin-right: 1px;
+      font-size: 16px;
+
+      color: #000;
+      font-weight: bold;
+      text-align: center;
+
+      .result {
+        position: relative;
+      }
+
+      &::before {
+        content: "";
+        display: block;
+        position: absolute;
+        background-image: url("/icons/svg/d20-grey.svg");
+        background-size: 24px 24px;
+        filter: brightness(0) invert(.9); // white background image
+        width: 24px;
+        height: 24px;
+      }
+      &.d4::before {
+        background-image: url("/icons/svg/d4-grey.svg");
+      }
+      &.d6::before {
+        background-image: url("/icons/svg/d6-grey.svg");
+      }
+      &.d8::before {
+        background-image: url("/icons/svg/d8-grey.svg");
+      }
+      &.d10::before {
+        background-image: url("/icons/svg/d10-grey.svg");
+      }
+      &.d12::before {
+        background-image: url("/icons/svg/d12-grey.svg");
+      }
+      &.d20::before {
+        background-image: url("/icons/svg/d20-grey.svg");
+      }
+
+      &.min {
+        color: #aa0200;
+        &::before {
+          filter: sepia(5) hue-rotate(-20deg);
+        }
+      }
+      &.max {
+        color: #18520b;
+        &::before {
+          filter: sepia(0.5) hue-rotate(60deg);
+        }
+      }
+      &.discarded,
+      &.rerolled {
+        filter: sepia(0.5) contrast(0.75) opacity(0.4);
+      }
+      
+    }
+    .roll.exploded:before {
+      font-size: 8px;
+      font-family: "Font Awesome 5 Free";
+      content: "\f666";
+      position: absolute;
+      top: -8px;
+      right: 0px;
+    }
+    .roll.success {
+      color: #18520b;
+      filter: sepia(0.5) hue-rotate(60deg);
+    }
+    .roll.failure {
+      color: #aa0200;
+      filter: sepia(0.5) hue-rotate(-60deg);
+    }
+  }
+}
+
 #chat {
   .#{$module-name}-item-card {
     font-style: normal;
@@ -10,6 +99,13 @@
       border: 2px groove #eeede0;
       height: 28px;
       line-height: 22px;
+    }
+
+    .dice-rolls {
+      list-style: none;
+      margin: 5px 0;
+      padding: 0;
+      overflow: hidden;
     }
 
     .#{$module-name}-flavor {
@@ -79,7 +175,7 @@
 
     .#{$module-name}-item-attack-mode-plus,
     .#{$module-name}-item-post-attack-mode-plus {
-      color: green;
+      color: #4F8A10;
       top: 3px;
       right: 0;
       transform: translate(-25%, 0);
