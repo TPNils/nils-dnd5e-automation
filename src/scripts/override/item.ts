@@ -2,7 +2,6 @@ import { MyActor } from "../types/fixed-types";
 import { ItemCardData, UtilsChatMessage } from "../utils/utils-chat-message";
 
 async function itemRoll(this: Item, {configureDialog=true, rollMode, createMessage=true}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage> {
-  console.log('itemRoll', this)
   let itemData = UtilsChatMessage.createDefaultItemData({
     item: this as any,
     actor: this.actor as MyActor
@@ -21,7 +20,6 @@ async function itemRoll(this: Item, {configureDialog=true, rollMode, createMessa
     }
   }
 
-  console.log(itemCardData)
   return await UtilsChatMessage.createCard(itemCardData);
 }
 
