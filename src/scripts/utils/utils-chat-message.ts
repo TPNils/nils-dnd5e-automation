@@ -487,22 +487,30 @@ export class UtilsChatMessage {
       }
     }
     
+    const actor: MyActor = messageData.token?.uuid == null ? null : (await UtilsDocument.tokenFromUuid(messageData.token?.uuid)).getActor();
     const attack = messageData.items[itemIndex].attack;
-    let baseRoll: string;
+    let baseRoll = new Die();
+    baseRoll.faces = 20;
+    baseRoll.number = 1;
     switch (attack.mode) {
       case 'advantage': {
-        baseRoll = '2d20kh';
+        baseRoll.number = 2;
+        baseRoll.modifiers.push('kh');
         break;
       }
       case 'disadvantage': {
-        baseRoll = '2d20kl';
+        baseRoll.number = 2;
+        baseRoll.modifiers.push('kl');
         break;
       }
-      default: {
-        baseRoll = '1d20';
-      }
     }
-    const parts: string[] = [baseRoll];
+    if (actor && actor.getFlag("dnd5e", "halflingLucky")) {
+      // reroll a base roll 1 once
+      // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
+      // second 2 = reroll when the roll result is equal to 1 (=1)
+      baseRoll.modifiers.push('r1=1');
+    }
+    const parts: string[] = [baseRoll.formula];
     if (attack.rollBonus) {
       parts.push(attack.rollBonus);
     }
