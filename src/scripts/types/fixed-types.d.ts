@@ -181,6 +181,7 @@ export type MyActor = Actor & BaseDocument<MyActorData> & {
   items: Map<string, MyItem>;
   parent: any;
   pack: any;
+  owner: boolean;
   update(data: any, context?: any);
 }
 
