@@ -34,6 +34,9 @@
     {
       "name": "compendium-folders",
       "manifest": "https://raw.githubusercontent.com/earlSt1/vtt-compendium-folders/master/module.json"
+    },
+    {
+        "name": "lib-wrapper"
     }
   ],
 	"packs": [

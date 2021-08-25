@@ -1,3 +1,4 @@
+import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
 import { ItemCardData, UtilsChatMessage } from "../utils/utils-chat-message";
 
@@ -24,11 +25,7 @@ async function itemRoll(this: Item, {configureDialog=true, rollMode, createMessa
 }
 
 export function registerHooks(): void {
-  Hooks.on('ready', () => {
-    // @ts-ignore
-    import('/systems/dnd5e/module/item/entity.js').then(module => {
-      // TODO lib wrapper
-      module.default.prototype.roll = itemRoll;
-    });
+  Hooks.on('setup', () => {
+    libWrapper.register(staticValues.moduleName, 'CONFIG.Item.documentClass.prototype.roll', itemRoll, 'OVERRIDE');
   });
 }
