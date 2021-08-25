@@ -10,17 +10,6 @@ class GlobalHtmlListener {
       // If a change event is fired immidatly after the click, cancel the delayed click toggle
       document.addEventListener('change', GlobalHtmlListener.toggleRadioChange);
     });
-
-    
-    Hooks.on('renderChatLog', () => {
-      if (game.user.isGM) {
-        return;
-      }
-      const chatElement = document.getElementById('chat-log');
-      const mutationObserver = new MutationObserver(GlobalHtmlListener.onChatMutation);
-      mutationObserver.observe(chatElement, {subtree: true, childList: true});
-      GlobalHtmlListener.removeDmSecrets(chatElement);
-    });
   }
 
   private static toggleRadioClick(event: MouseEvent): void {
@@ -49,26 +38,6 @@ class GlobalHtmlListener {
     const timeout = GlobalHtmlListener.radioClickedTimeouts.get(event.target as any);
     clearTimeout(timeout);
     GlobalHtmlListener.radioClickedTimeouts.delete(event.target as any);
-  }
-
-  private static onChatMutation(mutations: MutationRecord[]): void {
-    for (const mutation of mutations) {
-      mutation.addedNodes.forEach(node => {
-        if (node instanceof HTMLElement) {
-          GlobalHtmlListener.removeDmSecrets(node);
-        }
-      });
-    }
-  }
-
-  private static removeDmSecrets(element: HTMLElement): void {
-    if (element.classList.contains(`${staticValues.moduleName}-gm-secret`)) {
-      element.remove();
-      return;
-    }
-    element.querySelectorAll(`:scope .${staticValues.moduleName}-gm-secret`).forEach(found => {
-      found.remove();
-    });
   }
 }
 
