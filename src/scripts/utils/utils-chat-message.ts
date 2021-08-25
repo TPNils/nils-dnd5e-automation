@@ -101,10 +101,7 @@ export class UtilsChatMessage {
   private static readonly actionMatches: Array<{regex: RegExp, execute(event: MouseEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData>}> = [
     {
       regex: /^refresh$/, // used for testing during dev
-      execute: (event, regexResult, messageId, messageData) => {
-        console.log('refresh')
-        return Promise.resolve(messageData);
-      },
+      execute: (event, regexResult, messageId, messageData) => Promise.resolve(messageData),
     },
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)$/,
@@ -437,7 +434,6 @@ export class UtilsChatMessage {
         const log = document.querySelector("#chat-log");
         const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
         let response = await actionMatch.execute(event, result, messageId, deepClone(messageData));
-        console.log('response')
         if (response) {
           response = await UtilsChatMessage.calculateTargetResult(response);
           const html = await UtilsChatMessage.generateTemplate(response);
@@ -559,7 +555,6 @@ export class UtilsChatMessage {
         }
       }
     }
-    console.log(target);
     if (!target || target.check?.evaluatedRoll?.evaluated) {
       // If no target was found or target already rolled, do nothing
       // TODO should create a new card (?)
@@ -581,7 +576,6 @@ export class UtilsChatMessage {
 
     target.check.evaluatedRoll = roll.toJSON();
 
-    console.log(deepClone(messageData));
     return messageData;
   }
 
