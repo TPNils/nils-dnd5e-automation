@@ -184,10 +184,10 @@ export class UtilsChatMessage {
       img: item.img,
     };
 
-    if (item.data.data.description.value) {
+    if (item.data.data.description?.value) {
       itemCardData.description =item.data.data.description.value
     }
-    if (item.data.data.materials.value) {
+    if (item.data.data.materials?.value) {
       itemCardData.materials = item.data.data.materials.value
     }
 
