@@ -100,6 +100,13 @@ export class UtilsChatMessage {
 
   private static readonly actionMatches: Array<{regex: RegExp, execute(event: MouseEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData>}> = [
     {
+      regex: /^refresh$/, // used for testing during dev
+      execute: (event, regexResult, messageId, messageData) => {
+        console.log('refresh')
+        return Promise.resolve(messageData);
+      },
+    },
+    {
       regex: /^item-([0-9]+)-damage-([0-9]+)$/,
       execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemDamage(event, Number(regexResult[2]), Number(regexResult[1]), messageData),
     },
@@ -114,6 +121,10 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)$/,
       execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemCheck(Number(regexResult[1]), regexResult[2], messageData),
+    },
+    {
+      regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-mode-(minus|plus)$/,
+      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemCheckMode(event, Number(regexResult[1]), regexResult[2], regexResult[3] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^apply-damage-([a-zA-Z0-9\.]+)$/,
@@ -595,6 +606,46 @@ export class UtilsChatMessage {
 
     const originalRoll = Roll.fromJSON(JSON.stringify(attack.evaluatedRoll));
     attack.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, attack.mode)).toJSON();
+
+    return messageData;
+  }
+
+  private static async processItemCheckMode(event: MouseEvent, itemIndex: number, targetUuid: string, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
+    
+    if (!messageData.items?.[itemIndex]?.check) {
+      console.warn('No check found')
+      return;
+    }
+
+    let target: ItemCardItemData['targets'][0];
+    if (messageData.items[itemIndex].targets) {
+      for (const t of messageData.items[itemIndex].targets) {
+        if (t.uuid === targetUuid) {
+          target = t;
+          break;
+        }
+      }
+    }
+  
+    let modifier = modName === 'plus' ? 1 : -1;
+    if (event.shiftKey && modifier > 0) {
+      modifier++;
+    } else if (event.shiftKey && modifier < 0) {
+      modifier--;
+    }
+    
+    const order: Array<typeof target.check.mode> = ['disadvantage', 'normal', 'advantage'];
+    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(target.check.mode) + modifier));
+    if (target.check.mode === order[newIndex]) {
+      return;
+    }
+    target.check.mode = order[newIndex];
+    if (!target.check.evaluatedRoll) {
+      return messageData;
+    }
+
+    const originalRoll = Roll.fromJSON(JSON.stringify(target.check.evaluatedRoll));
+    target.check.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, target.check.mode)).toJSON();
 
     return messageData;
   }

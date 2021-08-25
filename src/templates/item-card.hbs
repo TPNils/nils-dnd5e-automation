@@ -7,7 +7,7 @@
     <div>
       <div class="{{@root.staticValues.moduleName}}-header">
         <img src="{{item.img}}" title="{{item.name}}" width="36" height="36"/>
-        <h3 class="{{@root.staticValues.moduleName}}-item-name">{{item.name}}</h3>
+        <h3 class="{{@root.staticValues.moduleName}}-item-name" data-{{@root.staticValues.moduleName}}-action="refresh">{{item.name}}</h3>
       </div>
 
       <div class="{{@root.staticValues.moduleName}}-section">
@@ -26,7 +26,7 @@
               <div class="{{@root.staticValues.moduleName}}-flavor">
                 {{#if item.attack.evaluatedRoll}}{{item.attack.mode}}{{else}}&nbsp;{{/if}}
               </div>
-              <div class="{{@root.staticValues.moduleName}}-attack-wrapper {{@root.staticValues.moduleName}}-attack-mode-{{item.attack.mode}}">
+              <div class="{{@root.staticValues.moduleName}}-roll-wrapper">
                 {{#if item.attack.evaluatedRoll}}
                   <div>
                     {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=item.attack.evaluatedRoll}}
@@ -41,8 +41,8 @@
                   </button>
                 {{/if}}
                 
-                <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-minus" class="{{@root.staticValues.moduleName}}-item-attack-mode-minus" {{#if (eq item.attack.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
-                <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-plus" class="{{@root.staticValues.moduleName}}-item-attack-mode-plus" {{#if (eq item.attack.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+                <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq item.attack.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+                <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq item.attack.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
               </div>
             </div>
           {{/if}}
@@ -88,21 +88,29 @@
                   <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
                   <td>{{target.name}}</td>
                   <td>
-                    {{#if target.check.evaluatedRoll.evaluated}}
-                      <div class="{{@root.staticValues.moduleName}}-check-{{#if target.result.checkPass}}pass{{else}}fail{{/if}}">
-                        {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=target.check.evaluatedRoll compact=true}}
-                      </div>
-                    {{else}}
-                      <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}">
-                        {{#if item.check.label}}
-                        {{item.check.label}}
-                        {{else if item.check.addSaveBonus}}
-                        {{localize "DND5E.SavingThrow"}}
-                        {{else}}
-                        Ability check
-                        {{/if}}
-                      </button>
-                    {{/if}}
+                    <div class="{{@root.staticValues.moduleName}}-roll-wrapper">
+                      {{#if target.check.evaluatedRoll.evaluated}}
+                        <div class="{{@root.staticValues.moduleName}}-check-{{#if target.result.checkPass}}pass{{else}}fail{{/if}}">
+                          {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=target.check.evaluatedRoll compact=true}}
+                        </div>
+                      {{else}}
+                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}">
+                          {{#if (eq target.check.mode 'normal')}}
+                            {{#if item.check.label}}
+                              {{item.check.label}}
+                            {{else if item.check.addSaveBonus}}
+                              {{localize "DND5E.SavingThrow"}}
+                            {{else}}
+                              Ability check
+                            {{/if}}
+                          {{else}}
+                            {{target.check.mode}}
+                          {{/if}}
+                        </button>
+                      {{/if}}
+                      <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq target.check.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+                      <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq target.check.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+                    </div>
                   </td>
                 </tr>
               {{/each}}
