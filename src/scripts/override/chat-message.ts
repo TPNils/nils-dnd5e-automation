@@ -11,7 +11,8 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
     const secrets = response.find(`[data-${staticValues.moduleName}-secret]`);
     for (const item of secrets) {
       const secretFilters = item.getAttribute(`data-${staticValues.moduleName}-secret`).split(';');
-      let matchesFilter = false;
+      // no filters = always visible
+      let matchesFilter = secrets.length === 0;
 
       for (const filter of secretFilters) {
         if ((filter.toLowerCase() === 'gm' || filter.toLowerCase() === 'dm') && game.user.isGM) {
@@ -25,14 +26,14 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
         }
         if (filter.toLowerCase().startsWith('actorowneruuid:')) {
           const actor = await UtilsDocument.actorFromUuid(filter.substring(15));
-          // always show deleted actors
+          // always show missing/invalid/deleted/null actors
           if (!actor || actor.isOwner) {
             matchesFilter = true;
           }
         }
         if (filter.toLowerCase().startsWith('actorownerid:')) {
           const actor = game.actors.get(filter.substring(13));
-          // always show deleted actors
+          // always show missing/invalid/deleted/null actors
           if (!actor || actor.isOwner) {
             matchesFilter = true;
           }
