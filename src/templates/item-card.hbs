@@ -32,7 +32,7 @@
                     {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=item.attack.evaluatedRoll}}
                   </div>
                 {{else}}
-                  <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack" class="{{@root.staticValues.moduleName}}-item-attack">
+                  <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack" class="{{@root.staticValues.moduleName}}-item-attack" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}">
                     {{#if (eq item.attack.mode 'normal')}}
                       {{#if item.attack.label}}{{item.attack.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}
                     {{else}}
@@ -40,9 +40,9 @@
                     {{/if}}
                   </button>
                 {{/if}}
-                
-                <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq item.attack.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
-                <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq item.attack.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+                  
+                  <button data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq item.attack.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq item.attack.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
               </div>
             </div>
           {{/if}}
@@ -57,7 +57,13 @@
                 {{#if this.roll.evaluated}}
                   {{> modules/nils-automated-compendium/templates/roll/roll.hbs overrideFormula=this.displayFormula roll=this.roll}}
                 {{else}}
-                  <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-damage-0">{{#if this.label}}{{this.label}}{{else}}{{localize "DND5E.Damage"}}{{/if}}</button>
+                  <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-damage-0" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}">
+                    {{#if this.label}}
+                      {{this.label}}
+                    {{else}}
+                      {{localize "DND5E.Damage"}}
+                    {{/if}}
+                  </button>
                 {{/if}}
               </div>
             </div>
@@ -70,7 +76,13 @@
             {{#if dmg.roll.evaluated}}
               {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=dmg.displayDamageTypes overrideFormula=dmg.displayFormula roll=dmg.roll}}
             {{else}}
-              <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-damage-{{dmgIndex}}">{{#if dmg.label}}{{dmg.label}}{{else}}{{localize "DND5E.Damage"}}{{/if}}</button>
+              <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-damage-{{dmgIndex}}" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}">
+                {{#if dmg.label}}
+                  {{dmg.label}}
+                {{else}}
+                  {{localize "DND5E.Damage"}}
+                {{/if}}
+              </button>
             {{/if}}
           {{/if}}
         {{/each}}
@@ -94,7 +106,7 @@
                           {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=target.check.evaluatedRoll compact=true}}
                         </div>
                       {{else}}
-                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}">
+                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{target.uuid}}">
                           {{#if (eq target.check.mode 'normal')}}
                             {{#if item.check.label}}
                               {{item.check.label}}
@@ -108,8 +120,8 @@
                           {{/if}}
                         </button>
                       {{/if}}
-                      <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq target.check.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
-                      <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq target.check.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+                      <button data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{target.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq target.check.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+                      <button data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{target.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq target.check.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
                     </div>
                   </td>
                 </tr>

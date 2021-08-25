@@ -21,6 +21,7 @@ export interface ItemCardItemData {
   materials?: string;
   targets?: {
     uuid: string;
+    actorUuid: string;
     ac: number;
     img?: string;
     name?: string;
@@ -96,40 +97,52 @@ export interface ItemCardData {
   }[]
 }
 
+interface ActionParam {event: MouseEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData};
+type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, tokenUuid?: string, message?: boolean};
+type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
+
 export class UtilsChatMessage {
 
-  private static readonly actionMatches: Array<{regex: RegExp, execute(event: MouseEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData): Promise<void | ItemCardData>}> = [
+  private static readonly actionMatches: Array<{regex: RegExp, permissionCheck: ActionPermissionCheck, execute: ActionPermissionExecute}> = [
     {
       regex: /^refresh$/, // used for testing during dev
-      execute: (event, regexResult, messageId, messageData) => Promise.resolve(messageData),
+      permissionCheck: () => {return {message: true}},
+      execute: ({messageData}) => Promise.resolve(messageData),
     },
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)$/,
-      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemDamage(event, Number(regexResult[2]), Number(regexResult[1]), messageData),
+      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
+      execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemDamage(event, Number(regexResult[2]), Number(regexResult[1]), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack$/,
-      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemAttack(event, Number(regexResult[1]), messageData),
+      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
+      execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemAttack(event, Number(regexResult[1]), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
-      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemAttackMode(event, Number(regexResult[1]), regexResult[2] as ('plus' | 'minus'), messageData),
+      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
+      execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemAttackMode(event, Number(regexResult[1]), regexResult[2] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)$/,
-      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemCheck(Number(regexResult[1]), regexResult[2], messageData),
+      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
+      execute: ({regexResult, messageData}) => UtilsChatMessage.processItemCheck(Number(regexResult[1]), regexResult[2], messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-mode-(minus|plus)$/,
-      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.processItemCheckMode(event, Number(regexResult[1]), regexResult[2], regexResult[3] as ('plus' | 'minus'), messageData),
+      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
+      execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemCheckMode(event, Number(regexResult[1]), regexResult[2], regexResult[3] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^apply-damage-([a-zA-Z0-9\.]+)$/,
-      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.applyDamage(regexResult[1], messageData, messageId),
+      permissionCheck: ({regexResult}) => {return {message: true, tokenUuid: regexResult[1]}},
+      execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.applyDamage(regexResult[1], messageData, messageId),
     },
     {
       regex: /^undo-damage-([a-zA-Z0-9\.]+)$/,
-      execute: (event, regexResult, messageId, messageData) => UtilsChatMessage.undoDamage(regexResult[1], messageData, messageId),
+      permissionCheck: ({regexResult}) => {return {message: true, tokenUuid: regexResult[1]}},
+      execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.undoDamage(regexResult[1], messageData, messageId),
     },
   ];
 
@@ -362,6 +375,7 @@ export class UtilsChatMessage {
       const actor = token.getActor() as MyActor;
       const target: ItemCardItemData['targets'][0] = {
         uuid: targetUuid,
+        actorUuid: actor.uuid,
         ac: actor.data.data.attributes.ac.value,
         img: token.data.img,
         name: token.data.name,
@@ -381,6 +395,7 @@ export class UtilsChatMessage {
       itemCardItemData.targets.push(target);
     }
     itemCardItemData.targets = itemCardItemData.targets.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    console.log('targets', itemCardItemData.targets);
 
     return itemCardItemData;
   }
@@ -419,9 +434,6 @@ export class UtilsChatMessage {
     }
     
     const message = game.messages.get(messageId);
-    if (!message.isAuthor && !game.user.isGM) {
-      return;
-    }
     let messageData = message.getFlag(staticValues.moduleName, 'data') as ItemCardData;
     if (messageData == null) {
       console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} but no data was found`);
@@ -431,9 +443,29 @@ export class UtilsChatMessage {
     for (const actionMatch of UtilsChatMessage.actionMatches) {
       const result = actionMatch.regex.exec(action);
       if (result) {
+        const param: ActionParam = {event: event, regexResult: result, messageId: messageId, messageData: deepClone(messageData)};
+        const permissionCheck = actionMatch.permissionCheck(param);
+        if (permissionCheck.message) {
+          if (!message.isAuthor && !game.user.isGM) {
+            continue;
+          }
+        }
+        if (permissionCheck.actorUuid) {
+          const actor = await UtilsDocument.actorFromUuid(permissionCheck.actorUuid);
+          if (actor && !actor.isOwner) {
+            continue;
+          }
+        }
+        if (permissionCheck.tokenUuid) {
+          const token = await UtilsDocument.tokenFromUuid(permissionCheck.tokenUuid);
+          if (token && !token.isOwner) {
+            continue;
+          }
+        }
+        // TODO run as GM if user does not have the message permissions and does not need them
         const log = document.querySelector("#chat-log");
         const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
-        let response = await actionMatch.execute(event, result, messageId, deepClone(messageData));
+        let response = await actionMatch.execute(param);
         if (response) {
           response = await UtilsChatMessage.calculateTargetResult(response);
           const html = await UtilsChatMessage.generateTemplate(response);
@@ -457,6 +489,12 @@ export class UtilsChatMessage {
   }
 
   private static async processItemAttack(event: MouseEvent, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+    {
+      const actor = messageData.actor?.uuid == null ? null : (await UtilsDocument.actorFromUuid(messageData.actor.uuid));
+      if (actor && !actor.isOwner) {
+        return;
+      }
+    }
     if (messageData.items[itemIndex].attack.evaluatedRoll) {
       // If attack was already rolled, do nothing
       // TODO should create a new card (?)
@@ -545,6 +583,10 @@ export class UtilsChatMessage {
       console.warn('No check found')
       return;
     }
+    const targetActor = (await UtilsDocument.tokenFromUuid(targetUuid)).getActor() as MyActor;
+    if (!targetActor.isOwner) {
+      return;
+    }
 
     let target: ItemCardItemData['targets'][0];
     if (messageData.items[itemIndex].targets) {
@@ -568,7 +610,6 @@ export class UtilsChatMessage {
       }
     }
 
-    const targetActor = (await UtilsDocument.tokenFromUuid(targetUuid)).getActor() as MyActor;
     let roll = UtilsRoll.getAbilityRoll(targetActor, {ability: check.ability, skill: check.skill, addSaveBonus: check.addSaveBonus});
     roll = await UtilsRoll.setRollMode(roll, target.check.mode);
     roll = await roll.roll({async: true});
@@ -580,6 +621,12 @@ export class UtilsChatMessage {
   }
 
   private static async processItemAttackMode(event: MouseEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
+    {
+      const actor = messageData.actor?.uuid == null ? null : (await UtilsDocument.actorFromUuid(messageData.actor.uuid));
+      if (actor && !actor.isOwner) {
+        return;
+      }
+    }
     const attack = messageData.items[itemIndex].attack;
     let modifier = modName === 'plus' ? 1 : -1;
     if (event.shiftKey && modifier > 0) {
@@ -605,9 +652,12 @@ export class UtilsChatMessage {
   }
 
   private static async processItemCheckMode(event: MouseEvent, itemIndex: number, targetUuid: string, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
-    
     if (!messageData.items?.[itemIndex]?.check) {
       console.warn('No check found')
+      return;
+    }
+    const targetActor = (await UtilsDocument.tokenFromUuid(targetUuid)).getActor() as MyActor;
+    if (!targetActor.isOwner) {
       return;
     }
 
@@ -645,6 +695,12 @@ export class UtilsChatMessage {
   }
 
   private static async processItemDamage(event: MouseEvent, damageIndex: number, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+    {
+      const actor = messageData.actor?.uuid == null ? null : (await UtilsDocument.actorFromUuid(messageData.actor.uuid));
+      if (actor && !actor.isOwner) {
+        return;
+      }
+    }
     // If damage was already rolled, do nothing
     // TODO should create a new card (?)
     const roll = messageData.items[itemIndex].damages[damageIndex].roll;
