@@ -25,14 +25,14 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
       if (filter.toLowerCase().startsWith('actorowneruuid:')) {
         const actor = await UtilsDocument.actorFromUuid(filter.substring(15));
         // always show deleted actors
-        if (!actor || actor.owner) {
+        if (!actor || actor.isOwner) {
           matchesFilter = true;
         }
       }
       if (filter.toLowerCase().startsWith('actorownerid:')) {
         const actor = game.actors.get(filter.substring(13));
         // always show deleted actors
-        if (!actor || actor.owner) {
+        if (!actor || actor.isOwner) {
           matchesFilter = true;
         }
       }
