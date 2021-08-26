@@ -135,12 +135,12 @@ export class UtilsChatMessage {
       execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemCheckMode(event, Number(regexResult[1]), regexResult[2], regexResult[3] as ('plus' | 'minus'), messageData),
     },
     {
-      regex: /^apply-damage-([a-zA-Z0-9\.]+)$/,
+      regex: /^apply-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
       permissionCheck: ({regexResult}) => {return {message: true, tokenUuid: regexResult[1]}},
       execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.applyDamage(regexResult[1], messageData, messageId),
     },
     {
-      regex: /^undo-damage-([a-zA-Z0-9\.]+)$/,
+      regex: /^undo-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
       permissionCheck: ({regexResult}) => {return {message: true, tokenUuid: regexResult[1]}},
       execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.undoDamage(regexResult[1], messageData, messageId),
     },
@@ -715,70 +715,79 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async applyDamage(tokenUuid: string, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
+  private static async applyDamage(tokenUuid: string | '*', messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
     if (!messageData.targetAggregate) {
       return;
     }
-    let tokenResponse: ItemCardData['targetAggregate'][0];
-    for (const aggregate of messageData.targetAggregate) {
-      if (aggregate.uuid === tokenUuid) {
-        tokenResponse = aggregate;
-      }
+    let targetAggregates: ItemCardData['targetAggregate'];
+    if (tokenUuid === '*') {
+      targetAggregates = messageData.targetAggregate;
+    } else {
+      targetAggregates = messageData.targetAggregate.filter(aggr => aggr.uuid === tokenUuid);
     }
-    if (!tokenResponse) {
+    if (!targetAggregates.length) {
       console.warn(`Could not find an aggregate for token "${tokenUuid}" with messageId "${messageId}"`);
       return;
     }
-    const token = await UtilsDocument.tokenFromUuid(tokenUuid);
-    const actor = token.getActor() as MyActor;
 
-    CONFIG.Actor.documentClass.updateDocuments([{
-      _id: actor.id,
-      data: {
-        attributes: {
-          hp: {
-            value: tokenResponse.dmg.calcHp,
-            temp: tokenResponse.dmg.calcTemp,
+
+    for (const aggregate of targetAggregates) {
+      const token = await UtilsDocument.tokenFromUuid(aggregate.uuid);
+      const actor = token.getActor() as MyActor;
+      
+      // TODO preferable to not update in a loop... but since the parent is a single argument, I am not sure you can
+      await CONFIG.Actor.documentClass.updateDocuments([{
+        _id: actor.id,
+        data: {
+          attributes: {
+            hp: {
+              value: aggregate.dmg.calcHp,
+              temp: aggregate.dmg.calcTemp,
+            }
           }
         }
-      }
-    }], {
-      parent: actor.parent,
-      pack: actor.pack,
-    });
+      }], {
+        parent: actor.parent,
+        pack: actor.pack,
+      });
+    }
   }
   
   private static async undoDamage(tokenUuid: string, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
     if (!messageData.targetAggregate) {
       return;
     }
-    let tokenResponse: ItemCardData['targetAggregate'][0];
-    for (const aggregate of messageData.targetAggregate) {
-      if (aggregate.uuid === tokenUuid) {
-        tokenResponse = aggregate;
-      }
+    let targetAggregates: ItemCardData['targetAggregate'];
+    if (tokenUuid === '*') {
+      targetAggregates = messageData.targetAggregate;
+    } else {
+      targetAggregates = messageData.targetAggregate.filter(aggr => aggr.uuid === tokenUuid);
     }
-    if (!tokenResponse) {
+    if (!targetAggregates.length) {
       console.warn(`Could not find an aggregate for token "${tokenUuid}" with messageId "${messageId}"`);
       return;
     }
-    const token = await UtilsDocument.tokenFromUuid(tokenUuid);
-    const actor = token.getActor() as MyActor;
 
-    CONFIG.Actor.documentClass.updateDocuments([{
-      _id: actor.id,
-      data: {
-        attributes: {
-          hp: {
-            value: tokenResponse.hpSnapshot.hp,
-            temp: tokenResponse.hpSnapshot.temp,
+    for (const aggregate of targetAggregates) {
+      const token = await UtilsDocument.tokenFromUuid(aggregate.uuid);
+      const actor = token.getActor() as MyActor;
+      
+      // TODO preferable to not update in a loop... but since the parent is a single argument bulk, I am not sure you can
+      await CONFIG.Actor.documentClass.updateDocuments([{
+        _id: actor.id,
+        data: {
+          attributes: {
+            hp: {
+              value: aggregate.hpSnapshot.hp,
+              temp: aggregate.hpSnapshot.temp,
+            }
           }
         }
-      }
-    }], {
-      parent: actor.parent,
-      pack: actor.pack,
-    });
+      }], {
+        parent: actor.parent,
+        pack: actor.pack,
+      });
+    }
   }
 
   private static async calculateTargetResult(messageData: ItemCardData): Promise<ItemCardData> {

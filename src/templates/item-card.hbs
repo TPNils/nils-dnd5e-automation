@@ -171,6 +171,18 @@
               </td>
             </tr>
           {{/each}}
+          {{#ifCond data.targetAggregate.length '>' 1}}
+            <tr>
+              <td></td>
+              <td colspan="3">All</td>
+              <td class="{{@root.staticValues.moduleName}}-target-actions">
+                <div style="display: flex;">
+                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-*"><i class="fas fa-check"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-*"><i class="fas fa-undo"></i></button>
+                </div>
+              </td>
+            </tr>
+          {{/ifCond}}
         </tbody>
       </table>
     </section>
