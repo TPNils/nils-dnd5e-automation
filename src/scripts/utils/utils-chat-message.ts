@@ -92,6 +92,7 @@ export interface ItemCardData {
     },
     dmg?: {
       applied: boolean,
+      appliedDmg: number,
       rawDmg: number;
       calcDmg: number;
       calcHp: number;
@@ -745,7 +746,7 @@ export class UtilsChatMessage {
     for (const aggregate of targetAggregates) {
       const token = await UtilsDocument.tokenFromUuid(aggregate.uuid);
       const actor = token.getActor() as MyActor;
-      aggregate.dmg.applied = true;
+      aggregate.dmg.appliedDmg = aggregate.dmg.calcDmg;
       
       tokenActorUpdates.set(token.uuid, {
         _id: actor.id,
@@ -783,7 +784,7 @@ export class UtilsChatMessage {
     for (const aggregate of targetAggregates) {
       const token = await UtilsDocument.tokenFromUuid(aggregate.uuid);
       const actor = token.getActor() as MyActor;
-      aggregate.dmg.applied = false;
+      aggregate.dmg.appliedDmg = 0;
       
       tokenActorUpdates.set(token.uuid, {
         _id: actor.id,
@@ -886,6 +887,7 @@ export class UtilsChatMessage {
           hpSnapshot: oldAggregate.hpSnapshot,
           dmg: {
             applied: false,
+            appliedDmg: oldAggregate.dmg?.appliedDmg || 0,
             rawDmg: 0,
             calcDmg: 0,
             calcHp: oldAggregate.hpSnapshot.hp,
@@ -909,6 +911,7 @@ export class UtilsChatMessage {
           if (aggregate.dmg == null) {
             aggregate.dmg = {
               applied: false,
+              appliedDmg: 0,
               rawDmg: target.result.dmg.rawDmg,
               calcDmg: target.result.dmg.calcDmg,
               calcHp: 0,
@@ -922,13 +925,6 @@ export class UtilsChatMessage {
       }
     }
 
-    const oldAggregatesByUuid = new Map<string, ItemCardData['targetAggregate'][0]>();
-    if (messageData.targetAggregate) {
-      for (const aggregate of messageData.targetAggregate) {
-        oldAggregatesByUuid.set(aggregate.uuid, aggregate);
-      }
-    }
-
     messageData.targetAggregate = Array.from(aggregates.values()).sort((a, b) => (a.name || '').localeCompare((b.name || '')));
     for (const aggregate of messageData.targetAggregate) {
       if (aggregate.dmg) {
@@ -938,22 +934,15 @@ export class UtilsChatMessage {
         let calcTempDmg = Math.min(calcTemp, calcDmg);
         calcTemp -= calcTempDmg;
         calcHp = Math.max(0, calcHp - (calcDmg - calcTempDmg));
-        const oldAggregate = oldAggregatesByUuid.get(aggregate.uuid);
         
         aggregate.dmg = {
-          applied: true,
+          applied: calcDmg === aggregate.dmg.appliedDmg,
+          appliedDmg: aggregate.dmg.appliedDmg,
           rawDmg: aggregate.dmg.rawDmg,
           calcDmg: calcDmg,
           calcHp: calcHp,
           calcTemp: calcTemp,
         }
-        let sameAsOld = true;
-        for (const key of Object.keys(aggregate.dmg)) {
-          if (aggregate.dmg[key] !== oldAggregate?.dmg?.[key]) {
-            sameAsOld = false;
-          }
-        }
-        aggregate.dmg.applied = sameAsOld;
       }
     }
 
