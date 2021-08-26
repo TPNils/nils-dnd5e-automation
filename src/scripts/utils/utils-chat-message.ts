@@ -741,6 +741,8 @@ export class UtilsChatMessage {
       return;
     }
 
+    // TODO idea: popup to prompt a custom apply amount when applying to 1 token
+    // TODO idea: apply all does not apply to tokens which have already received damage
 
     const tokenActorUpdates = new Map<string, DeepPartial<MyActorData>>();
     for (const aggregate of targetAggregates) {
