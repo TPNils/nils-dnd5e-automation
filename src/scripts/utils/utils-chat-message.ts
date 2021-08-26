@@ -431,7 +431,6 @@ export class UtilsChatMessage {
       itemCardItemData.targets.push(target);
     }
     itemCardItemData.targets = itemCardItemData.targets.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    console.log('targets', itemCardItemData.targets);
 
     return itemCardItemData;
   }
@@ -496,10 +495,8 @@ export class UtilsChatMessage {
     let response: OnClickResponse;
     if (message.canUserModify(game.user, 'update')) {
       // User has all required permissions, run locally
-      console.log('local')
       response = await UtilsChatMessage.onClickProcessor(clickEvent, game.userId, messageId, action);
     } else {
-      console.log('gm')
       response = await provider.getSocket().then(socket => socket.executeAsGM('onItemCardClick', {event: clickEvent, userId: game.userId, messageId, action}));
     }
 
