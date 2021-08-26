@@ -1,4 +1,4 @@
-import { MyActor, MyItem } from "../types/fixed-types";
+import { MyActor, MyActorData, MyItem } from "../types/fixed-types";
 
 export class UtilsDocument {
 
@@ -66,6 +66,27 @@ export class UtilsDocument {
     }
     return Promise.all(uuids.map(tokenUuid => {
       return UtilsDocument.itemFromUuid(tokenUuid);
+    }));
+  }
+
+  public static async sceneFromUuid(uuid: string): Promise<Scene> {
+    try {
+      let document = await fromUuid(uuid);
+      if (document.documentName !== (Scene as any).documentName) {
+        throw new Error(`UUID '${uuid}' is not an ${(Scene as any).documentName}. In stead found: ${document.documentName}`)
+      }
+      return document as Scene;
+    } catch {
+      return null;
+    }
+  }
+
+  public static scenesFromUuid(uuids: string[], options: {deduplciate?: boolean} = {}): Promise<Scene[]> {
+    if (options.deduplciate) {
+      uuids = Array.from(new Set<string>(uuids));
+    }
+    return Promise.all(uuids.map(tokenUuid => {
+      return UtilsDocument.sceneFromUuid(tokenUuid);
     }));
   }
 
