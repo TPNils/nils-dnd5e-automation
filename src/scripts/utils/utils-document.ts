@@ -90,4 +90,47 @@ export class UtilsDocument {
     }));
   }
 
+  public static async updateTokenActors(actorDataByTokenUuid: Map<string, DeepPartial<MyActorData>>): Promise<void> {
+    const linkedActorUpdates = [];
+    const unlinkedActorUpdatesByParentUuid = new Map<string, Array<Partial<TokenDocument['data']>>>();
+
+    const tokensByUuid = new Map<string, TokenDocument>();
+    for (const token of (await UtilsDocument.tokensFromUuid(Array.from(actorDataByTokenUuid.keys())))) {
+      tokensByUuid.set(token.uuid, token);
+    }
+
+    for (const [tokenUuid, actorData] of actorDataByTokenUuid.entries()) {
+      const token = tokensByUuid.get(tokenUuid);
+      // token got deleted I guess?
+      if (!token) {
+        continue;
+      }
+
+      if (token.isLinked) {
+        linkedActorUpdates.push({
+          ...actorData,
+          _id: (token.getActor() as MyActor).id,
+        });
+      } else {
+        if (!unlinkedActorUpdatesByParentUuid.has(token.parent.uuid)) {
+          unlinkedActorUpdatesByParentUuid.set(token.parent.uuid, []);
+        }
+        unlinkedActorUpdatesByParentUuid.get(token.parent.uuid).push({
+          _id: token.id,
+          actorData: actorData
+        });
+      }
+    }
+
+    const promises: Promise<any>[] = [];
+    if (linkedActorUpdates.length > 0) {
+      promises.push(CONFIG.Actor.documentClass.updateDocuments(linkedActorUpdates));
+    }
+    for (const [parentUuid, actorUpdates] of unlinkedActorUpdatesByParentUuid.entries()) {
+      promises.push(fromUuid(parentUuid).then(parent => parent.updateEmbeddedDocuments('Token', actorUpdates)));
+    }
+
+    return Promise.all(promises).then();
+  }
+
 }

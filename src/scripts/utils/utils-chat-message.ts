@@ -97,7 +97,14 @@ export interface ItemCardData {
   }[]
 }
 
-interface ActionParam {event: MouseEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData};
+interface ClickEvent {
+  readonly altKey: boolean;
+  readonly ctrlKey: boolean;
+  readonly metaKey: boolean;
+  readonly shiftKey: boolean;
+}
+
+interface ActionParam {event: ClickEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData};
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, tokenUuid?: string, message?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
 
@@ -112,12 +119,12 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)$/,
       permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
-      execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemDamage(event, Number(regexResult[2]), Number(regexResult[1]), messageData),
+      execute: ({regexResult, messageData}) => UtilsChatMessage.processItemDamage(Number(regexResult[2]), Number(regexResult[1]), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack$/,
       permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
-      execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemAttack(event, Number(regexResult[1]), messageData),
+      execute: ({regexResult, messageData}) => UtilsChatMessage.processItemAttack(Number(regexResult[1]), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
@@ -488,7 +495,7 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async processItemAttack(event: MouseEvent, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttack(itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     {
       const actor = messageData.actor?.uuid == null ? null : (await UtilsDocument.actorFromUuid(messageData.actor.uuid));
       if (actor && !actor.isOwner) {
@@ -620,7 +627,7 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async processItemAttackMode(event: MouseEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttackMode(event: ClickEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
     {
       const actor = messageData.actor?.uuid == null ? null : (await UtilsDocument.actorFromUuid(messageData.actor.uuid));
       if (actor && !actor.isOwner) {
@@ -651,7 +658,7 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async processItemCheckMode(event: MouseEvent, itemIndex: number, targetUuid: string, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemCheckMode(event: ClickEvent, itemIndex: number, targetUuid: string, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
     if (!messageData.items?.[itemIndex]?.check) {
       console.warn('No check found')
       return;
@@ -694,7 +701,7 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async processItemDamage(event: MouseEvent, damageIndex: number, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemDamage(damageIndex: number, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     {
       const actor = messageData.actor?.uuid == null ? null : (await UtilsDocument.actorFromUuid(messageData.actor.uuid));
       if (actor && !actor.isOwner) {
@@ -731,12 +738,12 @@ export class UtilsChatMessage {
     }
 
 
+    const tokenActorUpdates = new Map<string, DeepPartial<MyActorData>>();
     for (const aggregate of targetAggregates) {
       const token = await UtilsDocument.tokenFromUuid(aggregate.uuid);
       const actor = token.getActor() as MyActor;
       
-      // TODO preferable to not update in a loop... but since the parent is a single argument, I am not sure you can
-      await CONFIG.Actor.documentClass.updateDocuments([{
+      tokenActorUpdates.set(token.uuid, {
         _id: actor.id,
         data: {
           attributes: {
@@ -746,11 +753,9 @@ export class UtilsChatMessage {
             }
           }
         }
-      }], {
-        parent: actor.parent,
-        pack: actor.pack,
       });
     }
+    UtilsDocument.updateTokenActors(tokenActorUpdates);
   }
   
   private static async undoDamage(tokenUuid: string, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
@@ -768,12 +773,13 @@ export class UtilsChatMessage {
       return;
     }
 
+    
+    const tokenActorUpdates = new Map<string, DeepPartial<MyActorData>>();
     for (const aggregate of targetAggregates) {
       const token = await UtilsDocument.tokenFromUuid(aggregate.uuid);
       const actor = token.getActor() as MyActor;
       
-      // TODO preferable to not update in a loop... but since the parent is a single argument bulk, I am not sure you can
-      await CONFIG.Actor.documentClass.updateDocuments([{
+      tokenActorUpdates.set(token.uuid, {
         _id: actor.id,
         data: {
           attributes: {
@@ -783,11 +789,9 @@ export class UtilsChatMessage {
             }
           }
         }
-      }], {
-        parent: actor.parent,
-        pack: actor.pack,
       });
     }
+    UtilsDocument.updateTokenActors(tokenActorUpdates);
   }
 
   private static async calculateTargetResult(messageData: ItemCardData): Promise<ItemCardData> {
