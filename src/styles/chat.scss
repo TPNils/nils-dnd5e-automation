@@ -144,6 +144,12 @@
     :hover .#{$module-name}-roll-wrapper .#{$module-name}-mode-plus{
       display: block;
     }
+
+    .#{$module-name}-damage-applied {
+      .#{$module-name}-apply-damage {
+        color: green;
+      }
+    }
     
     .#{$module-name}-roll-wrapper {
       position: relative;
@@ -186,8 +192,8 @@
     }
 
     
-    [data-#{$module-name}-action^="apply-damage-"],
-    [data-#{$module-name}-action^="undo-damage-"] {
+    .#{$module-name}-apply-damage,
+    .#{$module-name}-undo-damage {
       font-size: 10px;
       height: 20px;
       width: 20px;

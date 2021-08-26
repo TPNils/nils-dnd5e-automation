@@ -158,27 +158,27 @@
         </thead>
         <tbody>
           {{#each data.targetAggregate as |target|}}
-            <tr>
+            <tr {{#if target.dmg.applied}}class="{{@root.staticValues.moduleName}}-damage-applied"{{/if}}>
               <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
               <td>{{target.name}}</td>
               <td style="text-align: center;">{{target.hpSnapshot.hp}}{{#if target.hpSnapshot.temp}}[{{target.hpSnapshot.temp}}]{{/if}}</td>
               <td style="text-align: center;">{{target.dmg.calcHp}}{{#if target.hpSnapshot.temp}}{{#if target.dmg.calcTemp}}[{{target.dmg.calcTemp}}]{{/if}}{{/if}}</td>
               <td class="{{@root.staticValues.moduleName}}-target-actions">
                 <div style="display: flex;">
-                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-{{target.uuid}}"><i class="fas fa-check"></i></button>
-                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-{{target.uuid}}"><i class="fas fa-undo"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-apply-damage"><i class="fas fa-check"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-undo-damage"><i class="fas fa-undo"></i></button>
                 </div>
               </td>
             </tr>
           {{/each}}
           {{#ifCond data.targetAggregate.length '>' 1}}
-            <tr>
+            <tr {{#if @root.data.allDmgApplied}}class="{{@root.staticValues.moduleName}}-damage-applied"{{/if}}>
               <td></td>
               <td colspan="3">All</td>
               <td class="{{@root.staticValues.moduleName}}-target-actions">
                 <div style="display: flex;">
-                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-*"><i class="fas fa-check"></i></button>
-                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-*"><i class="fas fa-undo"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-*" class="{{@root.staticValues.moduleName}}-apply-damage"><i class="fas fa-check"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-*" class="{{@root.staticValues.moduleName}}-undo-damage"><i class="fas fa-undo"></i></button>
                 </div>
               </td>
             </tr>

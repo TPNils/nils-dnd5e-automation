@@ -1,4 +1,5 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
+import { deepEqual, deepStrictEqual } from "assert";
 import * as path from "path";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyActorData, MyItem } from "../types/fixed-types";
@@ -80,6 +81,7 @@ export interface ItemCardData {
   actor?: ItemCardActorData;
   items: ItemCardItemData[];
   token?: ItemCardTokenData;
+  allDmgApplied?: boolean;
   targetAggregate?: {
     uuid: string;
     img?: string;
@@ -89,6 +91,7 @@ export interface ItemCardData {
       temp?: number;
     },
     dmg?: {
+      applied: boolean,
       rawDmg: number;
       calcDmg: number;
       calcHp: number;
@@ -742,6 +745,7 @@ export class UtilsChatMessage {
     for (const aggregate of targetAggregates) {
       const token = await UtilsDocument.tokenFromUuid(aggregate.uuid);
       const actor = token.getActor() as MyActor;
+      aggregate.dmg.applied = true;
       
       tokenActorUpdates.set(token.uuid, {
         _id: actor.id,
@@ -755,7 +759,8 @@ export class UtilsChatMessage {
         }
       });
     }
-    UtilsDocument.updateTokenActors(tokenActorUpdates);
+    await UtilsDocument.updateTokenActors(tokenActorUpdates);
+    return messageData;
   }
   
   private static async undoDamage(tokenUuid: string, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
@@ -778,6 +783,7 @@ export class UtilsChatMessage {
     for (const aggregate of targetAggregates) {
       const token = await UtilsDocument.tokenFromUuid(aggregate.uuid);
       const actor = token.getActor() as MyActor;
+      aggregate.dmg.applied = false;
       
       tokenActorUpdates.set(token.uuid, {
         _id: actor.id,
@@ -791,7 +797,8 @@ export class UtilsChatMessage {
         }
       });
     }
-    UtilsDocument.updateTokenActors(tokenActorUpdates);
+    await UtilsDocument.updateTokenActors(tokenActorUpdates);
+    return messageData;
   }
 
   private static async calculateTargetResult(messageData: ItemCardData): Promise<ItemCardData> {
@@ -878,6 +885,7 @@ export class UtilsChatMessage {
           img: oldAggregate.img,
           hpSnapshot: oldAggregate.hpSnapshot,
           dmg: {
+            applied: false,
             rawDmg: 0,
             calcDmg: 0,
             calcHp: oldAggregate.hpSnapshot.hp,
@@ -900,6 +908,7 @@ export class UtilsChatMessage {
           const aggregate = aggregates.get(target.uuid);
           if (aggregate.dmg == null) {
             aggregate.dmg = {
+              applied: false,
               rawDmg: target.result.dmg.rawDmg,
               calcDmg: target.result.dmg.calcDmg,
               calcHp: 0,
@@ -913,6 +922,13 @@ export class UtilsChatMessage {
       }
     }
 
+    const oldAggregatesByUuid = new Map<string, ItemCardData['targetAggregate'][0]>();
+    if (messageData.targetAggregate) {
+      for (const aggregate of messageData.targetAggregate) {
+        oldAggregatesByUuid.set(aggregate.uuid, aggregate);
+      }
+    }
+
     messageData.targetAggregate = Array.from(aggregates.values()).sort((a, b) => (a.name || '').localeCompare((b.name || '')));
     for (const aggregate of messageData.targetAggregate) {
       if (aggregate.dmg) {
@@ -922,15 +938,26 @@ export class UtilsChatMessage {
         let calcTempDmg = Math.min(calcTemp, calcDmg);
         calcTemp -= calcTempDmg;
         calcHp = Math.max(0, calcHp - (calcDmg - calcTempDmg));
+        const oldAggregate = oldAggregatesByUuid.get(aggregate.uuid);
         
         aggregate.dmg = {
+          applied: true,
           rawDmg: aggregate.dmg.rawDmg,
           calcDmg: calcDmg,
           calcHp: calcHp,
           calcTemp: calcTemp,
         }
+        let sameAsOld = true;
+        for (const key of Object.keys(aggregate.dmg)) {
+          if (aggregate.dmg[key] !== oldAggregate?.dmg?.[key]) {
+            sameAsOld = false;
+          }
+        }
+        aggregate.dmg.applied = sameAsOld;
       }
     }
+
+    messageData.allDmgApplied = messageData.targetAggregate != null && messageData.targetAggregate.filter(aggr => aggr.dmg?.applied).length === messageData.targetAggregate.length;
 
     return messageData;
   }
