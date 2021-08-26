@@ -1,6 +1,4 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
-import { deepEqual, deepStrictEqual } from "assert";
-import * as path from "path";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyActorData, MyItem } from "../types/fixed-types";
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
@@ -368,6 +366,22 @@ export class UtilsChatMessage {
         ability: item.data.data.save.ability,
         dc: item.data.data.save.dc,
         addSaveBonus: true,
+      }
+    }
+
+    // Damage modifier
+    if (itemCardData.check && itemCardData.damages) {
+      let modfierRule: ItemCardItemData['damages'][0]['modfierRule'] = 'save-halve-dmg';
+      if (item.type === 'spell') {
+        if (item.data.data.level === 0) {
+          // Official cantrips never deal half damage
+          modfierRule = 'save-no-dmg';
+        }
+      }
+
+      // TODO be smart like midi-qol and inject add these type into the item sheet
+      for (const damage of itemCardData.damages) {
+        damage.modfierRule = modfierRule;
       }
     }
 
