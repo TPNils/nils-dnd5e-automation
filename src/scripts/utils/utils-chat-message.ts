@@ -832,22 +832,46 @@ export class UtilsChatMessage {
 
       // Check
       if (item.check) {
-        // TODO
+        for (const target of item.targets) {
+          if (!target.check?.evaluatedRoll?.evaluated) {
+            target.result.checkPass = null;
+          } else {
+            target.result.checkPass = target.check.evaluatedRoll.total >= item.check.dc;
+          }
+        }
       }
 
       // TODO damage should take checks into account
       // Include when no attack has happend (null) and when hit (true)
-      const hitTargets = item.targets.filter(target => target.result.hit !== false);
-
-      // TODO saving throw
+      // Include when no check is present in the item or the check happend (check passed/failed is handled later)
+      const calcDmgForTargets = item.targets.filter(target => target.result.hit !== false && (!item.check || target.check?.evaluatedRoll?.evaluated));
 
       // Damage
       const evaluatedDamageRolls = item.damages ? item.damages.filter(dmg => dmg.roll.evaluated) : [];
-      if (hitTargets.length > 0 && evaluatedDamageRolls.length > 0) {
+      if (calcDmgForTargets.length > 0 && evaluatedDamageRolls.length > 0) {
         for (const damage of evaluatedDamageRolls) {
           const damageResults = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(damage.roll)));
-          for (const target of hitTargets) {
+          for (const target of calcDmgForTargets) {
             for (const [dmgType, dmg] of damageResults.entries()) {
+              let baseDmg = dmg;
+              if (item.check && target.result.checkPass) {
+                // If a creature or an object has resistance to a damage type, damage of that type is halved against it.
+                // I read that as, first apply the save modifier, not at the same time or not after res/vuln
+                switch (damage.modfierRule) {
+                  case 'save-full-dmg': {
+                    break;
+                  }
+                  case 'save-no-dmg': {
+                    baseDmg = 0;
+                    break;
+                  }
+                  case 'save-halve-dmg':
+                  default: {
+                    baseDmg = baseDmg * .5;
+                    break;
+                  }
+                }
+              }
               let modifier = 1;
               if (target.immunities.includes(dmgType)) {
                 modifier = 0;
@@ -862,13 +886,13 @@ export class UtilsChatMessage {
 
               if (UtilsChatMessage.healingDamageTypes.includes(dmgType)) {
                 target.result.dmg = {
-                  rawDmg: -dmg,
-                  calcDmg: -Math.floor(dmg * modifier),
+                  rawDmg: -baseDmg,
+                  calcDmg: -Math.floor(baseDmg * modifier),
                 }
               } else {
                 target.result.dmg = {
-                  rawDmg: dmg,
-                  calcDmg: Math.floor(dmg * modifier),
+                  rawDmg: baseDmg,
+                  calcDmg: Math.floor(baseDmg * modifier),
                 }
               }
             }
