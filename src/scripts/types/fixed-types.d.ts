@@ -4,6 +4,7 @@ interface BaseDocument<DATA> {
   data: DATA;
   folder?: string;
   getFlag(moduleName: string, key: string): any;
+  testUserPermission(user: User, permission: keyof CONST.ENTITY_PERMISSIONS, exact?: boolean);
 }
 
 export interface ActorAbility {

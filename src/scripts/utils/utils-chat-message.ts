@@ -1,4 +1,6 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
+import { MessageData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/foundry.js/roll";
+import { provider } from "../provider/provider";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyActorData, MyItem } from "../types/fixed-types";
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
@@ -105,7 +107,7 @@ interface ClickEvent {
   readonly metaKey: boolean;
   readonly shiftKey: boolean;
 }
-
+type OnClickResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
 interface ActionParam {event: ClickEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData};
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, tokenUuid?: string, message?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
@@ -120,43 +122,43 @@ export class UtilsChatMessage {
     },
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)$/,
-      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
+      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, messageData}) => UtilsChatMessage.processItemDamage(Number(regexResult[2]), Number(regexResult[1]), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack$/,
-      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
+      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, messageData}) => UtilsChatMessage.processItemAttack(Number(regexResult[1]), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
-      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
+      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemAttackMode(event, Number(regexResult[1]), regexResult[2] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)$/,
-      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
+      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, messageData}) => UtilsChatMessage.processItemCheck(Number(regexResult[1]), regexResult[2], messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-mode-(minus|plus)$/,
-      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
+      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemCheckMode(event, Number(regexResult[1]), regexResult[2], regexResult[3] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^apply-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
-      permissionCheck: ({regexResult}) => {return {message: true, tokenUuid: regexResult[1]}},
+      permissionCheck: ({regexResult}) => {return {tokenUuid: regexResult[1]}},
       execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.applyDamage(regexResult[1], messageData, messageId),
     },
     {
       regex: /^undo-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
-      permissionCheck: ({regexResult}) => {return {message: true, tokenUuid: regexResult[1]}},
+      permissionCheck: ({regexResult}) => {return {tokenUuid: regexResult[1]}},
       execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.undoDamage(regexResult[1], messageData, messageId),
     },
   ];
 
   private static get healingDamageTypes(): DamageType[] {
-    return (CONFIG as any).DND5E.healingTypes;
+    return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
   }
 
   public static registerHooks(): void {
@@ -172,6 +174,13 @@ export class UtilsChatMessage {
         'modules/nils-automated-compendium/templates/roll/tooltip.hbs'
       ]);
     });
+
+    
+  provider.getSocket().then(socket => {
+    socket.register('onItemCardClick', ({event, userId, messageId, action}) => {
+      return UtilsChatMessage.onClickProcessor(event, userId, messageId, action);
+    })
+  });
   }
 
   public static async createCard(data: ItemCardData): Promise<ChatMessage> {
@@ -467,52 +476,148 @@ export class UtilsChatMessage {
       return;
     }
 
+    const actions = await UtilsChatMessage.getActions(action, event, game.userId, messageId, messageData);
+    if (actions.missingPermissions) {
+      console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} with action ${action} for current user but permissions are missing`)
+      return;
+    }
+    if (actions.actionsToExecute.length === 0) {
+      console.debug('no actions found')
+      return;
+    }
+
+    const clickEvent: ClickEvent = {
+      altKey: event.altKey,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      shiftKey: event.shiftKey,
+    }
+
+    let response: OnClickResponse;
+    if (message.canUserModify(game.user, 'update')) {
+      // User has all required permissions, run locally
+      console.log('local')
+      response = await UtilsChatMessage.onClickProcessor(clickEvent, game.userId, messageId, action);
+    } else {
+      console.log('gm')
+      response = await provider.getSocket().then(socket => socket.executeAsGM('onItemCardClick', {event: clickEvent, userId: game.userId, messageId, action}));
+    }
+
+    if (response.success === false) {
+      if (response.errorType === 'warn') {
+        console.warn(response.errorMessage);
+      }
+      if (response.errorType === 'error') {
+        console.error(response.errorMessage);
+      }
+    }
+  }
+
+  private static async onClickProcessor(event: ClickEvent, userId: string, messageId: string, action: string): Promise<OnClickResponse> {
+    const message = game.messages.get(messageId);
+    const messageData = message.getFlag(staticValues.moduleName, 'data') as ItemCardData;
+    if (messageData == null) {
+      return {
+        success: false,
+        errorType: 'warn',
+        errorMessage: `pressed a ${staticValues.moduleName} action button for message ${messageId} but no data was found`,
+      };
+    }
+
+    const actions = await UtilsChatMessage.getActions(action, event, userId, messageId, messageData);
+    if (actions.actionsToExecute.length === 0) {
+      return {
+        success: false,
+        errorType: 'error',
+        errorMessage: `pressed a ${staticValues.moduleName} action button for message ${messageId} with action ${action} for user ${userId} but permissions are missing`,
+      };
+    }
+    
+    let latestMessageData = messageData;
+    for (const action of actions.actionsToExecute) {
+      const param: ActionParam = {event: event, regexResult: action.regex, messageId: messageId, messageData: deepClone(latestMessageData)};
+      // TODO run as GM if user does not have the message permissions and does not need them
+      let response = await action.action.execute(param);
+      if (response) {
+        latestMessageData = response;
+      }
+    }
+
+    if (latestMessageData !== messageData) {
+      // TODO add "go to bottom" logic to a chat message update hook
+      const log = document.querySelector("#chat-log");
+      const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
+
+      // Don't use await so you can return a response faster to the client
+      UtilsChatMessage.calculateTargetResult(latestMessageData).then(mData => {
+        return UtilsChatMessage.generateTemplate(mData).then(html => {
+          return ChatMessage.updateDocuments([{
+            _id: messageId,
+            content: html,
+            flags: {
+              [staticValues.moduleName]: {
+                data: mData
+              }
+            }
+          }]);
+        })
+      }).then(message => {
+        if (isAtBottom) {
+          (ui.chat as any).scrollBottom();
+        }
+      });
+    }
+
+    return {
+      success: true,
+    }
+  }
+
+  private static async getActions(action: string, event: ClickEvent, userId: string, messageId: string, messageData: ItemCardData): Promise<{missingPermissions: boolean, actionsToExecute: Array<{action: typeof UtilsChatMessage.actionMatches[0], regex: RegExpExecArray}>}> {
+    const response = {
+      missingPermissions: false, 
+      actionsToExecute: [] as Array<{
+        action: typeof UtilsChatMessage.actionMatches[0],
+        regex: RegExpExecArray
+      }>
+    };
+
+    const user = game.users.get(userId);
     for (const actionMatch of UtilsChatMessage.actionMatches) {
       const result = actionMatch.regex.exec(action);
       if (result) {
-        const param: ActionParam = {event: event, regexResult: result, messageId: messageId, messageData: deepClone(messageData)};
-        const permissionCheck = actionMatch.permissionCheck(param);
+        const permissionCheck = actionMatch.permissionCheck({event: event, regexResult: result, messageId: messageId, messageData: messageData});
         if (permissionCheck.message) {
-          if (!message.isAuthor && !game.user.isGM) {
+          // Is not author and is no gm
+          if (game.messages.get(messageId).data.user !== userId && !user.isGM) {
+            response.missingPermissions = true;
             continue;
           }
         }
         if (permissionCheck.actorUuid) {
           const actor = await UtilsDocument.actorFromUuid(permissionCheck.actorUuid);
-          if (actor && !actor.isOwner) {
+          if (actor && !actor.testUserPermission(user, 'OWNER')) {
+            response.missingPermissions = true;
             continue;
           }
         }
         if (permissionCheck.tokenUuid) {
           const token = await UtilsDocument.tokenFromUuid(permissionCheck.tokenUuid);
-          if (token && !token.isOwner) {
+          if (token && !token.testUserPermission(user, 'OWNER')) {
+            response.missingPermissions = true;
             continue;
           }
         }
-        // TODO run as GM if user does not have the message permissions and does not need them
-        const log = document.querySelector("#chat-log");
-        const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
-        let response = await actionMatch.execute(param);
-        if (response) {
-          response = await UtilsChatMessage.calculateTargetResult(response);
-          const html = await UtilsChatMessage.generateTemplate(response);
-          messageData = response;
-          await ChatMessage.updateDocuments([{
-            _id: messageId,
-            content: html,
-            flags: {
-              [staticValues.moduleName]: {
-                data: response
-              }
-            }
-          }]);
-          if (isAtBottom) {
-            (ui.chat as any).scrollBottom();
-          }
-        }
-        // Don't break, maybe multiple actions need to be taken (though not used at the time of writing)
+
+        response.actionsToExecute.push({
+          action: actionMatch,
+          regex: result
+        });
       }
     }
+
+
+    return response;
   }
 
   private static async processItemAttack(itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
