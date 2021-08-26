@@ -157,7 +157,7 @@ export class UtilsChatMessage {
     },
   ];
 
-  private static healingDamageTypes: DamageType[] = ['healing', 'temphp'];
+  private static healingDamageTypes: DamageType[] = (CONFIG as any).DND5E.healingTypes;
 
   public static registerHooks(): void {
     Hooks.on('renderChatLog', () => {
