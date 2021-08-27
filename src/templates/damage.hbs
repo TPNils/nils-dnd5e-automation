@@ -1,0 +1,28 @@
+{{!
+  moduleName=
+  actionBase=
+  interactionSecret=
+  dmg=
+  flavor=
+}}
+<div class="{{moduleName}}-roll-wrapper">
+  {{#if dmg.roll.evaluated}}
+    {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=flavor overrideFormula=dmg.displayFormula roll=dmg.roll}}
+  {{else}}
+    <button data-{{moduleName}}-action="{{actionBase}}" {{#if interactionSecret}}data-{{moduleName}}-secret="{{interactionSecret}}"{{/if}}>
+      {{#if (eq dmg.mode 'critical')}}
+        {{localize "DND5E.Critical"}}
+      {{else}}
+        {{#if dmg.label}}
+          {{dmg.label}}
+        {{else}}
+          {{localize "DND5E.Damage"}}
+        {{/if}}
+      {{/if}}
+    </button>
+
+    <!-- TODO should support editing after the roll in the future -->
+    <button {{#if interactionSecret}}data-{{moduleName}}-secret="{{interactionSecret}}"{{/if}} data-{{moduleName}}-action="{{actionBase}}-mode-minus" class="{{moduleName}}-mode-minus" {{#if (eq dmg.mode 'normal')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+    <button {{#if interactionSecret}}data-{{moduleName}}-secret="{{interactionSecret}}"{{/if}} data-{{moduleName}}-action="{{actionBase}}-mode-plus" class="{{moduleName}}-mode-plus" {{#if (eq dmg.mode 'critical')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+  {{/if}}
+</div>

@@ -53,19 +53,13 @@
               <div class="{{@root.staticValues.moduleName}}-flavor">
                 {{#if this.roll.evaluated}}{{this.displayDamageTypes}}{{else}}&nbsp;{{/if}}
               </div>
-              <div>
-                {{#if this.roll.evaluated}}
-                  {{> modules/nils-automated-compendium/templates/roll/roll.hbs overrideFormula=this.displayFormula roll=this.roll}}
-                {{else}}
-                  <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-damage-0" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}">
-                    {{#if this.label}}
-                      {{this.label}}
-                    {{else}}
-                      {{localize "DND5E.Damage"}}
-                    {{/if}}
-                  </button>
-                {{/if}}
-              </div>
+              
+              {{> modules/nils-automated-compendium/templates/damage.hbs 
+                moduleName=@root.staticValues.moduleName
+                actionBase=(nacConcat "item-" itemIndex "-damage-0")
+                interactionSecret=(nacConcat "actorowneruuid:" @root.data.actor.uuid)
+                dmg=item.damages.[0]
+              }}
             </div>
             {{/with}}
           {{/if}}
@@ -73,17 +67,13 @@
         
         {{#each item.damages as |dmg dmgIndex|}}
           {{#if (gt dmgIndex 0)}}
-            {{#if dmg.roll.evaluated}}
-              {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=dmg.displayDamageTypes overrideFormula=dmg.displayFormula roll=dmg.roll}}
-            {{else}}
-              <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-damage-{{dmgIndex}}" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}">
-                {{#if dmg.label}}
-                  {{dmg.label}}
-                {{else}}
-                  {{localize "DND5E.Damage"}}
-                {{/if}}
-              </button>
-            {{/if}}
+            {{> modules/nils-automated-compendium/templates/damage.hbs 
+              moduleName=@root.staticValues.moduleName
+              actionBase=(nacConcat "item-" itemIndex "-damage-" dmgIndex)
+              interactionSecret=(nacConcat "actorowneruuid:" @root.data.actor.uuid)
+              dmg=dmg
+              flavor=dmg.displayDamageTypes
+            }}
           {{/if}}
         {{/each}}
         

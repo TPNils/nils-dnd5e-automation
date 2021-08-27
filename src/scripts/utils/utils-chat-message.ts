@@ -55,6 +55,7 @@ export interface ItemCardItemData {
   damages?: {
     label?: string;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
+    mode: 'normal' | 'critical';
     roll: RollJson;
     displayDamageTypes?: string;
     displayFormula?: string;
@@ -113,7 +114,6 @@ type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?:
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
 
 // TODO bonus attack/dmg/save input
-// TODO critical damage
 export class UtilsChatMessage {
 
   private static readonly actionMatches: Array<{regex: RegExp, permissionCheck: ActionPermissionCheck, execute: ActionPermissionExecute}> = [
@@ -126,6 +126,11 @@ export class UtilsChatMessage {
       regex: /^item-([0-9]+)-damage-([0-9]+)$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, messageData}) => UtilsChatMessage.processItemDamage(Number(regexResult[2]), Number(regexResult[1]), messageData),
+    },
+    {
+      regex: /^item-([0-9]+)-damage-([0-9]+)-mode-(minus|plus)$/,
+      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
+      execute: ({regexResult, messageData}) => UtilsChatMessage.processItemDamageMode(Number(regexResult[1]), Number(regexResult[2]), regexResult[3] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack$/,
@@ -172,17 +177,18 @@ export class UtilsChatMessage {
     Hooks.on("init", () => {
       // register templates parts
       loadTemplates([
+        'modules/nils-automated-compendium/templates/damage.hbs',
         'modules/nils-automated-compendium/templates/roll/roll.hbs',
         'modules/nils-automated-compendium/templates/roll/tooltip.hbs'
       ]);
     });
 
     
-  provider.getSocket().then(socket => {
-    socket.register('onItemCardClick', ({event, userId, messageId, action}) => {
-      return UtilsChatMessage.onClickProcessor(event, userId, messageId, action);
-    })
-  });
+    provider.getSocket().then(socket => {
+      socket.register('onItemCardClick', ({event, userId, messageId, action}) => {
+        return UtilsChatMessage.onClickProcessor(event, userId, messageId, action);
+      })
+    });
   }
 
   public static async createCard(data: ItemCardData): Promise<ChatMessage> {
@@ -281,6 +287,7 @@ export class UtilsChatMessage {
       let mainDamage: typeof inputDamages[0];
       if (damageParts && damageParts.length > 0) {
         mainDamage = {
+          mode: 'critical',
           roll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON()
         }
         // Consider it healing if all damage types are healing
@@ -321,6 +328,7 @@ export class UtilsChatMessage {
         if (inputDamages.length === 0) {
           // when only dealing damage by upcasting? not sure if that ever happens
           inputDamages.push({
+            mode: 'normal',
             roll: new Roll(scalingRollFormula, rollData).toJSON()
           });
         } else {
@@ -843,6 +851,25 @@ export class UtilsChatMessage {
     const dmgRoll = await Roll.fromJSON(JSON.stringify(roll)).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: dmgRoll});
     messageData.items[itemIndex].damages[damageIndex].roll = dmgRoll.toJSON();
+
+    return messageData;
+  }
+
+  private static async processItemDamageMode(itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
+    const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
+    if (!dmg || dmg.roll.evaluated) {
+      // TODO allow to edit after roll
+      return;
+    }
+  
+    let modifier = modName === 'plus' ? 1 : -1;
+    
+    const order: Array<ItemCardItemData['damages'][0]['mode']> = ['normal', 'critical'];
+    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(dmg.mode) + modifier));
+    if (dmg.mode === order[newIndex]) {
+      return;
+    }
+    dmg.mode = order[newIndex];
 
     return messageData;
   }
