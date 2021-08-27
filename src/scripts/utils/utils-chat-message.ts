@@ -109,7 +109,7 @@ interface ClickEvent {
 }
 type OnClickResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
 interface ActionParam {event: ClickEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData};
-type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, tokenUuid?: string, message?: boolean};
+type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
 
 export class UtilsChatMessage {
@@ -147,12 +147,12 @@ export class UtilsChatMessage {
     },
     {
       regex: /^apply-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
-      permissionCheck: ({regexResult}) => {return {tokenUuid: regexResult[1]}},
+      permissionCheck: ({regexResult}) => {return {gm: true}},
       execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.applyDamage(regexResult[1], messageData, messageId),
     },
     {
       regex: /^undo-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
-      permissionCheck: ({regexResult}) => {return {tokenUuid: regexResult[1]}},
+      permissionCheck: ({regexResult}) => {return {gm: true}},
       execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.undoDamage(regexResult[1], messageData, messageId),
     },
   ];
@@ -598,9 +598,8 @@ export class UtilsChatMessage {
             continue;
           }
         }
-        if (permissionCheck.tokenUuid) {
-          const token = await UtilsDocument.tokenFromUuid(permissionCheck.tokenUuid);
-          if (token && !token.testUserPermission(user, 'OWNER')) {
+        if (permissionCheck.gm) {
+          if (!user.isGM) {
             response.missingPermissions = true;
             continue;
           }
