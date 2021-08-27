@@ -548,6 +548,8 @@ export class UtilsChatMessage {
       // Don't use await so you can return a response faster to the client
       UtilsChatMessage.calculateTargetResult(latestMessageData).then(mData => {
         return UtilsChatMessage.generateTemplate(mData).then(html => {
+          // TODO idea: don't update the html. on create, set some generic small html body. In ChatMessage.getHtml (or other place) generate the html
+          // Result => less bandwidth usage
           return ChatMessage.updateDocuments([{
             _id: messageId,
             content: html,
