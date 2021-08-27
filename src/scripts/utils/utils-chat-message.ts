@@ -112,6 +112,8 @@ interface ActionParam {event: ClickEvent, regexResult: RegExpExecArray, messageI
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
 
+// TODO bonus attack/dmg/save input
+// TODO critical damage
 export class UtilsChatMessage {
 
   private static readonly actionMatches: Array<{regex: RegExp, permissionCheck: ActionPermissionCheck, execute: ActionPermissionExecute}> = [
