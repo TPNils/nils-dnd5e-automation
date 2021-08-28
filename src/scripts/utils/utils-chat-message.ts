@@ -139,17 +139,12 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-attack$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({regexResult, messageData}) => UtilsChatMessage.processItemAttack(Number(regexResult[1]), messageData),
+      execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemAttack(event, Number(regexResult[1]), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack-bonus$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, inputValue, messageData}) => UtilsChatMessage.processItemAttackBonus(Number(regexResult[1]), inputValue as string, messageData),
-    },
-    {
-      regex: /^item-([0-9]+)-attack-roll$/,
-      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({regexResult, messageData}) => UtilsChatMessage.processItemAttackRoll(Number(regexResult[1]), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
@@ -694,13 +689,26 @@ export class UtilsChatMessage {
     return response;
   }
 
-  private static async processItemAttack(itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttack(event: ClickEvent, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items?.[itemIndex]?.attack;
-    if (!attack || attack.phase !== 'mode-select') {
+    if (!attack || attack.phase === 'result') {
       return;
     }
 
-    attack.phase = 'bonus-input';
+    const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
+    if (event.shiftKey) {
+      attack.phase = orderedPhases[orderedPhases.length - 1];
+    } else {
+      attack.phase = orderedPhases[orderedPhases.indexOf(attack.phase) + 1];
+    }
+
+    if (orderedPhases.indexOf(attack.phase) === orderedPhases.length - 1) {
+      const response = await UtilsChatMessage.processItemAttackRoll(itemIndex, messageData);
+      if (response) {
+        return response;
+      }
+    }
+
     return messageData;
   }
   
@@ -729,7 +737,7 @@ export class UtilsChatMessage {
 
   private static async processItemAttackRoll(itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items?.[itemIndex]?.attack;
-    if (!attack || attack.evaluatedRoll || attack.phase === 'result') {
+    if (!attack || attack.evaluatedRoll) {
       // If attack was already rolled, do nothing
       // TODO should create a new card (?)
       return;

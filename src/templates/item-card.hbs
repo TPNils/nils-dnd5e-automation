@@ -27,7 +27,11 @@
                 {{#if item.attack.evaluatedRoll}}{{item.attack.mode}}{{else}}&nbsp;{{/if}}
               </div>
               <div class="{{@root.staticValues.moduleName}}-roll-wrapper">
-                {{#if (eq item.attack.phase "bonus-input")}}
+                {{#if (eq item.attack.phase "result")}}
+                  <div>
+                    {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=item.attack.evaluatedRoll}}
+                  </div>
+                {{else}}
                   <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack" class="{{@root.staticValues.moduleName}}-item-attack" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}">
                     {{#if (eq item.attack.mode 'normal')}}
                       {{#if item.attack.label}}{{item.attack.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}
@@ -35,20 +39,9 @@
                       {{item.attack.mode}}
                     {{/if}}
                   </button>
-                  <input placeholder="{{localize "DND5E.Bonus"}}: e.g. 1d4" type="text" value="{{item.attack.userBonus}}" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-bonus"/>
-                {{else}}
-                  {{#if item.attack.evaluatedRoll}}
-                    <div>
-                      {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=item.attack.evaluatedRoll}}
-                    </div>
-                  {{else}}
-                    <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack" class="{{@root.staticValues.moduleName}}-item-attack" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}">
-                      {{#if (eq item.attack.mode 'normal')}}
-                        {{#if item.attack.label}}{{item.attack.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}
-                      {{else}}
-                        {{item.attack.mode}}
-                      {{/if}}
-                    </button>
+                  
+                  {{#if (eq item.attack.phase "bonus-input")}}
+                    <input placeholder="{{localize "DND5E.Bonus"}}: e.g. 1d4" type="text" value="{{item.attack.userBonus}}" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-bonus"/>
                   {{/if}}
                 {{/if}}
                 <button data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq item.attack.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
