@@ -4,18 +4,14 @@ export type WrappedDie = Die & {
   [`_nils-automated-compendium-original-reroll`]: Die['reroll'];
 }
 
-export class ReEvaluatableDie extends Die {
-
-  constructor(delegate: Die) {
-    super(delegate as Die.TermData);
-  }
+export class ReEvaluatableDie {
 
   public static wrap(dice: Die | Die[]): void {
     dice = Array.isArray(dice) ? dice : [dice as Die];
 
     for (const die of dice) {
       (die as WrappedDie)['_nils-automated-compendium-original-reroll'] = die.reroll;
-      die.reroll = ReEvaluatableDie.prototype.reroll;
+      die.reroll = ReEvaluatableDie.reroll;
     }
   }
 
@@ -42,7 +38,7 @@ export class ReEvaluatableDie extends Die {
    * @param recursive - Reroll recursively, continuing to reroll until the condition is no longer met
    * @returns False if the modifier was unmatched
    */
-  public reroll(modifier: string, {recursive}: {recursive?: boolean} = {}): boolean | void {
+  public static reroll(this: Die, modifier: string, {recursive}: {recursive?: boolean} = {}): boolean | void {
     // Match the re-roll modifier
     const rgx = /rr?([0-9]+)?([<>=]+)?([0-9]+)?/i;
     const match = modifier.match(rgx);
@@ -101,9 +97,4 @@ export class ReEvaluatableDie extends Die {
 }
 
 export function registerHooks(): void {
-  Hooks.on('ready', () => {
-    // TODO lib wrapper compatibility when a complere solution is found
-    // Currently it is solved with the wrap/unwrap methods
-    // Die.prototype.reroll = ReEvaluatableDie.prototype.reroll;
-  })
 }
