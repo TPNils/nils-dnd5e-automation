@@ -113,7 +113,7 @@ export class DevTools {
         syncWorldItems.push(item)
       }
     }
-    console.log(syncWorldItems, compendiumFolderIds);
+    console.debug(syncWorldItems, compendiumFolderIds);
 
     const compendiumItems = await UtilsDocument.itemsFromUuid(syncWorldItems.map(item => item.getFlag(staticValues.moduleName, 'source-uuid')).filter(uuid => typeof uuid === 'string'));
     const compendiumItemsByUuid = new Map<string, MyItem>();
@@ -167,7 +167,7 @@ export class DevTools {
 
     // TODO delete
 
-    console.log(compendiumDmls)
+    console.debug(compendiumDmls)
     for (const [compendiumUuid, dmls] of compendiumDmls.entries()) {
       if (dmls.insertItems.length > 0) {
         CONFIG.Item.documentClass.createDocuments(dmls.insertItems, {pack: compendiumUuid, render: false});

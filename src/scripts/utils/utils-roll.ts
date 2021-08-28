@@ -320,7 +320,6 @@ export class UtilsRoll {
         baseTerms.push(operator, ...added.terms);
       }
     }
-    console.log(baseTerms);
 
     return Roll.fromTerms(deepClone(baseTerms));
   }

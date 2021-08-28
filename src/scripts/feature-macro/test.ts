@@ -20,7 +20,7 @@ export class Test implements IMacro {
   }
   
   public async run(context: MacroContext, data: any): Promise<void> {
-    console.log('run test macro', {context, data});
+    console.debug('run test macro', {context, data});
   }
 
 }
