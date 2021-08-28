@@ -14,6 +14,7 @@ export interface ItemCardActorData {
 
 export type RollJson = ReturnType<Roll['toJSON']>
 
+type RollPhase = 'mode-select' | 'bonus-input' | 'result';
 export interface ItemCardItemData {
   uuid: string;
   name: string;
@@ -48,6 +49,7 @@ export interface ItemCardItemData {
   }[];
   attack?: {
     label?: string;
+    phase: RollPhase;
     mode: 'normal' | 'advantage' | 'disadvantage';
     rollBonus?: string;
     evaluatedRoll?: RollJson
@@ -109,7 +111,7 @@ interface ClickEvent {
   readonly metaKey: boolean;
   readonly shiftKey: boolean;
 }
-type OnClickResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
+type InteractionResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
 interface ActionParam {event: ClickEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData};
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
@@ -186,8 +188,8 @@ export class UtilsChatMessage {
 
     
     provider.getSocket().then(socket => {
-      socket.register('onItemCardClick', ({event, userId, messageId, action}) => {
-        return UtilsChatMessage.onClickProcessor(event, userId, messageId, action);
+      socket.register('onInteraction', ({event, userId, messageId, action}) => {
+        return UtilsChatMessage.onInteractionProcessor(event, userId, messageId, action);
       })
     });
   }
@@ -276,6 +278,7 @@ export class UtilsChatMessage {
 
       itemCardData.attack = {
         mode: 'normal',
+        phase: 'mode-select',
         rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
       };
     }
@@ -431,28 +434,40 @@ export class UtilsChatMessage {
   }
 
   private static async onClick(event: MouseEvent): Promise<void> {
-    if (!(event.target instanceof HTMLElement)) {
-      return;
+    if (event.target instanceof Node) {
+      UtilsChatMessage.onInteraction({
+        clickEvent: event,
+        element: event.target as Node
+      });
+    }
+  }
+
+  private static async onInteraction({clickEvent, element}: {element: Node, clickEvent?: ClickEvent}): Promise<void> {
+    clickEvent = {
+      altKey: clickEvent?.altKey === true,
+      ctrlKey: clickEvent?.ctrlKey === true,
+      metaKey: clickEvent?.metaKey === true,
+      shiftKey: clickEvent?.shiftKey === true,
     }
 
     let messageId: string;
     let action: string;
-    const path = event.composedPath();
-    for (let i = path.length - 1; i >= 0; i--) {
-      const element = path[i];
-      if (!(element instanceof HTMLElement)) {
-        continue;
-      }
-      if (element.dataset.messageId != null) {
-        messageId = element.dataset.messageId;
-      }
-      if (element.hasAttribute(`data-${staticValues.moduleName}-action`)) {
-        action = element.getAttribute(`data-${staticValues.moduleName}-action`);
+    let currentElement = element;
+    while (currentElement != null) {
+      if (currentElement instanceof HTMLElement) {
+        if (currentElement.dataset.messageId != null) {
+          messageId = currentElement.dataset.messageId;
+        }
+        if (currentElement.hasAttribute(`data-${staticValues.moduleName}-action`)) {
+          action = currentElement.getAttribute(`data-${staticValues.moduleName}-action`);
+        }
       }
       
       if (messageId != null && action != null) {
         break;
       }
+
+      currentElement = currentElement.parentNode;
     }
 
     if (!action) {
@@ -470,7 +485,7 @@ export class UtilsChatMessage {
       return;
     }
 
-    const actions = await UtilsChatMessage.getActions(action, event, game.userId, messageId, messageData);
+    const actions = await UtilsChatMessage.getActions(action, clickEvent, game.userId, messageId, messageData);
     if (actions.missingPermissions) {
       console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} with action ${action} for current user but permissions are missing`)
       return;
@@ -480,19 +495,12 @@ export class UtilsChatMessage {
       return;
     }
 
-    const clickEvent: ClickEvent = {
-      altKey: event.altKey,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey,
-      shiftKey: event.shiftKey,
-    }
-
-    let response: OnClickResponse;
+    let response: InteractionResponse;
     if (message.canUserModify(game.user, 'update')) {
       // User has all required permissions, run locally
-      response = await UtilsChatMessage.onClickProcessor(clickEvent, game.userId, messageId, action);
+      response = await UtilsChatMessage.onInteractionProcessor(clickEvent, game.userId, messageId, action);
     } else {
-      response = await provider.getSocket().then(socket => socket.executeAsGM('onItemCardClick', {event: clickEvent, userId: game.userId, messageId, action}));
+      response = await provider.getSocket().then(socket => socket.executeAsGM('onInteraction', {event: clickEvent, userId: game.userId, messageId, action}));
     }
 
     if (response.success === false) {
@@ -505,7 +513,7 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async onClickProcessor(event: ClickEvent, userId: string, messageId: string, action: string): Promise<OnClickResponse> {
+  private static async onInteractionProcessor(event: ClickEvent, userId: string, messageId: string, action: string): Promise<InteractionResponse> {
     const message = game.messages.get(messageId);
     const messageData = message.getFlag(staticValues.moduleName, 'data') as ItemCardData;
     if (messageData == null) {
