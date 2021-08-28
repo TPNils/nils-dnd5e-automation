@@ -253,4 +253,74 @@ export class UtilsRoll {
     return new Roll(Roll.fromTerms(critTerms).formula);
   }
 
+  public static mergeRolls(...rolls: Roll[]): Roll {
+    if (rolls.length === 0) {
+      return Roll.fromTerms([]);
+    }
+    if (rolls.length === 1) {
+      return Roll.fromJSON(JSON.stringify(rolls[0].toJSON()));
+    }
+    // return null when merge is not supported
+    const getMergeKey = (term: RollTerm): string | null => {
+      let optionsParts: string[] = [];
+      if (term.options) {
+        for (const key of Object.keys(term.options)) {
+          if (term.options[key] != null) {
+            optionsParts.push(`${key}:${term.options[key]}`);
+          }
+        }
+      }
+      optionsParts = optionsParts.sort();
+      if (term instanceof DiceTerm) {
+        return `${term.constructor.name}/${term.faces}/${term.modifiers.join('-')}/${optionsParts.join('-')}`;
+      } else if (term.constructor === NumericTerm.prototype.constructor) {
+        return `${term.constructor.name}/${optionsParts.join('-')}`;
+      }
+      return null;
+    }
+    const baseTerms: RollTerm[] = deepClone(rolls[0].terms);
+    const additionalTermsByMergeKey = new Map<string, {merged: boolean, terms: RollTerm[]}>()
+
+    for (let i = 1; i < rolls.length; i++) {
+      for (const term of rolls[i].terms) {
+        const mergeKey = getMergeKey(term);
+        if (!additionalTermsByMergeKey.has(mergeKey)) {
+          additionalTermsByMergeKey.set(mergeKey, {
+            merged: false,
+            terms: []
+          });
+        }
+        additionalTermsByMergeKey.get(mergeKey).terms.push(term);
+      }
+    }
+
+    for (const baseTerm of baseTerms) {
+      const mergeKey = getMergeKey(baseTerm);
+      if (mergeKey != null && additionalTermsByMergeKey.get(mergeKey)?.merged === false) {
+        const added = additionalTermsByMergeKey.get(mergeKey);
+        added.merged = true;
+
+        for (const addedTerm of added.terms) {
+          if (baseTerm instanceof DiceTerm) {
+            baseTerm.number += (addedTerm as DiceTerm).number;
+          } else if (baseTerm instanceof NumericTerm) {
+            baseTerm.number += (addedTerm as NumericTerm).number;
+          }
+        }
+      }
+    }
+
+    for (const added of additionalTermsByMergeKey.values()) {
+      if (!added.merged) {
+        const operator = new OperatorTerm({operator: '+'});
+        if (added.terms[0].evaluate) {
+          operator.evaluate({async: false});
+        }
+        baseTerms.push(operator, ...added.terms);
+      }
+    }
+
+    return Roll.fromTerms(deepClone(baseTerms));
+  }
+
 }

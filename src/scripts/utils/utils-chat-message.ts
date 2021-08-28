@@ -845,9 +845,7 @@ export class UtilsChatMessage {
       const critBonusPromise = UtilsRoll.getCriticalBonusRoll(normalRoll).roll({async: true});
 
       const [normalResolved, critBonusResolved] = await Promise.all([normalPromise, critBonusPromise]);
-      const critTerms = deepClone([...normalResolved.terms, new OperatorTerm({operator: '+'}).evaluate({async: false}), ...critBonusResolved.terms]);
-      // TODO simplify terms does not seem to work the way I want it to
-      dmg.criticalRoll = Roll.fromTerms(Roll.simplifyTerms(critTerms)).toJSON();
+      dmg.criticalRoll = UtilsRoll.mergeRolls(normalResolved, critBonusResolved).toJSON();
       return messageData;
     } else {
       if (dmg.normalRoll.evaluated) {
