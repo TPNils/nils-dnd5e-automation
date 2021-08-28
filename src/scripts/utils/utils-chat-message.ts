@@ -52,6 +52,7 @@ export interface ItemCardItemData {
     phase: RollPhase;
     mode: 'normal' | 'advantage' | 'disadvantage';
     rollBonus?: string;
+    userBonus: string;
     evaluatedRoll?: RollJson
   },
   damages?: {
@@ -112,7 +113,7 @@ interface ClickEvent {
   readonly shiftKey: boolean;
 }
 type InteractionResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
-interface ActionParam {event: ClickEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData};
+interface ActionParam {event: ClickEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData, inputValue?: boolean | number | string};
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
 
@@ -139,6 +140,16 @@ export class UtilsChatMessage {
       regex: /^item-([0-9]+)-attack$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, messageData}) => UtilsChatMessage.processItemAttack(Number(regexResult[1]), messageData),
+    },
+    {
+      regex: /^item-([0-9]+)-attack-bonus$/,
+      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
+      execute: ({regexResult, inputValue, messageData}) => UtilsChatMessage.processItemAttackBonus(Number(regexResult[1]), inputValue as string, messageData),
+    },
+    {
+      regex: /^item-([0-9]+)-attack-roll$/,
+      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
+      execute: ({regexResult, messageData}) => UtilsChatMessage.processItemAttackRoll(Number(regexResult[1]), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
@@ -175,6 +186,7 @@ export class UtilsChatMessage {
     Hooks.on('renderChatLog', () => {
       const chatElement = document.getElementById('chat-log');
       chatElement.addEventListener('click', event => UtilsChatMessage.onClick(event));
+      chatElement.addEventListener('focusout', event => UtilsChatMessage.onBlur(event));
     });
 
     Hooks.on("init", () => {
@@ -188,8 +200,8 @@ export class UtilsChatMessage {
 
     
     provider.getSocket().then(socket => {
-      socket.register('onInteraction', ({event, userId, messageId, action}) => {
-        return UtilsChatMessage.onInteractionProcessor(event, userId, messageId, action);
+      socket.register('onInteraction', (params: Parameters<typeof UtilsChatMessage['onInteractionProcessor']>[0]) => {
+        return UtilsChatMessage.onInteractionProcessor(params);
       })
     });
   }
@@ -280,6 +292,7 @@ export class UtilsChatMessage {
         mode: 'normal',
         phase: 'mode-select',
         rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
+        userBonus: "",
       };
     }
 
@@ -434,9 +447,31 @@ export class UtilsChatMessage {
   }
 
   private static async onClick(event: MouseEvent): Promise<void> {
+    if (event.target instanceof HTMLInputElement) {
+      // do not register clicks on inputs, except checkboxes
+      const input = event.target as HTMLInputElement;
+      if (input.type !== 'checkbox') {
+        return;
+      }
+    }
     if (event.target instanceof Node) {
       UtilsChatMessage.onInteraction({
         clickEvent: event,
+        element: event.target as Node
+      });
+    }
+  }
+
+  private static async onBlur(event: FocusEvent): Promise<void> {
+    if (event.target instanceof HTMLInputElement) {
+      // blur does not work very well with checkboxes => listen to click event
+      const input = event.target as HTMLInputElement;
+      if (input.type === 'checkbox') {
+        return;
+      }
+    }
+    if (event.target instanceof Node) {
+      UtilsChatMessage.onInteraction({
         element: event.target as Node
       });
     }
@@ -453,6 +488,7 @@ export class UtilsChatMessage {
     let messageId: string;
     let action: string;
     let currentElement = element;
+    let inputValue: boolean | number | string;
     while (currentElement != null) {
       if (currentElement instanceof HTMLElement) {
         if (currentElement.dataset.messageId != null) {
@@ -460,11 +496,17 @@ export class UtilsChatMessage {
         }
         if (currentElement.hasAttribute(`data-${staticValues.moduleName}-action`)) {
           action = currentElement.getAttribute(`data-${staticValues.moduleName}-action`);
+          
+          if (currentElement instanceof HTMLInputElement) {
+            if (['radio', 'checkbox'].includes(currentElement.type)) {
+              inputValue = currentElement.checked;
+            } else if (['number'].includes(currentElement.type)) {
+              inputValue = Number(currentElement.value);
+            } else {
+              inputValue = currentElement.value;
+            }
+          }
         }
-      }
-      
-      if (messageId != null && action != null) {
-        break;
       }
 
       currentElement = currentElement.parentNode;
@@ -495,12 +537,21 @@ export class UtilsChatMessage {
       return;
     }
 
+    const request: Parameters<typeof UtilsChatMessage['onInteractionProcessor']>[0] = {
+      event: clickEvent,
+      userId: game.userId,
+      messageId: messageId,
+      action: action,
+      inputValue: inputValue,
+    }
+
+    console.log(request);
     let response: InteractionResponse;
     if (message.canUserModify(game.user, 'update')) {
       // User has all required permissions, run locally
-      response = await UtilsChatMessage.onInteractionProcessor(clickEvent, game.userId, messageId, action);
+      response = await UtilsChatMessage.onInteractionProcessor(request);
     } else {
-      response = await provider.getSocket().then(socket => socket.executeAsGM('onInteraction', {event: clickEvent, userId: game.userId, messageId, action}));
+      response = await provider.getSocket().then(socket => socket.executeAsGM('onInteraction', request));
     }
 
     if (response.success === false) {
@@ -513,7 +564,13 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async onInteractionProcessor(event: ClickEvent, userId: string, messageId: string, action: string): Promise<InteractionResponse> {
+  private static async onInteractionProcessor({event, userId, messageId, action, inputValue}: {
+    event: ClickEvent,
+    userId: string,
+    messageId: string,
+    action: string,
+    inputValue?: ActionParam['inputValue'];
+  }): Promise<InteractionResponse> {
     const message = game.messages.get(messageId);
     const messageData = message.getFlag(staticValues.moduleName, 'data') as ItemCardData;
     if (messageData == null) {
@@ -525,7 +582,7 @@ export class UtilsChatMessage {
     }
 
     const actions = await UtilsChatMessage.getActions(action, event, userId, messageId, messageData);
-    if (actions.actionsToExecute.length === 0) {
+    if (action && actions.actionsToExecute.length === 0) {
       return {
         success: false,
         errorType: 'error',
@@ -533,17 +590,19 @@ export class UtilsChatMessage {
       };
     }
     
-    let latestMessageData = messageData;
+    let latestMessageData = deepClone(messageData);
+    let doUpdate = false;
+    
     for (const action of actions.actionsToExecute) {
-      const param: ActionParam = {event: event, regexResult: action.regex, messageId: messageId, messageData: deepClone(latestMessageData)};
-      // TODO run as GM if user does not have the message permissions and does not need them
+      const param: ActionParam = {event: event, regexResult: action.regex, messageId: messageId, messageData: latestMessageData, inputValue: inputValue};
       let response = await action.action.execute(param);
       if (response) {
+        doUpdate = true;
         latestMessageData = response;
       }
     }
 
-    if (latestMessageData !== messageData) {
+    if (doUpdate) {
       // TODO add "go to bottom" logic to a chat message update hook
       const log = document.querySelector("#chat-log");
       const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
@@ -571,6 +630,7 @@ export class UtilsChatMessage {
             }]);
         })
       }).then(message => {
+        console.log('update', latestMessageData);
         if (isAtBottom) {
           (ui.chat as any).scrollBottom();
         }
@@ -583,6 +643,12 @@ export class UtilsChatMessage {
   }
 
   private static async getActions(action: string, event: ClickEvent, userId: string, messageId: string, messageData: ItemCardData): Promise<{missingPermissions: boolean, actionsToExecute: Array<{action: typeof UtilsChatMessage.actionMatches[0], regex: RegExpExecArray}>}> {
+    if (!action) {
+      return {
+        missingPermissions: false,
+        actionsToExecute: []
+      };
+    }
     const response = {
       missingPermissions: false, 
       actionsToExecute: [] as Array<{
@@ -629,13 +695,41 @@ export class UtilsChatMessage {
   }
 
   private static async processItemAttack(itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
-    {
-      const actor = messageData.actor?.uuid == null ? null : (await UtilsDocument.actorFromUuid(messageData.actor.uuid));
-      if (actor && !actor.isOwner) {
-        return;
-      }
+    const attack = messageData.items?.[itemIndex]?.attack;
+    if (!attack || attack.phase !== 'mode-select') {
+      return;
     }
-    if (messageData.items[itemIndex].attack.evaluatedRoll) {
+
+    attack.phase = 'bonus-input';
+    return messageData;
+  }
+  
+  private static async processItemAttackBonus(itemIndex: number, attackBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+    const attack = messageData.items?.[itemIndex]?.attack;
+    console.log(deepClone({
+      attack,
+      attackBonus
+    }))
+    if (!attack || attack.evaluatedRoll?.evaluated || attack.phase === 'result' || attack.userBonus === attackBonus) {
+      return;
+    }
+
+    if (attackBonus) {
+      attack.userBonus = attackBonus;
+    } else {
+      attack.userBonus = "";
+    }
+
+    if (attack.userBonus && !Roll.validate(attack.userBonus)) {
+      // TODO warning
+    }
+
+    return messageData;
+  }
+
+  private static async processItemAttackRoll(itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+    const attack = messageData.items?.[itemIndex]?.attack;
+    if (!attack || attack.evaluatedRoll || attack.phase === 'result') {
       // If attack was already rolled, do nothing
       // TODO should create a new card (?)
       return;
@@ -684,7 +778,6 @@ export class UtilsChatMessage {
     }
     
     const actor: MyActor = messageData.token?.uuid == null ? null : (await UtilsDocument.tokenFromUuid(messageData.token?.uuid)).getActor();
-    const attack = messageData.items[itemIndex].attack;
     let baseRoll = new Die();
     baseRoll.faces = 20;
     baseRoll.number = 1;
@@ -710,10 +803,20 @@ export class UtilsChatMessage {
     if (attack.rollBonus) {
       parts.push(attack.rollBonus);
     }
+    
+    if (!Roll.validate(attack.userBonus)) {
+      // TODO error
+    } else {
+      if (attack.userBonus) {
+        parts.push(attack.userBonus);
+      }
+    }
+    
 
     const roll = await new Roll(parts.join(' + ')).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: roll});
     attack.evaluatedRoll = roll.toJSON();
+    attack.phase = 'result';
 
     return messageData;
   }
