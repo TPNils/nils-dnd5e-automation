@@ -56,7 +56,8 @@ export interface ItemCardItemData {
     label?: string;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     mode: 'normal' | 'critical';
-    roll: RollJson;
+    normalRoll: RollJson;
+    criticalRoll?: RollJson;
     displayDamageTypes?: string;
     displayFormula?: string;
   }[];
@@ -287,8 +288,8 @@ export class UtilsChatMessage {
       let mainDamage: typeof inputDamages[0];
       if (damageParts && damageParts.length > 0) {
         mainDamage = {
-          mode: 'critical',
-          roll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON()
+          mode: 'normal',
+          normalRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON()
         }
         // Consider it healing if all damage types are healing
         const isHealing = damageParts.filter(roll => UtilsChatMessage.healingDamageTypes.includes(roll[1])).length === damageParts.length;
@@ -302,7 +303,7 @@ export class UtilsChatMessage {
       if (mainDamage && item.data.data.damage?.versatile) {
         const versatileDamage = deepClone(mainDamage);
         versatileDamage.label = game.i18n.localize('DND5E.Versatile');
-        versatileDamage.roll = new Roll(item.data.data.damage.versatile, rollData).toJSON();
+        versatileDamage.normalRoll = new Roll(item.data.data.damage.versatile, rollData).toJSON();
         inputDamages.push(versatileDamage);
       }
   
@@ -329,11 +330,11 @@ export class UtilsChatMessage {
           // when only dealing damage by upcasting? not sure if that ever happens
           inputDamages.push({
             mode: 'normal',
-            roll: new Roll(scalingRollFormula, rollData).toJSON()
+            normalRoll: new Roll(scalingRollFormula, rollData).toJSON()
           });
         } else {
           for (const damage of inputDamages) {
-            const originalDamageParts = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(damage.roll)));
+            const originalDamageParts = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(damage.normalRoll)));
             const damageType: DamageType = originalDamageParts.length > 0 ? originalDamageParts[0][1] : ''
             const scalingParts = UtilsRoll.damageFormulaToDamageParts(scalingRollFormula);
             for (const part of scalingParts) {
@@ -343,7 +344,7 @@ export class UtilsChatMessage {
               }
             }
             
-            damage.roll = UtilsRoll.damagePartsToRoll([...originalDamageParts, ...scalingParts], rollData).toJSON();
+            damage.normalRoll = UtilsRoll.damagePartsToRoll([...originalDamageParts, ...scalingParts], rollData).toJSON();
           }
         }
       }
@@ -353,30 +354,14 @@ export class UtilsChatMessage {
         const actorBonus = actor.data.data.bonuses?.[item.data.data.actionType];
         if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
           for (const damage of inputDamages) {
-            const originalDamageParts = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(damage.roll)));
+            const originalDamageParts = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(damage.normalRoll)));
             const damageType: DamageType = originalDamageParts.length > 0 ? originalDamageParts[0][1] : ''
-            damage.roll = UtilsRoll.damagePartsToRoll([...originalDamageParts, [String(actorBonus.damage), damageType]], rollData).toJSON();
+            damage.normalRoll = UtilsRoll.damagePartsToRoll([...originalDamageParts, [String(actorBonus.damage), damageType]], rollData).toJSON();
           }
         }
       }
-
-      itemCardData.damages = inputDamages.map(damage => {
-        let displayFormula = damage.roll.formula;
-        const damageTypes: DamageType[] = [];
-        for (const damageType of UtilsRoll.getValidDamageTypes()) {
-          if (displayFormula.match(`\\[${damageType}\\]`)) {
-            damageTypes.push(damageType);
-            displayFormula = displayFormula.replace(new RegExp(`\\[${damageType}\\]`, 'g'), '');
-          }
-        }
-
-        return {
-          ...damage,
-          displayFormula: displayFormula,
-          displayDamageTypes: damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined
-        };
-      })
       
+      itemCardData.damages = UtilsChatMessage.calculateDamageFormulas(inputDamages);
     }
 
     // Saving throw
@@ -556,19 +541,26 @@ export class UtilsChatMessage {
       const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
 
       // Don't use await so you can return a response faster to the client
-      UtilsChatMessage.calculateTargetResult(latestMessageData).then(mData => {
-        return UtilsChatMessage.generateTemplate(mData).then(html => {
-          // TODO idea: don't update the html. on create, set some generic small html body. In ChatMessage.getHtml (or other place) generate the html
-          // Result => less bandwidth usage
-          return ChatMessage.updateDocuments([{
-            _id: messageId,
-            content: html,
-            flags: {
-              [staticValues.moduleName]: {
-                data: mData
+      UtilsChatMessage.calculateTargetResult(latestMessageData)
+        .then(mData => {
+          for (const item of latestMessageData.items) {
+            item.damages = UtilsChatMessage.calculateDamageFormulas(item.damages);
+          }
+          return mData;
+        })
+        .then(mData => {
+          return UtilsChatMessage.generateTemplate(mData).then(html => {
+            // TODO idea: don't update the html. on create, set some generic small html body. In ChatMessage.getHtml (or other place) generate the html
+            // Result => less bandwidth usage
+            return ChatMessage.updateDocuments([{
+              _id: messageId,
+              content: html,
+              flags: {
+                [staticValues.moduleName]: {
+                  data: mData
+                }
               }
-            }
-          }]);
+            }]);
         })
       }).then(message => {
         if (isAtBottom) {
@@ -841,27 +833,37 @@ export class UtilsChatMessage {
         return;
       }
     }
-    // If damage was already rolled, do nothing
-    // TODO should create a new card (?)
-    const roll = messageData.items[itemIndex].damages[damageIndex].roll;
-    if (roll.evaluated) {
-      return;
+
+    const dmg = messageData.items[itemIndex].damages[damageIndex];
+    if (dmg.mode === 'critical') {
+      if (dmg.criticalRoll?.evaluated) {
+        return;
+      }
+
+      const normalRoll = Roll.fromJSON(JSON.stringify(dmg.normalRoll));
+      const normalPromise = dmg.normalRoll.evaluated ? Promise.resolve(normalRoll) : normalRoll.roll({async: true});
+      const critBonusPromise = UtilsRoll.getCriticalBonusRoll(normalRoll).roll({async: true});
+
+      const [normalResolved, critBonusResolved] = await Promise.all([normalPromise, critBonusPromise]);
+      const critTerms = deepClone([...normalResolved.terms, new OperatorTerm({operator: '+'}).evaluate({async: false}), ...critBonusResolved.terms]);
+      // TODO simplify terms does not seem to work the way I want it to
+      dmg.criticalRoll = Roll.fromTerms(Roll.simplifyTerms(critTerms)).toJSON();
+      return messageData;
+    } else {
+      if (dmg.normalRoll.evaluated) {
+        return;
+      }
+  
+      const dmgRoll = await Roll.fromJSON(JSON.stringify(dmg.normalRoll)).roll({async: true});
+      UtilsDiceSoNice.showRoll({roll: dmgRoll});
+      dmg.normalRoll = dmgRoll.toJSON();
+  
+      return messageData;
     }
-
-    const dmgRoll = await Roll.fromJSON(JSON.stringify(roll)).roll({async: true});
-    UtilsDiceSoNice.showRoll({roll: dmgRoll});
-    messageData.items[itemIndex].damages[damageIndex].roll = dmgRoll.toJSON();
-
-    return messageData;
   }
 
   private static async processItemDamageMode(itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
     const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
-    if (!dmg || dmg.roll.evaluated) {
-      // TODO allow to edit after roll
-      return;
-    }
-  
     let modifier = modName === 'plus' ? 1 : -1;
     
     const order: Array<ItemCardItemData['damages'][0]['mode']> = ['normal', 'critical'];
@@ -871,6 +873,10 @@ export class UtilsChatMessage {
     }
     dmg.mode = order[newIndex];
 
+    const response = await UtilsChatMessage.processItemDamage(itemIndex, damageIndex, messageData);
+    if (response) {
+      return response;
+    }
     return messageData;
   }
   
@@ -952,6 +958,28 @@ export class UtilsChatMessage {
     return messageData;
   }
 
+  private static calculateDamageFormulas(damages: ItemCardItemData['damages']): ItemCardItemData['damages'] {
+    if (!damages) {
+      return damages;
+    }
+    return damages.map(damage => {
+      let displayFormula = damage.mode === 'critical' ? damage.criticalRoll.formula : damage.normalRoll.formula;
+      const damageTypes: DamageType[] = [];
+      for (const damageType of UtilsRoll.getValidDamageTypes()) {
+        if (displayFormula.match(`\\[${damageType}\\]`)) {
+          damageTypes.push(damageType);
+          displayFormula = displayFormula.replace(new RegExp(`\\[${damageType}\\]`, 'g'), '');
+        }
+      }
+
+      return {
+        ...damage,
+        displayFormula: displayFormula,
+        displayDamageTypes: damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined
+      };
+    })
+  }
+
   private static async calculateTargetResult(messageData: ItemCardData): Promise<ItemCardData> {
     const items = messageData.items.filter(item => item.targets?.length);
 
@@ -995,10 +1023,10 @@ export class UtilsChatMessage {
       const calcDmgForTargets = item.targets.filter(target => target.result.hit !== false && (!item.check || target.check?.evaluatedRoll?.evaluated));
 
       // Damage
-      const evaluatedDamageRolls = item.damages ? item.damages.filter(dmg => dmg.roll.evaluated) : [];
+      const evaluatedDamageRolls = item.damages ? item.damages.filter(dmg => dmg.mode === 'critical' ? dmg.criticalRoll?.evaluated : dmg.normalRoll.evaluated) : [];
       if (calcDmgForTargets.length > 0 && evaluatedDamageRolls.length > 0) {
         for (const damage of evaluatedDamageRolls) {
-          const damageResults = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(damage.roll)));
+          const damageResults = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(damage.mode === 'critical' ? damage.criticalRoll : damage.normalRoll)));
           for (const target of calcDmgForTargets) {
             for (const [dmgType, dmg] of damageResults.entries()) {
               let baseDmg = dmg;

@@ -234,4 +234,23 @@ export class UtilsRoll {
     return new Roll(parts.join(' + '), data);
   }
 
+  public static getCriticalBonusRoll(normal: Roll): Roll {
+    const critTerms: RollTerm[] = [];
+    for (const normalTerm of normal.terms) {
+      if (normalTerm instanceof NumericTerm) {
+        // Do not add numeric terms to the crit bonus
+        // also remove operators related to that numeric term
+        while (critTerms.length > 0 && critTerms[critTerms.length - 1] instanceof OperatorTerm) {
+          critTerms.pop();
+        }
+        continue;
+      } 
+      
+      critTerms.push(normalTerm);
+    }
+
+    // This will reset the results
+    return new Roll(Roll.fromTerms(critTerms).formula);
+  }
+
 }
