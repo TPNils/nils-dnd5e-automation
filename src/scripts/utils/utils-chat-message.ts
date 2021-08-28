@@ -289,7 +289,7 @@ export class UtilsChatMessage {
       if (damageParts && damageParts.length > 0) {
         mainDamage = {
           mode: 'normal',
-          normalRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON()
+          normalRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON(),
         }
         // Consider it healing if all damage types are healing
         const isHealing = damageParts.filter(roll => UtilsChatMessage.healingDamageTypes.includes(roll[1])).length === damageParts.length;
@@ -330,7 +330,7 @@ export class UtilsChatMessage {
           // when only dealing damage by upcasting? not sure if that ever happens
           inputDamages.push({
             mode: 'normal',
-            normalRoll: new Roll(scalingRollFormula, rollData).toJSON()
+            normalRoll: new Roll(scalingRollFormula, rollData).toJSON(),
           });
         } else {
           for (const damage of inputDamages) {
@@ -841,11 +841,23 @@ export class UtilsChatMessage {
       }
 
       const normalRoll = Roll.fromJSON(JSON.stringify(dmg.normalRoll));
-      const normalPromise = dmg.normalRoll.evaluated ? Promise.resolve(normalRoll) : normalRoll.roll({async: true});
-      const critBonusPromise = UtilsRoll.getCriticalBonusRoll(normalRoll).roll({async: true});
+      const normalRollEvaluated = dmg.normalRoll.evaluated;
+      const normalPromise = normalRollEvaluated ? Promise.resolve(normalRoll) : normalRoll.roll({async: true});
+      const critBonusPromise = UtilsRoll.getCriticalBonusRoll(new Roll(normalRoll.formula)).roll({async: true});
 
       const [normalResolved, critBonusResolved] = await Promise.all([normalPromise, critBonusPromise]);
-      dmg.criticalRoll = UtilsRoll.mergeRolls(normalResolved, critBonusResolved).toJSON();
+      const critResolved = UtilsRoll.mergeRolls(normalResolved, critBonusResolved);
+      if (!normalRollEvaluated) {
+        dmg.normalRoll = normalResolved.toJSON();
+      }
+      dmg.criticalRoll = critResolved.toJSON();
+      if (normalRollEvaluated) {
+        // If normal was already rolled, only roll crit die
+        UtilsDiceSoNice.showRoll({roll: critBonusResolved});
+      } else {
+        // If normal was not yet rolled, roll all dice
+        UtilsDiceSoNice.showRoll({roll: critResolved});
+      }
       return messageData;
     } else {
       if (dmg.normalRoll.evaluated) {
@@ -871,9 +883,11 @@ export class UtilsChatMessage {
     }
     dmg.mode = order[newIndex];
 
-    const response = await UtilsChatMessage.processItemDamage(itemIndex, damageIndex, messageData);
-    if (response) {
-      return response;
+    if (dmg.normalRoll.evaluated && (dmg.mode === 'critical' && !dmg.criticalRoll?.evaluated)) {
+      const response = await UtilsChatMessage.processItemDamage(itemIndex, damageIndex, messageData);
+      if (response) {
+        return response;
+      }
     }
     return messageData;
   }
@@ -961,12 +975,14 @@ export class UtilsChatMessage {
       return damages;
     }
     return damages.map(damage => {
-      let displayFormula = damage.mode === 'critical' ? damage.criticalRoll.formula : damage.normalRoll.formula;
+      let displayFormula = damage.mode === 'critical' ? damage.criticalRoll?.formula : damage.normalRoll.formula;
       const damageTypes: DamageType[] = [];
-      for (const damageType of UtilsRoll.getValidDamageTypes()) {
-        if (displayFormula.match(`\\[${damageType}\\]`)) {
-          damageTypes.push(damageType);
-          displayFormula = displayFormula.replace(new RegExp(`\\[${damageType}\\]`, 'g'), '');
+      if (displayFormula) {
+        for (const damageType of UtilsRoll.getValidDamageTypes()) {
+          if (displayFormula.match(`\\[${damageType}\\]`)) {
+            damageTypes.push(damageType);
+            displayFormula = displayFormula.replace(new RegExp(`\\[${damageType}\\]`, 'g'), '');
+          }
         }
       }
 

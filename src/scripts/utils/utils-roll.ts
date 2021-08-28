@@ -236,7 +236,8 @@ export class UtilsRoll {
 
   public static getCriticalBonusRoll(normal: Roll): Roll {
     const critTerms: RollTerm[] = [];
-    for (const normalTerm of normal.terms) {
+    // new Roll(formula) will ensure we create a new instance
+    for (const normalTerm of new Roll(normal.formula).terms) {
       if (normalTerm instanceof NumericTerm) {
         // Do not add numeric terms to the crit bonus
         // also remove operators related to that numeric term
@@ -249,8 +250,7 @@ export class UtilsRoll {
       critTerms.push(normalTerm);
     }
 
-    // This will reset the results
-    return new Roll(Roll.fromTerms(critTerms).formula);
+    return Roll.fromTerms(critTerms);
   }
 
   public static mergeRolls(...rolls: Roll[]): Roll {
