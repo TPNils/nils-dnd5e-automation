@@ -303,6 +303,7 @@ export class UtilsRoll {
         for (const addedTerm of added.terms) {
           if (baseTerm instanceof DiceTerm) {
             baseTerm.number += (addedTerm as DiceTerm).number;
+            baseTerm.results.push(...(addedTerm as DiceTerm).results);
           } else if (baseTerm instanceof NumericTerm) {
             baseTerm.number += (addedTerm as NumericTerm).number;
           }
@@ -319,6 +320,7 @@ export class UtilsRoll {
         baseTerms.push(operator, ...added.terms);
       }
     }
+    console.log(baseTerms);
 
     return Roll.fromTerms(deepClone(baseTerms));
   }
