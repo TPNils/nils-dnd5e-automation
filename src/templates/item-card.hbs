@@ -95,13 +95,13 @@
                   <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
                   <td>{{target.name}}</td>
                   <td>
-                    <div class="{{@root.staticValues.moduleName}}-roll-wrapper">
-                      {{#if target.check.evaluatedRoll.evaluated}}
+                    <div class="{{@root.staticValues.moduleName}}-roll-wrapper" {{#nacPerm (nacConcat "actorowneruuid:" target.actorUuid)}}title="{{target.check.evaluatedRoll.formula}}"{{/nacPerm}}>
+                      {{#if (eq target.check.phase "result")}}
                         <div class="{{@root.staticValues.moduleName}}-check-{{#if target.result.checkPass}}pass{{else}}fail{{/if}}">
                           {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=target.check.evaluatedRoll compact=true}}
                         </div>
                       {{else}}
-                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}" {{#nacMisPerm (nacConcat "actorowneruuid:" target.uuid)}}disabled{{/nacMisPerm}}>
+                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}" {{#nacMisPerm (nacConcat "actorowneruuid:" target.actorUuid)}}disabled{{/nacMisPerm}}>
                           {{#if (eq target.check.mode 'normal')}}
                             {{#if item.check.label}}
                               {{item.check.label}}
@@ -114,12 +114,15 @@
                             {{target.check.mode}}
                           {{/if}}
                         </button>
+                        
+                        {{#if (eq target.check.phase "bonus-input")}}
+                          <input placeholder="{{localize "DND5E.Bonus"}}: e.g. 1d4" type="text" value="{{target.check.userBonus}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-bonus" {{#nacMisPerm (nacConcat "actorowneruuid:" target.actorUuid)}}disabled{{/nacMisPerm}}/>
+                        {{/if}}
                       {{/if}}
-                      {{#nacPerm (nacConcat "actorowneruuid:" target.uuid)}}
+                      {{#nacPerm (nacConcat "actorowneruuid:" target.actorUuid)}}
                         <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq target.check.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
                         <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq target.check.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
                       {{/nacPerm}}
-                    </div>
                   </td>
                 </tr>
               {{/each}}

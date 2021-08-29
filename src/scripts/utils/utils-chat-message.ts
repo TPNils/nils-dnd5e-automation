@@ -36,6 +36,8 @@ export interface ItemCardItemData {
     vulnerabilities: string[];
     check?: {
       evaluatedRoll?: RollJson;
+      phase: RollPhase;
+      userBonus: string;
       mode: 'normal' | 'advantage' | 'disadvantage';
     }
     result: {
@@ -122,7 +124,6 @@ interface ActionParam {clickEvent: ClickEvent, keyEvent?: KeyEvent, regexResult:
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
 
-// TODO bonus dmg/save input
 export class UtilsChatMessage {
 
   private static readonly actionMatches: Array<{regex: RegExp, permissionCheck: ActionPermissionCheck, execute: ActionPermissionExecute}> = [
@@ -159,7 +160,12 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)$/,
       permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2]}},
-      execute: ({regexResult, messageData}) => UtilsChatMessage.processItemCheck(Number(regexResult[1]), regexResult[2], messageData),
+      execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemCheck(clickEvent, Number(regexResult[1]), regexResult[2], messageData),
+    },
+    {
+      regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-bonus$/,
+      permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2]}},
+      execute: ({keyEvent, regexResult, inputValue, messageData}) => UtilsChatMessage.processItemCheckBonus(keyEvent, Number(regexResult[1]), regexResult[2], inputValue as string, messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-mode-(minus|plus)$/,
@@ -445,7 +451,11 @@ export class UtilsChatMessage {
       };
       if (itemCardItemData.check) {
         // Don't prefil the roll, generate that at the moment the roll is made
-        target.check = {mode: 'normal'};
+        target.check = {
+          mode: 'normal',
+          phase: 'mode-select',
+          userBonus: "",
+        };
       }
       itemCardItemData.targets.push(target);
     }
@@ -899,13 +909,13 @@ export class UtilsChatMessage {
   //#endregion
 
   //#region check
-  private static async processItemCheck(itemIndex: number, targetUuid: string, messageData: ItemCardData): Promise<void | ItemCardData> {
-    if (!messageData.items?.[itemIndex]?.check) {
+  private static async processItemCheck(event: ClickEvent, itemIndex: number, targetUuid: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+    const itemCheck = messageData.items?.[itemIndex]?.check;
+    if (!itemCheck) {
       console.warn('No check found')
       return;
     }
-    const targetActor = (await UtilsDocument.tokenFromUuid(targetUuid)).getActor() as MyActor;
-
+    
     let target: ItemCardItemData['targets'][0];
     if (messageData.items[itemIndex].targets) {
       for (const t of messageData.items[itemIndex].targets) {
@@ -915,25 +925,70 @@ export class UtilsChatMessage {
         }
       }
     }
-    if (!target || target.check?.evaluatedRoll?.evaluated) {
+
+    if (!target || target.check.phase === 'result') {
       return;
     }
-    
-    const check = messageData.items[itemIndex].check;
-    if (!target.check) {
-      target.check = {
-        mode: 'normal'
+
+    const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
+    if (event.shiftKey) {
+      target.check.phase = orderedPhases[orderedPhases.length - 1];
+    } else {
+      target.check.phase = orderedPhases[orderedPhases.indexOf(target.check.phase) + 1];
+    }
+
+    if (orderedPhases.indexOf(target.check.phase) === orderedPhases.length - 1) {
+      const response = await UtilsChatMessage.processItemCheckRoll(itemIndex, targetUuid, messageData);
+      if (response) {
+        return response;
       }
     }
 
-    let roll = UtilsRoll.getAbilityRoll(targetActor, {ability: check.ability, skill: check.skill, addSaveBonus: check.addSaveBonus});
-    roll = await UtilsRoll.setRollMode(roll, target.check.mode);
-    roll = await roll.roll({async: true});
-    UtilsDiceSoNice.showRoll({roll: roll});
-
-    target.check.evaluatedRoll = roll.toJSON();
-
     return messageData;
+  }
+  
+  private static async processItemCheckBonus(keyEvent: KeyEvent | null, itemIndex: number, targetUuid: string, attackBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+    const itemCheck = messageData.items?.[itemIndex]?.check;
+    if (!itemCheck) {
+      console.warn('No check found')
+      return;
+    }
+    
+    let target: ItemCardItemData['targets'][0];
+    if (messageData.items[itemIndex].targets) {
+      for (const t of messageData.items[itemIndex].targets) {
+        if (t.uuid === targetUuid) {
+          target = t;
+          break;
+        }
+      }
+    }
+
+    if (!target || target.check.phase === 'result') {
+      return;
+    }
+
+    const oldBonus = target.check.userBonus;
+    if (attackBonus) {
+      target.check.userBonus = attackBonus;
+    } else {
+      target.check.userBonus = "";
+    }
+
+    if (target.check.userBonus && !Roll.validate(target.check.userBonus)) {
+      // TODO warning
+    }
+
+    if (keyEvent?.key === 'Enter') {
+      const response = await UtilsChatMessage.processItemCheckRoll(itemIndex, targetUuid, messageData);
+      if (response) {
+        return response;
+      }
+    }
+
+    if (target.check.userBonus !== oldBonus) {
+      return messageData;
+    }
   }
 
   private static async processItemCheckMode(event: ClickEvent, itemIndex: number, targetUuid: string, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
@@ -941,7 +996,6 @@ export class UtilsChatMessage {
       console.warn('No check found')
       return;
     }
-    const targetActor = (await UtilsDocument.tokenFromUuid(targetUuid)).getActor() as MyActor;
 
     let target: ItemCardItemData['targets'][0];
     if (messageData.items[itemIndex].targets) {
@@ -972,6 +1026,42 @@ export class UtilsChatMessage {
 
     const originalRoll = Roll.fromJSON(JSON.stringify(target.check.evaluatedRoll));
     target.check.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, target.check.mode)).toJSON();
+
+    return messageData;
+  }
+
+  private static async processItemCheckRoll(itemIndex: number, targetUuid: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+    if (!messageData.items?.[itemIndex]?.check) {
+      console.warn('No check found')
+      return;
+    }
+    const targetActor = (await UtilsDocument.tokenFromUuid(targetUuid)).getActor() as MyActor;
+
+    let target: ItemCardItemData['targets'][0];
+    if (messageData.items[itemIndex].targets) {
+      for (const t of messageData.items[itemIndex].targets) {
+        if (t.uuid === targetUuid) {
+          target = t;
+          break;
+        }
+      }
+    }
+    if (!target || target.check?.evaluatedRoll?.evaluated) {
+      return;
+    }
+    
+    const check = messageData.items[itemIndex].check;
+
+    let roll = UtilsRoll.getAbilityRoll(targetActor, {ability: check.ability, skill: check.skill, addSaveBonus: check.addSaveBonus});
+    if (target.check.userBonus) {
+      roll = new Roll(roll.formula + ' + ' + target.check.userBonus);
+    }
+    roll = await UtilsRoll.setRollMode(roll, target.check.mode);
+    roll = await roll.roll({async: true});
+    UtilsDiceSoNice.showRoll({roll: roll});
+
+    target.check.evaluatedRoll = roll.toJSON();
+    target.check.phase = 'result';
 
     return messageData;
   }
