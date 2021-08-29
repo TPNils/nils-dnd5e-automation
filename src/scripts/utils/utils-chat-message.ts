@@ -112,8 +112,11 @@ interface ClickEvent {
   readonly metaKey: boolean;
   readonly shiftKey: boolean;
 }
+interface KeyEvent {
+  readonly key: 'Enter';
+}
 type InteractionResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
-interface ActionParam {event: ClickEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData, inputValue?: boolean | number | string};
+interface ActionParam {clickEvent: ClickEvent, keyEvent?: KeyEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData, inputValue?: boolean | number | string};
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
 
@@ -139,17 +142,17 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-attack$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemAttack(event, Number(regexResult[1]), messageData),
+      execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemAttack(clickEvent, Number(regexResult[1]), messageData),
     },
     {
       regex: /^item-([0-9]+)-attack-bonus$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({regexResult, inputValue, messageData}) => UtilsChatMessage.processItemAttackBonus(Number(regexResult[1]), inputValue as string, messageData),
+      execute: ({keyEvent, regexResult, inputValue, messageData}) => UtilsChatMessage.processItemAttackBonus(keyEvent, Number(regexResult[1]), inputValue as string, messageData),
     },
     {
       regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemAttackMode(event, Number(regexResult[1]), regexResult[2] as ('plus' | 'minus'), messageData),
+      execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemAttackMode(clickEvent, Number(regexResult[1]), regexResult[2] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)$/,
@@ -159,7 +162,7 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-mode-(minus|plus)$/,
       permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2]}},
-      execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemCheckMode(event, Number(regexResult[1]), regexResult[2], regexResult[3] as ('plus' | 'minus'), messageData),
+      execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemCheckMode(clickEvent, Number(regexResult[1]), regexResult[2], regexResult[3] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^apply-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
@@ -182,6 +185,7 @@ export class UtilsChatMessage {
       const chatElement = document.getElementById('chat-log');
       chatElement.addEventListener('click', event => UtilsChatMessage.onClick(event));
       chatElement.addEventListener('focusout', event => UtilsChatMessage.onBlur(event));
+      chatElement.addEventListener('keydown', event => UtilsChatMessage.onKeyDown(event));
     });
 
     Hooks.on("init", () => {
@@ -477,13 +481,27 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async onInteraction({clickEvent, element}: {element: Node, clickEvent?: ClickEvent}): Promise<void> {
+  private static async onKeyDown(event: KeyboardEvent): Promise<void> {
+    if (event.target instanceof HTMLInputElement && event.key === 'Enter') {
+      UtilsChatMessage.onInteraction({
+        element: event.target as Node,
+        keyEvent: {
+          key: 'Enter'
+        },
+      });
+    }
+  }
+
+  private static async onInteraction({clickEvent, element, keyEvent}: {element: Node, clickEvent?: ClickEvent, keyEvent?: KeyEvent}): Promise<void> {
     clickEvent = {
       altKey: clickEvent?.altKey === true,
       ctrlKey: clickEvent?.ctrlKey === true,
       metaKey: clickEvent?.metaKey === true,
       shiftKey: clickEvent?.shiftKey === true,
     }
+    keyEvent = !keyEvent ? null : {
+      key: keyEvent.key
+    };
 
     let messageId: string;
     let action: string;
@@ -527,7 +545,7 @@ export class UtilsChatMessage {
       return;
     }
 
-    const actions = await UtilsChatMessage.getActions(action, clickEvent, game.userId, messageId, messageData);
+    const actions = await UtilsChatMessage.getActions(action, clickEvent, keyEvent, game.userId, messageId, messageData);
     if (actions.missingPermissions) {
       console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} with action ${action} for current user but permissions are missing`)
       return;
@@ -538,7 +556,8 @@ export class UtilsChatMessage {
     }
 
     const request: Parameters<typeof UtilsChatMessage['onInteractionProcessor']>[0] = {
-      event: clickEvent,
+      clickEvent: clickEvent,
+      keyEvent: keyEvent,
       userId: game.userId,
       messageId: messageId,
       action: action,
@@ -573,8 +592,9 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async onInteractionProcessor({event, userId, messageId, action, inputValue}: {
-    event: ClickEvent,
+  private static async onInteractionProcessor({clickEvent, keyEvent, userId, messageId, action, inputValue}: {
+    clickEvent: ClickEvent,
+    keyEvent: KeyEvent,
     userId: string,
     messageId: string,
     action: string,
@@ -590,7 +610,7 @@ export class UtilsChatMessage {
       };
     }
 
-    const actions = await UtilsChatMessage.getActions(action, event, userId, messageId, messageData);
+    const actions = await UtilsChatMessage.getActions(action, clickEvent, keyEvent, userId, messageId, messageData);
     if (action && actions.actionsToExecute.length === 0) {
       return {
         success: false,
@@ -603,7 +623,7 @@ export class UtilsChatMessage {
     let doUpdate = false;
     
     for (const action of actions.actionsToExecute) {
-      const param: ActionParam = {event: event, regexResult: action.regex, messageId: messageId, messageData: latestMessageData, inputValue: inputValue};
+      const param: ActionParam = {clickEvent: clickEvent, keyEvent: keyEvent, regexResult: action.regex, messageId: messageId, messageData: latestMessageData, inputValue: inputValue};
       let response = await action.action.execute(param);
       if (response) {
         doUpdate = true;
@@ -648,7 +668,7 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async getActions(action: string, event: ClickEvent, userId: string, messageId: string, messageData: ItemCardData): Promise<{missingPermissions: boolean, actionsToExecute: Array<{action: typeof UtilsChatMessage.actionMatches[0], regex: RegExpExecArray}>}> {
+  private static async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, messageData: ItemCardData): Promise<{missingPermissions: boolean, actionsToExecute: Array<{action: typeof UtilsChatMessage.actionMatches[0], regex: RegExpExecArray}>}> {
     if (!action) {
       return {
         missingPermissions: false,
@@ -667,7 +687,7 @@ export class UtilsChatMessage {
     for (const actionMatch of UtilsChatMessage.actionMatches) {
       const result = actionMatch.regex.exec(action);
       if (result) {
-        const permissionCheck = actionMatch.permissionCheck({event: event, regexResult: result, messageId: messageId, messageData: messageData});
+        const permissionCheck = actionMatch.permissionCheck({clickEvent: clickEvent, keyEvent: keyEvent, regexResult: result, messageId: messageId, messageData: messageData});
         if (permissionCheck.message) {
           // Is not author and is no gm
           if (game.messages.get(messageId).data.user !== userId && !user.isGM) {
@@ -725,12 +745,13 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async processItemAttackBonus(itemIndex: number, attackBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttackBonus(keyEvent: KeyEvent | null,itemIndex: number, attackBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items?.[itemIndex]?.attack;
-    if (!attack || attack.evaluatedRoll?.evaluated || attack.phase === 'result' || attack.userBonus === attackBonus) {
+    if (!attack || attack.evaluatedRoll?.evaluated || attack.phase === 'result') {
       return;
     }
 
+    const oldBonus = attack.userBonus;
     if (attackBonus) {
       attack.userBonus = attackBonus;
     } else {
@@ -741,7 +762,16 @@ export class UtilsChatMessage {
       // TODO warning
     }
 
-    return messageData;
+    if (keyEvent?.key === 'Enter') {
+      const response = await UtilsChatMessage.processItemAttackRoll(itemIndex, messageData);
+      if (response) {
+        return response;
+      }
+    }
+
+    if (attack.userBonus !== oldBonus) {
+      return messageData;
+    }
   }
 
   private static async processItemAttackRoll(itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
