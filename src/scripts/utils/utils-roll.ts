@@ -314,11 +314,15 @@ export class UtilsRoll {
     for (const added of additionalTermsByMergeKey.values()) {
       if (!added.merged) {
         const operator = new OperatorTerm({operator: '+'});
-        if (added.terms[0].evaluate) {
+        if ((added.terms[0] as any)._evaluated) {
           operator.evaluate({async: false});
         }
-        baseTerms.push(operator, ...added.terms);
+        baseTerms.push(...Roll.simplifyTerms([operator, ...added.terms]));
       }
+    }
+
+    while (baseTerms[baseTerms.length - 1] instanceof OperatorTerm) {
+      baseTerms.pop();
     }
 
     return Roll.fromTerms(deepClone(baseTerms));
