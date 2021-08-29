@@ -416,7 +416,7 @@ export class UtilsChatMessage {
     itemCardItemData.targets = [];
     for (const targetUuid of targetUuids) {
       const token = tokenMap.get(targetUuid);
-      const actor = token.getActor() as MyActor;
+      const actor = (token.data.actorId ? game.actors.get(token.data.actorId) : token.getActor()) as MyActor;
       const target: ItemCardItemData['targets'][0] = {
         uuid: targetUuid,
         actorUuid: actor.uuid,
