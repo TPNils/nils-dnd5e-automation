@@ -656,7 +656,6 @@ export class UtilsChatMessage {
             flags: {
               [staticValues.moduleName]: {
                 clientTemplateData: {
-                  staticValues: staticValues,
                   data: mData,
                 }
               }
