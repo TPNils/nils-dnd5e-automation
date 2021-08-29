@@ -722,10 +722,6 @@ export class UtilsChatMessage {
   
   private static async processItemAttackBonus(itemIndex: number, attackBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items?.[itemIndex]?.attack;
-    console.log(deepClone({
-      attack,
-      attackBonus
-    }))
     if (!attack || attack.evaluatedRoll?.evaluated || attack.phase === 'result' || attack.userBonus === attackBonus) {
       return;
     }
@@ -841,9 +837,6 @@ export class UtilsChatMessage {
       return;
     }
     const targetActor = (await UtilsDocument.tokenFromUuid(targetUuid)).getActor() as MyActor;
-    if (!targetActor.isOwner) {
-      return;
-    }
 
     let target: ItemCardItemData['targets'][0];
     if (messageData.items[itemIndex].targets) {
@@ -876,12 +869,6 @@ export class UtilsChatMessage {
   }
 
   private static async processItemAttackMode(event: ClickEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
-    {
-      const actor = messageData.actor?.uuid == null ? null : (await UtilsDocument.actorFromUuid(messageData.actor.uuid));
-      if (actor && !actor.isOwner) {
-        return;
-      }
-    }
     const attack = messageData.items[itemIndex].attack;
     let modifier = modName === 'plus' ? 1 : -1;
     if (event.shiftKey && modifier > 0) {
@@ -912,9 +899,6 @@ export class UtilsChatMessage {
       return;
     }
     const targetActor = (await UtilsDocument.tokenFromUuid(targetUuid)).getActor() as MyActor;
-    if (!targetActor.isOwner) {
-      return;
-    }
 
     let target: ItemCardItemData['targets'][0];
     if (messageData.items[itemIndex].targets) {
@@ -950,13 +934,6 @@ export class UtilsChatMessage {
   }
 
   private static async processItemDamage(damageIndex: number, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
-    {
-      const actor = messageData.actor?.uuid == null ? null : (await UtilsDocument.actorFromUuid(messageData.actor.uuid));
-      if (actor && !actor.isOwner) {
-        return;
-      }
-    }
-
     const dmg = messageData.items[itemIndex].damages[damageIndex];
     if (dmg.mode === 'critical') {
       if (dmg.criticalRoll?.evaluated) {
