@@ -117,7 +117,7 @@ interface ActionParam {event: ClickEvent, regexResult: RegExpExecArray, messageI
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
 
-// TODO bonus attack/dmg/save input
+// TODO bonus dmg/save input
 export class UtilsChatMessage {
 
   private static readonly actionMatches: Array<{regex: RegExp, permissionCheck: ActionPermissionCheck, execute: ActionPermissionExecute}> = [
@@ -747,8 +747,6 @@ export class UtilsChatMessage {
   private static async processItemAttackRoll(itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items?.[itemIndex]?.attack;
     if (!attack || attack.evaluatedRoll) {
-      // If attack was already rolled, do nothing
-      // TODO should create a new card (?)
       return;
     }
 
@@ -858,8 +856,6 @@ export class UtilsChatMessage {
       }
     }
     if (!target || target.check?.evaluatedRoll?.evaluated) {
-      // If no target was found or target already rolled, do nothing
-      // TODO should create a new card (?)
       return;
     }
     
@@ -1159,7 +1155,6 @@ export class UtilsChatMessage {
         }
       }
 
-      // TODO damage should take checks into account
       // Include when no attack has happend (null) and when hit (true)
       // Include when no check is present in the item or the check happend (check passed/failed is handled later)
       const calcDmgForTargets = item.targets.filter(target => target.result.hit !== false && (!item.check || target.check?.evaluatedRoll?.evaluated));
