@@ -97,8 +97,8 @@
     button {
       background: rgba(0, 0, 0, 0.1);
       border: 2px groove #eeede0;
-      height: 28px;
-      line-height: 22px;
+      height: 26px;
+      line-height: 20px;
     }
 
     .dice-rolls {
@@ -137,7 +137,7 @@
     }
 
     .#{$module-name}-item-check {
-      width: 10em;
+      width: 12em;
     }
 
     .#{$module-name}-item-attack {
@@ -174,14 +174,14 @@
         color: red;
         top: 3px;
         left: 2px;
-        //transform: translate(10%, 0);
+        //transform: translate(25%, 0);
       }
 
       .#{$module-name}-mode-plus {
         color: #4F8A10;
         top: 3px;
         right: 2px;
-        //transform: translate(-10%, 0);
+        //transform: translate(-25%, 0);
       }
 
       .#{$module-name}-mode-plus[disabled],
