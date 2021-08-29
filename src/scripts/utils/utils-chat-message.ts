@@ -545,14 +545,17 @@ export class UtilsChatMessage {
     if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
       element.disabled = true;
     }
-    if (message.canUserModify(game.user, 'update')) {
-      // User has all required permissions, run locally
-      response = await UtilsChatMessage.onInteractionProcessor(request);
-    } else {
-      response = await provider.getSocket().then(socket => socket.executeAsGM('onInteraction', request));
-    }
-    if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
-      element.disabled = false;
+    try {
+      if (message.canUserModify(game.user, 'update')) {
+        // User has all required permissions, run locally
+        response = await UtilsChatMessage.onInteractionProcessor(request);
+      } else {
+        response = await provider.getSocket().then(socket => socket.executeAsGM('onInteraction', request));
+      }
+    } finally {
+      if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
+        element.disabled = false;
+      }
     }
 
     if (response.success === false) {
