@@ -1,8 +1,8 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
-import { MessageData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/foundry.js/roll";
+import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
 import { staticValues } from "../static-values";
-import { DamageType, MyActor, MyActorData, MyItem } from "../types/fixed-types";
+import { DamageType, MyActor, MyActorData, MyItem, MyItemData } from "../types/fixed-types";
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
 import { UtilsDocument } from "./utils-document";
 import { UtilsInput } from "./utils-input";
@@ -75,7 +75,10 @@ export interface ItemCardItemData {
     skill?: string;
     addSaveBonus?: boolean;
   };
-  template?: any;
+  targetDefinition: {
+    hasAoe: boolean,
+    createdTemplateUuid?: string;
+  } & MyItemData['data']['target'];
   spell?: {
     level: number;
   },
@@ -121,7 +124,7 @@ interface KeyEvent {
 }
 type InteractionResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
 interface ActionParam {clickEvent: ClickEvent, keyEvent?: KeyEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData, inputValue?: boolean | number | string};
-type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean};
+type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean, onlyRunLocal?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
 
 export class UtilsChatMessage {
@@ -173,6 +176,11 @@ export class UtilsChatMessage {
       execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemCheckMode(clickEvent, Number(regexResult[1]), regexResult[2], regexResult[3] as ('plus' | 'minus'), messageData),
     },
     {
+      regex: /^item-([0-9]+)-template$/,
+      permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2], onlyRunLocal: true}},
+      execute: ({regexResult, messageData, messageId}) => UtilsChatMessage.processItemTemplate(Number(regexResult[1]), messageData, messageId),
+    },
+    {
       regex: /^apply-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
       permissionCheck: ({regexResult}) => {return {gm: true}},
       execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.applyDamage(regexResult[1], messageData, messageId),
@@ -205,6 +213,7 @@ export class UtilsChatMessage {
       ]);
     });
 
+    Hooks.on(`create${MeasuredTemplateDocument.documentName}`, UtilsChatMessage.processTemplateCreated)
     
     provider.getSocket().then(socket => {
       socket.register('onInteraction', (params: Parameters<typeof UtilsChatMessage['onInteractionProcessor']>[0]) => {
@@ -248,6 +257,11 @@ export class UtilsChatMessage {
       uuid: item.uuid,
       name: item.data.name,
       img: item.img,
+      targetDefinition: {
+        // @ts-expect-error
+        hasAoe: CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type),
+        ...item.data.data.target,
+      }
     };
 
     if (item.data.data.description?.value) {
@@ -586,7 +600,7 @@ export class UtilsChatMessage {
       element.disabled = true;
     }
     try {
-      if (message.canUserModify(game.user, 'update')) {
+      if (actions.onlyRunLocal || message.canUserModify(game.user, 'update')) {
         // User has all required permissions, run locally
         response = await UtilsChatMessage.onInteractionProcessor(request);
       } else {
@@ -683,15 +697,17 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, messageData: ItemCardData): Promise<{missingPermissions: boolean, actionsToExecute: Array<{action: typeof UtilsChatMessage.actionMatches[0], regex: RegExpExecArray}>}> {
+  private static async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, messageData: ItemCardData): Promise<{missingPermissions: boolean, onlyRunLocal: boolean, actionsToExecute: Array<{action: typeof UtilsChatMessage.actionMatches[0], regex: RegExpExecArray}>}> {
     if (!action) {
       return {
         missingPermissions: false,
+        onlyRunLocal: true,
         actionsToExecute: []
       };
     }
     const response = {
       missingPermissions: false, 
+      onlyRunLocal: false,
       actionsToExecute: [] as Array<{
         action: typeof UtilsChatMessage.actionMatches[0],
         regex: RegExpExecArray
@@ -703,6 +719,9 @@ export class UtilsChatMessage {
       const result = actionMatch.regex.exec(action);
       if (result) {
         const permissionCheck = actionMatch.permissionCheck({clickEvent: clickEvent, keyEvent: keyEvent, regexResult: result, messageId: messageId, messageData: messageData});
+        if (permissionCheck.onlyRunLocal === true) {
+          response.onlyRunLocal = true;
+        }
         if (permissionCheck.message) {
           // Is not author and is no gm
           if (game.messages.get(messageId).data.user !== userId && !user.isGM) {
@@ -1265,6 +1284,62 @@ export class UtilsChatMessage {
     }
     await UtilsDocument.updateTokenActors(tokenActorUpdates);
     return messageData;
+  }
+  //#endregion
+
+  //#region targeting
+  private static async processItemTemplate(itemIndex: number, messageData: ItemCardData, messageId: string): Promise<void> {
+    const targetDefinition = messageData.items?.[itemIndex]?.targetDefinition;
+    if (!targetDefinition || !targetDefinition.hasAoe) {
+      // TODO check if you can retarget
+      return;
+    }
+
+    const template = MyAbilityTemplate.fromItem({
+      target: targetDefinition,
+      flags: {
+        [staticValues.moduleName]: {
+          dmlCallbackMessageId: messageId,
+          dmlCallbackItemIndex: itemIndex,
+        }
+      }
+    });
+    template.drawPreview();
+  }
+
+  private static processTemplateCreated(template: MeasuredTemplateDocument): void {
+    const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
+    if (!messageId || !game.messages.has(messageId)) {
+      return;
+    }
+    const message = game.messages.get(messageId);
+    const messageData = UtilsChatMessage.getItemCardData(message);
+    if (!messageData) {
+      return;
+    }
+
+    const item = messageData.items[template.getFlag(staticValues.moduleName, 'dmlCallbackItemIndex') as number];
+    if (!item) {
+      return;
+    }
+
+    if (item.targetDefinition.createdTemplateUuid && item.targetDefinition.createdTemplateUuid !== template.uuid) {
+      fromUuid(item.targetDefinition.createdTemplateUuid).then(doc => {
+        doc.delete();
+      });
+    }
+
+    item.targetDefinition.createdTemplateUuid = template.uuid;
+    ChatMessage.updateDocuments([{
+      _id: messageId,
+      flags: {
+        [staticValues.moduleName]: {
+          clientTemplateData: {
+            data: messageData,
+          }
+        }
+      }
+    }]);
   }
   //#endregion
 

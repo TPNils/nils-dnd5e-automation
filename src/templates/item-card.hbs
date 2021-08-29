@@ -134,6 +134,14 @@
           <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-template">{{ localize "DND5E.PlaceTemplate" }}</button>
         {{/if}}
       </div>
+      
+      {{#if item.targetDefinition.hasAoe}}
+        <div class="{{@root.staticValues.moduleName}}-section">
+          <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-template" {{#nacMisPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}disabled{{/nacMisPerm}}>
+            {{localize "DND5E.PlaceTemplate"}}
+          </button> 
+        </div>
+      {{/if}}
 
       <div class="{{@root.staticValues.moduleName}}-footer">
         {{#each item.properties}}

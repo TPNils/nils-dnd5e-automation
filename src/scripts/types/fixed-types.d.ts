@@ -159,7 +159,7 @@ export type MyItemData = {
       value?: number;
       width?: number;
       units: string;
-      type: string;
+      type: '' | 'ally' | 'cone' | 'creature' | 'cube' | 'cylinder' | 'enemy' | 'line' | 'none' | 'object' | 'radius' | 'self' | 'space' | 'sphere' | 'square' | 'wall';
     },
     save: {
       dc?: number;
