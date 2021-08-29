@@ -466,11 +466,11 @@ export class UtilsChatMessage {
       if (input.type === 'checkbox') {
         return;
       }
-    }
-    if (event.target instanceof Node) {
-      UtilsChatMessage.onInteraction({
-        element: event.target as Node
-      });
+      if (event.target instanceof Node) {
+        UtilsChatMessage.onInteraction({
+          element: event.target as Node
+        });
+      }
     }
   }
 
