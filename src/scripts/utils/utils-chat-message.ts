@@ -791,6 +791,7 @@ export class UtilsChatMessage {
       return;
     }
 
+    // TODO this implementation does not work and should also account for checks along side the attack
     // Re-evaluate the targets, the user may have changed targets
     const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
 
