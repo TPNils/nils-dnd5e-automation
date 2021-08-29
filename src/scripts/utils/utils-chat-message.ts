@@ -127,11 +127,6 @@ export class UtilsChatMessage {
 
   private static readonly actionMatches: Array<{regex: RegExp, permissionCheck: ActionPermissionCheck, execute: ActionPermissionExecute}> = [
     {
-      regex: /^refresh$/, // used for testing during dev
-      permissionCheck: () => {return {message: true}},
-      execute: ({messageData}) => Promise.resolve(messageData),
-    },
-    {
       regex: /^item-([0-9]+)-damage-([0-9]+)$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemDamage(clickEvent, Number(regexResult[1]), Number(regexResult[2]), messageData),
