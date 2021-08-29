@@ -4,7 +4,11 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
   const clientTemplate = this.getFlag(staticValues.moduleName, 'clientTemplate') as string;
   const clientTemplateData = this.getFlag(staticValues.moduleName, 'clientTemplateData') as any;
   if (clientTemplate && clientTemplateData) {
-    this.data.update({content: await renderTemplate(clientTemplate, clientTemplateData)})
+    const options: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {}
+    if (game.user.isGM) {
+      options.secrets = true;
+    }
+    this.data.update({content: TextEditor.enrichHTML(await renderTemplate(clientTemplate, clientTemplateData), options as any)})
   }
 
   return wrapped(args);

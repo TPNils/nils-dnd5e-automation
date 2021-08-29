@@ -2,17 +2,33 @@ import { MyActor, MyActorData, MyItem } from "../types/fixed-types";
 
 export class UtilsDocument {
 
-  public static async actorFromUuid(uuid: string): Promise<MyActor> {
+  public static actorFromUuid(uuid: string): Promise<MyActor>
+  public static actorFromUuid(uuid: string, options: {sync: true}): MyActor
+  public static actorFromUuid(uuid: string, options: {sync?: boolean} = {}): MyActor | Promise<MyActor> {
     try {
-      let document = await fromUuid(uuid);
-      // The UUID of a token actor is the token
-      if (document.documentName === (TokenDocument as any).documentName) {
-        document = (document as TokenDocument).getActor();
+      if (options.sync === true) {
+        const directActorRegex = uuid.match(new RegExp(`^${(Actor as any).documentName}.([^\\.]+)$`))
+        if (directActorRegex) {
+          return game.actors.get(directActorRegex[1]);
+        }
+        const tokenActorRegex = uuid.match(new RegExp(`^${(Scene as any).documentName}.([^\\.]+).${(TokenDocument as any).documentName}.([^\\.]+)$`))
+        if (tokenActorRegex) {
+          return (game.scenes.get(tokenActorRegex[1]).getEmbeddedDocument('Token', tokenActorRegex[2]) as TokenDocument).getActor();
+        }
+
+        console.warn(`${(Actor as any).documentName} uuid not supported for sync calls`)
+        return null;
       }
-      if (document.documentName !== (Actor as any).documentName) {
-        throw new Error(`UUID '${uuid}' is not an ${(Actor as any).documentName}. In stead found: ${document.documentName}`)
-      }
-      return document as any as MyActor;
+
+      return fromUuid(uuid).then(document => {
+        if (document.documentName === (TokenDocument as any).documentName) {
+          document = (document as TokenDocument).getActor();
+        }
+        if (document.documentName !== (Actor as any).documentName) {
+          throw new Error(`UUID '${uuid}' is not an ${(Actor as any).documentName}. In stead found: ${document.documentName}`)
+        }
+        return document as any as MyActor;
+      }).catch(e => null);
     } catch {
       return null;
     }

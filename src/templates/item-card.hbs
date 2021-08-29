@@ -32,7 +32,7 @@
                     {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=item.attack.evaluatedRoll}}
                   </div>
                 {{else}}
-                  <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack" class="{{@root.staticValues.moduleName}}-item-attack" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}">
+                  <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack" class="{{@root.staticValues.moduleName}}-item-attack" {{#nacMisPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}disabled{{/nacMisPerm}}>
                     {{#if (eq item.attack.mode 'normal')}}
                       {{#if item.attack.label}}{{item.attack.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}
                     {{else}}
@@ -41,11 +41,13 @@
                   </button>
                   
                   {{#if (eq item.attack.phase "bonus-input")}}
-                    <input placeholder="{{localize "DND5E.Bonus"}}: e.g. 1d4" type="text" value="{{item.attack.userBonus}}" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-bonus"/>
+                    <input placeholder="{{localize "DND5E.Bonus"}}: e.g. 1d4" type="text" value="{{item.attack.userBonus}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-bonus" {{#nacMisPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}disabled{{/nacMisPerm}}/>
                   {{/if}}
                 {{/if}}
-                <button data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq item.attack.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
-                <button data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{@root.data.actor.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq item.attack.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+                {{#nacPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}
+                  <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq item.attack.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq item.attack.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+                {{/nacPerm}}
               </div>
             </div>
           {{/if}}
@@ -60,7 +62,7 @@
               {{> modules/nils-automated-compendium/templates/damage.hbs 
                 moduleName=@root.staticValues.moduleName
                 actionBase=(nacConcat "item-" itemIndex "-damage-0")
-                interactionSecret=(nacConcat "actorowneruuid:" @root.data.actor.uuid)
+                interactionPermission=(nacConcat "actorowneruuid:" @root.data.actor.uuid)
                 dmg=item.damages.[0]
               }}
             </div>
@@ -73,14 +75,14 @@
             {{> modules/nils-automated-compendium/templates/damage.hbs 
               moduleName=@root.staticValues.moduleName
               actionBase=(nacConcat "item-" itemIndex "-damage-" dmgIndex)
-              interactionSecret=(nacConcat "actorowneruuid:" @root.data.actor.uuid)
+              interactionPermission=(nacConcat "actorowneruuid:" @root.data.actor.uuid)
               dmg=dmg
               flavor=dmg.displayDamageTypes
             }}
           {{/if}}
         {{/each}}
         
-        {{#if item.check}}
+        {{#if (and item.check item.targets.length)}}
           <table>
             <thead>
                 <th style="width: 30px;">{{! img}}</th>
@@ -99,7 +101,7 @@
                           {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=target.check.evaluatedRoll compact=true}}
                         </div>
                       {{else}}
-                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}" data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{target.uuid}}">
+                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}" {{#nacMisPerm (nacConcat "actorowneruuid:" target.uuid)}}disabled{{/nacMisPerm}}>
                           {{#if (eq target.check.mode 'normal')}}
                             {{#if item.check.label}}
                               {{item.check.label}}
@@ -113,8 +115,10 @@
                           {{/if}}
                         </button>
                       {{/if}}
-                      <button data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{target.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq target.check.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
-                      <button data-{{@root.staticValues.moduleName}}-secret="actorowneruuid:{{target.uuid}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq target.check.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+                      {{#nacPerm (nacConcat "actorowneruuid:" target.uuid)}}
+                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq target.check.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq target.check.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+                      {{/nacPerm}}
                     </div>
                   </td>
                 </tr>
@@ -137,7 +141,8 @@
   {{/each}}
 
   {{#if data.targetAggregate.length}}
-    <section data-{{@root.staticValues.moduleName}}-secret="gm" class="{{@root.staticValues.moduleName}}-gm-secret">
+  {{#nacPerm "gm"}}
+    <section class="{{@root.staticValues.moduleName}}-gm-secret">
       <table class="{{@root.staticValues.moduleName}}-targets">
         <thead>
           <tr>
@@ -178,6 +183,7 @@
         </tbody>
       </table>
     </section>
+  {{/nacPerm}}
   {{/if}}
     
 </div>
