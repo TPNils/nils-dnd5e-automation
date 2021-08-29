@@ -87,7 +87,7 @@
             <thead>
                 <th style="width: 30px;">{{! img}}</th>
                 <th>Name</th>
-                <th>DC: {{item.check.dc}}</th>
+                <th class="{{@root.staticValues.moduleName}}-item-check">DC: {{item.check.dc}}</th>
             </thead>
             <tbody>
               {{#each item.targets as |target|}}

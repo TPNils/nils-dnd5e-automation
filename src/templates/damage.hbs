@@ -11,7 +11,7 @@
   {{else if (and dmg.criticalRoll.evaluated (eq dmg.mode 'critical'))}}
     {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=flavor overrideFormula=dmg.displayFormula roll=dmg.criticalRoll}}
   {{else}}
-    <button data-{{moduleName}}-action="{{actionBase}}" {{#if interactionPermission}}{{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}{{/if}}>
+    <button data-{{moduleName}}-action="{{actionBase}}" class="{{moduleName}}-item-damage" {{#if interactionPermission}}{{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}{{/if}}>
       {{#if (eq dmg.mode 'critical')}}
         {{localize "DND5E.Critical"}}
       {{else}}

@@ -136,6 +136,10 @@
       flex-basis: 0;
     }
 
+    .#{$module-name}-item-check {
+      width: 10em;
+    }
+
     .#{$module-name}-item-attack {
       text-transform: capitalize;
     }
@@ -169,15 +173,15 @@
       .#{$module-name}-mode-minus {
         color: red;
         top: 3px;
-        left: 0;
-        transform: translate(25%, 0);
+        left: 2px;
+        //transform: translate(10%, 0);
       }
 
       .#{$module-name}-mode-plus {
         color: #4F8A10;
         top: 3px;
-        right: 0;
-        transform: translate(-25%, 0);
+        right: 2px;
+        //transform: translate(-10%, 0);
       }
 
       .#{$module-name}-mode-plus[disabled],
