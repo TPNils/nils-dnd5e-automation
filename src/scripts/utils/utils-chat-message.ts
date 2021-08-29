@@ -201,6 +201,7 @@ export class UtilsChatMessage {
     });
   }
 
+  //#region public conversion utils
   public static async createCard(data: ItemCardData): Promise<ChatMessage> {
     // I expect actor & token to sometimes include the whole actor/token document by accident
     // While I would prefer a full type validation, it is the realistic approach
@@ -442,7 +443,9 @@ export class UtilsChatMessage {
 
     return itemCardItemData;
   }
+  //#endregion
 
+  //#region routing
   private static async onClick(event: MouseEvent): Promise<void> {
     if (event.target instanceof HTMLInputElement) {
       // do not register clicks on inputs, except checkboxes
@@ -696,7 +699,9 @@ export class UtilsChatMessage {
 
     return response;
   }
+  //#endregion
 
+  //#region attack
   private static async processItemAttack(event: ClickEvent, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items?.[itemIndex]?.attack;
     if (!attack || attack.phase === 'result') {
@@ -831,6 +836,33 @@ export class UtilsChatMessage {
     return messageData;
   }
 
+  private static async processItemAttackMode(event: ClickEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
+    const attack = messageData.items[itemIndex].attack;
+    let modifier = modName === 'plus' ? 1 : -1;
+    if (event.shiftKey && modifier > 0) {
+      modifier++;
+    } else if (event.shiftKey && modifier < 0) {
+      modifier--;
+    }
+    
+    const order: Array<typeof attack.mode> = ['disadvantage', 'normal', 'advantage'];
+    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(attack.mode) + modifier));
+    if (attack.mode === order[newIndex]) {
+      return;
+    }
+    attack.mode = order[newIndex];
+    if (!attack.evaluatedRoll) {
+      return messageData;
+    }
+
+    const originalRoll = Roll.fromJSON(JSON.stringify(attack.evaluatedRoll));
+    attack.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, attack.mode)).toJSON();
+
+    return messageData;
+  }
+  //#endregion
+
+  //#region check
   private static async processItemCheck(itemIndex: number, targetUuid: string, messageData: ItemCardData): Promise<void | ItemCardData> {
     if (!messageData.items?.[itemIndex]?.check) {
       console.warn('No check found')
@@ -864,31 +896,6 @@ export class UtilsChatMessage {
     UtilsDiceSoNice.showRoll({roll: roll});
 
     target.check.evaluatedRoll = roll.toJSON();
-
-    return messageData;
-  }
-
-  private static async processItemAttackMode(event: ClickEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
-    const attack = messageData.items[itemIndex].attack;
-    let modifier = modName === 'plus' ? 1 : -1;
-    if (event.shiftKey && modifier > 0) {
-      modifier++;
-    } else if (event.shiftKey && modifier < 0) {
-      modifier--;
-    }
-    
-    const order: Array<typeof attack.mode> = ['disadvantage', 'normal', 'advantage'];
-    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(attack.mode) + modifier));
-    if (attack.mode === order[newIndex]) {
-      return;
-    }
-    attack.mode = order[newIndex];
-    if (!attack.evaluatedRoll) {
-      return messageData;
-    }
-
-    const originalRoll = Roll.fromJSON(JSON.stringify(attack.evaluatedRoll));
-    attack.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, attack.mode)).toJSON();
 
     return messageData;
   }
@@ -932,7 +939,9 @@ export class UtilsChatMessage {
 
     return messageData;
   }
+  //#endregion
 
+  //#region damage
   private static async processItemDamage(damageIndex: number, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     const dmg = messageData.items[itemIndex].damages[damageIndex];
     if (dmg.mode === 'critical') {
@@ -1069,7 +1078,9 @@ export class UtilsChatMessage {
     await UtilsDocument.updateTokenActors(tokenActorUpdates);
     return messageData;
   }
+  //#endregion
 
+  //#region calculations
   private static calculateDamageFormulas(damages: ItemCardItemData['damages']): ItemCardItemData['damages'] {
     if (!damages) {
       return damages;
@@ -1269,12 +1280,6 @@ export class UtilsChatMessage {
   private static getItemCardData(message: ChatMessage): ItemCardData {
     return (message.getFlag(staticValues.moduleName, 'clientTemplateData') as any)?.data;
   }
-
-  private static generateTemplate(data: ItemCardData): Promise<string> {
-    return renderTemplate(`modules/${staticValues.moduleName}/templates/item-card.hbs`, {
-      staticValues: staticValues,
-      data: data
-    });
-  }
+  //#endregion
 
 }
