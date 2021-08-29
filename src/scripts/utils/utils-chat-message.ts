@@ -153,12 +153,12 @@ export class UtilsChatMessage {
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)$/,
-      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
+      permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2]}},
       execute: ({regexResult, messageData}) => UtilsChatMessage.processItemCheck(Number(regexResult[1]), regexResult[2], messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-mode-(minus|plus)$/,
-      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
+      permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2]}},
       execute: ({event, regexResult, messageData}) => UtilsChatMessage.processItemCheckMode(event, Number(regexResult[1]), regexResult[2], regexResult[3] as ('plus' | 'minus'), messageData),
     },
     {
