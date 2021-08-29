@@ -6,11 +6,14 @@
   flavor=
 }}
 <div class="{{moduleName}}-roll-wrapper">
-  {{#if (and dmg.normalRoll.evaluated (eq dmg.mode 'normal'))}}
-    {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=flavor overrideFormula=dmg.displayFormula roll=dmg.normalRoll}}
-  {{else if (and dmg.criticalRoll.evaluated (eq dmg.mode 'critical'))}}
-    {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=flavor overrideFormula=dmg.displayFormula roll=dmg.criticalRoll}}
+  {{#if (eq dmg.phase "result")}}
+    {{#if (and dmg.normalRoll.evaluated (eq dmg.mode 'normal'))}}
+      {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=flavor overrideFormula=dmg.displayFormula roll=dmg.normalRoll}}
+    {{else if (and dmg.criticalRoll.evaluated (eq dmg.mode 'critical'))}}
+      {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=flavor overrideFormula=dmg.displayFormula roll=dmg.criticalRoll}}
+    {{/if}}
   {{else}}
+  
     <button data-{{moduleName}}-action="{{actionBase}}" class="{{moduleName}}-item-damage" {{#if interactionPermission}}{{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}{{/if}}>
       {{#if (eq dmg.mode 'critical')}}
         {{localize "DND5E.Critical"}}
@@ -22,7 +25,12 @@
         {{/if}}
       {{/if}}
     </button>
+    
+    {{#if (eq dmg.phase "bonus-input")}}
+      <input placeholder="{{localize "DND5E.Bonus"}}: e.g. 1d4" type="text" value="{{dmg.userBonus}}" data-{{moduleName}}-action="{{actionBase}}-bonus" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}/>
+    {{/if}}
   {{/if}}
+  
   {{#if interactionPermission}}
   {{#nacPerm interactionPermission}}
     <button data-{{moduleName}}-action="{{actionBase}}-mode-minus" class="{{moduleName}}-mode-minus" {{#if (eq dmg.mode 'normal')}}disabled{{/if}}><i class="fas fa-minus"></i></button>

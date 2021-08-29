@@ -57,10 +57,12 @@ export interface ItemCardItemData {
   },
   damages?: {
     label?: string;
+    phase: RollPhase;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     mode: 'normal' | 'critical';
     normalRoll: RollJson;
     criticalRoll?: RollJson;
+    userBonus: string;
     displayDamageTypes?: string;
     displayFormula?: string;
   }[];
@@ -132,12 +134,17 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({regexResult, messageData}) => UtilsChatMessage.processItemDamage(Number(regexResult[2]), Number(regexResult[1]), messageData),
+      execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemDamage(clickEvent, Number(regexResult[1]), Number(regexResult[2]), messageData),
     },
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)-mode-(minus|plus)$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, messageData}) => UtilsChatMessage.processItemDamageMode(Number(regexResult[1]), Number(regexResult[2]), regexResult[3] as ('plus' | 'minus'), messageData),
+    },
+    {
+      regex: /^item-([0-9]+)-damage-([0-9]+)-bonus$/,
+      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
+      execute: ({keyEvent, regexResult, inputValue, messageData}) => UtilsChatMessage.processItemDamageBonus(keyEvent, Number(regexResult[1]), Number(regexResult[2]), inputValue as string, messageData),
     },
     {
       regex: /^item-([0-9]+)-attack$/,
@@ -307,7 +314,9 @@ export class UtilsChatMessage {
       if (damageParts && damageParts.length > 0) {
         mainDamage = {
           mode: 'normal',
+          phase: 'mode-select',
           normalRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON(),
+          userBonus: "",
         }
         // Consider it healing if all damage types are healing
         const isHealing = damageParts.filter(roll => UtilsChatMessage.healingDamageTypes.includes(roll[1])).length === damageParts.length;
@@ -348,7 +357,9 @@ export class UtilsChatMessage {
           // when only dealing damage by upcasting? not sure if that ever happens
           inputDamages.push({
             mode: 'normal',
+            phase: 'mode-select',
             normalRoll: new Roll(scalingRollFormula, rollData).toJSON(),
+            userBonus: "",
           });
         } else {
           for (const damage of inputDamages) {
@@ -745,7 +756,7 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async processItemAttackBonus(keyEvent: KeyEvent | null,itemIndex: number, attackBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttackBonus(keyEvent: KeyEvent | null, itemIndex: number, attackBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
     const attack = messageData.items?.[itemIndex]?.attack;
     if (!attack || attack.evaluatedRoll?.evaluated || attack.phase === 'result') {
       return;
@@ -972,15 +983,91 @@ export class UtilsChatMessage {
   //#endregion
 
   //#region damage
-  private static async processItemDamage(damageIndex: number, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemDamage(event: ClickEvent, itemIndex: number, damageIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+    const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
+    if (!dmg || dmg.phase === 'result') {
+      return;
+    }
+
+    const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
+    if (event.shiftKey) {
+      dmg.phase = orderedPhases[orderedPhases.length - 1];
+    } else {
+      dmg.phase = orderedPhases[orderedPhases.indexOf(dmg.phase) + 1];
+    }
+
+    if (orderedPhases.indexOf(dmg.phase) === orderedPhases.length - 1) {
+      const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData);
+      if (response) {
+        return response;
+      }
+    }
+
+    return messageData;
+  }
+
+  private static async processItemDamageMode(itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
+    const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
+    let modifier = modName === 'plus' ? 1 : -1;
+    
+    const order: Array<ItemCardItemData['damages'][0]['mode']> = ['normal', 'critical'];
+    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(dmg.mode) + modifier));
+    if (dmg.mode === order[newIndex]) {
+      return;
+    }
+    dmg.mode = order[newIndex];
+
+    if (dmg.normalRoll.evaluated && (dmg.mode === 'critical' && !dmg.criticalRoll?.evaluated)) {
+      const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData);
+      if (response) {
+        return response;
+      }
+    }
+    return messageData;
+  }
+  
+  private static async processItemDamageBonus(keyEvent: KeyEvent | null, itemIndex: number, damageIndex: number, damageBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+    const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
+    if (!dmg || dmg.normalRoll?.evaluated || dmg.phase === 'result') {
+      return;
+    }
+
+    const oldBonus = dmg.userBonus;
+    if (damageBonus) {
+      dmg.userBonus = damageBonus;
+    } else {
+      dmg.userBonus = "";
+    }
+
+    if (dmg.userBonus && !Roll.validate(dmg.userBonus)) {
+      // TODO warning
+    }
+
+    if (keyEvent?.key === 'Enter') {
+      const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData);
+      if (response) {
+        return response;
+      }
+    }
+
+    if (dmg.userBonus !== oldBonus) {
+      return messageData;
+    }
+  }
+
+  private static async processItemDamageRoll(itemIndex: number, damageIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
     const dmg = messageData.items[itemIndex].damages[damageIndex];
+    dmg.phase = 'result';
     if (dmg.mode === 'critical') {
       if (dmg.criticalRoll?.evaluated) {
         return;
       }
 
-      const normalRoll = Roll.fromJSON(JSON.stringify(dmg.normalRoll));
+      let normalRoll = Roll.fromJSON(JSON.stringify(dmg.normalRoll));
       const normalRollEvaluated = dmg.normalRoll.evaluated;
+      if (dmg.userBonus && !normalRollEvaluated) {
+        normalRoll = new Roll(normalRoll.formula + ' + ' + dmg.userBonus)
+      }
       const normalPromise = normalRollEvaluated ? Promise.resolve(normalRoll) : normalRoll.roll({async: true});
       const critBonusPromise = UtilsRoll.getCriticalBonusRoll(new Roll(normalRoll.formula)).roll({async: true});
 
@@ -1002,33 +1089,19 @@ export class UtilsChatMessage {
       if (dmg.normalRoll.evaluated) {
         return;
       }
+      
+      let normalRoll = Roll.fromJSON(JSON.stringify(dmg.normalRoll));
+      const normalRollEvaluated = dmg.normalRoll.evaluated;
+      if (dmg.userBonus && !normalRollEvaluated) {
+        normalRoll = new Roll(normalRoll.formula + ' + ' + dmg.userBonus)
+      }
   
-      const dmgRoll = await Roll.fromJSON(JSON.stringify(dmg.normalRoll)).roll({async: true});
-      UtilsDiceSoNice.showRoll({roll: dmgRoll});
-      dmg.normalRoll = dmgRoll.toJSON();
+      normalRoll = await normalRoll.roll({async: true});
+      UtilsDiceSoNice.showRoll({roll: normalRoll});
+      dmg.normalRoll = normalRoll.toJSON();
   
       return messageData;
     }
-  }
-
-  private static async processItemDamageMode(itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
-    const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
-    let modifier = modName === 'plus' ? 1 : -1;
-    
-    const order: Array<ItemCardItemData['damages'][0]['mode']> = ['normal', 'critical'];
-    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(dmg.mode) + modifier));
-    if (dmg.mode === order[newIndex]) {
-      return;
-    }
-    dmg.mode = order[newIndex];
-
-    if (dmg.normalRoll.evaluated && (dmg.mode === 'critical' && !dmg.criticalRoll?.evaluated)) {
-      const response = await UtilsChatMessage.processItemDamage(itemIndex, damageIndex, messageData);
-      if (response) {
-        return response;
-      }
-    }
-    return messageData;
   }
   
   private static async applyDamage(tokenUuid: string | '*', messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
