@@ -215,13 +215,15 @@ export class UtilsChatMessage {
       }
     }
 
-    const template = await UtilsChatMessage.generateTemplate(data);
-
     const chatMessageData: ChatMessageDataConstructorData = {
-      content: template,
+      content: `The ${staticValues.moduleName} module is required to render this message.`,
       flags: {
         [staticValues.moduleName]: {
-          data: data
+          clientTemplate: `modules/${staticValues.moduleName}/templates/item-card.hbs`,
+          clientTemplateData: {
+            staticValues: staticValues,
+            data: data,
+          }
         }
       }
     };
@@ -516,7 +518,7 @@ export class UtilsChatMessage {
     }
     
     const message = game.messages.get(messageId);
-    let messageData = message.getFlag(staticValues.moduleName, 'data') as ItemCardData;
+    const messageData = UtilsChatMessage.getItemCardData(message);
     if (messageData == null) {
       console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} but no data was found`);
       return;
@@ -576,7 +578,7 @@ export class UtilsChatMessage {
     inputValue?: ActionParam['inputValue'];
   }): Promise<InteractionResponse> {
     const message = game.messages.get(messageId);
-    const messageData = message.getFlag(staticValues.moduleName, 'data') as ItemCardData;
+    const messageData = UtilsChatMessage.getItemCardData(message);
     if (messageData == null) {
       return {
         success: false,
@@ -620,21 +622,18 @@ export class UtilsChatMessage {
           return mData;
         })
         .then(mData => {
-          return UtilsChatMessage.generateTemplate(mData).then(html => {
-            // TODO idea: don't update the html. on create, set some generic small html body. In ChatMessage.getHtml (or other place) generate the html
-            // Result => less bandwidth usage
-            return ChatMessage.updateDocuments([{
-              _id: messageId,
-              content: html,
-              flags: {
-                [staticValues.moduleName]: {
-                  data: mData
+          return ChatMessage.updateDocuments([{
+            _id: messageId,
+            flags: {
+              [staticValues.moduleName]: {
+                clientTemplateData: {
+                  staticValues: staticValues,
+                  data: mData,
                 }
               }
-            }]);
-        })
+            }
+          }]);
       }).then(message => {
-        console.log('update', latestMessageData);
         if (isAtBottom) {
           (ui.chat as any).scrollBottom();
         }
@@ -1288,6 +1287,10 @@ export class UtilsChatMessage {
     messageData.allDmgApplied = messageData.targetAggregate != null && messageData.targetAggregate.filter(aggr => aggr.dmg?.applied).length === messageData.targetAggregate.length;
 
     return messageData;
+  }
+
+  private static getItemCardData(message: ChatMessage): ItemCardData {
+    return (message.getFlag(staticValues.moduleName, 'clientTemplateData') as any)?.data;
   }
 
   private static generateTemplate(data: ItemCardData): Promise<string> {
