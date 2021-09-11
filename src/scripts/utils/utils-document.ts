@@ -106,6 +106,27 @@ export class UtilsDocument {
     }));
   }
 
+  public static async templateFromUuid(uuid: string): Promise<MeasuredTemplateDocument> {
+    try {
+      let document = await fromUuid(uuid);
+      if (document.documentName !== (MeasuredTemplateDocument as any).documentName) {
+        throw new Error(`UUID '${uuid}' is not an ${(MeasuredTemplateDocument as any).documentName}. In stead found: ${document.documentName}`)
+      }
+      return document as MeasuredTemplateDocument;
+    } catch {
+      return null;
+    }
+  }
+
+  public static templatesFromUuid(uuids: string[], options: {deduplciate?: boolean} = {}): Promise<MeasuredTemplateDocument[]> {
+    if (options.deduplciate) {
+      uuids = Array.from(new Set<string>(uuids));
+    }
+    return Promise.all(uuids.map(tokenUuid => {
+      return UtilsDocument.templateFromUuid(tokenUuid);
+    }));
+  }
+
   public static async updateTokenActors(actorDataByTokenUuid: Map<string, DeepPartial<MyActorData>>): Promise<void> {
     const linkedActorUpdates = [];
     const unlinkedActorUpdatesByParentUuid = new Map<string, Array<Partial<TokenDocument['data']>>>();

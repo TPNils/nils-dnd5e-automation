@@ -7,6 +7,7 @@ import { UtilsDiceSoNice } from "./utils-dice-so-nice";
 import { UtilsDocument } from "./utils-document";
 import { UtilsInput } from "./utils-input";
 import { UtilsRoll } from "./utils-roll";
+import { UtilsTemplate } from "./utils-template";
 
 export interface ItemCardActorData {
   uuid: string;
@@ -44,6 +45,7 @@ export interface ItemCardItemData {
       hit?: boolean;
       checkPass?: boolean;
       dmg?: {
+        applied: boolean;
         rawDmg: number;
         calcDmg: number;
       },
@@ -123,7 +125,7 @@ interface KeyEvent {
   readonly key: 'Enter';
 }
 type InteractionResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
-interface ActionParam {clickEvent: ClickEvent, keyEvent?: KeyEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData, inputValue?: boolean | number | string};
+interface ActionParam {clickEvent: ClickEvent, userId: string, keyEvent?: KeyEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData, inputValue?: boolean | number | string};
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean, onlyRunLocal?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
 
@@ -653,7 +655,7 @@ export class UtilsChatMessage {
     let doUpdate = false;
     
     for (const action of actions.actionsToExecute) {
-      const param: ActionParam = {clickEvent: clickEvent, keyEvent: keyEvent, regexResult: action.regex, messageId: messageId, messageData: latestMessageData, inputValue: inputValue};
+      const param: ActionParam = {clickEvent: clickEvent, userId: userId, keyEvent: keyEvent, regexResult: action.regex, messageId: messageId, messageData: latestMessageData, inputValue: inputValue};
       let response = await action.action.execute(param);
       if (response) {
         doUpdate = true;
@@ -718,7 +720,7 @@ export class UtilsChatMessage {
     for (const actionMatch of UtilsChatMessage.actionMatches) {
       const result = actionMatch.regex.exec(action);
       if (result) {
-        const permissionCheck = actionMatch.permissionCheck({clickEvent: clickEvent, keyEvent: keyEvent, regexResult: result, messageId: messageId, messageData: messageData});
+        const permissionCheck = actionMatch.permissionCheck({clickEvent: clickEvent, userId: userId, keyEvent: keyEvent, regexResult: result, messageId: messageId, messageData: messageData});
         if (permissionCheck.onlyRunLocal === true) {
           response.onlyRunLocal = true;
         }
@@ -1291,7 +1293,9 @@ export class UtilsChatMessage {
   private static async processItemTemplate(itemIndex: number, messageData: ItemCardData, messageId: string): Promise<void> {
     const targetDefinition = messageData.items?.[itemIndex]?.targetDefinition;
     if (!targetDefinition || !targetDefinition.hasAoe) {
-      // TODO check if you can retarget
+      return;
+    }
+    if (!UtilsChatMessage.canChangeTargets(messageData.items[itemIndex])) {
       return;
     }
 
@@ -1307,7 +1311,10 @@ export class UtilsChatMessage {
     template.drawPreview();
   }
 
-  private static processTemplateCreated(template: MeasuredTemplateDocument): void {
+  private static async processTemplateCreated(template: MeasuredTemplateDocument, arg2: any, userId: string): Promise<void> {
+    if (game.userId !== userId) {
+      return;
+    }
     const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
     if (!messageId || !game.messages.has(messageId)) {
       return;
@@ -1318,7 +1325,8 @@ export class UtilsChatMessage {
       return;
     }
 
-    const item = messageData.items[template.getFlag(staticValues.moduleName, 'dmlCallbackItemIndex') as number];
+    const itemIndex = template.getFlag(staticValues.moduleName, 'dmlCallbackItemIndex') as number;
+    let item = messageData.items[itemIndex];
     if (!item) {
       return;
     }
@@ -1332,6 +1340,16 @@ export class UtilsChatMessage {
     }
 
     item.targetDefinition.createdTemplateUuid = template.uuid;
+
+    item = await UtilsChatMessage.setTargetsFromTemplate(item);
+    messageData.items[itemIndex] = item;
+    game.user.targets.clear();
+    if (item.targets) {
+      const targetCanvasIds = (await UtilsDocument.tokensFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
+      game.user.updateTokenTargets(targetCanvasIds);
+      game.user.broadcastActivity({targets: targetCanvasIds});
+    }
+
     ChatMessage.updateDocuments([{
       _id: messageId,
       flags: {
@@ -1342,6 +1360,50 @@ export class UtilsChatMessage {
         }
       }
     }]);
+  }
+
+  private static async setTargetsFromTemplate(item: ItemCardItemData): Promise<ItemCardItemData> {
+    if (!item.targetDefinition?.createdTemplateUuid) {
+      return item;
+    }
+
+    if (!UtilsChatMessage.canChangeTargets(item)) {
+      return item;
+    }
+
+    const template = await UtilsDocument.templateFromUuid(item.targetDefinition.createdTemplateUuid);
+    if (!template) {
+      return item;
+    }
+    
+    const templateDetails = UtilsTemplate.getTemplateDetails(template);
+    const scene = template.parent;
+    const newTargets: string[] = [];
+    // @ts-ignore
+    for (const token of scene.getEmbeddedCollection('Token') as Iterable<TokenDocument>) {
+      if (UtilsTemplate.isTokenInside(templateDetails, token, true)) {
+        newTargets.push(token.uuid);
+      }
+    }
+
+    return UtilsChatMessage.setTargets(item, newTargets);
+  }
+
+  private static canChangeTargets(itemData: ItemCardItemData): boolean {
+    if (!itemData.targets) {
+      return true;
+    }
+    for (const target of itemData.targets) {
+      if (target.result.checkPass != null) {
+        return false;
+      }
+    }
+    for (const target of itemData.targets) {
+      if (target.result.dmg?.applied) {
+        return false;
+      }
+    }
+    return true;
   }
   //#endregion
 
@@ -1451,11 +1513,13 @@ export class UtilsChatMessage {
 
               if (UtilsChatMessage.healingDamageTypes.includes(dmgType)) {
                 target.result.dmg = {
+                  applied: false,
                   rawDmg: -baseDmg,
                   calcDmg: -Math.floor(baseDmg * modifier),
                 }
               } else {
                 target.result.dmg = {
+                  applied: false,
                   rawDmg: baseDmg,
                   calcDmg: Math.floor(baseDmg * modifier),
                 }
@@ -1538,6 +1602,25 @@ export class UtilsChatMessage {
     }
 
     messageData.allDmgApplied = messageData.targetAggregate != null && messageData.targetAggregate.filter(aggr => aggr.dmg?.applied).length === messageData.targetAggregate.length;
+    const appliedDmgTo = new Set<string>();
+    if (messageData.targetAggregate != null) {
+      for (const aggr of messageData.targetAggregate) {
+        if (aggr.dmg?.applied) {
+          appliedDmgTo.add(aggr.uuid);
+        }
+      }
+    }
+    for (const item of messageData.items) {
+      if (!item.targets) {
+        continue;
+      }
+
+      for (const target of item.targets) {
+        if (target.result.dmg) {
+          target.result.dmg.applied = appliedDmgTo.has(target.uuid);
+        }
+      }
+    }
 
     return messageData;
   }
