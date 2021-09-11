@@ -87,7 +87,7 @@
             <thead>
                 <th style="width: 30px;">{{! img}}</th>
                 <th>Name</th>
-                <th class="{{@root.staticValues.moduleName}}-item-check">DC: {{item.check.dc}}</th>
+                <th class="{{@root.staticValues.moduleName}}-item-check">DC: {{#nacPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}{{item.check.dc}}{{else}}?{{/nacPerm}}</th>
             </thead>
             <tbody>
               {{#each item.targets as |target|}}
