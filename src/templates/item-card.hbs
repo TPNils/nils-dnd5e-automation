@@ -135,7 +135,7 @@
         {{/if}}
       </div>
       
-      {{#if item.targetDefinition.hasAoe}}
+      {{#if (and item.targetDefinition.hasAoe item.canChangeTargets)}}
         <div class="{{@root.staticValues.moduleName}}-section">
           <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-template" {{#nacMisPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}disabled{{/nacMisPerm}}>
             {{localize "DND5E.PlaceTemplate"}}

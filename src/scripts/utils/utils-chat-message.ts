@@ -81,6 +81,7 @@ export interface ItemCardItemData {
     hasAoe: boolean,
     createdTemplateUuid?: string;
   } & MyItemData['data']['target'];
+  canChangeTargets: boolean;
   spell?: {
     level: number;
   },
@@ -259,6 +260,7 @@ export class UtilsChatMessage {
       uuid: item.uuid,
       name: item.data.name,
       img: item.img,
+      canChangeTargets: true,
       targetDefinition: {
         // @ts-expect-error
         hasAoe: CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type),
@@ -1601,6 +1603,7 @@ export class UtilsChatMessage {
     data = await UtilsChatMessage.calculateTargetResult(data);
     for (const item of data.items) {
       item.damages = UtilsChatMessage.calculateDamageFormulas(item.damages);
+      item.canChangeTargets = UtilsChatMessage.canChangeTargets(item);
     }
     await ChatMessage.updateDocuments([{
       _id: messageId,
