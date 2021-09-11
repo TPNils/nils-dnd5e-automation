@@ -1325,7 +1325,9 @@ export class UtilsChatMessage {
 
     if (item.targetDefinition.createdTemplateUuid && item.targetDefinition.createdTemplateUuid !== template.uuid) {
       fromUuid(item.targetDefinition.createdTemplateUuid).then(doc => {
-        doc.delete();
+        if (doc != null) {
+          doc.delete();
+        }
       });
     }
 
