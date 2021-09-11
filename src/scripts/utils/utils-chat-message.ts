@@ -179,7 +179,7 @@ export class UtilsChatMessage {
     },
     {
       regex: /^item-([0-9]+)-template$/,
-      permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2], onlyRunLocal: true}},
+      permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2], onlyRunLocal: true, message: true}},
       execute: ({regexResult, messageData, messageId}) => UtilsChatMessage.processItemTemplate(Number(regexResult[1]), messageData, messageId),
     },
     {
@@ -664,34 +664,8 @@ export class UtilsChatMessage {
     }
 
     if (doUpdate) {
-      // TODO add "go to bottom" logic to a chat message update hook
-      const log = document.querySelector("#chat-log");
-      const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
-
       // Don't use await so you can return a response faster to the client
-      UtilsChatMessage.calculateTargetResult(latestMessageData)
-        .then(mData => {
-          for (const item of latestMessageData.items) {
-            item.damages = UtilsChatMessage.calculateDamageFormulas(item.damages);
-          }
-          return mData;
-        })
-        .then(mData => {
-          return ChatMessage.updateDocuments([{
-            _id: messageId,
-            flags: {
-              [staticValues.moduleName]: {
-                clientTemplateData: {
-                  data: mData,
-                }
-              }
-            }
-          }]);
-      }).then(message => {
-        if (isAtBottom) {
-          (ui.chat as any).scrollBottom();
-        }
-      });
+      UtilsChatMessage.saveItemCardData(messageId, latestMessageData);
     }
 
     return {
@@ -817,45 +791,47 @@ export class UtilsChatMessage {
     }
 
     // TODO this implementation does not work and should also account for checks along side the attack
-    // Re-evaluate the targets, the user may have changed targets
-    const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
+    if (UtilsChatMessage.canChangeTargets(messageData.items[itemIndex])) {
+      // Re-evaluate the targets, the user may have changed targets
+      const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
 
-    // Assume targets did not changes when non are selected at this time
-    if (currentTargetUuids.size !== 0) {
-      const itemTargetUuids = new Set<string>();
-      if (messageData.items[itemIndex].targets) {
-        for (const target of messageData.items[itemIndex].targets) {
-          itemTargetUuids.add(target.uuid);
-        }
-      }
-
-      let targetsChanged = itemTargetUuids.size !== currentTargetUuids.size;
-      
-      if (!targetsChanged) {
-        for (const uuid of itemTargetUuids.values()) {
-          if (!currentTargetUuids.has(uuid)) {
-            targetsChanged = true;
-            break;
+      // Assume targets did not changes when non are selected at this time
+      if (currentTargetUuids.size !== 0) {
+        const itemTargetUuids = new Set<string>();
+        if (messageData.items[itemIndex].targets) {
+          for (const target of messageData.items[itemIndex].targets) {
+            itemTargetUuids.add(target.uuid);
           }
         }
-      }
 
-      if (targetsChanged) {
-        const response = await UtilsInput.targets(Array.from(currentTargetUuids), {
-          nrOfTargets: messageData.items[itemIndex].targets == null ? 0 : messageData.items[itemIndex].targets.length,
-          allowSameTarget: true, // TODO
-          allPossibleTargets: game.scenes.get(game.user.viewedScene).getEmbeddedCollection('Token').map(token => {
-            return {
-              uuid: (token as any).uuid,
-              type: 'within-range'
+        let targetsChanged = itemTargetUuids.size !== currentTargetUuids.size;
+        
+        if (!targetsChanged) {
+          for (const uuid of itemTargetUuids.values()) {
+            if (!currentTargetUuids.has(uuid)) {
+              targetsChanged = true;
+              break;
             }
-          }),
-        });
-
-        if (response.cancelled == true) {
-          return;
+          }
         }
-        messageData.items[itemIndex] = await UtilsChatMessage.setTargets(messageData.items[itemIndex], response.data.tokenUuids)
+
+        if (targetsChanged) {
+          const response = await UtilsInput.targets(Array.from(currentTargetUuids), {
+            nrOfTargets: messageData.items[itemIndex].targets == null ? 0 : messageData.items[itemIndex].targets.length,
+            allowSameTarget: true, // TODO
+            allPossibleTargets: game.scenes.get(game.user.viewedScene).getEmbeddedCollection('Token').map(token => {
+              return {
+                uuid: (token as any).uuid,
+                type: 'within-range'
+              }
+            }),
+          });
+
+          if (response.cancelled == true) {
+            return;
+          }
+          messageData.items[itemIndex] = await UtilsChatMessage.setTargets(messageData.items[itemIndex], response.data.tokenUuids)
+        }
       }
     }
     
@@ -1350,16 +1326,7 @@ export class UtilsChatMessage {
       game.user.broadcastActivity({targets: targetCanvasIds});
     }
 
-    ChatMessage.updateDocuments([{
-      _id: messageId,
-      flags: {
-        [staticValues.moduleName]: {
-          clientTemplateData: {
-            data: messageData,
-          }
-        }
-      }
-    }]);
+    UtilsChatMessage.saveItemCardData(messageId, messageData);
   }
 
   private static async setTargetsFromTemplate(item: ItemCardItemData): Promise<ItemCardItemData> {
@@ -1393,14 +1360,15 @@ export class UtilsChatMessage {
     if (!itemData.targets) {
       return true;
     }
-    for (const target of itemData.targets) {
-      if (target.result.checkPass != null) {
-        return false;
-      }
-    }
-    for (const target of itemData.targets) {
-      if (target.result.dmg?.applied) {
-        return false;
+    // A target has rolled a save or damage has been applied
+    if (itemData.targets) {
+      for (const target of itemData.targets) {
+        if (target.result.checkPass != null) {
+          return false;
+        }
+        if (target.result.dmg?.applied) {
+          return false;
+        }
       }
     }
     return true;
@@ -1623,6 +1591,30 @@ export class UtilsChatMessage {
     }
 
     return messageData;
+  }
+
+  private static async saveItemCardData(messageId: string, data: ItemCardData): Promise<void> {
+    // TODO add "go to bottom" logic to a chat message update hook
+    const log = document.querySelector("#chat-log");
+    const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
+
+    data = await UtilsChatMessage.calculateTargetResult(data);
+    for (const item of data.items) {
+      item.damages = UtilsChatMessage.calculateDamageFormulas(item.damages);
+    }
+    await ChatMessage.updateDocuments([{
+      _id: messageId,
+      flags: {
+        [staticValues.moduleName]: {
+          clientTemplateData: {
+            data: data,
+          }
+        }
+      }
+    }]);
+    if (isAtBottom) {
+      (ui.chat as any).scrollBottom();
+    }
   }
 
   private static getItemCardData(message: ChatMessage): ItemCardData {
