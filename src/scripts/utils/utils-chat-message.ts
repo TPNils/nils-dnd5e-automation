@@ -140,17 +140,17 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemDamage(clickEvent, Number(regexResult[1]), Number(regexResult[2]), messageData),
+      execute: ({clickEvent, regexResult, messageData, messageId}) => UtilsChatMessage.processItemDamage(clickEvent, Number(regexResult[1]), Number(regexResult[2]), messageData, messageId),
     },
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)-mode-(minus|plus)$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({regexResult, messageData}) => UtilsChatMessage.processItemDamageMode(Number(regexResult[1]), Number(regexResult[2]), regexResult[3] as ('plus' | 'minus'), messageData),
+      execute: ({regexResult, messageData, messageId}) => UtilsChatMessage.processItemDamageMode(Number(regexResult[1]), Number(regexResult[2]), regexResult[3] as ('plus' | 'minus'), messageData, messageId),
     },
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)-bonus$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({keyEvent, regexResult, inputValue, messageData}) => UtilsChatMessage.processItemDamageBonus(keyEvent, Number(regexResult[1]), Number(regexResult[2]), inputValue as string, messageData),
+      execute: ({keyEvent, regexResult, inputValue, messageData, messageId}) => UtilsChatMessage.processItemDamageBonus(keyEvent, Number(regexResult[1]), Number(regexResult[2]), inputValue as string, messageData, messageId),
     },
     {
       regex: /^item-([0-9]+)-attack$/,
@@ -190,7 +190,7 @@ export class UtilsChatMessage {
     {
       regex: /^apply-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
       permissionCheck: ({regexResult}) => {return {gm: true}},
-      execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.applyDamage(regexResult[1], messageData, messageId),
+      execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.applyDamage([regexResult[1]], messageData, messageId),
     },
     {
       regex: /^undo-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
@@ -1077,7 +1077,7 @@ export class UtilsChatMessage {
   //#endregion
 
   //#region damage
-  private static async processItemDamage(event: ClickEvent, itemIndex: number, damageIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemDamage(event: ClickEvent, itemIndex: number, damageIndex: number, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
     const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
     if (!dmg || dmg.phase === 'result') {
       return;
@@ -1091,7 +1091,7 @@ export class UtilsChatMessage {
     }
 
     if (orderedPhases.indexOf(dmg.phase) === orderedPhases.length - 1) {
-      const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData);
+      const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData, messageId);
       if (response) {
         return response;
       }
@@ -1100,7 +1100,7 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async processItemDamageMode(itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemDamageMode(itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
     const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
     let modifier = modName === 'plus' ? 1 : -1;
     
@@ -1112,7 +1112,7 @@ export class UtilsChatMessage {
     dmg.mode = order[newIndex];
 
     if (dmg.normalRoll.evaluated && (dmg.mode === 'critical' && !dmg.criticalRoll?.evaluated)) {
-      const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData);
+      const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData, messageId);
       if (response) {
         return response;
       }
@@ -1120,7 +1120,7 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async processItemDamageBonus(keyEvent: KeyEvent | null, itemIndex: number, damageIndex: number, damageBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemDamageBonus(keyEvent: KeyEvent | null, itemIndex: number, damageIndex: number, damageBonus: string, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
     const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
     if (!dmg || dmg.normalRoll?.evaluated || dmg.phase === 'result') {
       return;
@@ -1138,7 +1138,7 @@ export class UtilsChatMessage {
     }
 
     if (keyEvent?.key === 'Enter') {
-      const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData);
+      const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData, messageId);
       if (response) {
         return response;
       }
@@ -1149,8 +1149,15 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async processItemDamageRoll(itemIndex: number, damageIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
-    const dmg = messageData.items[itemIndex].damages[damageIndex];
+  private static async processItemDamageRoll(itemIndex: number, damageIndex: number, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
+    const item = messageData.items?.[itemIndex];
+    if (!item) {
+      return;
+    }
+    const dmg = item.damages?.[damageIndex];
+    if (!dmg) {
+      return;
+    }
     dmg.phase = 'result';
     if (dmg.mode === 'critical') {
       if (dmg.criticalRoll?.evaluated) {
@@ -1193,20 +1200,38 @@ export class UtilsChatMessage {
       normalRoll = await normalRoll.roll({async: true});
       UtilsDiceSoNice.showRoll({roll: normalRoll});
       dmg.normalRoll = normalRoll.toJSON();
+      
+      // Auto apply healing since it very rarely gets modified
+      const damageTypes = UtilsRoll.rollToDamageResults(normalRoll);
+      let isHealing = true;
+      for (const type of damageTypes.keys()) {
+        if (!UtilsChatMessage.healingDamageTypes.includes(type)) {
+          isHealing = false;
+          break;
+        }
+      }
+
+      if (isHealing && item.targets) {
+        messageData = await UtilsChatMessage.calculateTargetResult(messageData);
+        const response = await UtilsChatMessage.applyDamage(item.targets.map(t => t.uuid), messageData, messageId);
+        if (response) {
+          messageData = response;
+        }
+      }
   
       return messageData;
     }
   }
   
-  private static async applyDamage(tokenUuid: string | '*', messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
+  private static async applyDamage(tokenUuid: (string | '*')[], messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
     if (!messageData.targetAggregate) {
       return;
     }
     let targetAggregates: ItemCardData['targetAggregate'];
-    if (tokenUuid === '*') {
+    if (tokenUuid.includes('*')) {
       targetAggregates = messageData.targetAggregate;
     } else {
-      targetAggregates = messageData.targetAggregate.filter(aggr => aggr.uuid === tokenUuid);
+      targetAggregates = messageData.targetAggregate.filter(aggr => tokenUuid.includes(aggr.uuid));
     }
     if (!targetAggregates.length) {
       console.warn(`Could not find an aggregate for token "${tokenUuid}" with messageId "${messageId}"`);
