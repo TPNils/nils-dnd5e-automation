@@ -11,6 +11,10 @@ import { UtilsTemplate } from "./utils-template";
 
 export interface ItemCardActorData {
   uuid: string;
+  consume?: {
+    attribute: string;
+    amount: number;
+  }[];
 }
 
 export type RollJson = ReturnType<Roll['toJSON']>
@@ -227,7 +231,7 @@ export class UtilsChatMessage {
   }
 
   //#region public conversion utils
-  public static async createCard(data: ItemCardData): Promise<ChatMessage> {
+  public static async createCard(data: ItemCardData, insert: boolean = true): Promise<ChatMessage> {
     // I expect actor & token to sometimes include the whole actor/token document by accident
     // While I would prefer a full type validation, it is the realistic approach
     if (data.actor) {
@@ -253,7 +257,12 @@ export class UtilsChatMessage {
         }
       }
     };
-    return await ChatMessage.create(chatMessageData)
+
+    if (insert) {
+      return await ChatMessage.create(chatMessageData)
+    } else {
+      return new ChatMessage(chatMessageData);
+    }
   }
 
   public static createDefaultItemData({item, level, overrideItemScaling, actor}: {item: MyItem, level?: number, overrideItemScaling?: MyItem['data']['data']['scaling'], actor?: MyActor}): ItemCardItemData {

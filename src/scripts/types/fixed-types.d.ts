@@ -5,6 +5,9 @@ interface BaseDocument<DATA> {
   folder?: string;
   getFlag(moduleName: string, key: string): any;
   testUserPermission(user: User, permission: keyof CONST.ENTITY_PERMISSIONS, exact?: boolean);
+  clone(merge: DeepPartial<this>, options?: {keepId: boolean});
+  update(data: DeepPartial<DATA> | {[key: string]: any});
+  delete();
 }
 
 export interface ActorAbility {
@@ -177,7 +180,11 @@ export type MyItemData = {
 
 export type MyItem = Item & BaseDocument<MyItemData> & {
   getChatData: () => any;
+  roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
+  displayCard({}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
+  protected prepareFinalAttributes: () => void;
   pack?: string;
+  hasAreaTarget: boolean;
 };
 
 export type MyActor = Actor & BaseDocument<MyActorData> & {
