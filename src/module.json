@@ -20,6 +20,10 @@
   "esmodules": [
     "scripts/main.js"
   ],
+  "bugs": "https://github.com/TPNils/nils-automated-compendium/issues",
+  "flags": {
+    "allowBugReporter": true
+  },
   "includes": [
     "./assets/**",
     "./lang/**",
