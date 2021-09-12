@@ -44,6 +44,8 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
         const aUrl = document.createElement('a');
         aUrl.innerText = 'report the bug';
         aUrl.setAttribute('href', bugsUrl);
+        aUrl.setAttribute('target', '_blank');
+        aUrl.style.textDecoration = 'underline';
         message.append(aUrl);
         message.append(document.createTextNode(" with the follwoing message"));
 
