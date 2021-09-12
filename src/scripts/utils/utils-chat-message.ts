@@ -217,6 +217,7 @@ export class UtilsChatMessage {
     });
 
     Hooks.on(`create${MeasuredTemplateDocument.documentName}`, UtilsChatMessage.processTemplateCreated)
+    Hooks.on(`update${MeasuredTemplateDocument.documentName}`, UtilsChatMessage.processTemplateUpdated)
     
     provider.getSocket().then(socket => {
       socket.register('onInteraction', (params: Parameters<typeof UtilsChatMessage['onInteractionProcessor']>[0]) => {
@@ -1318,6 +1319,43 @@ export class UtilsChatMessage {
     }
 
     item.targetDefinition.createdTemplateUuid = template.uuid;
+
+    item = await UtilsChatMessage.setTargetsFromTemplate(item);
+    messageData.items[itemIndex] = item;
+    game.user.targets.clear();
+    if (item.targets) {
+      const targetCanvasIds = (await UtilsDocument.tokensFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
+      game.user.updateTokenTargets(targetCanvasIds);
+      game.user.broadcastActivity({targets: targetCanvasIds});
+    }
+
+    UtilsChatMessage.saveItemCardData(messageId, messageData);
+  }
+
+  private static async processTemplateUpdated(arg0: any, templateData: Partial<MeasuredTemplateDocument['data']>, options: any, userId: string): Promise<void> {
+    if (game.userId !== userId) {
+      return;
+    }
+    const template: MeasuredTemplateDocument = arg0.data.document;
+    const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
+    if (!messageId || !game.messages.has(messageId)) {
+      return;
+    }
+    const message = game.messages.get(messageId);
+    const messageData = UtilsChatMessage.getItemCardData(message);
+    if (!messageData) {
+      return;
+    }
+
+    const itemIndex = template.getFlag(staticValues.moduleName, 'dmlCallbackItemIndex') as number;
+    let item = messageData.items[itemIndex];
+    if (!item) {
+      return;
+    }
+
+    if (!UtilsChatMessage.canChangeTargets(item)) {
+      return;
+    }
 
     item = await UtilsChatMessage.setTargetsFromTemplate(item);
     messageData.items[itemIndex] = item;
