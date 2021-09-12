@@ -120,6 +120,8 @@ export type MyActorData = {
 
 export type DamageType = '' /* none */ | 'acid' | 'bludgeoning' | 'cold' | 'fire' | 'force' | 'lightning' | 'necrotic' | 'piercing' | 'poison' | 'psychic' | 'radiant' | 'slashing' | 'thunder' | 'healing' | 'temphp';
 
+export type RangeUnits = '' | 'none' | 'self' | 'touch' | 'spec' | 'any' | 'ft' | 'mi' | 'm' | 'km';
+
 export type MyItemData = {
   [key: string]: any;
   name: string;
@@ -153,12 +155,12 @@ export type MyItemData = {
     range: {
       value?: number;
       long?: number;
-      units: string;
+      units: RangeUnits;
     },
     target: {
       value?: number;
       width?: number;
-      units: string;
+      units: RangeUnits;
       type: '' | 'ally' | 'cone' | 'creature' | 'cube' | 'cylinder' | 'enemy' | 'line' | 'none' | 'object' | 'radius' | 'self' | 'space' | 'sphere' | 'square' | 'wall';
     },
     save: {

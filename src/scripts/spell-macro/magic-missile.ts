@@ -5,6 +5,7 @@ import { MyItem } from "../types/fixed-types";
 import { UtilsChatMessage } from "../utils/utils-chat-message";
 import { UtilsDocument } from "../utils/utils-document";
 import { TargetRequest, TargetResponse, UserInputResponse, UtilsInput } from "../utils/utils-input";
+import { TemplateDetails, UtilsTemplate } from "../utils/utils-template";
 
 interface MagicMissileData {
   targets: UserInputResponse<TargetResponse>;
@@ -19,6 +20,13 @@ export class MagicMissile implements IMacro<MagicMissileData> {
     
     const item = await this.getItem(context);
 
+    const token = await UtilsDocument.tokenFromUuid(context.tokenUuid);
+    const scene = token.parent;
+    const rangeShape: TemplateDetails = {
+      x: token.data.x,
+      y: token.data.y,
+      shape: new PIXI.Circle(0, 0, UtilsTemplate.getFeet(item.data.data.range) * scene.data.grid / scene.data.gridDistance)
+    }
     const targetRequest: TargetRequest = {
       nrOfTargets: item.data.data.target.value || 1,
       allowSameTarget: true,
@@ -27,10 +35,10 @@ export class MagicMissile implements IMacro<MagicMissileData> {
         startLevel: 1,
         maxLevel: 9
       },
-      allPossibleTargets: game.scenes.get(game.user.viewedScene).getEmbeddedCollection('Token').map(token => {
+      allPossibleTargets: scene.getEmbeddedCollection('Token').map(token => {
         return {
           uuid: (token as any).uuid,
-          type: 'within-range'
+          type: UtilsTemplate.isTokenInside(rangeShape, (token as TokenDocument), true) ? 'within-range' : 'outside-range'
         }
       }),
     };

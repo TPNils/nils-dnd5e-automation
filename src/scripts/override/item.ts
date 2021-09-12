@@ -21,6 +21,10 @@ async function itemRoll(this: Item, {configureDialog=true, rollMode, createMessa
     }
   }
 
+  // TODO spell scaling, both dmg and targets
+  // TODO refund spell slot usage with the apply/undo card part
+  // TODO auto consume spell slot usage AFTER attack/dmg roll
+
   return await UtilsChatMessage.createCard(itemCardData);
 }
 

@@ -1,3 +1,5 @@
+import { RangeUnits } from "../types/fixed-types";
+
 export interface TemplateDetails {
   x: number;
   y: number;
@@ -64,6 +66,39 @@ export class UtilsTemplate {
       x: document.data.x,
       y: document.data.y,
       shape: shape
+    }
+  }
+
+  public static getFeet({value, unit}: {value?: number, unit?: RangeUnits}): number {
+    if (value == null) {
+      return Infinity;
+    }
+    switch (unit) {
+      case '':
+      case 'any':
+      case 'spec': {
+        return Infinity;
+      }
+      case 'none':
+      case 'self': {
+        return 0;
+      }
+      case 'touch': {
+        return 5;
+      }
+      case 'mi': {
+        return value * 5280;
+      }
+      case 'm': {
+        return value * 3.281;
+      }
+      case 'km': {
+        return value * 3281;
+      }
+      case 'ft':
+      default: {
+        return value;
+      }
     }
   }
 
