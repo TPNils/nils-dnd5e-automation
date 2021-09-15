@@ -146,7 +146,7 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)-mode-(minus|plus)$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({regexResult, messageData, messageId}) => UtilsChatMessage.processItemDamageMode(Number(regexResult[1]), Number(regexResult[2]), regexResult[3] as ('plus' | 'minus'), messageData, messageId),
+      execute: ({clickEvent, regexResult, messageData, messageId}) => UtilsChatMessage.processItemDamageMode(clickEvent, Number(regexResult[1]), Number(regexResult[2]), regexResult[3] as ('plus' | 'minus'), messageData, messageId),
     },
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)-bonus$/,
@@ -907,6 +907,14 @@ export class UtilsChatMessage {
       return;
     }
     attack.mode = order[newIndex];
+
+    if (event.shiftKey) {
+      const response = await UtilsChatMessage.processItemAttackRoll(itemIndex, messageData);
+      if (response) {
+        messageData = response;
+      }
+    }
+    
     if (!attack.evaluatedRoll) {
       return messageData;
     }
@@ -1101,7 +1109,7 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async processItemDamageMode(itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
+  private static async processItemDamageMode(event: ClickEvent, itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
     const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
     let modifier = modName === 'plus' ? 1 : -1;
     
@@ -1112,7 +1120,7 @@ export class UtilsChatMessage {
     }
     dmg.mode = order[newIndex];
 
-    if (dmg.normalRoll.evaluated && (dmg.mode === 'critical' && !dmg.criticalRoll?.evaluated)) {
+    if (event.shiftKey || (dmg.normalRoll.evaluated && (dmg.mode === 'critical' && !dmg.criticalRoll?.evaluated))) {
       const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData, messageId);
       if (response) {
         return response;
