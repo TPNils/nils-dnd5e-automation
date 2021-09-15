@@ -50,8 +50,9 @@ export interface ItemCardItemData {
       checkPass?: boolean;
       dmg?: {
         applied: boolean;
-        rawDmg: number;
-        calcDmg: number;
+        type: DamageType;
+        rawNumber: number;
+        calcNumber: number;
       },
     }
   }[];
@@ -1490,6 +1491,76 @@ export class UtilsChatMessage {
       }
     }
 
+    
+    // Reset aggregate
+    const aggregates = new Map<string, ItemCardData['targetAggregate'][0]>();
+    if (messageData.targetAggregate) {
+      // If an aggregate was shown, make sure it will always be shown to make sure it can be reset back to the original state
+      for (const oldAggregate of messageData.targetAggregate) {
+        aggregates.set(oldAggregate.uuid, {
+          uuid: oldAggregate.uuid,
+          name: oldAggregate.name,
+          img: oldAggregate.img,
+          hpSnapshot: oldAggregate.hpSnapshot,
+          dmg: {
+            applied: false,
+            appliedDmg: oldAggregate.dmg?.appliedDmg || 0,
+            rawDmg: 0,
+            calcDmg: 0,
+            calcHp: oldAggregate.hpSnapshot.hp,
+            calcTemp: oldAggregate.hpSnapshot.temp,
+          }
+        })
+      }
+    }
+
+    const applyDmg = async (aggregate: ItemCardData['targetAggregate'][0], amount: number) => {
+      if (aggregate.dmg == null) {
+        aggregate.dmg = {
+          applied: false,
+          appliedDmg: 0,
+          rawDmg: 0,
+          calcDmg: 0,
+          calcHp: Number(aggregate.hpSnapshot.hp),
+          calcTemp: Number(aggregate.hpSnapshot.temp),
+        }
+      }
+
+      const maxDmg = aggregate.hpSnapshot.hp + Number(aggregate.hpSnapshot.temp);
+      const minDmg = 0;
+      console.log({maxDmg, minDmg})
+      let dmg = Math.min(maxDmg, Math.max(minDmg, amount));
+      
+      if (dmg > 0) {
+        let tempDmg = Math.min(Number(aggregate.dmg.calcTemp), dmg);
+        aggregate.dmg.calcTemp -= tempDmg;
+        dmg -= tempDmg;
+      }
+      aggregate.dmg.calcDmg += dmg;
+      aggregate.dmg.calcHp -= dmg;
+    }
+    
+    const applyHeal = async (aggregate: ItemCardData['targetAggregate'][0], amount: number) => {
+      if (aggregate.dmg == null) {
+        aggregate.dmg = {
+          applied: false,
+          appliedDmg: 0,
+          rawDmg: 0,
+          calcDmg: 0,
+          calcHp: Number(aggregate.hpSnapshot.hp),
+          calcTemp: Number(aggregate.hpSnapshot.temp),
+        }
+      }
+
+      const tokenActor = await UtilsDocument.actorFromUuid(aggregate.uuid);
+      const maxHeal = Math.max(0, tokenActor.data.data.attributes.hp.max - aggregate.hpSnapshot.hp);
+      const minHeal = 0;
+      console.log({maxHeal: maxHeal, minHeal: minHeal})
+      const heal = Math.min(maxHeal, Math.max(minHeal, amount));
+      aggregate.dmg.calcDmg -= heal;
+      aggregate.dmg.calcHp += heal;
+    }
+
     // Calculate
     for (const item of items) {
       // Attack
@@ -1553,18 +1624,41 @@ export class UtilsChatMessage {
                 }
               }
 
-              if (UtilsChatMessage.healingDamageTypes.includes(dmgType)) {
-                target.result.dmg = {
+              // TODO fix applying dmg/healing
+              target.result.dmg = {
+                applied: false,
+                type: dmgType,
+                rawNumber: baseDmg,
+                calcNumber: Math.floor(baseDmg * modifier),
+              }
+
+              if (!aggregates.get(target.uuid)) {
+                aggregates.set(target.uuid, {
+                  uuid: target.uuid,
+                  hpSnapshot: target.hpSnapshot,
+                  name: target.name,
+                  img: target.img,
+                })
+              }
+              const aggregate = aggregates.get(target.uuid);
+              if (aggregate.dmg == null) {
+                aggregate.dmg = {
                   applied: false,
-                  rawDmg: -baseDmg,
-                  calcDmg: -Math.floor(baseDmg * modifier),
+                  appliedDmg: 0,
+                  rawDmg: 0,
+                  calcDmg: 0,
+                  calcHp: Number(aggregate.hpSnapshot.hp),
+                  calcTemp: Number(aggregate.hpSnapshot.temp),
                 }
+              }
+
+              // Apply healing & dmg aggregate in the same order as the items
+              if (target.result.dmg.type === 'temphp') {
+                aggregate.dmg.calcTemp += target.result.dmg.calcNumber;
+              } else if (UtilsChatMessage.healingDamageTypes.includes(target.result.dmg.type)) {
+                await applyHeal(aggregate, target.result.dmg.calcNumber);
               } else {
-                target.result.dmg = {
-                  applied: false,
-                  rawDmg: baseDmg,
-                  calcDmg: Math.floor(baseDmg * modifier),
-                }
+                await applyDmg(aggregate, target.result.dmg.calcNumber);
               }
             }
           }
@@ -1572,74 +1666,15 @@ export class UtilsChatMessage {
       }
     }
 
-    // Aggregate
-    const aggregates = new Map<string, ItemCardData['targetAggregate'][0]>();
-    if (messageData.targetAggregate) {
-      // If an aggregate was shown, make sure it will always be shown to make sure it can be reset back to the original state
-      for (const oldAggregate of messageData.targetAggregate) {
-        aggregates.set(oldAggregate.uuid, {
-          uuid: oldAggregate.uuid,
-          name: oldAggregate.name,
-          img: oldAggregate.img,
-          hpSnapshot: oldAggregate.hpSnapshot,
-          dmg: {
-            applied: false,
-            appliedDmg: oldAggregate.dmg?.appliedDmg || 0,
-            rawDmg: 0,
-            calcDmg: 0,
-            calcHp: oldAggregate.hpSnapshot.hp,
-            calcTemp: oldAggregate.hpSnapshot.temp,
-          }
-        })
-      }
-    }
-    for (const item of items) {
-      for (const target of item.targets) {
-        if (target.result.dmg) {
-          if (!aggregates.get(target.uuid)) {
-            aggregates.set(target.uuid, {
-              uuid: target.uuid,
-              hpSnapshot: target.hpSnapshot,
-              name: target.name,
-              img: target.img,
-            })
-          }
-          const aggregate = aggregates.get(target.uuid);
-          if (aggregate.dmg == null) {
-            aggregate.dmg = {
-              applied: false,
-              appliedDmg: 0,
-              rawDmg: target.result.dmg.rawDmg,
-              calcDmg: target.result.dmg.calcDmg,
-              calcHp: 0,
-              calcTemp: 0,
-            }
-          } else {
-            aggregate.dmg.rawDmg = aggregate.dmg.rawDmg + target.result.dmg.rawDmg;
-            aggregate.dmg.calcDmg = aggregate.dmg.calcDmg + target.result.dmg.calcDmg;
-          }
-        }
-      }
-    }
-
     messageData.targetAggregate = Array.from(aggregates.values()).sort((a, b) => (a.name || '').localeCompare((b.name || '')));
+    const targetActors = new Map<string, MyActor>();
+    for (const token of (await UtilsDocument.tokensFromUuid(messageData.targetAggregate.map(t => t.uuid)))) {
+      targetActors.set(token.uuid, token.getActor());
+    }
     for (const aggregate of messageData.targetAggregate) {
       if (aggregate.dmg) {
-        let calcHp = Number(aggregate.hpSnapshot.hp);
-        let calcTemp = Number(aggregate.hpSnapshot.temp);
-        let calcDmg = Math.min(aggregate.dmg.calcDmg, calcHp + calcTemp);
-        let calcTempDmg = Math.min(calcTemp, calcDmg);
-        calcTemp -= calcTempDmg;
-        calcHp = Math.max(0, calcHp - (calcDmg - calcTempDmg));
-        
-        aggregate.dmg = {
-          applied: calcDmg === aggregate.dmg.appliedDmg,
-          appliedDmg: aggregate.dmg.appliedDmg,
-          rawDmg: aggregate.dmg.rawDmg,
-          calcDmg: calcDmg,
-          calcHp: calcHp,
-          calcTemp: calcTemp,
-        }
+        aggregate.dmg.applied = aggregate.dmg.calcDmg === aggregate.dmg.appliedDmg;
+        console.log(aggregate);
       }
     }
 
