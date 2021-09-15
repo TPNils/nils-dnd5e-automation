@@ -1528,7 +1528,6 @@ export class UtilsChatMessage {
 
       const maxDmg = aggregate.hpSnapshot.hp + Number(aggregate.hpSnapshot.temp);
       const minDmg = 0;
-      console.log({maxDmg, minDmg})
       let dmg = Math.min(maxDmg, Math.max(minDmg, amount));
       
       if (dmg > 0) {
@@ -1555,7 +1554,6 @@ export class UtilsChatMessage {
       const tokenActor = await UtilsDocument.actorFromUuid(aggregate.uuid);
       const maxHeal = Math.max(0, tokenActor.data.data.attributes.hp.max - aggregate.hpSnapshot.hp);
       const minHeal = 0;
-      console.log({maxHeal: maxHeal, minHeal: minHeal})
       const heal = Math.min(maxHeal, Math.max(minHeal, amount));
       aggregate.dmg.calcDmg -= heal;
       aggregate.dmg.calcHp += heal;
@@ -1674,7 +1672,6 @@ export class UtilsChatMessage {
     for (const aggregate of messageData.targetAggregate) {
       if (aggregate.dmg) {
         aggregate.dmg.applied = aggregate.dmg.calcDmg === aggregate.dmg.appliedDmg;
-        console.log(aggregate);
       }
     }
 
