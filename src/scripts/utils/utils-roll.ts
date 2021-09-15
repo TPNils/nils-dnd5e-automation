@@ -98,7 +98,7 @@ export class UtilsRoll {
   }
 
   public static async setRollMode(roll: Roll, mode: 'disadvantage' |'normal' | 'advantage', options: {skipDiceSoNice?: boolean} = {}): Promise<Roll> {
-    const terms = deepClone(roll.terms);
+    const terms = roll.terms.map(t => RollTerm.fromJSON(JSON.stringify(t.toJSON())))
     const d20Term = terms[0] as (Die & {_evaluated: boolean, _evaluateModifiers: () => void});
     if (d20Term.faces !== 20) {
       throw new Error(`The first roll term needs to be a d20. Roll formula: ${roll.formula}`)
@@ -278,7 +278,7 @@ export class UtilsRoll {
       }
       return null;
     }
-    const baseTerms: RollTerm[] = deepClone(rolls[0].terms);
+    const baseTerms: RollTerm[] = rolls[0].terms.map(t => RollTerm.fromJSON(JSON.stringify(t.toJSON())));
     const additionalTermsByMergeKey = new Map<string, {merged: boolean, terms: RollTerm[]}>()
 
     for (let i = 1; i < rolls.length; i++) {
@@ -325,7 +325,7 @@ export class UtilsRoll {
       baseTerms.pop();
     }
 
-    return Roll.fromTerms(deepClone(baseTerms));
+    return Roll.fromTerms(baseTerms.map(t => RollTerm.fromJSON(JSON.stringify(t.toJSON()))));
   }
 
 }
