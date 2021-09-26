@@ -1,4 +1,5 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
+import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
 import { staticValues } from "../static-values";
@@ -54,6 +55,7 @@ export interface ItemCardItemData {
         rawNumber: number;
         calcNumber: number;
       },
+      appliedActiveEffectUuid?: string;
     }
   }[];
   attack?: {
@@ -1269,6 +1271,12 @@ export class UtilsChatMessage {
       });
     }
     await UtilsDocument.updateTokenActors(tokenActorUpdates);
+    {
+      const response = await UtilsChatMessage.applyActiveEffects(tokenUuid, messageData);
+      if (response) {
+        messageData = response;
+      }
+    }
     return messageData;
   }
   
@@ -1458,6 +1466,109 @@ export class UtilsChatMessage {
   }
   //#endregion
 
+  //#region active effects
+  // TODO undo active effects
+  public static async applyActiveEffects(tokenUuid: (string | '*')[], messageData: ItemCardData): Promise<ItemCardData | void> {
+    const actorsByTokenUuid = new Map<string, MyActor>();
+    for (const item of messageData.items) {
+      let matchingTargets: ItemCardItemData['targets'];
+      if (tokenUuid.includes('*')) {
+        matchingTargets = item.targets;
+      } else {
+        matchingTargets = item.targets.filter(aggr => tokenUuid.includes(aggr.uuid));
+      }
+      
+      if (matchingTargets) {
+        for (const target of matchingTargets) {
+          actorsByTokenUuid.set(target.uuid, null);
+        }
+      }
+    }
+
+    for (const token of (await UtilsDocument.tokensFromUuid(Array.from(actorsByTokenUuid.keys())))) {
+      actorsByTokenUuid.set(token.uuid, token.getActor());
+    }
+    for (const tokenUuid of actorsByTokenUuid.keys()) {
+      if (!actorsByTokenUuid.get(tokenUuid)) {
+        actorsByTokenUuid.delete(tokenUuid);
+      }
+    }
+
+    const createEffectsByTokenUuid = new Map<string, {effect: ActiveEffectData, target: ItemCardItemData['targets'][0]}[]>();
+    // TODO update in stead of delete => cleaner presentation to the user
+    const deleteEffectsByTokenUuid = new Map<string, Set<string>>();
+    for (const item of messageData.items) {
+      let matchingTargets: ItemCardItemData['targets'];
+      if (tokenUuid.includes('*')) {
+        matchingTargets = item.targets;
+      } else {
+        matchingTargets = item.targets.filter(aggr => tokenUuid.includes(aggr.uuid));
+      }
+      if (!matchingTargets.length) {
+        continue;
+      }
+
+      // TODO store active effects on the card
+      const itemDocument = await UtilsDocument.itemFromUuid(item.uuid);
+      const activeEffects = (await Promise.all(Array.from(itemDocument.effects.values())
+        .map(effect => effect.clone())))
+        .map(effect => effect.data)
+        .filter(effectData => !effectData.transfer);
+
+      for (const effect of activeEffects) {
+        // TODO this somehow does not set the origin
+        //  When creating, the value gets changed somehow
+        effect.origin = item.uuid;
+      }
+      
+      const appliedEffectUuids = new Set<string>();
+      for (const target of matchingTargets) {
+        appliedEffectUuids.add(target.result.appliedActiveEffectUuid);
+      }
+      appliedEffectUuids.delete(null);
+      appliedEffectUuids.delete(undefined);
+
+      for (const target of matchingTargets) {
+        const targetActor = actorsByTokenUuid.get(target.uuid);
+        const deleteAlreadyAppliedEffectIds: string[] = [];
+        for (const effect of targetActor.getEmbeddedCollection(ActiveEffect.name)) {
+          if (appliedEffectUuids.has((effect as ActiveEffect).uuid)) {
+            deleteAlreadyAppliedEffectIds.push(effect.id);
+          }
+        }
+
+        if (!createEffectsByTokenUuid.has(target.uuid)) {
+          createEffectsByTokenUuid.set(target.uuid, []);
+        }
+        for (const effect of activeEffects) {
+          createEffectsByTokenUuid.get(target.uuid).push({effect: effect, target: target}); 
+        }
+        if (deleteAlreadyAppliedEffectIds.length > 0) {
+          if (!deleteEffectsByTokenUuid.has(target.uuid)) {
+            deleteEffectsByTokenUuid.set(target.uuid, new Set<string>());
+          }
+          for (const id of deleteAlreadyAppliedEffectIds) {
+            deleteEffectsByTokenUuid.get(target.uuid).add(id); 
+          }
+        }
+      }
+    }
+
+    await Promise.all(Array.from(createEffectsByTokenUuid.entries()).map(([tokenUuid, value]) => {
+      return actorsByTokenUuid.get(tokenUuid).createEmbeddedDocuments(ActiveEffect.name, value.map(v => v.effect)).then((createdEffects: ActiveEffect[]) => {
+        for (let i = 0; i < createdEffects.length; i++) {
+          value[i].target.result.appliedActiveEffectUuid = createdEffects[i].uuid;
+        }
+      });
+    }));
+    await Promise.all(Array.from(deleteEffectsByTokenUuid.entries()).map(([tokenUuid, value]) => {
+      return actorsByTokenUuid.get(tokenUuid).deleteEmbeddedDocuments(ActiveEffect.name, Array.from(value));
+    }));
+
+    return messageData;
+  }
+  //#endregion
+
   //#region calculations
   private static calculateDamageFormulas(damages: ItemCardItemData['damages']): ItemCardItemData['damages'] {
     if (!damages) {
@@ -1492,7 +1603,10 @@ export class UtilsChatMessage {
     const calculatedHealthModByTargetUuid = new Map<string, number>();
     for (const item of items) {
       for (const target of item.targets) {
-        target.result = {};
+        target.result = !target.result ? {} : {...target.result}
+        delete target.result.checkPass;
+        delete target.result.dmg;
+        delete target.result.hit;
         tokenUuidToName.set(target.uuid, target.name || '');
         rawHealthModByTargetUuid.set(target.uuid, 0);
         calculatedHealthModByTargetUuid.set(target.uuid, 0);

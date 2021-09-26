@@ -1,3 +1,6 @@
+import EmbeddedCollection from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/embedded-collection.mjs";
+import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
+
 interface BaseDocument<DATA> {
   id?: string;
   uuid: string;
@@ -8,6 +11,9 @@ interface BaseDocument<DATA> {
   clone(merge: DeepPartial<this>, options?: {keepId: boolean});
   update(data: DeepPartial<DATA> | {[key: string]: any});
   delete();
+  createEmbeddedDocuments(embeddedName: string, data: any[]): Promise<Array<Document<any, this>>>;
+  updateEmbeddedDocuments(embeddedName: string, updates?: Array<Record<string, unknown>>, context?: DocumentModificationContext): Promise<Array<Document<any, this>>>;
+  deleteEmbeddedDocuments(embeddedName: string, ids: string[], context?: DocumentModificationContext): Promise<Array<Document<any, this>>>;
 }
 
 export interface ActorAbility {
@@ -185,6 +191,7 @@ export type MyItem = Item & BaseDocument<MyItemData> & {
   protected prepareFinalAttributes: () => void;
   pack?: string;
   hasAreaTarget: boolean;
+  effects: Map<string, ActiveEffect>;
 };
 
 export type MyActor = Actor & BaseDocument<MyActorData> & {
