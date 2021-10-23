@@ -1531,7 +1531,7 @@ export class UtilsChatMessage {
       for (const target of matchingTargets) {
         const targetActor = actorsByTokenUuid.get(target.uuid);
         const deleteAlreadyAppliedEffectIds: string[] = [];
-        for (const effect of targetActor.getEmbeddedCollection(ActiveEffect.name)) {
+        for (const effect of targetActor.getEmbeddedCollection(ActiveEffect.name).values()) {
           if (appliedEffectUuids.has((effect as ActiveEffect).uuid)) {
             deleteAlreadyAppliedEffectIds.push(effect.id);
           }
