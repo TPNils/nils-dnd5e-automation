@@ -27,6 +27,7 @@ export interface ItemCardItemData {
   img: string;
   description?: string;
   materials?: string;
+  properties?: string[];
   targets?: {
     uuid: string;
     actorUuid: string;
@@ -89,10 +90,6 @@ export interface ItemCardItemData {
     createdTemplateUuid?: string;
   } & MyItemData['data']['target'];
   canChangeTargets: boolean;
-  spell?: {
-    level: number;
-  },
-  properties?: string[];
 }
 
 export interface ItemCardTokenData {
