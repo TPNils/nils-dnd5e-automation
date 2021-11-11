@@ -6,7 +6,7 @@
     "build": "gulp build",
     "package": "gulp package",
     "foundry": "gulp link",
-    "watch": "gulp watch",
+    "dev": "gulp watch",
     "release": "git checkout master && git pull && git merge dev && git push && git checkout dev",
     "updateSrcPacks": "gulp updateSrcPacks"
   },
