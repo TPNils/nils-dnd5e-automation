@@ -1,5 +1,6 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
+import { IDmlContext, DmlTrigger, IDmlTrigger } from "../dml-trigger/dml-trigger";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
 import { staticValues } from "../static-values";
@@ -231,11 +232,9 @@ export class UtilsChatMessage {
         'modules/nils-automated-compendium/templates/roll/tooltip.hbs'
       ]);
     });
-
-    Hooks.on(`create${MeasuredTemplateDocument.documentName}`, UtilsChatMessage.processTemplateCreated)
-    Hooks.on(`update${MeasuredTemplateDocument.documentName}`, UtilsChatMessage.processTemplateUpdated)
     
-    Hooks.on(`create${ChatMessage.documentName}`, UtilsChatMessage.processChatMessageCreated)
+    DmlTrigger.registerTrigger(new DmlTriggerChatMessage());
+    DmlTrigger.registerTrigger(new DmlTriggerTemplate());
     
     provider.getSocket().then(socket => {
       socket.register('onInteraction', (params: Parameters<typeof UtilsChatMessage['onInteractionProcessor']>[0]) => {
@@ -438,7 +437,7 @@ export class UtilsChatMessage {
         }
       }
       
-      itemCardData.damages = UtilsChatMessage.calculateDamageFormulas(inputDamages);
+      itemCardData.damages = inputDamages;
     }
 
     // Saving throw
@@ -694,7 +693,7 @@ export class UtilsChatMessage {
     }
     
     const message = game.messages.get(messageId);
-    const messageData = UtilsChatMessage.getItemCardData(message);
+    const messageData = InternalFunctions.getItemCardData(message);
     if (messageData == null) {
       console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} but no data was found`);
       return;
@@ -756,7 +755,7 @@ export class UtilsChatMessage {
     inputValue?: ActionParam['inputValue'];
   }): Promise<InteractionResponse> {
     const message = game.messages.get(messageId);
-    const messageData = UtilsChatMessage.getItemCardData(message);
+    const messageData = InternalFunctions.getItemCardData(message);
     if (messageData == null) {
       return {
         success: false,
@@ -788,7 +787,7 @@ export class UtilsChatMessage {
 
     if (doUpdate) {
       // Don't use await so you can return a response faster to the client
-      UtilsChatMessage.saveItemCardData(messageId, latestMessageData);
+      InternalFunctions.saveItemCardData(messageId, latestMessageData);
     }
 
     return {
@@ -914,7 +913,7 @@ export class UtilsChatMessage {
     }
 
     // TODO this implementation does not work and should also account for checks along side the attack
-    if (UtilsChatMessage.canChangeTargets(messageData.items[itemIndex])) {
+    if (InternalFunctions.canChangeTargets(messageData.items[itemIndex])) {
       // Re-evaluate the targets, the user may have changed targets
       const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
 
@@ -1000,7 +999,7 @@ export class UtilsChatMessage {
     attack.phase = 'result';
 
     {
-      const result = await UtilsChatMessage.applyConsumeResources(messageData);
+      const result = await InternalFunctions.applyConsumeResources(messageData);
       if (result) {
         messageData = result;
       }
@@ -1080,7 +1079,7 @@ export class UtilsChatMessage {
     }
     
     {
-      const result = await UtilsChatMessage.applyConsumeResources(messageData);
+      const result = await InternalFunctions.applyConsumeResources(messageData);
       if (result) {
         messageData = result;
       }
@@ -1345,7 +1344,7 @@ export class UtilsChatMessage {
       }
 
       if (isHealing && item.targets) {
-        messageData = await UtilsChatMessage.calculateTargetResult(messageData);
+        messageData = await InternalFunctions.calculateTargetResult(messageData);
         const response = await UtilsChatMessage.applyDamage(item.targets.map(t => t.uuid), messageData, messageId);
         if (response) {
           messageData = response;
@@ -1447,7 +1446,7 @@ export class UtilsChatMessage {
     if (!targetDefinition || !targetDefinition.hasAoe) {
       return;
     }
-    if (!UtilsChatMessage.canChangeTargets(messageData.items[itemIndex])) {
+    if (!InternalFunctions.canChangeTargets(messageData.items[itemIndex])) {
       return;
     }
 
@@ -1461,130 +1460,6 @@ export class UtilsChatMessage {
       }
     });
     template.drawPreview();
-  }
-
-  private static async processTemplateCreated(template: MeasuredTemplateDocument, arg2: any, userId: string): Promise<void> {
-    if (game.userId !== userId) {
-      return;
-    }
-    const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
-    if (!messageId || !game.messages.has(messageId)) {
-      return;
-    }
-    const message = game.messages.get(messageId);
-    const messageData = UtilsChatMessage.getItemCardData(message);
-    if (!messageData) {
-      return;
-    }
-
-    const itemIndex = template.getFlag(staticValues.moduleName, 'dmlCallbackItemIndex') as number;
-    let item = messageData.items[itemIndex];
-    if (!item) {
-      return;
-    }
-
-    if (item.targetDefinition.createdTemplateUuid && item.targetDefinition.createdTemplateUuid !== template.uuid) {
-      fromUuid(item.targetDefinition.createdTemplateUuid).then(doc => {
-        if (doc != null) {
-          doc.delete();
-        }
-      });
-    }
-
-    item.targetDefinition.createdTemplateUuid = template.uuid;
-
-    item = await UtilsChatMessage.setTargetsFromTemplate(item);
-    messageData.items[itemIndex] = item;
-    game.user.targets.clear();
-    if (item.targets) {
-      const targetCanvasIds = (await UtilsDocument.tokensFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
-      game.user.updateTokenTargets(targetCanvasIds);
-      game.user.broadcastActivity({targets: targetCanvasIds});
-    }
-
-    UtilsChatMessage.saveItemCardData(messageId, messageData);
-  }
-
-  private static async processTemplateUpdated(arg0: any, templateData: Partial<MeasuredTemplateDocument['data']>, options: any, userId: string): Promise<void> {
-    if (game.userId !== userId) {
-      return;
-    }
-    const template: MeasuredTemplateDocument = arg0.data.document;
-    const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
-    if (!messageId || !game.messages.has(messageId)) {
-      return;
-    }
-    const message = game.messages.get(messageId);
-    const messageData = UtilsChatMessage.getItemCardData(message);
-    if (!messageData) {
-      return;
-    }
-
-    const itemIndex = template.getFlag(staticValues.moduleName, 'dmlCallbackItemIndex') as number;
-    let item = messageData.items[itemIndex];
-    if (!item) {
-      return;
-    }
-
-    if (!UtilsChatMessage.canChangeTargets(item)) {
-      return;
-    }
-
-    item = await UtilsChatMessage.setTargetsFromTemplate(item);
-    messageData.items[itemIndex] = item;
-    game.user.targets.clear();
-    if (item.targets) {
-      const targetCanvasIds = (await UtilsDocument.tokensFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
-      game.user.updateTokenTargets(targetCanvasIds);
-      game.user.broadcastActivity({targets: targetCanvasIds});
-    }
-
-    UtilsChatMessage.saveItemCardData(messageId, messageData);
-  }
-
-  private static async setTargetsFromTemplate(item: ItemCardItemData): Promise<ItemCardItemData> {
-    if (!item.targetDefinition?.createdTemplateUuid) {
-      return item;
-    }
-
-    if (!UtilsChatMessage.canChangeTargets(item)) {
-      return item;
-    }
-
-    const template = await UtilsDocument.templateFromUuid(item.targetDefinition.createdTemplateUuid);
-    if (!template) {
-      return item;
-    }
-    
-    const templateDetails = UtilsTemplate.getTemplateDetails(template);
-    const scene = template.parent;
-    const newTargets: string[] = [];
-    // @ts-ignore
-    for (const token of scene.getEmbeddedCollection('Token') as Iterable<TokenDocument>) {
-      if (UtilsTemplate.isTokenInside(templateDetails, token, true)) {
-        newTargets.push(token.uuid);
-      }
-    }
-
-    return UtilsChatMessage.setTargets(item, newTargets);
-  }
-
-  private static canChangeTargets(itemData: ItemCardItemData): boolean {
-    if (!itemData.targets) {
-      return true;
-    }
-    // A target has rolled a save or damage has been applied
-    if (itemData.targets) {
-      for (const target of itemData.targets) {
-        if (target.result.checkPass != null) {
-          return false;
-        }
-        if (target.result.dmg?.applied) {
-          return false;
-        }
-      }
-    }
-    return true;
   }
   //#endregion
 
@@ -1691,32 +1566,225 @@ export class UtilsChatMessage {
   }
   //#endregion
 
-  //#region calculations
-  private static calculateDamageFormulas(damages: ItemCardItemData['damages']): ItemCardItemData['damages'] {
-    if (!damages) {
-      return damages;
+}
+
+class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
+
+  get type(): typeof ChatMessage {
+    return ChatMessage;
+  }
+
+  public async afterUpsert(context: IDmlContext<ChatMessage>): Promise<void> {
+    if (context.userId !== game.userId) {
+      // Only one user needs to do this operation
+      // TODO should happen before when async is possible
+      return;
     }
-    return damages.map(damage => {
-      let displayFormula = damage.mode === 'critical' ? damage.criticalRoll?.formula : damage.normalRoll.formula;
-      const damageTypes: DamageType[] = [];
-      if (displayFormula) {
-        for (const damageType of UtilsRoll.getValidDamageTypes()) {
-          if (displayFormula.match(`\\[${damageType}\\]`)) {
-            damageTypes.push(damageType);
-            displayFormula = displayFormula.replace(new RegExp(`\\[${damageType}\\]`, 'g'), '');
-          }
+    const chatMessages = this.filterItemCardsOnly(context);
+    for (const chatMessage of chatMessages) {
+      let clonedMessageData = deepClone(InternalFunctions.getItemCardData(chatMessage));
+      let changed = false;
+      {
+        const response = await InternalFunctions.applyConsumeResources(clonedMessageData);
+        if (response) {
+          clonedMessageData = response;
+          changed = true;
         }
       }
 
-      return {
-        ...damage,
-        displayFormula: displayFormula,
-        displayDamageTypes: damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined
-      };
-    })
+      if (changed) {
+        await InternalFunctions.saveItemCardData(chatMessage.id, clonedMessageData);
+      }
+    }
   }
 
-  private static async calculateTargetResult(messageData: ItemCardData): Promise<ItemCardData> {
+  public beforeUpsert(context: IDmlContext<ChatMessage>): boolean | void {
+    const itemCards = this.filterItemCardsOnly(context);
+    if (itemCards.length > 0) {
+      this.calcItemCardDamageFormulas(itemCards);
+      this.calcItemCardCanChangeTargets(itemCards);
+    }
+  }
+  
+  private calcItemCardDamageFormulas(chatMessages: ChatMessage[]): void {
+    for (const chatMessage of chatMessages) {
+      const data: ItemCardData = InternalFunctions.getItemCardData(chatMessage);
+      console.log(data);
+      for (const item of data.items) {
+        if (!item.damages) {
+          continue;
+        }
+
+        item.damages = item.damages.map(damage => {
+          let displayFormula = damage.mode === 'critical' ? damage.criticalRoll?.formula : damage.normalRoll.formula;
+          const damageTypes: DamageType[] = [];
+          if (displayFormula) {
+            for (const damageType of UtilsRoll.getValidDamageTypes()) {
+              if (displayFormula.match(`\\[${damageType}\\]`)) {
+                damageTypes.push(damageType);
+                displayFormula = displayFormula.replace(new RegExp(`\\[${damageType}\\]`, 'g'), '');
+              }
+            }
+          }
+    
+          return {
+            ...damage,
+            displayFormula: displayFormula,
+            displayDamageTypes: damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined
+          };
+        });
+      }
+      InternalFunctions.setItemCardData(chatMessage, data);
+    }
+  }
+  
+  private calcItemCardCanChangeTargets(chatMessages: ChatMessage[]): void {
+    for (const chatMessage of chatMessages) {
+      const data: ItemCardData = InternalFunctions.getItemCardData(chatMessage);
+      for (const item of data.items) {
+        item.canChangeTargets = InternalFunctions.canChangeTargets(item);
+      }
+    }
+  }
+  
+  private filterItemCardsOnly(context: IDmlContext<ChatMessage>) {
+    const itemCards: ChatMessage[] = [];
+    for (const row of context.rows) {
+      if (row.getFlag(staticValues.moduleName, 'clientTemplate') === `modules/${staticValues.moduleName}/templates/item-card.hbs`) {
+        itemCards.push(row);
+      }
+    }
+    return itemCards;
+  }
+  
+}
+
+class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
+
+  get type(): typeof MeasuredTemplateDocument {
+    return MeasuredTemplateDocument;
+  }
+  
+  public async afterCreate(context: IDmlContext<MeasuredTemplateDocument>): Promise<void> {
+    if (game.userId !== context.userId) {
+      return;
+    }
+    for (const template of context.rows) {
+      const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
+      if (!messageId || !game.messages.has(messageId)) {
+        continue;
+      }
+      const message = game.messages.get(messageId);
+      const messageData = InternalFunctions.getItemCardData(message);
+      if (!messageData) {
+        continue;
+      }
+
+      const itemIndex = template.getFlag(staticValues.moduleName, 'dmlCallbackItemIndex') as number;
+      let item = messageData.items[itemIndex];
+      if (!item) {
+        continue;
+      }
+
+      if (item.targetDefinition.createdTemplateUuid && item.targetDefinition.createdTemplateUuid !== template.uuid) {
+        fromUuid(item.targetDefinition.createdTemplateUuid).then(doc => {
+          if (doc != null) {
+            doc.delete();
+          }
+        });
+      }
+
+      item.targetDefinition.createdTemplateUuid = template.uuid;
+
+      item = await this.setTargetsFromTemplate(item);
+      messageData.items[itemIndex] = item;
+      game.user.targets.clear();
+      if (item.targets) {
+        const targetCanvasIds = (await UtilsDocument.tokensFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
+        game.user.updateTokenTargets(targetCanvasIds);
+        game.user.broadcastActivity({targets: targetCanvasIds});
+      }
+
+      await InternalFunctions.saveItemCardData(messageId, messageData);
+    }
+  }
+
+  public async afterUpdate(context: IDmlContext<MeasuredTemplateDocument>): Promise<void> {
+    console.log('afterUpdate', context)
+    if (game.userId !== context.userId) {
+      return;
+    }
+
+    for (const template of context.rows) {
+      const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
+      if (!messageId || !game.messages.has(messageId)) {
+        continue;
+      }
+      const message = game.messages.get(messageId);
+      const messageData = InternalFunctions.getItemCardData(message);
+      if (!messageData) {
+        continue;
+      }
+
+      const itemIndex = template.getFlag(staticValues.moduleName, 'dmlCallbackItemIndex') as number;
+      let item = messageData.items[itemIndex];
+      if (!item) {
+        continue;
+      }
+
+      if (!InternalFunctions.canChangeTargets(item)) {
+        continue;
+      }
+
+      item = await this.setTargetsFromTemplate(item);
+      messageData.items[itemIndex] = item;
+      game.user.targets.clear();
+      if (item.targets) {
+        const targetCanvasIds = (await UtilsDocument.tokensFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
+        game.user.updateTokenTargets(targetCanvasIds);
+        game.user.broadcastActivity({targets: targetCanvasIds});
+      }
+
+      await InternalFunctions.saveItemCardData(messageId, messageData);
+    }
+  }
+  
+  private async setTargetsFromTemplate(item: ItemCardItemData): Promise<ItemCardItemData> {
+    if (!item.targetDefinition?.createdTemplateUuid) {
+      return item;
+    }
+
+    if (!InternalFunctions.canChangeTargets(item)) {
+      return item;
+    }
+
+    const template = await UtilsDocument.templateFromUuid(item.targetDefinition.createdTemplateUuid);
+    if (!template) {
+      return item;
+    }
+    
+    const templateDetails = UtilsTemplate.getTemplateDetails(template);
+    const scene = template.parent;
+    const newTargets: string[] = [];
+    // @ts-ignore
+    for (const token of scene.getEmbeddedCollection('Token') as Iterable<TokenDocument>) {
+      if (UtilsTemplate.isTokenInside(templateDetails, token, true)) {
+        newTargets.push(token.uuid);
+      }
+    }
+
+    return UtilsChatMessage.setTargets(item, newTargets);
+  }
+
+}
+
+class InternalFunctions {
+  
+  public static get healingDamageTypes(): DamageType[] {
+    return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
+  }
+
+  public static async calculateTargetResult(messageData: ItemCardData): Promise<ItemCardData> {
     const items = messageData.items.filter(item => item.targets?.length);
 
     // Prepare data
@@ -1897,7 +1965,7 @@ export class UtilsChatMessage {
               // Apply healing & dmg aggregate in the same order as the items
               if (target.result.dmg.type === 'temphp') {
                 aggregate.dmg.calcTemp += target.result.dmg.calcNumber;
-              } else if (UtilsChatMessage.healingDamageTypes.includes(target.result.dmg.type)) {
+              } else if (InternalFunctions.healingDamageTypes.includes(target.result.dmg.type)) {
                 await applyHeal(aggregate, target.result.dmg.calcNumber);
               } else {
                 await applyDmg(aggregate, target.result.dmg.calcNumber);
@@ -1943,16 +2011,12 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async saveItemCardData(messageId: string, data: ItemCardData): Promise<void> {
+  public static async saveItemCardData(messageId: string, data: ItemCardData): Promise<void> {
     // TODO add "go to bottom" logic to a chat message update hook
     const log = document.querySelector("#chat-log");
     const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
 
-    data = await UtilsChatMessage.calculateTargetResult(data);
-    for (const item of data.items) {
-      item.damages = UtilsChatMessage.calculateDamageFormulas(item.damages);
-      item.canChangeTargets = UtilsChatMessage.canChangeTargets(item);
-    }
+    data = await InternalFunctions.calculateTargetResult(data);
     await ChatMessage.updateDocuments([{
       _id: messageId,
       flags: {
@@ -1968,33 +2032,15 @@ export class UtilsChatMessage {
     }
   }
 
-  private static getItemCardData(message: ChatMessage): ItemCardData {
+  public static getItemCardData(message: ChatMessage): ItemCardData {
     return (message.getFlag(staticValues.moduleName, 'clientTemplateData') as any)?.data;
   }
 
-  private static async processChatMessageCreated(chatMessage: ChatMessage, arg2: any, userId: string): Promise<void> {
-    const messageData = UtilsChatMessage.getItemCardData(chatMessage);
-    if (messageData == null) {
-      // Message is not managed by this class
-      return;
-    }
-
-    let clonedMessageData = deepClone(messageData);
-    let changed = false;
-    {
-      const response = await UtilsChatMessage.applyConsumeResources(clonedMessageData);
-      if (response) {
-        clonedMessageData = response;
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      await UtilsChatMessage.saveItemCardData(chatMessage.id, messageData);
-    }
+  public static setItemCardData(message: ChatMessage, data: ItemCardData): void {
+    setProperty(message.data, `flags.${staticValues.moduleName}.clientTemplateData.data`, data);
   }
 
-  private static async applyConsumeResources(messageData: ItemCardData): Promise<ItemCardData> {
+  public static async applyConsumeResources(messageData: ItemCardData): Promise<ItemCardData> {
     // TODO try to do dmls across all functions in a central place
     const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
     const consumeResourcesToApply: ItemCardData['items'][0]['consumeResources'] = [];
@@ -2079,6 +2125,23 @@ export class UtilsChatMessage {
     console.log('apply?', messageData)
     return messageData;
   }
-  //#endregion
+  
+  public static canChangeTargets(itemData: ItemCardItemData): boolean {
+    if (!itemData.targets) {
+      return true;
+    }
+    // A target has rolled a save or damage has been applied
+    if (itemData.targets) {
+      for (const target of itemData.targets) {
+        if (target.result.checkPass != null) {
+          return false;
+        }
+        if (target.result.dmg?.applied) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 
 }
