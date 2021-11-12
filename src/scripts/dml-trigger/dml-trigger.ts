@@ -35,18 +35,18 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
    * A hook event that fires for every embedded Document type after conclusion of a creation workflow.
    * This hook fires for all connected clients after the creation has been processed.
    */
-  afterCreate?(context: IDmlContext<T>): void;
+  afterCreate?(context: IDmlContext<T>): void | Promise<void>;
   /**
    * A hook event that fires for every Document type after conclusion of an update workflow.
    * This hook fires for all connected clients after the update has been processed.
    */
-  afterUpdate?(context: IDmlContext<T>): void;
-  afterUpsert?(context: IDmlContext<T>): void;
+  afterUpdate?(context: IDmlContext<T>): void | Promise<void>;
+  afterUpsert?(context: IDmlContext<T>): void | Promise<void>;
   /**
    * A hook event that fires for every Document type after conclusion of an deletion workflow.
    * This hook fires for all connected clients after the deletion has been processed.
    */
-  afterDelete?(context: IDmlContext<T>): void;
+  afterDelete?(context: IDmlContext<T>): void | Promise<void>;
 }
 
 export interface IDmlContext<T extends foundry.abstract.Document<any, any>> {
@@ -158,7 +158,7 @@ function wrapBeforeUpdate<T extends foundry.abstract.Document<any, any>>(callbac
 const wrapBeforeDelete = wrapBeforeCreate;
 
 
-function wrapAfterCreate<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => boolean | void): (document: T, data: any, options: IDmlContext<T>['options'], userId: string) => void {
+function wrapAfterCreate<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => void | Promise<void>): (document: T, data: any, options: IDmlContext<T>['options'], userId: string) => void {
   return (document: T, data: any, options: IDmlContext<T>['options'], userId: string) => {
     return callback({
       rows: [document],
@@ -167,5 +167,21 @@ function wrapAfterCreate<T extends foundry.abstract.Document<any, any>>(callback
     });
   }
 }
-const wrapAfterUpdate = wrapBeforeUpdate;
-const wrapAfterDelete = wrapBeforeCreate; // same contract as BEFORE create, not after
+function wrapAfterUpdate<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => void | Promise<void>): (document: T, change: any, options: IDmlContext<T>['options'], userId: string) => void {
+  return (document: T, change: any, options: IDmlContext<T>['options'], userId: string) => {
+    return callback({
+      rows: [document],
+      options: options,
+      userId: userId
+    });
+  }
+}
+function wrapAfterDelete<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => void | Promise<void>): (document: T, options: IDmlContext<T>['options'], userId: string) => void {
+  return (document: T, options: IDmlContext<T>['options'], userId: string) => {
+    return callback({
+      rows: [document],
+      options: options,
+      userId: userId
+    });
+  }
+}
