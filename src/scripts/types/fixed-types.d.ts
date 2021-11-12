@@ -159,6 +159,10 @@ export type MyItemData = {
       value?: string | null;
     },
     proficient: boolean;
+    preparation: {
+      mode: 'always' | 'atwill' | 'innate' | 'pact' | 'prepared';
+      prepared: boolean;
+    }
     quantity?: number;
     range: {
       value?: number;
@@ -179,11 +183,18 @@ export type MyItemData = {
     scaling: {
       mode?: 'none' | 'cantrip' | 'level',
       formula?: string;
+    };
+    uses?: {
+      max?: string;
+      value?: number;
+      per?: 'sr' | 'lr' | 'day' | 'charges' | '';
+      autoDestroy?: boolean;
     }
   }
 }
 
 export type MyItem = Item & BaseDocument<MyItemData> & {
+  parent: MyActor;
   getChatData: () => any;
   roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
   displayCard({}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;

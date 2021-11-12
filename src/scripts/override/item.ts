@@ -16,7 +16,7 @@ async function roll(this: MyItem, {configureDialog=true, rollMode, createMessage
   const hasArea = this.hasAreaTarget;       // Is the ability usage an AoE?
   const resource = id.consume || {};        // Resource consumption
   const recharge = id.recharge || {};       // Recharge mechanic
-  const uses = id?.uses ?? {};              // Limited uses
+  const uses: (typeof id)['uses'] = id?.uses ?? {};              // Limited uses
   const isSpell = this.type === "spell";    // Does the item require a spell slot?
   const requireSpellSlot = isSpell && (id.level > 0) && (CONFIG as any).DND5E.spellUpcastModes.includes(id.preparation.mode);
 
@@ -59,30 +59,6 @@ async function roll(this: MyItem, {configureDialog=true, rollMode, createMessage
         item.data.update({_id: this.id}); // Retain the original ID (needed until 0.8.2+)
         item.prepareFinalAttributes(); // Spell save DC, etc...
       }
-    }
-  }
-
-  // Determine whether the item can be used by testing for resource consumption
-  const usage = (item as any)._getUsageUpdates({consumeRecharge, consumeResource, consumeSpellLevel, consumeUsage, consumeQuantity});
-  if (!usage) {
-    return;
-  }
-  const {actorUpdates, itemUpdates, resourceUpdates} = usage;
-
-  // Commit pending data updates
-  if (!foundry.utils.isObjectEmpty(itemUpdates)) {
-    await item.update(itemUpdates);
-  }
-  if (consumeQuantity && (item.data.data.quantity === 0)) {
-    await item.delete();
-  }
-  if (!foundry.utils.isObjectEmpty(actorUpdates)) {
-    await actor.update(actorUpdates);
-  }
-  if (!foundry.utils.isObjectEmpty(resourceUpdates)) {
-    const resource = actor.items.get(id.consume?.target);
-    if (resource) {
-      await resource.update(resourceUpdates);
     }
   }
 
@@ -129,7 +105,6 @@ async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode
 
   // TODO spell scaling, both dmg and targets
   // TODO refund spell slot usage with the apply/undo card part
-  // TODO auto consume spell slot usage AFTER attack/dmg roll
 
   return await UtilsChatMessage.createCard(itemCardData, createMessage);
 }

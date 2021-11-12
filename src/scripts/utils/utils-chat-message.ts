@@ -89,6 +89,14 @@ export interface ItemCardItemData {
     hasAoe: boolean,
     createdTemplateUuid?: string;
   } & MyItemData['data']['target'];
+  consumeResources: {
+    uuid: string;
+    path: string;
+    amount: number;
+    original: number;
+    autoconsumeAfter?: 'init' | 'attack' | 'damage' | 'check' | 'template-placed';
+    applied: boolean;
+  }[];
   canChangeTargets: boolean;
 }
 
@@ -203,6 +211,10 @@ export class UtilsChatMessage {
     return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
   }
 
+  private static get spellUpcastModes(): Array<MyItemData['data']['preparation']['mode']> {
+    return (CONFIG as any).DND5E.spellUpcastModes;
+  }
+
   public static registerHooks(): void {
     Hooks.on('renderChatLog', () => {
       const chatElement = document.getElementById('chat-log');
@@ -222,6 +234,8 @@ export class UtilsChatMessage {
 
     Hooks.on(`create${MeasuredTemplateDocument.documentName}`, UtilsChatMessage.processTemplateCreated)
     Hooks.on(`update${MeasuredTemplateDocument.documentName}`, UtilsChatMessage.processTemplateUpdated)
+    
+    Hooks.on(`create${ChatMessage.documentName}`, UtilsChatMessage.processChatMessageCreated)
     
     provider.getSocket().then(socket => {
       socket.register('onInteraction', (params: Parameters<typeof UtilsChatMessage['onInteractionProcessor']>[0]) => {
@@ -275,11 +289,16 @@ export class UtilsChatMessage {
         // @ts-expect-error
         hasAoe: CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type),
         ...item.data.data.target,
-      }
+      },
+      consumeResources: [],
     };
+    const isSpell = item.type === "spell";
+    if (level == null) {
+      level = item.data.data.level;
+    }
 
     if (item.data.data.description?.value) {
-      itemCardData.description =item.data.data.description.value
+      itemCardData.description = item.data.data.description.value
     }
     if (item.data.data.materials?.value) {
       itemCardData.materials = item.data.data.materials.value
@@ -449,6 +468,98 @@ export class UtilsChatMessage {
 
     // TODO template
 
+    // Consume actor resources
+    if (actor) {
+      const requireSpellSlot = isSpell && level > 0 && UtilsChatMessage.spellUpcastModes.includes(item.data.data.preparation.mode);
+      if (requireSpellSlot) {
+        let spellPropertyName = item.data.data.preparation.mode === "pact" ? "pact" : `spell${level}`;
+        itemCardData.consumeResources.push({
+          uuid: actor.uuid,
+          path: `data.spells.${spellPropertyName}.value`,
+          amount: 1,
+          original: actor?.data?.data?.spells?.[spellPropertyName]?.value ?? 0,
+          applied: false
+        });
+      }
+
+      switch (item.data.data.consume.type) {
+        case 'attribute': {
+          if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
+            let propertyPath = `data.${item.data.data.consume.target}`;
+            itemCardData.consumeResources.push({
+              uuid: actor.uuid,
+              path: propertyPath,
+              amount: item.data.data.consume.amount,
+              original: getProperty(actor.data, propertyPath) ?? 0,
+              applied: false
+            });
+          }
+          break;
+        }
+      }
+    }
+
+    // Consume item resources
+    switch (item.data.data.consume.type) {
+      case 'ammo':
+      case 'material': {
+        if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
+          const targetItem = item.actor.items.get(item.data.data.consume.target);
+          let propertyPath = `data.quantity`;
+          itemCardData.consumeResources.push({
+            uuid: targetItem.uuid,
+            path: propertyPath,
+            amount: item.data.data.consume.amount,
+            original: getProperty(targetItem.data, propertyPath) ?? 0,
+            applied: false
+          });
+        }
+        break;
+      }
+      case 'charges': {
+        if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
+          const targetItem = item.actor.items.get(item.data.data.consume.target);
+          let propertyPath = `data.uses.value`;
+          itemCardData.consumeResources.push({
+            uuid: targetItem.uuid,
+            path: propertyPath,
+            amount: item.data.data.consume.amount,
+            original: getProperty(targetItem.data, propertyPath) ?? 0,
+            applied: false
+          });
+        }
+        break;
+      }
+    }
+    
+    if (item.data.data.uses?.per != null && item.data.data.uses?.per != '') {
+      let propertyPath = `data.uses.value`;
+      itemCardData.consumeResources.push({
+        uuid: item.uuid,
+        path: propertyPath,
+        amount: 1,
+        original: getProperty(item.data, propertyPath) ?? 0,
+        applied: false
+      });
+    }
+
+    for (const consumeResource of itemCardData.consumeResources) {
+      if (consumeResource.autoconsumeAfter == null) {
+        if (itemCardData.attack) {
+          consumeResource.autoconsumeAfter = 'attack';
+        } else if (itemCardData.damages?.length) {
+          consumeResource.autoconsumeAfter = 'damage';
+        } else if (itemCardData.targetDefinition?.hasAoe) {
+          consumeResource.autoconsumeAfter = 'template-placed';
+        } else if (itemCardData.check) {
+          consumeResource.autoconsumeAfter = 'check';
+        } else {
+          consumeResource.autoconsumeAfter = 'init';
+        }
+      }
+    }
+
+    console.log('create', itemCardData)
     return itemCardData;
   }
 
@@ -888,6 +999,13 @@ export class UtilsChatMessage {
     attack.evaluatedRoll = roll.toJSON();
     attack.phase = 'result';
 
+    {
+      const result = await UtilsChatMessage.applyConsumeResources(messageData);
+      if (result) {
+        messageData = result;
+      }
+    }
+
     return messageData;
   }
 
@@ -957,7 +1075,14 @@ export class UtilsChatMessage {
     if (orderedPhases.indexOf(target.check.phase) === orderedPhases.length - 1) {
       const response = await UtilsChatMessage.processItemCheckRoll(itemIndex, targetUuid, messageData);
       if (response) {
-        return response;
+        messageData = response;
+      }
+    }
+    
+    {
+      const result = await UtilsChatMessage.applyConsumeResources(messageData);
+      if (result) {
+        messageData = result;
       }
     }
 
@@ -1845,6 +1970,114 @@ export class UtilsChatMessage {
 
   private static getItemCardData(message: ChatMessage): ItemCardData {
     return (message.getFlag(staticValues.moduleName, 'clientTemplateData') as any)?.data;
+  }
+
+  private static async processChatMessageCreated(chatMessage: ChatMessage, arg2: any, userId: string): Promise<void> {
+    const messageData = UtilsChatMessage.getItemCardData(chatMessage);
+    if (messageData == null) {
+      // Message is not managed by this class
+      return;
+    }
+
+    let clonedMessageData = deepClone(messageData);
+    let changed = false;
+    {
+      const response = await UtilsChatMessage.applyConsumeResources(clonedMessageData);
+      if (response) {
+        clonedMessageData = response;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await UtilsChatMessage.saveItemCardData(chatMessage.id, messageData);
+    }
+  }
+
+  private static async applyConsumeResources(messageData: ItemCardData): Promise<ItemCardData> {
+    // TODO try to do dmls across all functions in a central place
+    const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
+    const consumeResourcesToApply: ItemCardData['items'][0]['consumeResources'] = [];
+    {
+      const promisesByUuid = new Map<string, Promise<{uuid: string, document: foundry.abstract.Document<any, any>}>>();
+      for (const item of messageData.items) {
+        for (const consumeResource of item.consumeResources) {
+          if (consumeResource.applied) {
+            continue;
+          }
+
+          let shouldApply = false;
+          switch (consumeResource.autoconsumeAfter) {
+            case 'init': {
+              shouldApply = true;
+              break;
+            }
+            case 'attack': {
+              shouldApply = item.attack?.evaluatedRoll?.evaluated === true;
+              break;
+            }
+            case 'template-placed': {
+              shouldApply = item.targetDefinition?.createdTemplateUuid != null;
+              break;
+            }
+            case 'damage': {
+              for (const damage of (item.damages ?? [])) {
+                if (damage.normalRoll.evaluated === true || damage.criticalRoll?.evaluated === true) {
+                  shouldApply = true;
+                  break;
+                }
+              }
+              break;
+            }
+            case 'check': {
+              for (const target of (item.targets ?? [])) {
+                if (target.check?.evaluatedRoll?.evaluated === true) {
+                  shouldApply = true;
+                  break;
+                }
+              }
+              break;
+            }
+          }
+          
+          if (shouldApply) {
+            consumeResourcesToApply.push(consumeResource);
+            if (!promisesByUuid.has(consumeResource.uuid)) {
+              promisesByUuid.set(consumeResource.uuid, fromUuid(consumeResource.uuid).then(doc => {return {uuid: consumeResource.uuid, document: doc}}));
+            }
+          }
+        }
+      }
+
+      const rows = await Promise.all(Array.from(promisesByUuid.values()));
+      for (const row of rows) {
+        documentsByUuid.set(row.uuid, row.document);
+      }
+    }
+
+    if (consumeResourcesToApply.length === 0) {
+      return null;
+    }
+
+    const updatesByUuid = new Map<string, any>();
+    for (const consumeResource of consumeResourcesToApply) {
+      if (!updatesByUuid.has(consumeResource.uuid)) {
+        updatesByUuid.set(consumeResource.uuid, {});
+      }
+      const updates = updatesByUuid.get(consumeResource.uuid);
+      setProperty(updates, consumeResource.path, consumeResource.original - consumeResource.amount);
+      consumeResource.applied = true;
+    }
+
+    for (const uuid of documentsByUuid.keys()) {
+      // TODO should add a bulk update to UtilsDocument
+      if (updatesByUuid.has(uuid)) {
+        await documentsByUuid.get(uuid).update(updatesByUuid.get(uuid))
+      }
+    }
+
+    console.log('apply?', messageData)
+    return messageData;
   }
   //#endregion
 
