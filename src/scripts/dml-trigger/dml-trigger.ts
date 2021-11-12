@@ -99,7 +99,7 @@ export class DmlTrigger {
     if (typeof trigger.beforeDelete === 'function') {
       hooks.push({
         hook: `preDelete${trigger.type.documentName}`,
-        id: Hooks.on(`preDelete${trigger.type.documentName}`, wrapBeforeDelete(trigger.beforeCreate)),
+        id: Hooks.on(`preDelete${trigger.type.documentName}`, wrapBeforeDelete(trigger.beforeDelete)),
       });
     }
   
@@ -129,7 +129,7 @@ export class DmlTrigger {
     if (typeof trigger.afterDelete === 'function') {
       hooks.push({
         hook: `delete${trigger.type.documentName}`,
-        id: Hooks.on(`delete${trigger.type.documentName}`, wrapAfterDelete(trigger.afterCreate)),
+        id: Hooks.on(`delete${trigger.type.documentName}`, wrapAfterDelete(trigger.afterDelete)),
       });
     }
   
