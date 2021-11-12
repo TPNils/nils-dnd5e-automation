@@ -558,7 +558,6 @@ export class UtilsChatMessage {
       }
     }
 
-    console.log('create', itemCardData)
     return itemCardData;
   }
 
@@ -1609,7 +1608,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   private calcItemCardDamageFormulas(chatMessages: ChatMessage[]): void {
     for (const chatMessage of chatMessages) {
       const data: ItemCardData = InternalFunctions.getItemCardData(chatMessage);
-      console.log(data);
       for (const item of data.items) {
         if (!item.damages) {
           continue;
@@ -1710,7 +1708,6 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
   }
 
   public async afterUpdate(context: IDmlContext<MeasuredTemplateDocument>): Promise<void> {
-    console.log('afterUpdate', context)
     if (game.userId !== context.userId) {
       return;
     }
@@ -2122,7 +2119,6 @@ class InternalFunctions {
       }
     }
 
-    console.log('apply?', messageData)
     return messageData;
   }
   
