@@ -77,29 +77,29 @@ export class DmlTrigger {
     if (typeof trigger.beforeCreate === 'function') {
       hooks.push({
         hook: `preCreate${trigger.type.documentName}`,
-        id: Hooks.on(`preCreate${trigger.type.documentName}`, wrapBeforeCreate(trigger.beforeCreate)),
+        id: Hooks.on(`preCreate${trigger.type.documentName}`, wrapBeforeCreate(trigger.beforeCreate.bind(trigger))),
       });
     }
     if (typeof trigger.beforeUpdate === 'function') {
       hooks.push({
         hook: `preUpdate${trigger.type.documentName}`,
-        id: Hooks.on(`preUpdate${trigger.type.documentName}`, wrapBeforeUpdate(trigger.beforeUpdate)),
+        id: Hooks.on(`preUpdate${trigger.type.documentName}`, wrapBeforeUpdate(trigger.beforeUpdate.bind(trigger))),
       });
     }
     if (typeof trigger.beforeUpsert === 'function') {
       hooks.push({
         hook: `preCreate${trigger.type.documentName}`,
-        id: Hooks.on(`preCreate${trigger.type.documentName}`, wrapBeforeCreate(trigger.beforeUpsert)),
+        id: Hooks.on(`preCreate${trigger.type.documentName}`, wrapBeforeCreate(trigger.beforeUpsert.bind(trigger))),
       });
       hooks.push({
         hook: `preUpdate${trigger.type.documentName}`,
-        id: Hooks.on(`preUpdate${trigger.type.documentName}`, wrapBeforeUpdate(trigger.beforeUpsert)),
+        id: Hooks.on(`preUpdate${trigger.type.documentName}`, wrapBeforeUpdate(trigger.beforeUpsert.bind(trigger))),
       });
     }
     if (typeof trigger.beforeDelete === 'function') {
       hooks.push({
         hook: `preDelete${trigger.type.documentName}`,
-        id: Hooks.on(`preDelete${trigger.type.documentName}`, wrapBeforeDelete(trigger.beforeDelete)),
+        id: Hooks.on(`preDelete${trigger.type.documentName}`, wrapBeforeDelete(trigger.beforeDelete.bind(trigger))),
       });
     }
   
@@ -107,29 +107,29 @@ export class DmlTrigger {
     if (typeof trigger.afterCreate === 'function') {
       hooks.push({
         hook: `create${trigger.type.documentName}`,
-        id: Hooks.on(`create${trigger.type.documentName}`, wrapAfterCreate(trigger.afterCreate)),
+        id: Hooks.on(`create${trigger.type.documentName}`, wrapAfterCreate(trigger.afterCreate.bind(trigger))),
       });
     }
     if (typeof trigger.afterUpdate === 'function') {
       hooks.push({
         hook: `update${trigger.type.documentName}`,
-        id: Hooks.on(`update${trigger.type.documentName}`, wrapAfterUpdate(trigger.afterUpdate)),
+        id: Hooks.on(`update${trigger.type.documentName}`, wrapAfterUpdate(trigger.afterUpdate.bind(trigger))),
       });
     }
     if (typeof trigger.afterUpsert === 'function') {
       hooks.push({
         hook: `create${trigger.type.documentName}`,
-        id: Hooks.on(`create${trigger.type.documentName}`, wrapAfterCreate(trigger.afterUpsert)),
+        id: Hooks.on(`create${trigger.type.documentName}`, wrapAfterCreate(trigger.afterUpsert.bind(trigger))),
       });
       hooks.push({
         hook: `update${trigger.type.documentName}`,
-        id: Hooks.on(`update${trigger.type.documentName}`, wrapAfterUpdate(trigger.afterUpsert)),
+        id: Hooks.on(`update${trigger.type.documentName}`, wrapAfterUpdate(trigger.afterUpsert.bind(trigger))),
       });
     }
     if (typeof trigger.afterDelete === 'function') {
       hooks.push({
         hook: `delete${trigger.type.documentName}`,
-        id: Hooks.on(`delete${trigger.type.documentName}`, wrapAfterDelete(trigger.afterDelete)),
+        id: Hooks.on(`delete${trigger.type.documentName}`, wrapAfterDelete(trigger.afterDelete.bind(trigger))),
       });
     }
   
@@ -158,8 +158,8 @@ function wrapBeforeUpdate<T extends foundry.abstract.Document<any, any>>(callbac
 const wrapBeforeDelete = wrapBeforeCreate;
 
 
-function wrapAfterCreate<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => void | Promise<void>): (document: T, data: any, options: IDmlContext<T>['options'], userId: string) => void {
-  return (document: T, data: any, options: IDmlContext<T>['options'], userId: string) => {
+function wrapAfterCreate<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => void | Promise<void>): (document: T, options: IDmlContext<T>['options'], userId: string) => void {
+  return (document: T, options: IDmlContext<T>['options'], userId: string) => {
     return callback({
       rows: [document],
       options: options,
@@ -176,12 +176,4 @@ function wrapAfterUpdate<T extends foundry.abstract.Document<any, any>>(callback
     });
   }
 }
-function wrapAfterDelete<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => void | Promise<void>): (document: T, options: IDmlContext<T>['options'], userId: string) => void {
-  return (document: T, options: IDmlContext<T>['options'], userId: string) => {
-    return callback({
-      rows: [document],
-      options: options,
-      userId: userId
-    });
-  }
-}
+const wrapAfterDelete = wrapAfterCreate;
