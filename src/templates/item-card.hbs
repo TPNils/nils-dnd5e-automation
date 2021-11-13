@@ -5,19 +5,21 @@
 
   {{#each data.items as |item itemIndex|}}
     <div>
-      <div class="{{@root.staticValues.moduleName}}-header">
+      <div class="{{@root.staticValues.moduleName}}-header" data-{{@root.staticValues.moduleName}}-action="toggle-collapse">
         <img src="{{item.img}}" title="{{item.name}}" width="36" height="36"/>
         <h3 class="{{@root.staticValues.moduleName}}-item-name">{{item.name}}</h3>
       </div>
 
-      <div class="{{@root.staticValues.moduleName}}-section">
-        {{#if item.description}}
-          {{{item.description}}}
-        {{/if}}
-        {{#if item.materials}}
-          <p><strong>{{ localize "DND5E.RequiredMaterials" }}.</strong> {{item.materials}}</p>
-        {{/if}}
-      </div>
+      {{#unless (nacCardCollapse @root.messageId)}}
+        <div class="{{@root.staticValues.moduleName}}-section">
+          {{#if item.description}}
+            {{{item.description}}}
+          {{/if}}
+          {{#if item.materials}}
+            <p><strong>{{ localize "DND5E.RequiredMaterials" }}.</strong> {{item.materials}}</p>
+          {{/if}}
+        </div>
+      {{/unless}}
 
       <div class="{{@root.staticValues.moduleName}}-section">
         <div style="display: flex;">

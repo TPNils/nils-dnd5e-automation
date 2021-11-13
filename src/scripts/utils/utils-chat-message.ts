@@ -7,6 +7,7 @@ import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyActorData, MyItem, MyItemData } from "../types/fixed-types";
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
 import { UtilsDocument } from "./utils-document";
+import { UtilsHandlebars } from "./utils-handlebars";
 import { UtilsInput } from "./utils-input";
 import { UtilsRoll } from "./utils-roll";
 import { UtilsTemplate } from "./utils-template";
@@ -126,7 +127,7 @@ export interface ItemCardData {
       calcHp: number;
       calcTemp: number;
     },
-  }[]
+  }[];
 }
 
 interface ClickEvent {
@@ -146,6 +147,11 @@ type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>
 export class UtilsChatMessage {
 
   private static readonly actionMatches: Array<{regex: RegExp, permissionCheck: ActionPermissionCheck, execute: ActionPermissionExecute}> = [
+    {
+      regex: /^toggle-collapse$/,
+      permissionCheck: () => {return {onlyRunLocal: true}},
+      execute: ({messageId}) => UtilsChatMessage.toggleCollapse(messageId),
+    },
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
@@ -1562,6 +1568,12 @@ export class UtilsChatMessage {
     }));
 
     return messageData;
+  }
+  //#endregion
+
+  //#region misc
+  private static async toggleCollapse(messageId: string): Promise<ItemCardData | void> {
+    UtilsHandlebars.toggleCardCollapse(messageId);
   }
   //#endregion
 

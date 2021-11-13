@@ -16,7 +16,7 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
       options.secrets = true;
     }
     try {
-      this.data.update({content: TextEditor.enrichHTML(await renderTemplate(clientTemplate, clientTemplateData), options as any)})
+      this.data.update({content: TextEditor.enrichHTML(await renderTemplate(clientTemplate, {...clientTemplateData, messageId: this.id}), options as any)})
     } catch (e) {
       console.error(e);
 

@@ -111,6 +111,10 @@
     .#{$module-name}-flavor {
       text-align: center;
     }
+    
+    [data-#{$module-name}-action="toggle-collapse"] {
+      cursor: pointer;
+    }
 
     .#{$module-name}-header {
       padding: 3px 0;

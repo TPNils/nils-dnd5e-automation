@@ -2,6 +2,12 @@ import { filters } from "pixi.js";
 import { staticValues } from "../static-values";
 import { UtilsDocument } from "./utils-document";
 
+type Options = {fn: (argThis: any) => any, inverse: (argThis: any) => any};
+
+const collapsePreferences: {
+  [messageId: string]: boolean;
+} = {};
+
 export class UtilsHandlebars {
 
   public static concat(...args: any[]): string {
@@ -12,7 +18,7 @@ export class UtilsHandlebars {
 
   public static hasPermission(...args: any[]): any {
     const secretFilters: string[] = args.slice(0, args.length - 1);
-    const options: {fn: (argThis: any) => any, inverse: (argThis: any) => any} = args[args.length - 1];
+    const options: Options = args[args.length - 1];
     // no filters = always visible
     let matchesFilter = secretFilters.length === 0;
 
@@ -56,7 +62,7 @@ export class UtilsHandlebars {
 
   public static missingPermission(...args: any[]): any {
     const secretFilters: string[] = args.slice(0, args.length - 1);
-    const options: {fn: (argThis: any) => any, inverse: (argThis: any) => any} = args[args.length - 1];
+    const options: Options = args[args.length - 1];
     // no filters = always visible
     if (secretFilters.length === 0) {
       return options.fn(this);
@@ -92,11 +98,26 @@ export class UtilsHandlebars {
     return options.fn(this);
   }
 
+  public static isCardCollapse(messageId: string): boolean {
+    const messagePerference = collapsePreferences[messageId];
+    if (messagePerference != null) {
+      return messagePerference;
+    }
+
+    return !!game.settings.get('dnd5e', 'autoCollapseItemCards');
+  }
+
+  public static toggleCardCollapse(messageId: string): void {
+    collapsePreferences[messageId] = !UtilsHandlebars.isCardCollapse(messageId);
+    ui.chat.updateMessage(game.messages.get(messageId));
+  }
+
   public static registerHooks(): void {
     Hooks.on("init", () => {
       Handlebars.registerHelper(`${staticValues.code}Concat`, UtilsHandlebars.concat);
       Handlebars.registerHelper(`${staticValues.code}Perm`, UtilsHandlebars.hasPermission);
       Handlebars.registerHelper(`${staticValues.code}MisPerm`, UtilsHandlebars.missingPermission);
+      Handlebars.registerHelper(`${staticValues.code}CardCollapse`, UtilsHandlebars.isCardCollapse);
     });
   }
 }
