@@ -147,9 +147,11 @@ function wrapBeforeCreate<T extends foundry.abstract.Document<any, any>>(callbac
   }
 }
 function wrapBeforeUpdate<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => boolean | void): (document: T, change: any, options: IDmlContext<T>['options'], userId: string) => void {
-  return (document: T, change: any, options: IDmlContext<T>['options'], userId: string) => {
+  return (document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string) => {
+    const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
+    const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     return callback({
-      rows: [document],
+      rows: [modifiedDocument],
       options: options,
       userId: userId
     });
@@ -168,9 +170,11 @@ function wrapAfterCreate<T extends foundry.abstract.Document<any, any>>(callback
   }
 }
 function wrapAfterUpdate<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => void | Promise<void>): (document: T, change: any, options: IDmlContext<T>['options'], userId: string) => void {
-  return (document: T, change: any, options: IDmlContext<T>['options'], userId: string) => {
+  return (document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string) => {
+    const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
+    const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     return callback({
-      rows: [document],
+      rows: [modifiedDocument],
       options: options,
       userId: userId
     });
