@@ -1886,7 +1886,10 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
 
       item = await this.setTargetsFromTemplate(item);
       messageData.items[itemIndex] = item;
-      game.user.targets.clear();
+      // Game seems buggy when unetting targets, this however does work
+      if (game.user.targets.size > 0) {
+        Array.from(game.user.targets)[0].setTarget(false, {releaseOthers: true})
+      }
       if (item.targets) {
         const targetCanvasIds = (await UtilsDocument.tokensFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
         game.user.updateTokenTargets(targetCanvasIds);
@@ -1925,7 +1928,10 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
 
       item = await this.setTargetsFromTemplate(item);
       messageData.items[itemIndex] = item;
-      game.user.targets.clear();
+      // Game seems buggy when unetting targets, this however does work
+      if (game.user.targets.size > 0) {
+        Array.from(game.user.targets)[0].setTarget(false, {releaseOthers: true})
+      }
       if (item.targets) {
         const targetCanvasIds = (await UtilsDocument.tokensFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
         game.user.updateTokenTargets(targetCanvasIds);
