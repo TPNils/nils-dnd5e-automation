@@ -67,6 +67,27 @@ export class UtilsDocument {
     }));
   }
 
+  public static async activeEffectFromUuid(uuid: string): Promise<ActiveEffect> {
+    try {
+      let document = await fromUuid(uuid);
+      if (document.documentName !== (ActiveEffect as any).documentName) {
+        throw new Error(`UUID '${uuid}' is not an ${(ActiveEffect as any).documentName}. In stead found: ${document.documentName}`)
+      }
+      return document as any as ActiveEffect;
+    } catch {
+      return null;
+    }
+  }
+
+  public static activeEffectFromUuids(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<ActiveEffect[]> {
+    if (options.deduplciate) {
+      uuids = new Set<string>(uuids);
+    }
+    return Promise.all(Array.from(uuids).map(uuid => {
+      return UtilsDocument.activeEffectFromUuid(uuid);
+    }));
+  }
+
   public static async itemFromUuid(uuid: string): Promise<MyItem> {
     try {
       let document = await fromUuid(uuid);
