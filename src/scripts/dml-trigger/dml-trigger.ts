@@ -1,3 +1,5 @@
+import { documents } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
+
 export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
   readonly type: {new(...args: any[]): T, documentName: string};
   
@@ -150,11 +152,17 @@ function wrapBeforeUpdate<T extends foundry.abstract.Document<any, any>>(callbac
   return (document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string) => {
     const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
-    return callback({
+    const response = callback({
       rows: [modifiedDocument],
       options: options,
       userId: userId
     });
+    if (response === false) {
+      return false;
+    }
+    
+    const diff: any = diffObject(document.toObject(), modifiedDocument.data, {inner: true});
+    mergeObject(change, diff);
   }
 }
 const wrapBeforeDelete = wrapBeforeCreate;

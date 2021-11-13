@@ -1642,10 +1642,11 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       for (const item of data.items) {
         item.canChangeTargets = InternalFunctions.canChangeTargets(item);
       }
+      InternalFunctions.setItemCardData(chatMessage, data);
     }
   }
   
-  private filterItemCardsOnly(context: IDmlContext<ChatMessage>) {
+  private filterItemCardsOnly(context: IDmlContext<ChatMessage>): ChatMessage[] {
     const itemCards: ChatMessage[] = [];
     for (const row of context.rows) {
       if (row.getFlag(staticValues.moduleName, 'clientTemplate') === `modules/${staticValues.moduleName}/templates/item-card.hbs`) {
