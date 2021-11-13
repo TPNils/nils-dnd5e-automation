@@ -53,13 +53,13 @@ export interface ItemCardItemData {
     result: {
       hit?: boolean;
       checkPass?: boolean;
+      applyDmg?: boolean;
       dmg?: {
-        applied: boolean;
         type: DamageType;
         rawNumber: number;
         calcNumber: number;
       },
-      appliedActiveEffectUuid?: string;
+      appliedActiveEffects: boolean; // The UUIDs of the newly created effects
     }
   }[];
   attack?: {
@@ -103,6 +103,7 @@ export interface ItemCardItemData {
     applied: boolean;
   }[];
   canChangeTargets: boolean;
+  activeEffectsData: ActiveEffectData[];
 }
 
 export interface ItemCardTokenData {
@@ -318,6 +319,13 @@ export class UtilsChatMessage {
       },
       allConsumeResourcesApplied: true,
       consumeResources: [],
+      activeEffectsData:  Array.from(item.effects.values())
+        .map(effect => {
+          const data = deepClone(effect.data);
+          delete data._id;
+          return data;
+        })
+        .filter(effectData => !effectData.transfer),
     };
     const isSpell = item.type === "spell";
     if (level == null) {
@@ -612,7 +620,9 @@ export class UtilsChatMessage {
           hp: actor.data.data.attributes.hp.value,
           temp: actor.data.data.attributes.hp.temp
         },
-        result: {}
+        result: {
+          appliedActiveEffects: false
+        }
       };
       if (itemCardItemData.check) {
         // Don't prefil the roll, generate that at the moment the roll is made
@@ -1387,7 +1397,9 @@ export class UtilsChatMessage {
     // TODO idea: apply all does not apply to tokens which have already received damage
 
     const tokenActorUpdates = new Map<string, DeepPartial<MyActorData>>();
+    let appliedToTokenUuids: string[] = [];
     for (const aggregate of targetAggregates) {
+      appliedToTokenUuids.push(aggregate.uuid);
       const token = await UtilsDocument.tokenFromUuid(aggregate.uuid);
       const actor = token.getActor() as MyActor;
       aggregate.dmg.appliedDmg = aggregate.dmg.calcDmg;
@@ -1404,13 +1416,14 @@ export class UtilsChatMessage {
         }
       });
     }
-    await UtilsDocument.updateTokenActors(tokenActorUpdates);
-    {
-      const response = await UtilsChatMessage.applyActiveEffects(tokenUuid, messageData);
-      if (response) {
-        messageData = response;
+    for (const item of messageData.items) {
+      for (const target of item.targets ?? []) {
+        if (appliedToTokenUuids.includes(target.uuid)) {
+          target.result.applyDmg = true;
+        }
       }
     }
+    await UtilsDocument.updateTokenActors(tokenActorUpdates);
     return messageData;
   }
   
@@ -1431,7 +1444,9 @@ export class UtilsChatMessage {
 
     
     const tokenActorUpdates = new Map<string, DeepPartial<MyActorData>>();
+    let appliedToTokenUuids: string[] = [];
     for (const aggregate of targetAggregates) {
+      appliedToTokenUuids.push(aggregate.uuid);
       const token = await UtilsDocument.tokenFromUuid(aggregate.uuid);
       const actor = token.getActor() as MyActor;
       aggregate.dmg.appliedDmg = 0;
@@ -1447,6 +1462,13 @@ export class UtilsChatMessage {
           }
         }
       });
+    }
+    for (const item of messageData.items) {
+      for (const target of item.targets ?? []) {
+        if (appliedToTokenUuids.includes(target.uuid)) {
+          target.result.applyDmg = false;
+        }
+      }
     }
     await UtilsDocument.updateTokenActors(tokenActorUpdates);
     return messageData;
@@ -1473,109 +1495,6 @@ export class UtilsChatMessage {
       }
     });
     template.drawPreview();
-  }
-  //#endregion
-
-  //#region active effects
-  // TODO undo active effects
-  public static async applyActiveEffects(tokenUuid: (string | '*')[], messageData: ItemCardData): Promise<ItemCardData | void> {
-    const actorsByTokenUuid = new Map<string, MyActor>();
-    for (const item of messageData.items) {
-      let matchingTargets: ItemCardItemData['targets'];
-      if (tokenUuid.includes('*')) {
-        matchingTargets = item.targets;
-      } else {
-        matchingTargets = item.targets.filter(aggr => tokenUuid.includes(aggr.uuid));
-      }
-      
-      if (matchingTargets) {
-        for (const target of matchingTargets) {
-          actorsByTokenUuid.set(target.uuid, null);
-        }
-      }
-    }
-
-    for (const token of (await UtilsDocument.tokensFromUuid(Array.from(actorsByTokenUuid.keys())))) {
-      actorsByTokenUuid.set(token.uuid, token.getActor());
-    }
-    for (const tokenUuid of actorsByTokenUuid.keys()) {
-      if (!actorsByTokenUuid.get(tokenUuid)) {
-        actorsByTokenUuid.delete(tokenUuid);
-      }
-    }
-
-    const createEffectsByTokenUuid = new Map<string, {effect: ActiveEffectData, target: ItemCardItemData['targets'][0]}[]>();
-    // TODO update in stead of delete => cleaner presentation to the user
-    const deleteEffectsByTokenUuid = new Map<string, Set<string>>();
-    for (const item of messageData.items) {
-      let matchingTargets: ItemCardItemData['targets'];
-      if (tokenUuid.includes('*')) {
-        matchingTargets = item.targets;
-      } else {
-        matchingTargets = item.targets.filter(aggr => tokenUuid.includes(aggr.uuid));
-      }
-      if (!matchingTargets.length) {
-        continue;
-      }
-
-      // TODO store active effects on the card
-      const itemDocument = await UtilsDocument.itemFromUuid(item.uuid);
-      const activeEffects = (await Promise.all(Array.from(itemDocument.effects.values())
-        .map(effect => effect.clone())))
-        .map(effect => effect.data)
-        .filter(effectData => !effectData.transfer);
-
-      for (const effect of activeEffects) {
-        // TODO this somehow does not set the origin
-        //  When creating, the value gets changed somehow
-        effect.origin = item.uuid;
-      }
-      
-      const appliedEffectUuids = new Set<string>();
-      for (const target of matchingTargets) {
-        appliedEffectUuids.add(target.result.appliedActiveEffectUuid);
-      }
-      appliedEffectUuids.delete(null);
-      appliedEffectUuids.delete(undefined);
-
-      for (const target of matchingTargets) {
-        const targetActor = actorsByTokenUuid.get(target.uuid);
-        const deleteAlreadyAppliedEffectIds: string[] = [];
-        for (const effect of targetActor.getEmbeddedCollection(ActiveEffect.name).values()) {
-          if (appliedEffectUuids.has((effect as ActiveEffect).uuid)) {
-            deleteAlreadyAppliedEffectIds.push(effect.id);
-          }
-        }
-
-        if (!createEffectsByTokenUuid.has(target.uuid)) {
-          createEffectsByTokenUuid.set(target.uuid, []);
-        }
-        for (const effect of activeEffects) {
-          createEffectsByTokenUuid.get(target.uuid).push({effect: effect, target: target}); 
-        }
-        if (deleteAlreadyAppliedEffectIds.length > 0) {
-          if (!deleteEffectsByTokenUuid.has(target.uuid)) {
-            deleteEffectsByTokenUuid.set(target.uuid, new Set<string>());
-          }
-          for (const id of deleteAlreadyAppliedEffectIds) {
-            deleteEffectsByTokenUuid.get(target.uuid).add(id); 
-          }
-        }
-      }
-    }
-
-    await Promise.all(Array.from(createEffectsByTokenUuid.entries()).map(([tokenUuid, value]) => {
-      return actorsByTokenUuid.get(tokenUuid).createEmbeddedDocuments(ActiveEffect.name, value.map(v => v.effect)).then((createdEffects: ActiveEffect[]) => {
-        for (let i = 0; i < createdEffects.length; i++) {
-          value[i].target.result.appliedActiveEffectUuid = createdEffects[i].uuid;
-        }
-      });
-    }));
-    await Promise.all(Array.from(deleteEffectsByTokenUuid.entries()).map(([tokenUuid, value]) => {
-      return actorsByTokenUuid.get(tokenUuid).deleteEmbeddedDocuments(ActiveEffect.name, Array.from(value));
-    }));
-
-    return messageData;
   }
   //#endregion
 
@@ -1682,6 +1601,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
       this.calcAllConsumeResourcesApplied(itemCards);
+      this.applyActiveEffects(itemCards);
     }
   }
   
@@ -1740,6 +1660,149 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       }
       InternalFunctions.setItemCardData(chatMessage, data);
     }
+  }
+
+  /**
+   * @returns which messages should be updated
+   */
+  private async applyActiveEffects(chatMessages: ChatMessage[]): Promise<void> {
+    const chatMessageDatas: ItemCardData[] = [];
+    const chatMessageDatasByUuid = new Map<string, ItemCardData>();
+    for (const chatMessage of chatMessages) {
+      const data = InternalFunctions.getItemCardData(chatMessage);
+      chatMessageDatas.push(data);
+      chatMessageDatasByUuid.set(chatMessage.uuid, data);
+    }
+    const shouldApply = (target: ItemCardItemData['targets'][0]): boolean => {
+      if (target.result.dmg) {
+        return target.result.applyDmg === true;
+      } else {
+        return target.result.checkPass === false || target.result.hit === true;
+      }
+      return false;
+    }
+    const effectsByTargetUuid = new Map<string, {chatMessageIndex: number, itemIndex: number, apply: boolean}[]>();
+    for (let chatMessageIndex = 0; chatMessageIndex < chatMessageDatas.length; chatMessageIndex++) {
+      const messageData = chatMessageDatas[chatMessageIndex];
+      for (let itemIndex = 0; itemIndex < messageData.items.length; itemIndex++) {
+        const item = messageData.items[itemIndex];
+        if (item.activeEffectsData.length > 0 && item.targets?.length > 0) {
+          for (const target of item.targets) {
+            // TODO I am not happy with this, maybe this should be user input? but there is already enough user input
+            let shouldApplyResult = shouldApply(target);
+            if (shouldApplyResult === target.result.appliedActiveEffects) {
+              continue;
+            }
+
+            if (!effectsByTargetUuid.has(target.uuid)) {
+              effectsByTargetUuid.set(target.uuid, []);
+            }
+            effectsByTargetUuid.get(target.uuid).push({
+              chatMessageIndex: chatMessageIndex,
+              itemIndex: itemIndex,
+              apply: shouldApplyResult
+            });
+          }
+        }
+      }
+    }
+
+    // This _should_ prevent infinit loops
+    if (effectsByTargetUuid.size === 0) {
+      return;
+    }
+
+    const actorsByTokenUuid = new Map<string, MyActor>();
+    for (const token of (await UtilsDocument.tokensFromUuid(effectsByTargetUuid.keys()))) {
+      actorsByTokenUuid.set(token.uuid, token.getActor());
+    }
+
+    const getOriginKey = (origin: any): string => {
+      return `${origin.messageUuid}.${origin.itemIndex}.${origin.activeEffectsIndex}`;
+    }
+
+    for (const targetUuid of effectsByTargetUuid.keys()) {
+      const actor = actorsByTokenUuid.get(targetUuid);
+      const effects = effectsByTargetUuid.get(targetUuid);
+      const createActiveEffects: ActiveEffectData[] = [];
+      const updateActiveEffects: ActiveEffectData[] = [];
+      const deleteActiveEffects: ActiveEffectData[] = [];
+
+      const activeEffectsByKey = new Map<string, ActiveEffect[]>();
+      for (const effect of actor.getEmbeddedCollection(ActiveEffect.name).values()) {
+        const origin = (effect.data.flags?.[staticValues.moduleName] as any)?.origin;
+        if (origin) {
+          const key = getOriginKey(origin);
+          if (!activeEffectsByKey.has(key)) {
+            activeEffectsByKey.set(key, []);
+          }
+          activeEffectsByKey.get(key).push(effect as ActiveEffect);
+        }
+      }
+
+      for (const effect of effects) {
+        if (!effect.apply) {
+          const item = chatMessageDatas[effect.chatMessageIndex].items[effect.itemIndex];
+          for (let activeEffectsIndex = 0; activeEffectsIndex < item.activeEffectsData.length; activeEffectsIndex++) {
+            const origin = {
+              messageUuid: chatMessages[effect.chatMessageIndex].uuid,
+              itemIndex: effect.itemIndex,
+              activeEffectsIndex: activeEffectsIndex
+            };
+            const key = getOriginKey(origin);
+            if (activeEffectsByKey.has(key)) {
+              deleteActiveEffects.push(...activeEffectsByKey.get(key).map(row => row.data));
+            }
+          }
+        }
+      }
+      for (const effect of effects) {
+        if (effect.apply) {
+          const item = chatMessageDatas[effect.chatMessageIndex].items[effect.itemIndex];
+          for (let activeEffectsIndex = 0; activeEffectsIndex < item.activeEffectsData.length; activeEffectsIndex++) {
+            const activeEffectData = deepClone(item.activeEffectsData[activeEffectsIndex]);
+            activeEffectData.flags = activeEffectData.flags ?? {};
+            activeEffectData.flags[staticValues.moduleName] = activeEffectData.flags[staticValues.moduleName] ?? {};
+            (activeEffectData.flags[staticValues.moduleName] as any).origin = {
+              messageUuid: chatMessages[effect.chatMessageIndex].uuid,
+              itemIndex: effect.itemIndex,
+              activeEffectsIndex: activeEffectsIndex
+            };
+            delete activeEffectData._id
+            if (deleteActiveEffects.length > 0) {
+              activeEffectData._id = deleteActiveEffects[0]._id;
+              deleteActiveEffects.splice(0, 1)
+              updateActiveEffects.push(activeEffectData);
+            } else {
+              createActiveEffects.push(activeEffectData);
+            }
+          }
+        }
+      }
+
+      if (createActiveEffects.length > 0) {
+        await actor.createEmbeddedDocuments(ActiveEffect.name, createActiveEffects);
+      }
+      if (updateActiveEffects.length > 0) {
+        await actor.updateEmbeddedDocuments(ActiveEffect.name, updateActiveEffects as any);
+      }
+      if (deleteActiveEffects.length > 0) {
+        await actor.deleteEmbeddedDocuments(ActiveEffect.name, deleteActiveEffects.map(effect => effect._id));
+      }
+    }
+
+    // TODO smarter change detection
+    for (const chatMessage of chatMessages) {
+      const data = chatMessageDatasByUuid.get(chatMessage.uuid);
+      for (const item of data.items) {
+        for (const target of item.targets ?? []) {
+          // It should be applied by now
+          target.result.appliedActiveEffects = shouldApply(target);
+        }
+      }
+      InternalFunctions.setItemCardData(chatMessage, chatMessageDatasByUuid.get(chatMessage.uuid));
+    }
+    ChatMessage.updateDocuments(chatMessages.map(message => message.data));
   }
 
   private async applyConsumeResources(messageData: ItemCardData): Promise<ItemCardData> {
@@ -1986,7 +2049,7 @@ class InternalFunctions {
     const calculatedHealthModByTargetUuid = new Map<string, number>();
     for (const item of items) {
       for (const target of item.targets) {
-        target.result = !target.result ? {} : {...target.result}
+        target.result = !target.result ? {appliedActiveEffects: false} : {...target.result}
         delete target.result.checkPass;
         delete target.result.dmg;
         delete target.result.hit;
@@ -2129,7 +2192,6 @@ class InternalFunctions {
 
               // TODO fix applying dmg/healing
               target.result.dmg = {
-                applied: false,
                 type: dmgType,
                 rawNumber: baseDmg,
                 calcNumber: Math.floor(baseDmg * modifier),
@@ -2193,12 +2255,6 @@ class InternalFunctions {
       if (!item.targets) {
         continue;
       }
-
-      for (const target of item.targets) {
-        if (target.result.dmg) {
-          target.result.dmg.applied = appliedDmgTo.has(target.uuid);
-        }
-      }
     }
 
     return messageData;
@@ -2243,7 +2299,7 @@ class InternalFunctions {
         if (target.result.checkPass != null) {
           return false;
         }
-        if (target.result.dmg?.applied) {
+        if (target.result.applyDmg) {
           return false;
         }
       }
