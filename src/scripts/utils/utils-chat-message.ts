@@ -1004,13 +1004,6 @@ export class UtilsChatMessage {
     attack.evaluatedRoll = roll.toJSON();
     attack.phase = 'result';
 
-    {
-      const result = await InternalFunctions.applyConsumeResources(messageData);
-      if (result) {
-        messageData = result;
-      }
-    }
-
     return messageData;
   }
 
@@ -1081,13 +1074,6 @@ export class UtilsChatMessage {
       const response = await UtilsChatMessage.processItemCheckRoll(itemIndex, targetUuid, messageData);
       if (response) {
         messageData = response;
-      }
-    }
-    
-    {
-      const result = await InternalFunctions.applyConsumeResources(messageData);
-      if (result) {
-        messageData = result;
       }
     }
 
@@ -1598,7 +1584,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       let clonedMessageData = deepClone(InternalFunctions.getItemCardData(chatMessage));
       let changed = false;
       {
-        const response = await InternalFunctions.applyConsumeResources(clonedMessageData);
+        const response = await this.applyConsumeResources(clonedMessageData);
         if (response) {
           clonedMessageData = response;
           changed = true;
@@ -1658,6 +1644,91 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       }
       InternalFunctions.setItemCardData(chatMessage, data);
     }
+  }
+
+  private async applyConsumeResources(messageData: ItemCardData): Promise<ItemCardData> {
+    // TODO try to do dmls across all functions in a central place
+    const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
+    const consumeResourcesToApply: ItemCardData['items'][0]['consumeResources'] = [];
+    {
+      const promisesByUuid = new Map<string, Promise<{uuid: string, document: foundry.abstract.Document<any, any>}>>();
+      for (const item of messageData.items) {
+        for (const consumeResource of item.consumeResources) {
+          if (consumeResource.applied) {
+            continue;
+          }
+
+          let shouldApply = false;
+          switch (consumeResource.autoconsumeAfter) {
+            case 'init': {
+              shouldApply = true;
+              break;
+            }
+            case 'attack': {
+              shouldApply = item.attack?.evaluatedRoll?.evaluated === true;
+              break;
+            }
+            case 'template-placed': {
+              shouldApply = item.targetDefinition?.createdTemplateUuid != null;
+              break;
+            }
+            case 'damage': {
+              for (const damage of (item.damages ?? [])) {
+                if (damage.normalRoll.evaluated === true || damage.criticalRoll?.evaluated === true) {
+                  shouldApply = true;
+                  break;
+                }
+              }
+              break;
+            }
+            case 'check': {
+              for (const target of (item.targets ?? [])) {
+                if (target.check?.evaluatedRoll?.evaluated === true) {
+                  shouldApply = true;
+                  break;
+                }
+              }
+              break;
+            }
+          }
+          
+          if (shouldApply) {
+            consumeResourcesToApply.push(consumeResource);
+            if (!promisesByUuid.has(consumeResource.uuid)) {
+              promisesByUuid.set(consumeResource.uuid, fromUuid(consumeResource.uuid).then(doc => {return {uuid: consumeResource.uuid, document: doc}}));
+            }
+          }
+        }
+      }
+
+      const rows = await Promise.all(Array.from(promisesByUuid.values()));
+      for (const row of rows) {
+        documentsByUuid.set(row.uuid, row.document);
+      }
+    }
+
+    if (consumeResourcesToApply.length === 0) {
+      return null;
+    }
+
+    const updatesByUuid = new Map<string, any>();
+    for (const consumeResource of consumeResourcesToApply) {
+      if (!updatesByUuid.has(consumeResource.uuid)) {
+        updatesByUuid.set(consumeResource.uuid, {});
+      }
+      const updates = updatesByUuid.get(consumeResource.uuid);
+      setProperty(updates, consumeResource.path, consumeResource.original - consumeResource.amount);
+      consumeResource.applied = true;
+    }
+
+    for (const uuid of documentsByUuid.keys()) {
+      // TODO should add a bulk update to UtilsDocument
+      if (updatesByUuid.has(uuid)) {
+        await documentsByUuid.get(uuid).update(updatesByUuid.get(uuid))
+      }
+    }
+
+    return messageData;
   }
   
   private filterItemCardsOnly(context: IDmlContext<ChatMessage>): ChatMessage[] {
@@ -2050,91 +2121,6 @@ class InternalFunctions {
 
   public static setItemCardData(message: ChatMessage, data: ItemCardData): void {
     setProperty(message.data, `flags.${staticValues.moduleName}.clientTemplateData.data`, data);
-  }
-
-  public static async applyConsumeResources(messageData: ItemCardData): Promise<ItemCardData> {
-    // TODO try to do dmls across all functions in a central place
-    const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
-    const consumeResourcesToApply: ItemCardData['items'][0]['consumeResources'] = [];
-    {
-      const promisesByUuid = new Map<string, Promise<{uuid: string, document: foundry.abstract.Document<any, any>}>>();
-      for (const item of messageData.items) {
-        for (const consumeResource of item.consumeResources) {
-          if (consumeResource.applied) {
-            continue;
-          }
-
-          let shouldApply = false;
-          switch (consumeResource.autoconsumeAfter) {
-            case 'init': {
-              shouldApply = true;
-              break;
-            }
-            case 'attack': {
-              shouldApply = item.attack?.evaluatedRoll?.evaluated === true;
-              break;
-            }
-            case 'template-placed': {
-              shouldApply = item.targetDefinition?.createdTemplateUuid != null;
-              break;
-            }
-            case 'damage': {
-              for (const damage of (item.damages ?? [])) {
-                if (damage.normalRoll.evaluated === true || damage.criticalRoll?.evaluated === true) {
-                  shouldApply = true;
-                  break;
-                }
-              }
-              break;
-            }
-            case 'check': {
-              for (const target of (item.targets ?? [])) {
-                if (target.check?.evaluatedRoll?.evaluated === true) {
-                  shouldApply = true;
-                  break;
-                }
-              }
-              break;
-            }
-          }
-          
-          if (shouldApply) {
-            consumeResourcesToApply.push(consumeResource);
-            if (!promisesByUuid.has(consumeResource.uuid)) {
-              promisesByUuid.set(consumeResource.uuid, fromUuid(consumeResource.uuid).then(doc => {return {uuid: consumeResource.uuid, document: doc}}));
-            }
-          }
-        }
-      }
-
-      const rows = await Promise.all(Array.from(promisesByUuid.values()));
-      for (const row of rows) {
-        documentsByUuid.set(row.uuid, row.document);
-      }
-    }
-
-    if (consumeResourcesToApply.length === 0) {
-      return null;
-    }
-
-    const updatesByUuid = new Map<string, any>();
-    for (const consumeResource of consumeResourcesToApply) {
-      if (!updatesByUuid.has(consumeResource.uuid)) {
-        updatesByUuid.set(consumeResource.uuid, {});
-      }
-      const updates = updatesByUuid.get(consumeResource.uuid);
-      setProperty(updates, consumeResource.path, consumeResource.original - consumeResource.amount);
-      consumeResource.applied = true;
-    }
-
-    for (const uuid of documentsByUuid.keys()) {
-      // TODO should add a bulk update to UtilsDocument
-      if (updatesByUuid.has(uuid)) {
-        await documentsByUuid.get(uuid).update(updatesByUuid.get(uuid))
-      }
-    }
-
-    return messageData;
   }
   
   public static canChangeTargets(itemData: ItemCardItemData): boolean {
