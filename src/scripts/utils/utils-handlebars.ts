@@ -1,12 +1,9 @@
 import { filters } from "pixi.js";
+import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { UtilsDocument } from "./utils-document";
 
 type Options = {fn: (argThis: any) => any, inverse: (argThis: any) => any};
-
-const collapsePreferences: {
-  [messageId: string]: boolean;
-} = {};
 
 export class UtilsHandlebars {
 
@@ -99,17 +96,7 @@ export class UtilsHandlebars {
   }
 
   public static isCardCollapse(messageId: string): boolean {
-    const messagePerference = collapsePreferences[messageId];
-    if (messagePerference != null) {
-      return messagePerference;
-    }
-
-    return !!game.settings.get('dnd5e', 'autoCollapseItemCards');
-  }
-
-  public static toggleCardCollapse(messageId: string): void {
-    collapsePreferences[messageId] = !UtilsHandlebars.isCardCollapse(messageId);
-    ui.chat.updateMessage(game.messages.get(messageId));
+    return MemoryStorageService.isCardCollapsed(messageId);
   }
 
   public static registerHooks(): void {

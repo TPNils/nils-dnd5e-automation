@@ -3,6 +3,7 @@ import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-type
 import { IDmlContext, DmlTrigger, IDmlTrigger } from "../dml-trigger/dml-trigger";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
+import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyActorData, MyItem, MyItemData } from "../types/fixed-types";
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
@@ -1573,7 +1574,8 @@ export class UtilsChatMessage {
 
   //#region misc
   private static async toggleCollapse(messageId: string): Promise<ItemCardData | void> {
-    UtilsHandlebars.toggleCardCollapse(messageId);
+    MemoryStorageService.setCardCollapse(messageId, !MemoryStorageService.isCardCollapsed(messageId));
+    ui.chat.updateMessage(game.messages.get(messageId));
   }
   //#endregion
 
