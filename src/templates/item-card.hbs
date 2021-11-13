@@ -146,6 +146,36 @@
           <span>{{this}}</span>
         {{/each}}
       </div>
+      
+      {{! TODO should probably also be an aggregate }}
+      {{#if (and item.consumeResources.length (nacPerm (nacConcat "ActorObserverUuid:" @root.data.actor.uuid)))}}
+        <table class="{{@root.staticValues.moduleName}}-consume-resouces">
+          <thead>
+            <tr>
+              <th>Resource</th>
+              <th>Amount</th>
+              <th style="width: 50px;" {{#if item.allConsumeResourcesApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
+                {{#ifCond item.consumeResources '>' 1}}
+                  <button data-{{@root.staticValues.moduleName}}-action="apply-consume-resource-*-*" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="undo-consume-resource-*-*" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+                {{/ifCond}}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each item.consumeResources as |consumeResource consumeResourceIndex|}}
+              <tr {{#if consumeResource.applied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
+                <td>{{nacTranslateProperty consumeResource.path}}</td>
+                <td>{{consumeResource.original}}-{{consumeResource.amount}}=<b>{{nacMath consumeResource.original '-' consumeResource.amount}}</b></td>
+                <td>
+                  <button data-{{@root.staticValues.moduleName}}-action="apply-consume-resource-{{itemIndex}}-{{consumeResourceIndex}}" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="undo-consume-resource-{{itemIndex}}-{{consumeResourceIndex}}" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      {{/if}}
     </div>
   {{/each}}
 
@@ -164,27 +194,27 @@
         </thead>
         <tbody>
           {{#each data.targetAggregate as |target|}}
-            <tr {{#if target.dmg.applied}}class="{{@root.staticValues.moduleName}}-damage-applied"{{/if}}>
+            <tr {{#if target.dmg.applied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
               <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
               <td>{{target.name}}</td>
               <td style="text-align: center;">{{target.hpSnapshot.hp}}{{#if target.hpSnapshot.temp}}[{{target.hpSnapshot.temp}}]{{/if}}</td>
               <td style="text-align: center;">{{target.dmg.calcHp}}{{#if (or target.dmg.calcTemp target.hpSnapshot.temp)}}[{{target.dmg.calcTemp}}]{{/if}}</td>
               <td class="{{@root.staticValues.moduleName}}-target-actions">
                 <div style="display: flex;">
-                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-apply-damage"><i class="fas fa-check"></i></button>
-                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-undo-damage"><i class="fas fa-undo"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
                 </div>
               </td>
             </tr>
           {{/each}}
           {{#ifCond data.targetAggregate.length '>' 1}}
-            <tr {{#if @root.data.allDmgApplied}}class="{{@root.staticValues.moduleName}}-damage-applied"{{/if}}>
+            <tr {{#if @root.data.allDmgApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
               <td></td>
               <td colspan="3">All</td>
               <td class="{{@root.staticValues.moduleName}}-target-actions">
                 <div style="display: flex;">
-                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-*" class="{{@root.staticValues.moduleName}}-apply-damage"><i class="fas fa-check"></i></button>
-                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-*" class="{{@root.staticValues.moduleName}}-undo-damage"><i class="fas fa-undo"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-*" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-*" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
                 </div>
               </td>
             </tr>

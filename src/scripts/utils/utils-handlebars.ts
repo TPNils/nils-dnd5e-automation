@@ -112,12 +112,41 @@ export class UtilsHandlebars {
     return MemoryStorageService.isCardCollapsed(messageId);
   }
 
+  public static translateProperty(propertyPath: string): string {
+    const parts = propertyPath.split('.');
+
+    switch (parts[0]) {
+      case 'data': {
+        switch (parts[1]) {
+          case 'spells': {
+            let spellLevel;
+            if (parts[2] === 'pact') {
+              spellLevel = game.i18n.localize('DND5E.PactMagic');
+            } else {
+              spellLevel = parts[2].substring(5);
+            }
+            return `${game.i18n.localize('DND5E.SpellLevel')}: ${spellLevel}`;
+          }
+        }
+      }
+    }
+
+    return propertyPath;
+  }
+
+  public static math(...args: any[]): number {
+    const parts: string[] = args.slice(0, args.length - 1);
+    return new Roll(parts.join(' ')).roll({async: false}).total;
+  }
+
   public static registerHooks(): void {
     Hooks.on("init", () => {
       Handlebars.registerHelper(`${staticValues.code}Concat`, UtilsHandlebars.concat);
       Handlebars.registerHelper(`${staticValues.code}Perm`, UtilsHandlebars.hasPermission);
       Handlebars.registerHelper(`${staticValues.code}MisPerm`, UtilsHandlebars.missingPermission);
       Handlebars.registerHelper(`${staticValues.code}CardCollapse`, UtilsHandlebars.isCardCollapse);
+      Handlebars.registerHelper(`${staticValues.code}TranslateProperty`, UtilsHandlebars.translateProperty);
+      Handlebars.registerHelper(`${staticValues.code}Math`, UtilsHandlebars.math);
     });
   }
 

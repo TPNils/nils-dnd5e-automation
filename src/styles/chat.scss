@@ -95,7 +95,7 @@
     font-size: 12px;
 
     button {
-      background: rgba(0, 0, 0, 0.1);
+      background: rgb(190, 189, 178);
       border: 2px groove #eeede0;
       height: 26px;
       line-height: 20px;
@@ -153,8 +153,8 @@
       display: block;
     }
 
-    .#{$module-name}-damage-applied {
-      .#{$module-name}-apply-damage {
+    .#{$module-name}-applied {
+      .#{$module-name}-apply {
         color: green;
       }
     }
@@ -200,8 +200,8 @@
     }
 
     
-    .#{$module-name}-apply-damage,
-    .#{$module-name}-undo-damage {
+    .#{$module-name}-apply,
+    .#{$module-name}-undo {
       font-size: 10px;
       height: 20px;
       width: 20px;

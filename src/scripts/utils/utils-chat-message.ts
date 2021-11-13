@@ -92,12 +92,14 @@ export interface ItemCardItemData {
     hasAoe: boolean,
     createdTemplateUuid?: string;
   } & MyItemData['data']['target'];
+  allConsumeResourcesApplied: boolean;
   consumeResources: {
     uuid: string;
     path: string;
     amount: number;
     original: number;
     autoconsumeAfter?: 'init' | 'attack' | 'damage' | 'check' | 'template-placed';
+    consumeResourcesAction?: 'undo' | 'manual-apply';
     applied: boolean;
   }[];
   canChangeTargets: boolean;
@@ -204,6 +206,24 @@ export class UtilsChatMessage {
       execute: ({regexResult, messageData, messageId}) => UtilsChatMessage.processItemTemplate(Number(regexResult[1]), messageData, messageId),
     },
     {
+      regex: /^apply-consume-resource-((?:[0-9]+)|\*)-((?:[0-9]+)|\*)$/,
+      permissionCheck: ({regexResult}) => {return {message: true}},
+      execute: ({regexResult, messageData}) => {
+        let itemIndex: '*' | number = regexResult[1] === '*' ? '*' : Number.parseInt(regexResult[1]);
+        let consumeResourceIndex: '*' | number = regexResult[2] === '*' ? '*' : Number.parseInt(regexResult[2]);
+        return UtilsChatMessage.manualApplyConsumeResource(messageData, itemIndex, consumeResourceIndex);
+      },
+    },
+    {
+      regex: /^undo-consume-resource-((?:[0-9]+)|\*)-((?:[0-9]+)|\*)$/,
+      permissionCheck: ({regexResult}) => {return {message: true}},
+      execute: ({regexResult, messageData}) => {
+        let itemIndex: '*' | number = regexResult[1] === '*' ? '*' : Number.parseInt(regexResult[1]);
+        let consumeResourceIndex: '*' | number = regexResult[2] === '*' ? '*' : Number.parseInt(regexResult[2]);
+        return UtilsChatMessage.manualUndoConsumeResource(messageData, itemIndex, consumeResourceIndex);
+      },
+    },
+    {
       regex: /^apply-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
       permissionCheck: ({regexResult}) => {return {gm: true}},
       execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.applyDamage([regexResult[1]], messageData, messageId),
@@ -296,6 +316,7 @@ export class UtilsChatMessage {
         hasAoe: CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type),
         ...item.data.data.target,
       },
+      allConsumeResourcesApplied: true,
       consumeResources: [],
     };
     const isSpell = item.type === "spell";
@@ -1558,6 +1579,64 @@ export class UtilsChatMessage {
   }
   //#endregion
 
+  //#region consume resources
+  private static async manualApplyConsumeResource(messageData: ItemCardData, itemIndex: number | '*', resourceIndex: number | '*'): Promise<ItemCardData | void> {
+    const consumeResources: ItemCardItemData['consumeResources'] = [];
+    {
+      const items = itemIndex === '*' ? messageData.items : [messageData.items[itemIndex]];
+      for (const item of items) {
+        if (resourceIndex === '*') {
+          for (const consumeResource of item.consumeResources) {
+            consumeResources.push(consumeResource)
+          }
+        } else if (item.consumeResources.length >= resourceIndex-1) {
+          consumeResources.push(item.consumeResources[resourceIndex]);
+        }
+      }
+    }
+
+    let changed = false;
+    for (const consumeResource of consumeResources) {
+      if (consumeResource.consumeResourcesAction !== 'manual-apply') {
+        consumeResource.consumeResourcesAction = 'manual-apply';
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      return messageData;
+    }
+  }
+
+  private static async manualUndoConsumeResource(messageData: ItemCardData, itemIndex: number | '*', resourceIndex: number | '*'): Promise<ItemCardData | void> {
+    const consumeResources: ItemCardItemData['consumeResources'] = [];
+    {
+      const items = itemIndex === '*' ? messageData.items : [messageData.items[itemIndex]];
+      for (const item of items) {
+        if (resourceIndex === '*') {
+          for (const consumeResource of item.consumeResources) {
+            consumeResources.push(consumeResource)
+          }
+        } else if (item.consumeResources.length >= resourceIndex-1) {
+          consumeResources.push(item.consumeResources[resourceIndex]);
+        }
+      }
+    }
+
+    let changed = false;
+    for (const consumeResource of consumeResources) {
+      if (consumeResource.consumeResourcesAction !== 'undo') {
+        consumeResource.consumeResourcesAction = 'undo';
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      return messageData;
+    }
+  }
+  //#endregion
+
   //#region misc
   private static async toggleCollapse(messageId: string): Promise<ItemCardData | void> {
     MemoryStorageService.setCardCollapse(messageId, !MemoryStorageService.isCardCollapsed(messageId));
@@ -1602,6 +1681,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     if (itemCards.length > 0) {
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
+      this.calcAllConsumeResourcesApplied(itemCards);
     }
   }
   
@@ -1645,55 +1725,73 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       InternalFunctions.setItemCardData(chatMessage, data);
     }
   }
+  
+  private calcAllConsumeResourcesApplied(chatMessages: ChatMessage[]): void {
+    for (const chatMessage of chatMessages) {
+      const data: ItemCardData = InternalFunctions.getItemCardData(chatMessage);
+      for (const item of data.items) {
+        item.allConsumeResourcesApplied = true;
+        for (const consumedResource of item.consumeResources) {
+          if (!consumedResource.applied) {
+            item.allConsumeResourcesApplied = false;
+            break;
+          }
+        }
+      }
+      InternalFunctions.setItemCardData(chatMessage, data);
+    }
+  }
 
   private async applyConsumeResources(messageData: ItemCardData): Promise<ItemCardData> {
     // TODO try to do dmls across all functions in a central place
     const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
-    const consumeResourcesToApply: ItemCardData['items'][0]['consumeResources'] = [];
+    const consumeResourcesToToggle: ItemCardData['items'][0]['consumeResources'] = [];
     {
       const promisesByUuid = new Map<string, Promise<{uuid: string, document: foundry.abstract.Document<any, any>}>>();
       for (const item of messageData.items) {
         for (const consumeResource of item.consumeResources) {
-          if (consumeResource.applied) {
-            continue;
-          }
-
           let shouldApply = false;
-          switch (consumeResource.autoconsumeAfter) {
-            case 'init': {
-              shouldApply = true;
-              break;
-            }
-            case 'attack': {
-              shouldApply = item.attack?.evaluatedRoll?.evaluated === true;
-              break;
-            }
-            case 'template-placed': {
-              shouldApply = item.targetDefinition?.createdTemplateUuid != null;
-              break;
-            }
-            case 'damage': {
-              for (const damage of (item.damages ?? [])) {
-                if (damage.normalRoll.evaluated === true || damage.criticalRoll?.evaluated === true) {
-                  shouldApply = true;
-                  break;
-                }
+          if (consumeResource.consumeResourcesAction === 'undo') {
+            shouldApply = false;
+          } else if (consumeResource.consumeResourcesAction === 'manual-apply') {
+            shouldApply = true;
+          } else {
+            switch (consumeResource.autoconsumeAfter) {
+              case 'init': {
+                shouldApply = true;
+                break;
               }
-              break;
-            }
-            case 'check': {
-              for (const target of (item.targets ?? [])) {
-                if (target.check?.evaluatedRoll?.evaluated === true) {
-                  shouldApply = true;
-                  break;
-                }
+              case 'attack': {
+                shouldApply = item.attack?.evaluatedRoll?.evaluated === true;
+                break;
               }
-              break;
+              case 'template-placed': {
+                shouldApply = item.targetDefinition?.createdTemplateUuid != null;
+                break;
+              }
+              case 'damage': {
+                for (const damage of (item.damages ?? [])) {
+                  if (damage.normalRoll.evaluated === true || damage.criticalRoll?.evaluated === true) {
+                    shouldApply = true;
+                    break;
+                  }
+                }
+                break;
+              }
+              case 'check': {
+                for (const target of (item.targets ?? [])) {
+                  if (target.check?.evaluatedRoll?.evaluated === true) {
+                    shouldApply = true;
+                    break;
+                  }
+                }
+                break;
+              }
             }
           }
           
-          if (shouldApply) {
-            consumeResourcesToApply.push(consumeResource);
+          if (shouldApply !== consumeResource.applied) {
+            consumeResourcesToToggle.push(consumeResource);
             if (!promisesByUuid.has(consumeResource.uuid)) {
               promisesByUuid.set(consumeResource.uuid, fromUuid(consumeResource.uuid).then(doc => {return {uuid: consumeResource.uuid, document: doc}}));
             }
@@ -1707,18 +1805,24 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       }
     }
 
-    if (consumeResourcesToApply.length === 0) {
+    if (consumeResourcesToToggle.length === 0) {
       return null;
     }
 
     const updatesByUuid = new Map<string, any>();
-    for (const consumeResource of consumeResourcesToApply) {
+    for (const consumeResource of consumeResourcesToToggle) {
       if (!updatesByUuid.has(consumeResource.uuid)) {
         updatesByUuid.set(consumeResource.uuid, {});
       }
       const updates = updatesByUuid.get(consumeResource.uuid);
-      setProperty(updates, consumeResource.path, consumeResource.original - consumeResource.amount);
-      consumeResource.applied = true;
+      if (consumeResource.applied) {
+        // toggle => refund to original
+        setProperty(updates, consumeResource.path, consumeResource.original);
+      } else {
+        // toggle => apply
+        setProperty(updates, consumeResource.path, consumeResource.original - consumeResource.amount);
+      }
+      consumeResource.applied = !consumeResource.applied;
     }
 
     for (const uuid of documentsByUuid.keys()) {
