@@ -131,15 +131,11 @@
             </tbody>
           </table>
         {{/if}}
-
-        {{#if item.template}}
-          <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-template">{{ localize "DND5E.PlaceTemplate" }}</button>
-        {{/if}}
       </div>
       
-      {{#if (and item.targetDefinition.hasAoe item.canChangeTargets)}}
+      {{#if item.targetDefinition.hasAoe}}
         <div class="{{@root.staticValues.moduleName}}-section">
-          <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-template" {{#nacMisPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}disabled{{/nacMisPerm}}>
+          <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-template" {{#if (or (not item.canChangeTargets) (nacMisPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)))}}disabled{{/if}}>
             {{localize "DND5E.PlaceTemplate"}}
           </button> 
         </div>
