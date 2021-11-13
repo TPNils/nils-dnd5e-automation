@@ -44,7 +44,6 @@ export class UtilsHandlebars {
         matchesFilter = true;
       }
       const documentMatch = UtilsHandlebars.documentPermission.exec(filter);
-      console.log(filter, documentMatch);
       if (documentMatch) {
         switch (documentMatch[1].toLocaleLowerCase()) {
           case 'actor': {
@@ -60,7 +59,6 @@ export class UtilsHandlebars {
             } else {
               const exactMatch = documentMatch[2] != null;
               if (actor.testUserPermission(game.user, CONST.ENTITY_PERMISSIONS[documentMatch[3].toLocaleLowerCase().toUpperCase()], exactMatch)) {
-                console.log('match', filter)
                 matchesFilter = true;
               }
             }
