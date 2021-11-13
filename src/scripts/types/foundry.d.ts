@@ -219,3 +219,14 @@ declare module 'common/data/fields.mjs' {
 
 
 }
+
+export {};
+
+declare global {
+  class Actor {
+    static createDocuments(data: Array<ConstructorParameters<typeof foundry.documents.BaseActor>[0]>, context: ConstructorParameters<typeof foundry.documents.BaseActor>[1])
+  }
+  class ActiveEffect {
+    static createDocuments(data: Array<ConstructorParameters<typeof foundry.documents.BaseActiveEffect>[0]>, context: ConstructorParameters<typeof foundry.documents.BaseActiveEffect>[1])
+  }
+}
