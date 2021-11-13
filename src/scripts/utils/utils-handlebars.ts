@@ -85,12 +85,6 @@ export class UtilsHandlebars {
     const secretFilters: string[] = args.slice(0, args.length - 1);
     const options: Options = args[args.length - 1];
     const matchesFilter = !UtilsHandlebars.hasPermissionCheck(secretFilters);
-    console.log('missingPermission', {
-      secretFilters,
-      options,
-      matchesFilter,
-      blockHelper: UtilsHandlebars.isBlockHelper(options)
-    })
     
     if (!UtilsHandlebars.isBlockHelper(options)) {
       return matchesFilter;
