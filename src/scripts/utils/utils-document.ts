@@ -1,4 +1,7 @@
+import { documents } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
 import { MyActor, MyActorData, MyItem } from "../types/fixed-types";
+
+type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
 
 export class UtilsDocument {
 
@@ -127,47 +130,108 @@ export class UtilsDocument {
     }));
   }
 
-  public static async updateTokenActors(actorDataByTokenUuid: Map<string, DeepPartial<MyActorData>>): Promise<void> {
-    const linkedActorUpdates = [];
-    const unlinkedActorUpdatesByParentUuid = new Map<string, Array<Partial<TokenDocument['data']>>>();
-
-    const tokensByUuid = new Map<string, TokenDocument>();
-    for (const token of (await UtilsDocument.tokensFromUuid(Array.from(actorDataByTokenUuid.keys())))) {
-      tokensByUuid.set(token.uuid, token);
+  public static async bulkUpdate(inputDocuments: Array<{document: FoundryDocument, data: any}>): Promise<void> {
+    const documentsByUuid = new Map<string, {document: FoundryDocument, data: any}>();
+    for (const document of inputDocuments) {
+      documentsByUuid.set(document.document.uuid, document);
     }
 
-    for (const [tokenUuid, actorData] of actorDataByTokenUuid.entries()) {
-      const token = tokensByUuid.get(tokenUuid);
-      // token got deleted I guess?
-      if (!token) {
-        continue;
+    const updatesPerDocumentName = new Map<string, Map<string, BulkUpdateEntry>>();
+    for (let update of documentsByUuid.values()) {
+      // Special use case for actors since they are not an embeded entity
+      if (update.document.documentName === 'Actor' && (update.document as FoundryDocument & MyActor).isToken) {
+        update.document = update.document.parent;
+        update.data = {
+          _id: update.document.id,
+          actorData: update.data
+        };
       }
 
-      if (token.isLinked) {
-        linkedActorUpdates.push({
-          ...actorData,
-          _id: (token.getActor() as MyActor).id,
-        });
-      } else {
-        if (!unlinkedActorUpdatesByParentUuid.has(token.parent.uuid)) {
-          unlinkedActorUpdatesByParentUuid.set(token.parent.uuid, []);
+      if (update.document.parent == null) {
+        if (!updatesPerDocumentName.has(update.document.documentName)) {
+          updatesPerDocumentName.set(update.document.documentName, new Map<string, BulkUpdateEntry>());
         }
-        unlinkedActorUpdatesByParentUuid.get(token.parent.uuid).push({
-          _id: token.id,
-          actorData: actorData
-        });
+        const updatesByUuid = updatesPerDocumentName.get(update.document.documentName);
+        
+        if (!updatesByUuid.has(update.document.uuid)) {
+          updatesByUuid.set(update.document.uuid, {
+            uuid: update.document.uuid,
+            updateEmbeded: [],
+          });
+        }
+        updatesByUuid.get(update.document.uuid).updateData = update.data;
+      } else {
+        if (!updatesPerDocumentName.has(update.document.parent.documentName)) {
+          updatesPerDocumentName.set(update.document.parent.documentName, new Map<string, BulkUpdateEntry>());
+        }
+        const updatesByUuid = updatesPerDocumentName.get(update.document.parent.documentName);
+        if (!updatesByUuid.has(update.document.parent.uuid)) {
+          updatesByUuid.set(update.document.parent.uuid, {
+            uuid: update.document.parent.uuid,
+            updateEmbeded: [],
+          });
+        }
+        updatesByUuid.get(update.document.parent.uuid).updateEmbeded.push(update);
       }
     }
 
     const promises: Promise<any>[] = [];
-    if (linkedActorUpdates.length > 0) {
-      promises.push(CONFIG.Actor.documentClass.updateDocuments(linkedActorUpdates));
-    }
-    for (const [parentUuid, actorUpdates] of unlinkedActorUpdatesByParentUuid.entries()) {
-      promises.push(fromUuid(parentUuid).then(parent => parent.updateEmbeddedDocuments('Token', actorUpdates)));
+    for (const documentName of updatesPerDocumentName.keys()) {
+      const updatesByUuid = updatesPerDocumentName.get(documentName);
+      const documentClass: {updateDocuments: (rows: FoundryDocument[], options?: any) => Promise<any>} = CONFIG[documentName].documentClass;
+      const rootRows: FoundryDocument[] = [];
+
+      for (const bulkEntry of updatesByUuid.values()) {
+        if (bulkEntry.updateData != null) {
+          rootRows.push(bulkEntry.updateData);
+        }
+
+        const embededByDocumentName = new Map<string, any[]>();
+        for (const embeded of bulkEntry.updateEmbeded) {
+          if (!embededByDocumentName.has(embeded.document.documentName)) {
+            embededByDocumentName.set(embeded.document.documentName, []);
+          }
+          embededByDocumentName.get(embeded.document.documentName).push(embeded.data);
+        }
+        for (const embededDocumentName of embededByDocumentName.keys()) {
+          let parentDocument: foundry.abstract.Document<any, any> | Promise<foundry.abstract.Document<any, any>> = documentsByUuid.get(bulkEntry.uuid)?.document;
+          if (parentDocument == null) {
+            parentDocument = fromUuid(bulkEntry.uuid);
+          }
+          promises.push(Promise.resolve(parentDocument).then(doc => doc.updateEmbeddedDocuments(embededDocumentName, embededByDocumentName.get(embededDocumentName))));
+        }
+      }
+
+      if (rootRows.length > 0) {
+        promises.push(documentClass.updateDocuments(rootRows));
+      }
     }
 
     return Promise.all(promises).then();
   }
 
+  public static async updateTokenActors(actorDataByTokenUuid: Map<string, DeepPartial<MyActorData>>): Promise<void> {
+    const tokensByUuid = new Map<string, TokenDocument>();
+    for (const token of (await UtilsDocument.tokensFromUuid(Array.from(actorDataByTokenUuid.keys())))) {
+      tokensByUuid.set(token.uuid, token);
+    }
+    
+    if (true) {
+      const documents: Parameters<typeof UtilsDocument['bulkUpdate']>[0] = [];
+      for (const [tokenUuid, actorData] of actorDataByTokenUuid.entries()) {
+        documents.push({
+          document: tokensByUuid.get(tokenUuid).actor,
+          data: actorData
+        })
+      }
+      return UtilsDocument.bulkUpdate(documents);
+    }
+  }
+
+}
+
+interface BulkUpdateEntry {
+  uuid: string;
+  updateData?: any; // when provided, update this record itself
+  updateEmbeded: {document: FoundryDocument, data: any}[];
 }
