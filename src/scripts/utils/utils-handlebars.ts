@@ -1,5 +1,6 @@
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
+import { MyActor } from "../types/fixed-types";
 import { UtilsDocument } from "./utils-document";
 
 interface BlockHelperOptions {
@@ -27,6 +28,7 @@ export class UtilsHandlebars {
     return args.join('');
   }
 
+  private static documentPermission = /(actor)(exact)?(owner|observer|limited|none)(uuid|id):(.*)/i;
   private static hasPermissionCheck(secretFilters: string[]): boolean {
     // no filters = always visible
     let matchesFilter = secretFilters.length === 0;
@@ -41,18 +43,29 @@ export class UtilsHandlebars {
       if (filter.toLowerCase().startsWith('user:') && filter.substring(5) === game.userId) {
         matchesFilter = true;
       }
-      if (filter.toLowerCase().startsWith('actorowneruuid:')) {
-        const actor = UtilsDocument.actorFromUuid(filter.substring(15), {sync: true});
-        // always show missing/invalid/deleted/null actors
-        if (!actor || actor.isOwner) {
-          matchesFilter = true;
-        }
-      }
-      if (filter.toLowerCase().startsWith('actorownerid:')) {
-        const actor = game.actors.get(filter.substring(13));
-        // always show missing/invalid/deleted/null actors
-        if (!actor || actor.isOwner) {
-          matchesFilter = true;
+      const documentMatch = UtilsHandlebars.documentPermission.exec(filter);
+      console.log(filter, documentMatch);
+      if (documentMatch) {
+        switch (documentMatch[1].toLocaleLowerCase()) {
+          case 'actor': {
+            let actor: MyActor;
+            if (documentMatch[4].toLocaleLowerCase() === 'uuid') {
+              actor = UtilsDocument.actorFromUuid(documentMatch[5], {sync: true});
+            } else {
+              game.actors.get(documentMatch[5]);
+            }
+            // always show missing/invalid/deleted/null actors
+            if (actor == null) {
+              matchesFilter = true;
+            } else {
+              const exactMatch = documentMatch[2] != null;
+              if (actor.testUserPermission(game.user, CONST.ENTITY_PERMISSIONS[documentMatch[3].toLocaleLowerCase().toUpperCase()], exactMatch)) {
+                console.log('match', filter)
+                matchesFilter = true;
+              }
+            }
+            break;
+          }
         }
       }
       // Don't support token owner filter. They are too short lived and are based on actor anyway
