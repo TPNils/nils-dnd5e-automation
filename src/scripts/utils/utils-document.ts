@@ -37,11 +37,11 @@ export class UtilsDocument {
     }
   }
 
-  public static actorsFromUuid(uuids: string[], options: {deduplciate?: boolean} = {}): Promise<MyActor[]> {
+  public static actorsFromUuid(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<MyActor[]> {
     if (options.deduplciate) {
-      uuids = Array.from(new Set<string>(uuids));
+      uuids = new Set<string>(uuids);
     }
-    return Promise.all(uuids.map(tokenUuid => {
+    return Promise.all(Array.from(uuids).map(tokenUuid => {
       return UtilsDocument.actorFromUuid(tokenUuid);
     }));
   }
@@ -58,11 +58,11 @@ export class UtilsDocument {
     }
   }
 
-  public static tokensFromUuid(uuids: string[], options: {deduplciate?: boolean} = {}): Promise<TokenDocument[]> {
+  public static tokensFromUuid(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<TokenDocument[]> {
     if (options.deduplciate) {
-      uuids = Array.from(new Set<string>(uuids));
+      uuids = new Set<string>(uuids);
     }
-    return Promise.all(uuids.map(tokenUuid => {
+    return Promise.all(Array.from(uuids).map(tokenUuid => {
       return UtilsDocument.tokenFromUuid(tokenUuid);
     }));
   }
@@ -79,12 +79,12 @@ export class UtilsDocument {
     }
   }
 
-  public static itemsFromUuid(uuids: string[], options: {deduplciate?: boolean} = {}): Promise<MyItem[]> {
+  public static itemsFromUuid(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<MyItem[]> {
     if (options.deduplciate) {
-      uuids = Array.from(new Set<string>(uuids));
+      uuids = new Set<string>(uuids);
     }
-    return Promise.all(uuids.map(tokenUuid => {
-      return UtilsDocument.itemFromUuid(tokenUuid);
+    return Promise.all(Array.from(uuids).map(uuid => {
+      return UtilsDocument.itemFromUuid(uuid);
     }));
   }
 
@@ -100,12 +100,12 @@ export class UtilsDocument {
     }
   }
 
-  public static scenesFromUuid(uuids: string[], options: {deduplciate?: boolean} = {}): Promise<Scene[]> {
+  public static scenesFromUuid(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<Scene[]> {
     if (options.deduplciate) {
-      uuids = Array.from(new Set<string>(uuids));
+      uuids = new Set<string>(uuids);
     }
-    return Promise.all(uuids.map(tokenUuid => {
-      return UtilsDocument.sceneFromUuid(tokenUuid);
+    return Promise.all(Array.from(uuids).map(uuid => {
+      return UtilsDocument.sceneFromUuid(uuid);
     }));
   }
 
@@ -121,12 +121,12 @@ export class UtilsDocument {
     }
   }
 
-  public static templatesFromUuid(uuids: string[], options: {deduplciate?: boolean} = {}): Promise<MeasuredTemplateDocument[]> {
+  public static templatesFromUuid(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<MeasuredTemplateDocument[]> {
     if (options.deduplciate) {
-      uuids = Array.from(new Set<string>(uuids));
+      uuids = new Set<string>(uuids);
     }
-    return Promise.all(uuids.map(tokenUuid => {
-      return UtilsDocument.templateFromUuid(tokenUuid);
+    return Promise.all(Array.from(uuids).map(uuid => {
+      return UtilsDocument.templateFromUuid(uuid);
     }));
   }
 
