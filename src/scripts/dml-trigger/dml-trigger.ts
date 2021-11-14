@@ -53,6 +53,7 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
 
 export interface IDmlContext<T extends foundry.abstract.Document<any, any>> {
   readonly rows: ReadonlyArray<T>;
+  readonly oldRows?: ReadonlyArray<T>;
   readonly options: {[key: string]: any};
   readonly userId: string;
 }
@@ -154,6 +155,7 @@ function wrapBeforeUpdate<T extends foundry.abstract.Document<any, any>>(callbac
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     const response = callback({
       rows: [modifiedDocument],
+      oldRows: [document],
       options: options,
       userId: userId
     });
@@ -183,6 +185,7 @@ function wrapAfterUpdate<T extends foundry.abstract.Document<any, any>>(callback
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     return callback({
       rows: [modifiedDocument],
+      oldRows: [document],
       options: options,
       userId: userId
     });
