@@ -1726,12 +1726,13 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       chatMessageDatas.push(data);
       chatMessageDatasByUuid.set(chatMessage.uuid, data);
     }
-    const shouldApply = (target: ItemCardItemData['targets'][0]): boolean => {
-      if (target.result.dmg) {
-        return target.result.applyDmg === true;
-      } else {
-        return target.result.checkPass === false || target.result.hit === true;
+    const shouldApply = (item: ItemCardItemData, target: ItemCardItemData['targets'][0]): boolean => {
+      if (item.damages?.length) {
+        if (!target.result.applyDmg) {
+          return false;
+        }
       }
+      return target.result.checkPass === false || target.result.hit === true;
     }
     const effectsByTargetUuid = new Map<string, {chatMessageIndex: number, itemIndex: number, apply: boolean}[]>();
     for (let chatMessageIndex = 0; chatMessageIndex < chatMessageDatas.length; chatMessageIndex++) {
@@ -1741,7 +1742,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
         if (item.activeEffectsData.length > 0 && item.targets?.length > 0) {
           for (const target of item.targets) {
             // TODO I am not happy with this, maybe this should be user input? but there is already enough user input
-            let shouldApplyResult = shouldApply(target);
+            let shouldApplyResult = shouldApply(item, target);
             if (shouldApplyResult === target.result.appliedActiveEffects) {
               continue;
             }
@@ -1849,7 +1850,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       for (const item of data.items) {
         for (const target of item.targets ?? []) {
           // It should be applied by now
-          target.result.appliedActiveEffects = shouldApply(target);
+          target.result.appliedActiveEffects = shouldApply(item, target);
         }
       }
       InternalFunctions.setItemCardData(chatMessage, chatMessageDatasByUuid.get(chatMessage.uuid));
