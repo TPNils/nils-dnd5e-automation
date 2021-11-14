@@ -60,6 +60,7 @@ async function callMacroLocal(itemType: keyof typeof collections, macroName: str
         if (!response.success) {
           throw new Error(response.errorMessage);
         }
+        return;
       }
     }
   }

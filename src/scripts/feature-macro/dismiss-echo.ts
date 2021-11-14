@@ -43,7 +43,7 @@ export class DismissEcho implements IMacro {
   
       // If the actor as multiple tokens, throw an error
       // If needed, this can be updated later by filtering on player selected tokens
-      if (tokens.length !== 1) {
+      if (tokens.length > 1) {
         ui.notifications.error(`Actor ${game.actors.get(actorId).name} needs to have 1 token in the current scene, found: ${tokens.length}`)
         return;
       }
@@ -53,6 +53,7 @@ export class DismissEcho implements IMacro {
       }
     }
   
+    console.log('delete', deleteTokenIds)
     currentScene.deleteEmbeddedDocuments('Token', deleteTokenIds);
   }
 
