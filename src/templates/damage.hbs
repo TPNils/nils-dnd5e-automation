@@ -1,43 +1,46 @@
 {{!
   moduleName=
-  actionBase=
+  itemIndex=
+  damageIndex=
   interactionPermission=
   dmg=
 }}
-<div class="dice-flavor">{{dmg.displayDamageType}}</div>
-<div class="{{moduleName}}-roll-wrapper">
-  {{#if (eq dmg.phase "result")}}
-    {{#if (and dmg.normalRoll.evaluated (eq dmg.mode 'normal'))}}
-      {{> modules/nils-automated-compendium/templates/roll/roll.hbs overrideFormula=dmg.displayFormula roll=dmg.normalRoll}}
-    {{else if (and dmg.criticalRoll.evaluated (eq dmg.mode 'critical'))}}
-      {{> modules/nils-automated-compendium/templates/roll/roll.hbs overrideFormula=dmg.displayFormula roll=dmg.criticalRoll}}
-    {{/if}}
-  {{else}}
-  
-    <div class="{{moduleName}}-bonus-container">
-      <button data-{{moduleName}}-action="{{actionBase}}" class="{{moduleName}}-item-damage" {{#if interactionPermission}}{{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}{{/if}}>
-        {{#if (eq dmg.mode 'critical')}}
-          {{localize "DND5E.Critical"}}
-        {{else}}
-          {{#if dmg.label}}
-            {{dmg.label}}
-          {{else}}
-            {{localize "DND5E.Damage"}}
-          {{/if}}
-        {{/if}}
-      </button>
-
-      {{#if (eq dmg.phase "bonus-input")}}
-        <input class="{{moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{dmg.userBonus}}" data-{{moduleName}}-action="{{actionBase}}-bonus" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}/>
+<div class="{{moduleName}}-item-{{itemIndex}}-damage-{{dmgIndex}}">
+  <div class="dice-flavor">{{dmg.displayDamageType}}</div>
+  <div class="{{moduleName}}-roll-wrapper">
+    {{#if (eq dmg.phase "result")}}
+      {{#if (and dmg.normalRoll.evaluated (eq dmg.mode 'normal'))}}
+        {{> modules/nils-automated-compendium/templates/roll/roll.hbs overrideFormula=dmg.displayFormula roll=dmg.normalRoll}}
+      {{else if (and dmg.criticalRoll.evaluated (eq dmg.mode 'critical'))}}
+        {{> modules/nils-automated-compendium/templates/roll/roll.hbs overrideFormula=dmg.displayFormula roll=dmg.criticalRoll}}
       {{/if}}
-    </div>
+    {{else}}
     
-  {{/if}}
-  
-  {{#if interactionPermission}}
-  {{#nacPerm interactionPermission}}
-    <button data-{{moduleName}}-action="{{actionBase}}-mode-minus" class="{{moduleName}}-mode-minus" {{#if (eq dmg.mode 'normal')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
-    <button data-{{moduleName}}-action="{{actionBase}}-mode-plus" class="{{moduleName}}-mode-plus" {{#if (eq dmg.mode 'critical')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
-  {{/nacPerm}}
-  {{/if}}
+      <div class="{{moduleName}}-bonus-container">
+        <button data-{{moduleName}}-action="item-{{itemIndex}}-damage-{{dmgIndex}}" class="{{moduleName}}-item-damage" {{#if interactionPermission}}{{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}{{/if}}>
+          {{#if (eq dmg.mode 'critical')}}
+            {{localize "DND5E.Critical"}}
+          {{else}}
+            {{#if dmg.label}}
+              {{dmg.label}}
+            {{else}}
+              {{localize "DND5E.Damage"}}
+            {{/if}}
+          {{/if}}
+        </button>
+
+        {{#if (eq dmg.phase "bonus-input")}}
+          <input class="{{moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{dmg.userBonus}}" data-{{moduleName}}-action="item-{{itemIndex}}-damage-{{dmgIndex}}-bonus" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}/>
+        {{/if}}
+      </div>
+      
+    {{/if}}
+    
+    {{#if interactionPermission}}
+    {{#nacPerm interactionPermission}}
+      <button data-{{moduleName}}-action="item-{{itemIndex}}-damage-{{dmgIndex}}-mode-minus" class="{{moduleName}}-mode-minus" {{#if (eq dmg.mode 'normal')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+      <button data-{{moduleName}}-action="item-{{itemIndex}}-damage-{{dmgIndex}}-mode-plus" class="{{moduleName}}-mode-plus" {{#if (eq dmg.mode 'critical')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+    {{/nacPerm}}
+    {{/if}}
+  </div>
 </div>

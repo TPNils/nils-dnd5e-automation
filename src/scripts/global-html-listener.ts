@@ -1,3 +1,4 @@
+import { MemoryStorageService } from "./service/memory-storage-service";
 import { staticValues } from "./static-values";
 
 class GlobalHtmlListener {
@@ -9,6 +10,30 @@ class GlobalHtmlListener {
       document.addEventListener('click', GlobalHtmlListener.toggleRadioClick);
       // If a change event is fired immidatly after the click, cancel the delayed click toggle
       document.addEventListener('change', GlobalHtmlListener.toggleRadioChange);
+
+      // Create an observer instance linked to the callback function
+      const observer = new MutationObserver((mutationsList, observer) => {
+        const selector = MemoryStorageService.getFocusedElementSelector();
+        if (!selector) {
+          return;
+        }
+        for (const mutation of mutationsList) {
+          for (const addedNode of Array.from(mutation.addedNodes)) {
+            if (addedNode instanceof Element) {
+              const queryNode = addedNode.querySelector(selector);
+              if (queryNode instanceof HTMLElement) {
+                queryNode.focus();
+                // Only focus once
+                MemoryStorageService.setFocusedElementSelector(null);
+                return;
+              }
+            }
+          }
+        }
+      });
+
+      // Start observing the target node for configured mutations
+      observer.observe(document, { childList: true, subtree: true });
     });
   }
 

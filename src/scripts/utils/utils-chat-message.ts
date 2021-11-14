@@ -1607,6 +1607,10 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
+  public beforeUpdate(context: IDmlContext<ChatMessage>): void {
+    this.onBonusChange(context);
+  }
+
   public beforeUpsert(context: IDmlContext<ChatMessage>): boolean | void {
     const itemCards = this.filterItemCardsOnly(context);
     if (itemCards.length > 0) {
@@ -1671,6 +1675,47 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       }
       InternalFunctions.setItemCardData(chatMessage, data);
     }
+  }
+  
+  private onBonusChange(context: IDmlContext<ChatMessage>): void {
+    if (context.userId !== game.userId || !context.oldRows) {
+      return;
+    }
+    for (let rowIndex = 0; rowIndex < context.rows.length; rowIndex++) {
+      const data: ItemCardData = InternalFunctions.getItemCardData(context.rows[rowIndex]);
+      const oldData: ItemCardData = InternalFunctions.getItemCardData(context.oldRows[rowIndex]);
+      for (let itemIndex = 0; itemIndex < data.items.length; itemIndex++) {
+        const item = data.items[itemIndex];
+        const oldItem = oldData.items.length <= itemIndex ? null : oldData.items[itemIndex];
+        
+        if (item.attack?.phase === 'bonus-input' && oldItem?.attack?.phase !== 'bonus-input') {
+          MemoryStorageService.setFocusedElementSelector(`.${staticValues.moduleName}-attack input.${staticValues.moduleName}-bonus`);
+          return;
+        }
+
+        for (let dmgIndex = 0; dmgIndex < item.damages?.length; dmgIndex++) {
+          const dmg = item.damages[dmgIndex];
+          const oldDmg = oldItem?.damages?.[dmgIndex];
+          
+          if (dmg?.phase === 'bonus-input' && oldDmg?.phase !== 'bonus-input') {
+            MemoryStorageService.setFocusedElementSelector(`.${staticValues.moduleName}-item-${itemIndex}-damage-${dmgIndex} input.${staticValues.moduleName}-bonus`);
+            return;
+          }
+        }
+        for (let targetIndex = 0; targetIndex < item.targets?.length; targetIndex++) {
+          const target = item.targets[targetIndex];
+          const oldTarget = oldItem?.targets?.[targetIndex];
+          
+          if (target?.check?.phase === 'bonus-input' && oldTarget?.check?.phase !== 'bonus-input') {
+            MemoryStorageService.setFocusedElementSelector(`.${staticValues.moduleName}-item-${itemIndex}-check-target-${targetIndex} input.${staticValues.moduleName}-bonus`);
+            return;
+          }
+        }
+      }
+    }
+
+    // No focus found => reset
+    MemoryStorageService.setFocusedElementSelector(null);
   }
 
   private async applyActiveEffects(chatMessages: ChatMessage[]): Promise<void> {

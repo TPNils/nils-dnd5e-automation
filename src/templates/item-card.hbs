@@ -67,7 +67,8 @@
               
               {{> modules/nils-automated-compendium/templates/damage.hbs 
                 moduleName=@root.staticValues.moduleName
-                actionBase=(nacConcat "item-" itemIndex "-damage-0")
+                itemIndex=itemIndex
+                dmgIndex=0
                 interactionPermission=(nacConcat "actorowneruuid:" @root.data.actor.uuid)
                 dmg=item.damages.[0]
               }}
@@ -80,7 +81,8 @@
           {{#if (gt dmgIndex 0)}}
             {{> modules/nils-automated-compendium/templates/damage.hbs 
               moduleName=@root.staticValues.moduleName
-              actionBase=(nacConcat "item-" itemIndex "-damage-" dmgIndex)
+              itemIndex=itemIndex
+              dmgIndex=dmgIndex
               interactionPermission=(nacConcat "actorowneruuid:" @root.data.actor.uuid)
               dmg=dmg
             }}
@@ -109,8 +111,8 @@
               </th>
             </thead>
             <tbody>
-              {{#each item.targets as |target|}}
-                <tr>
+              {{#each item.targets as |target targetIndex|}}
+                <tr class="{{@root.staticValues.moduleName}}-item-{{itemIndex}}-check-target-{{targetIndex}}">
                   <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
                   <td>{{target.name}}</td>
                   <td>
