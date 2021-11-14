@@ -491,7 +491,7 @@ function gitCommit() {
 function gitTag() {
   let newVersion = 'v' + getManifest().file.version;
 	return git.tag(
-		`v${newVersion}`,
+		`${newVersion}`,
 		`Updated to ${newVersion}`,
 		(err) => {
 			if (err) {
