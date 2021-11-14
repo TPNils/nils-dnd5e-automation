@@ -309,7 +309,7 @@ export class UtilsChatMessage {
     }
   }
 
-  public static createDefaultItemData({item, level, overrideItemScaling, actor}: {item: MyItem, level?: number, overrideItemScaling?: MyItem['data']['data']['scaling'], actor?: MyActor}): ItemCardItemData {
+  public static async createDefaultItemData({item, level, overrideItemScaling, actor}: {item: MyItem, level?: number, overrideItemScaling?: MyItem['data']['data']['scaling'], actor?: MyActor}): Promise<ItemCardItemData> {
     const itemCardData: ItemCardItemData = {
       uuid: item.uuid,
       name: item.data.name,
@@ -333,6 +333,10 @@ export class UtilsChatMessage {
     const isSpell = item.type === "spell";
     if (level == null) {
       level = item.data.data.level;
+    }
+    let originalLevel = level;
+    if (item.uuid) {
+      originalLevel = (await UtilsDocument.itemFromUuid(item.uuid)).data.data.level;
     }
 
     if (item.data.data.description?.value) {
@@ -424,7 +428,7 @@ export class UtilsChatMessage {
       const scaling = overrideItemScaling || item.data.data.scaling;
       let applyScalingXTimes = 0;
       if (scaling?.mode === 'level') {
-        applyScalingXTimes = item.data.data.level - level;
+        applyScalingXTimes = level - originalLevel;
       } else if (scaling?.mode === 'cantrip' && actor) {
         let actorLevel = 0;
         if (actor.type === "character") {
@@ -436,6 +440,12 @@ export class UtilsChatMessage {
         }
         applyScalingXTimes = Math.floor((actorLevel + 1) / 6);
       }
+      console.log('scaling', {
+        applyScalingXTimes,
+        scaling,
+        originalLevel,
+        level
+      })
       if (applyScalingXTimes > 0) {
         const scalingRollFormula = new Roll(scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true}).formula;
   

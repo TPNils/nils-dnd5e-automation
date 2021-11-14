@@ -26,7 +26,6 @@ async function roll(this: MyItem, {configureDialog=true, rollMode, createMessage
   let consumeResource = !!resource.target && (resource.type !== "ammo") // Consume a linked (non-ammo) resource
   let consumeSpellSlot = requireSpellSlot;    // Consume a spell slot
   let consumeUsage = !!uses.per;              // Consume limited uses
-  let consumeQuantity = uses.autoDestroy;     // Consume quantity of the item in lieu of uses
   let consumeSpellLevel = null;               // Consume a specific category of spell slot
   if (requireSpellSlot) {
     consumeSpellLevel = id.preparation.mode === "pact" ? "pact" : `spell${id.level}`;
@@ -35,6 +34,7 @@ async function roll(this: MyItem, {configureDialog=true, rollMode, createMessage
   // Display a configuration dialog to customize the usage
   const needsConfiguration = createMeasuredTemplate || consumeRecharge || consumeResource || consumeSpellSlot || consumeUsage;
   if (configureDialog && needsConfiguration) {
+    // TODO replace
     const configuration = await AbilityUseDialog.create(this);
     if (!configuration) {
       return;
@@ -85,7 +85,7 @@ async function roll(this: MyItem, {configureDialog=true, rollMode, createMessage
 }
 
 async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage> {
-  let itemData = UtilsChatMessage.createDefaultItemData({
+  let itemData = await UtilsChatMessage.createDefaultItemData({
     item: this as any,
     actor: this.actor as MyActor
   });

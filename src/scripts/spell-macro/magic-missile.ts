@@ -101,7 +101,7 @@ export class MagicMissile implements IMacro<MagicMissileData> {
     const damageResults = await Promise.all(data.targets.data.tokenUuids.map(() => new Roll(baseDamageFormula).roll({async: true})));
     
     const actor = context.actorUuid == null ? null : (await UtilsDocument.actorFromUuid(context.actorUuid));
-    const itemCardData = UtilsChatMessage.createDefaultItemData({
+    const itemCardData = await UtilsChatMessage.createDefaultItemData({
       actor: actor,
       item: item,
     });
