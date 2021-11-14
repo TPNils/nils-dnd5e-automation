@@ -157,44 +157,7 @@ export class UtilsDocument {
       documentsByUuid.set(document.document.uuid, document);
     }
 
-    const updatesPerDocumentName = new Map<string, Map<string, BulkUpdateEntry>>();
-    for (let update of documentsByUuid.values()) {
-      // Special use case for actors since they are not an embeded entity
-      if (update.document.documentName === 'Actor' && (update.document as FoundryDocument & MyActor).isToken) {
-        update.document = update.document.parent;
-        update.data = {
-          _id: update.document.id,
-          actorData: update.data
-        };
-      }
-
-      if (update.document.parent == null) {
-        if (!updatesPerDocumentName.has(update.document.documentName)) {
-          updatesPerDocumentName.set(update.document.documentName, new Map<string, BulkUpdateEntry>());
-        }
-        const updatesByUuid = updatesPerDocumentName.get(update.document.documentName);
-        
-        if (!updatesByUuid.has(update.document.uuid)) {
-          updatesByUuid.set(update.document.uuid, {
-            uuid: update.document.uuid,
-            updateEmbeded: [],
-          });
-        }
-        updatesByUuid.get(update.document.uuid).updateData = update.data;
-      } else {
-        if (!updatesPerDocumentName.has(update.document.parent.documentName)) {
-          updatesPerDocumentName.set(update.document.parent.documentName, new Map<string, BulkUpdateEntry>());
-        }
-        const updatesByUuid = updatesPerDocumentName.get(update.document.parent.documentName);
-        if (!updatesByUuid.has(update.document.parent.uuid)) {
-          updatesByUuid.set(update.document.parent.uuid, {
-            uuid: update.document.parent.uuid,
-            updateEmbeded: [],
-          });
-        }
-        updatesByUuid.get(update.document.parent.uuid).updateEmbeded.push(update);
-      }
-    }
+    const updatesPerDocumentName = UtilsDocument.groupDocumentsForDml(inputDocuments);
 
     const promises: Promise<any>[] = [];
     for (const documentName of updatesPerDocumentName.keys()) {
@@ -203,12 +166,12 @@ export class UtilsDocument {
       const rootRows: FoundryDocument[] = [];
 
       for (const bulkEntry of updatesByUuid.values()) {
-        if (bulkEntry.updateData != null) {
-          rootRows.push(bulkEntry.updateData);
+        if (bulkEntry.data != null) {
+          rootRows.push(bulkEntry.data);
         }
 
         const embededByDocumentName = new Map<string, any[]>();
-        for (const embeded of bulkEntry.updateEmbeded) {
+        for (const embeded of bulkEntry.embededDocuments) {
           if (!embededByDocumentName.has(embeded.document.documentName)) {
             embededByDocumentName.set(embeded.document.documentName, []);
           }
@@ -225,6 +188,49 @@ export class UtilsDocument {
 
       if (rootRows.length > 0) {
         promises.push(documentClass.updateDocuments(rootRows));
+      }
+    }
+
+    return Promise.all(promises).then();
+  }
+
+  public static async bulkDelete(inputDocuments: Array<{document: FoundryDocument}>): Promise<void> {
+    const documentsByUuid = new Map<string, {document: FoundryDocument}>();
+    for (const document of inputDocuments) {
+      documentsByUuid.set(document.document.uuid, document);
+    }
+
+    const deletesPerDocumentName = UtilsDocument.groupDocumentsForDml(inputDocuments);
+
+    const promises: Promise<any>[] = [];
+    for (const documentName of deletesPerDocumentName.keys()) {
+      const deletesByUuid = deletesPerDocumentName.get(documentName);
+      const documentClass: {deleteDocuments: (ids: string[], options?: any) => Promise<any>} = CONFIG[documentName].documentClass;
+      const rootRows: FoundryDocument[] = [];
+
+      for (const bulkEntry of deletesByUuid.values()) {
+        if (bulkEntry.data != null) {
+          rootRows.push(bulkEntry.data);
+        }
+
+        const embededIdsByDocumentName = new Map<string, string[]>();
+        for (const embeded of bulkEntry.embededDocuments) {
+          if (!embededIdsByDocumentName.has(embeded.document.documentName)) {
+            embededIdsByDocumentName.set(embeded.document.documentName, []);
+          }
+          embededIdsByDocumentName.get(embeded.document.documentName).push(embeded.document.id);
+        }
+        for (const embededDocumentName of embededIdsByDocumentName.keys()) {
+          let parentDocument: foundry.abstract.Document<any, any> | Promise<foundry.abstract.Document<any, any>> = documentsByUuid.get(bulkEntry.uuid)?.document;
+          if (parentDocument == null) {
+            parentDocument = fromUuid(bulkEntry.uuid);
+          }
+          promises.push(Promise.resolve(parentDocument).then(doc => doc.deleteEmbeddedDocuments(embededDocumentName, embededIdsByDocumentName.get(embededDocumentName))));
+        }
+      }
+
+      if (rootRows.length > 0) {
+        promises.push(documentClass.deleteDocuments(rootRows.map(row => row.id)));
       }
     }
 
@@ -248,11 +254,61 @@ export class UtilsDocument {
       return UtilsDocument.bulkUpdate(documents);
     }
   }
+  
+  private static groupDocumentsForDml(inputDocuments: Array<{document: FoundryDocument, data?: any}>): Map<string, Map<string, BulkEntry>> {
+    const documentsByUuid = new Map<string, {document: FoundryDocument, data?: any}>();
+    for (const document of inputDocuments) {
+      documentsByUuid.set(document.document.uuid, document);
+    }
+
+    const dmlsPerDocumentName = new Map<string, Map<string, BulkEntry>>();
+    for (let documentWrapper of documentsByUuid.values()) {
+      // Special use case for actors since they are not an embeded entity
+      if (documentWrapper.document.documentName === 'Actor' && (documentWrapper.document as FoundryDocument & MyActor).isToken) {
+        documentWrapper.document = documentWrapper.document.parent;
+        if (documentWrapper.data) {
+          documentWrapper.data = {
+            _id: documentWrapper.document.id,
+            actorData: documentWrapper.data
+          };
+        }
+      }
+
+      if (documentWrapper.document.parent == null) {
+        if (!dmlsPerDocumentName.has(documentWrapper.document.documentName)) {
+          dmlsPerDocumentName.set(documentWrapper.document.documentName, new Map<string, BulkEntry>());
+        }
+        const dmlsByUuid = dmlsPerDocumentName.get(documentWrapper.document.documentName);
+        
+        if (!dmlsByUuid.has(documentWrapper.document.uuid)) {
+          dmlsByUuid.set(documentWrapper.document.uuid, {
+            uuid: documentWrapper.document.uuid,
+            embededDocuments: [],
+          });
+        }
+        dmlsByUuid.get(documentWrapper.document.uuid).data = documentWrapper.data;
+      } else {
+        if (!dmlsPerDocumentName.has(documentWrapper.document.parent.documentName)) {
+          dmlsPerDocumentName.set(documentWrapper.document.parent.documentName, new Map<string, BulkEntry>());
+        }
+        const dmlsByUuid = dmlsPerDocumentName.get(documentWrapper.document.parent.documentName);
+        if (!dmlsByUuid.has(documentWrapper.document.parent.uuid)) {
+          dmlsByUuid.set(documentWrapper.document.parent.uuid, {
+            uuid: documentWrapper.document.parent.uuid,
+            embededDocuments: [],
+          });
+        }
+        dmlsByUuid.get(documentWrapper.document.parent.uuid).embededDocuments.push(documentWrapper);
+      }
+    }
+
+     return dmlsPerDocumentName;
+  }
 
 }
 
-interface BulkUpdateEntry {
+interface BulkEntry {
   uuid: string;
-  updateData?: any; // when provided, update this record itself
-  updateEmbeded: {document: FoundryDocument, data: any}[];
+  data?: any; // when provided, update this record itself
+  embededDocuments: {document: FoundryDocument, data?: any}[];
 }

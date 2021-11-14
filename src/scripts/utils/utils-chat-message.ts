@@ -1619,6 +1619,25 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       this.calcAllConsumeResourcesApplied(itemCards);
     }
   }
+
+  public async afterDelete(context: IDmlContext<ChatMessage>): Promise<void> {
+    const chatMessages = this.filterItemCardsOnly(context);
+    if (context.userId === game.userId) {
+      const deleteTemplateUuids = new Set<string>();
+      for (const chatMessage of chatMessages) {
+        const data: ItemCardData = InternalFunctions.getItemCardData(chatMessage);
+        for (const item of data.items) {
+          deleteTemplateUuids.add(item.targetDefinition?.createdTemplateUuid);
+        }
+      }
+      deleteTemplateUuids.delete(null);
+      deleteTemplateUuids.delete(undefined);
+  
+      if (deleteTemplateUuids.size > 0) {
+        UtilsDocument.bulkDelete(((await UtilsDocument.templatesFromUuid(deleteTemplateUuids)).map(doc => {return {document: doc}})))
+      }
+    }
+  }
   
   private calcItemCardDamageFormulas(chatMessages: ChatMessage[]): void {
     for (const chatMessage of chatMessages) {
