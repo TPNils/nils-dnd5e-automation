@@ -68,18 +68,18 @@ jobs:
         files: './dist/module.json'
       env:
         url: https://github.com/${{github.repository}}
-        manifest: https://github.com/${{github.repository}}/releases/download/${{steps.get-version.outputs.version}}/module.json
+        manifest: https://github.com/${{github.repository}}/releases/download/latest/module.json
         download: https://github.com/${{github.repository}}/releases/download/${{steps.get-version.outputs.version}}/module.zip
     
     # Create a release for this specific version
     - name: Create Version Release
       id: create_version_release
-      uses: ncipollo/release-action@v1
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
       with:
-        allowUpdates: true # set this to false if you want to prevent updating existing releases
-        name: Release ${{ steps.get-version.outputs.version }}
+        release_name: Release ${{ steps.get-version.outputs.version }}
         draft: false
         prerelease: false
-        token: ${{ secrets.GITHUB_TOKEN }}
         artifacts: './dist/module.json, ./package/module.zip'
-        tag: ${{ steps.get-version.outputs.version }}
+        tag_name: ${{ steps.get-version.outputs.version }}
