@@ -376,7 +376,7 @@ async function packageBuild() {
 function getVersionFromArgs(currentVersion) {
   const version = argv.update || argv.u;
   if (!version) {
-    throw new Error('Missing version number. Use -v <version> to specify a version.');
+    throw new Error('Missing version number. Use -u <version> (or --update) to specify a version.');
   }
 
   const versionMatch = /^v?(\d{1,}).(\d{1,}).(\d{1,})(-.+)?$/;
