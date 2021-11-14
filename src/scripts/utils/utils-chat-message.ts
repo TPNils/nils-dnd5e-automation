@@ -141,7 +141,7 @@ interface ClickEvent {
   readonly shiftKey: boolean;
 }
 interface KeyEvent {
-  readonly key: 'Enter';
+  readonly key: 'Enter' | 'Escape';
 }
 type InteractionResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
 interface ActionParam {clickEvent: ClickEvent, userId: string, keyEvent?: KeyEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData, inputValue?: boolean | number | string};
@@ -673,11 +673,11 @@ export class UtilsChatMessage {
   }
 
   private static async onKeyDown(event: KeyboardEvent): Promise<void> {
-    if (event.target instanceof HTMLInputElement && event.key === 'Enter') {
+    if (event.target instanceof HTMLInputElement && ['Enter', 'Escape'].includes(event.key)) {
       UtilsChatMessage.onInteraction({
         element: event.target as Node,
         keyEvent: {
-          key: 'Enter'
+          key: event.key as KeyEvent['key']
         },
       });
     }
@@ -920,6 +920,7 @@ export class UtilsChatMessage {
       return;
     }
 
+    const oldPhase = attack.phase;
     const oldBonus = attack.userBonus;
     if (attackBonus) {
       attack.userBonus = attackBonus;
@@ -936,9 +937,11 @@ export class UtilsChatMessage {
       if (response) {
         return response;
       }
+    } else if (keyEvent?.key === 'Escape') {
+      attack.phase = 'mode-select';
     }
 
-    if (attack.userBonus !== oldBonus) {
+    if (attack.userBonus !== oldBonus || attack.phase !== oldPhase) {
       return messageData;
     }
   }
