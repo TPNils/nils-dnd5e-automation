@@ -1135,6 +1135,7 @@ export class UtilsChatMessage {
       return;
     }
 
+    const oldPhase = target.check.phase;
     const oldBonus = target.check.userBonus;
     if (attackBonus) {
       target.check.userBonus = attackBonus;
@@ -1151,9 +1152,11 @@ export class UtilsChatMessage {
       if (response) {
         return response;
       }
+    } else if (keyEvent?.key === 'Escape') {
+      target.check.phase = 'mode-select';
     }
 
-    if (target.check.userBonus !== oldBonus) {
+    if (target.check.userBonus !== oldBonus || target.check.phase !== oldPhase) {
       return messageData;
     }
   }
@@ -1284,6 +1287,7 @@ export class UtilsChatMessage {
       return;
     }
 
+    const oldPhase = dmg.phase;
     const oldBonus = dmg.userBonus;
     if (damageBonus) {
       dmg.userBonus = damageBonus;
@@ -1300,9 +1304,11 @@ export class UtilsChatMessage {
       if (response) {
         return response;
       }
+    } else if (keyEvent?.key === 'Escape') {
+      dmg.phase = 'mode-select';
     }
 
-    if (dmg.userBonus !== oldBonus) {
+    if (dmg.userBonus !== oldBonus || dmg.phase !== oldPhase) {
       return messageData;
     }
   }
