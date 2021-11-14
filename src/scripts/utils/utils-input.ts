@@ -130,7 +130,6 @@ export class UtilsInput {
         img: token.data.img,
         actorName: game.actors.get(token.data.actorId)?.name,
         selected: selectedTimes
-        // TODO visualize (not) within range
       });
     }
 

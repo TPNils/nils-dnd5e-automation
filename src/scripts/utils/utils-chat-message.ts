@@ -514,8 +514,6 @@ export class UtilsChatMessage {
       }
     }
 
-    // TODO template
-
     // Consume actor resources
     if (actor) {
       const requireSpellSlot = isSpell && level > 0 && UtilsChatMessage.spellUpcastModes.includes(item.data.data.preparation.mode);
@@ -2340,7 +2338,6 @@ class InternalFunctions {
                 }
               }
 
-              // TODO fix applying dmg/healing
               target.result.dmg = {
                 type: dmgType,
                 rawNumber: baseDmg,

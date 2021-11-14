@@ -104,7 +104,6 @@ async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode
   }
 
   // TODO spell scaling, both dmg and targets
-  // TODO refund spell slot usage with the apply/undo card part
 
   return await UtilsChatMessage.createCard(itemCardData, createMessage);
 }
