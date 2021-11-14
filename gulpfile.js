@@ -416,6 +416,7 @@ function getVersionFromArgs(currentVersion) {
  * Update version and URLs in the manifest JSON
  */
 function updateGithubManifest(cb) {
+  console.log('updateGithubManifest')
 	const packageJson = fs.readJSONSync('package.json');
 	const config = getConfig();
 	const manifest = getManifest();
@@ -469,6 +470,19 @@ function updateGithubManifest(cb) {
 	}
 }
 
+function validateCleanRepo(cb) {
+  return git.status({args: '--porcelain'}, function (err, stdout) {
+    if (typeof stdout === 'string' && stdout.length > 0) {
+      err = new Error("You must first commit your pending changes");
+    }
+    if (err) {
+      cb(Error(err));
+      throw Error(err);
+    }
+    cb();
+  });
+}
+
 function gitCommit() {
 	return gulp.src('./*').pipe(
 		git.commit(`v${getManifest().file.version}`, {
@@ -517,7 +531,7 @@ exports.watch = buildWatch;
 exports.clean = clean;
 exports.link = linkUserData;
 exports.package = packageBuild;
-exports.updateManifest = updateGithubManifest;
+exports.updateManifest = gulp.series(validateCleanRepo, updateGithubManifest);
 exports.publish = gulp.series(
 	clean,
 	updateGithubManifest,
