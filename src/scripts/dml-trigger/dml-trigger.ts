@@ -185,7 +185,6 @@ function wrapAfterUpdate<T extends foundry.abstract.Document<any, any>>(callback
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     return callback({
       rows: [modifiedDocument],
-      oldRows: [document],
       options: options,
       userId: userId
     });
