@@ -243,16 +243,14 @@ export class UtilsDocument {
       tokensByUuid.set(token.uuid, token);
     }
     
-    if (true) {
-      const documents: Parameters<typeof UtilsDocument['bulkUpdate']>[0] = [];
-      for (const [tokenUuid, actorData] of actorDataByTokenUuid.entries()) {
-        documents.push({
-          document: tokensByUuid.get(tokenUuid).actor,
-          data: actorData
-        })
-      }
-      return UtilsDocument.bulkUpdate(documents);
+    const documents: Parameters<typeof UtilsDocument['bulkUpdate']>[0] = [];
+    for (const [tokenUuid, actorData] of actorDataByTokenUuid.entries()) {
+      documents.push({
+        document: tokensByUuid.get(tokenUuid).getActor(),
+        data: actorData
+      });
     }
+    return UtilsDocument.bulkUpdate(documents);
   }
   
   private static groupDocumentsForDml(inputDocuments: Array<{document: FoundryDocument, data?: any}>): Map<string, Map<string, BulkEntry>> {
