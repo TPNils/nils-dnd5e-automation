@@ -784,9 +784,11 @@ export class UtilsChatMessage {
     if (response.success === false) {
       if (response.errorType === 'warn') {
         console.warn(response.errorMessage);
+        ui.notifications.warn(response.errorMessage);
       }
       if (response.errorType === 'error') {
         console.error(response.errorMessage);
+        ui.notifications.error(response.errorMessage);
       }
     }
   }
@@ -823,10 +825,18 @@ export class UtilsChatMessage {
     
     for (const action of actions.actionsToExecute) {
       const param: ActionParam = {clickEvent: clickEvent, userId: userId, keyEvent: keyEvent, regexResult: action.regex, messageId: messageId, messageData: latestMessageData, inputValue: inputValue};
-      let response = await action.action.execute(param);
-      if (response) {
-        doUpdate = true;
-        latestMessageData = response;
+      try {
+        let response = await action.action.execute(param);
+        if (response) {
+          doUpdate = true;
+          latestMessageData = response;
+        }
+      } catch (err) {
+        return {
+          success: false,
+          errorMessage: err instanceof Error ? err.message : String(err),
+          errorType: 'error'
+        }
       }
     }
 
@@ -936,8 +946,9 @@ export class UtilsChatMessage {
       attack.userBonus = "";
     }
 
-    if (attack.userBonus && !Roll.validate(attack.userBonus)) {
-      // TODO warning
+    if (attack.userBonus && !Roll.validate(attack.userBonus) && keyEvent) {
+      // Only show error on key press
+      throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
     }
 
     if (keyEvent?.key === 'Enter') {
@@ -1106,8 +1117,9 @@ export class UtilsChatMessage {
       target.check.userBonus = "";
     }
 
-    if (target.check.userBonus && !Roll.validate(target.check.userBonus)) {
-      // TODO warning
+    if (target.check.userBonus && !Roll.validate(target.check.userBonus) && keyEvent) {
+      // Only show error on key press
+      throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
     }
 
     if (keyEvent?.key === 'Enter') {
@@ -1258,8 +1270,9 @@ export class UtilsChatMessage {
       dmg.userBonus = "";
     }
 
-    if (dmg.userBonus && !Roll.validate(dmg.userBonus)) {
-      // TODO warning
+    if (dmg.userBonus && !Roll.validate(dmg.userBonus) && keyEvent) {
+      // Only show error on key press
+      throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
     }
 
     if (keyEvent?.key === 'Enter') {

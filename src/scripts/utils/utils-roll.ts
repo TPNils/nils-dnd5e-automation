@@ -3,7 +3,6 @@ import { DamageType, MyActor, MyActorData, MyItemData } from "../types/fixed-typ
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
 
 const validDamageTypes: DamageType[] = ['' /* none */, 'acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder', 'healing', 'temphp'];
-const negativeFormulaPattern = /^ *- *(.*)/;
 
 export class UtilsRoll {
 
