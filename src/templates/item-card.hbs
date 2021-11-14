@@ -16,17 +16,19 @@
             {{{item.description}}}
           {{/if}}
           {{#if item.materials}}
-            <p><strong>{{ localize "DND5E.RequiredMaterials" }}.</strong> {{item.materials}}</p>
+            <p><strong>.</strong> {{item.materials}}</p>
           {{/if}}
         </div>
       {{/unless}}
 
       <div class="{{@root.staticValues.moduleName}}-section">
-        <div style="display: flex;">
+        <div style="display: flex; align-items: end;">
           {{#if item.attack}}
             <div class="{{@root.staticValues.moduleName}}-attack">
               <div class="{{@root.staticValues.moduleName}}-flavor">
-                {{#if item.attack.evaluatedRoll}}{{item.attack.mode}}{{else}}&nbsp;{{/if}}
+                {{#if item.attack.evaluatedRoll}}
+                  {{ localize (nacConcat "DND5E." (nacCapitalize item.attack.mode)) }}
+                {{/if}}
               </div>
               <div class="{{@root.staticValues.moduleName}}-roll-wrapper">
                 {{#if (eq item.attack.phase "result")}}
@@ -38,12 +40,12 @@
                     {{#if (eq item.attack.mode 'normal')}}
                       {{#if item.attack.label}}{{item.attack.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}
                     {{else}}
-                      {{item.attack.mode}}
+                      {{ localize (nacConcat "DND5E." (nacCapitalize item.attack.mode)) }}
                     {{/if}}
                   </button>
                   
                   {{#if (eq item.attack.phase "bonus-input")}}
-                    <input placeholder="{{localize "DND5E.Bonus"}}: e.g. 1d4" type="text" value="{{item.attack.userBonus}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-bonus" {{#nacMisPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}disabled{{/nacMisPerm}}/>
+                    <input placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{item.attack.userBonus}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack-bonus" {{#nacMisPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}disabled{{/nacMisPerm}}/>
                   {{/if}}
                 {{/if}}
                 {{#nacPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}
@@ -58,7 +60,7 @@
             {{#with item.damages.[0]}}
             <div class="{{@root.staticValues.moduleName}}-first-dmg">
               <div class="{{@root.staticValues.moduleName}}-flavor">
-                {{#if this.roll.evaluated}}{{this.displayDamageTypes}}{{else}}&nbsp;{{/if}}
+                {{#if this.roll.evaluated}}{{this.displayDamageTypes}}{{/if}}
               </div>
               
               {{> modules/nils-automated-compendium/templates/damage.hbs 
@@ -87,9 +89,23 @@
         {{#if (and item.check item.targets.length)}}
           <table>
             <thead>
-                <th style="width: 30px;">{{! img}}</th>
-                <th>Name</th>
-                <th class="{{@root.staticValues.moduleName}}-item-check">DC: {{#nacPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}{{item.check.dc}}{{else}}?{{/nacPerm}}</th>
+              <th style="width: 30px;">{{! img}}</th>
+              <th>{{localize "Name"}}</th>
+              <th class="{{@root.staticValues.moduleName}}-item-check">
+                {{#if item.check.skill}}
+                  {{localize (nacConcat "DND5E.Skill" (nacCapitalize item.check.skill))}}
+                {{else}}
+                  {{localize (nacConcat "DND5E.Ability" (nacCapitalize item.check.ability))}}
+                {{/if}}
+
+                {{localize "DND5E.AbbreviationDC"}}:
+
+                {{#nacPerm (nacConcat "actorowneruuid:" @root.data.actor.uuid)}}
+                  {{item.check.dc}}
+                {{else}}
+                  {{localize "DND5E.SaveDC" dc="?" ability=""}}
+                {{/nacPerm}}
+              </th>
             </thead>
             <tbody>
               {{#each item.targets as |target|}}
@@ -110,15 +126,15 @@
                             {{else if item.check.addSaveBonus}}
                               {{localize "DND5E.SavingThrow"}}
                             {{else}}
-                              Ability check
+                              {{localize "DND5E.Ability"}}
                             {{/if}}
                           {{else}}
-                            {{target.check.mode}}
+                            {{ localize (nacConcat "DND5E." (nacCapitalize target.check.mode)) }}
                           {{/if}}
                         </button>
                         
                         {{#if (eq target.check.phase "bonus-input")}}
-                          <input placeholder="{{localize "DND5E.Bonus"}}: e.g. 1d4" type="text" value="{{target.check.userBonus}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-bonus" {{#nacMisPerm (nacConcat "actorowneruuid:" target.actorUuid)}}disabled{{/nacMisPerm}}/>
+                          <input placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{target.check.userBonus}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-bonus" {{#nacMisPerm (nacConcat "actorowneruuid:" target.actorUuid)}}disabled{{/nacMisPerm}}/>
                         {{/if}}
                       {{/if}}
                       {{#nacPerm (nacConcat "actorowneruuid:" target.actorUuid)}}
@@ -152,12 +168,14 @@
         <table class="{{@root.staticValues.moduleName}}-consume-resouces">
           <thead>
             <tr>
-              <th>Resource</th>
-              <th>Amount</th>
+              <th>{{ localize "Resources" }}</th>
+              <th>{{ localize "DND5E.Uses" }}</th>
               <th style="width: 50px;" {{#if item.allConsumeResourcesApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
                 {{#ifCond item.consumeResources '>' 1}}
-                  <button data-{{@root.staticValues.moduleName}}-action="apply-consume-resource-*-*" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
-                  <button data-{{@root.staticValues.moduleName}}-action="undo-consume-resource-*-*" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+                  <div style="display: flex;" title="All">
+                    <button data-{{@root.staticValues.moduleName}}-action="apply-consume-resource-*-*" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
+                    <button data-{{@root.staticValues.moduleName}}-action="undo-consume-resource-*-*" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+                  </div>
                 {{/ifCond}}
               </th>
             </tr>
@@ -166,7 +184,7 @@
             {{#each item.consumeResources as |consumeResource consumeResourceIndex|}}
               <tr {{#if consumeResource.applied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
                 <td>{{nacTranslateProperty consumeResource.path}}</td>
-                <td>{{consumeResource.original}}-{{consumeResource.amount}}=<b>{{nacMath consumeResource.original '-' consumeResource.amount}}</b></td>
+                <td>{{consumeResource.original}}-{{consumeResource.amount}}=<b><u>{{nacMath consumeResource.original '-' consumeResource.amount}}</b></u></td>
                 <td>
                   <button data-{{@root.staticValues.moduleName}}-action="apply-consume-resource-{{itemIndex}}-{{consumeResourceIndex}}" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
                   <button data-{{@root.staticValues.moduleName}}-action="undo-consume-resource-{{itemIndex}}-{{consumeResourceIndex}}" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
@@ -186,10 +204,16 @@
         <thead>
           <tr>
             <th style="width: 30px;"></th>
-            <th>Name</th>
-            <th style="width: 30px; text-align: center;">HP</th>
-            <th style="width: 40px; text-align: center;">Result</th>
-            <th style="width: 50px;">{{! actions }}</th>
+            <th>{{localize "Name"}}</th>
+            <th style="width: 30px; text-align: center;">{{ localize "DND5E.HP" }}</th>
+            <th style="width: 50px;" {{#if @root.data.allDmgApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
+              {{#ifCond data.targetAggregate.length '>' 1}}
+                <div style="display: flex;" title="All">
+                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-*" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
+                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-*" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+                </div>
+              {{/ifCond}}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -197,8 +221,9 @@
             <tr {{#if target.dmg.applied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
               <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
               <td>{{target.name}}</td>
-              <td style="text-align: center;">{{target.hpSnapshot.hp}}{{#if target.hpSnapshot.temp}}[{{target.hpSnapshot.temp}}]{{/if}}</td>
-              <td style="text-align: center;">{{target.dmg.calcHp}}{{#if (or target.dmg.calcTemp target.hpSnapshot.temp)}}[{{target.dmg.calcTemp}}]{{/if}}</td>
+              <td style="text-align: center; white-space: nowrap;">
+                <span title="{{ localize "DND5E.HP" }}">{{target.hpSnapshot.hp}}</span>{{#if target.hpSnapshot.temp}}<span title="{{ localize "DND5E.Temp" }}">[{{target.hpSnapshot.temp}}]</span>{{/if}}-{{target.dmg.calcDmg}}=<b><u>{{target.dmg.calcHp}}{{#if (or target.dmg.calcTemp target.hpSnapshot.temp)}}[{{target.dmg.calcTemp}}]{{/if}}</u></b>
+              </td>
               <td class="{{@root.staticValues.moduleName}}-target-actions">
                 <div style="display: flex;">
                   <button data-{{@root.staticValues.moduleName}}-action="apply-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
@@ -207,18 +232,6 @@
               </td>
             </tr>
           {{/each}}
-          {{#ifCond data.targetAggregate.length '>' 1}}
-            <tr {{#if @root.data.allDmgApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
-              <td></td>
-              <td colspan="3">All</td>
-              <td class="{{@root.staticValues.moduleName}}-target-actions">
-                <div style="display: flex;">
-                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-*" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
-                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-*" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
-                </div>
-              </td>
-            </tr>
-          {{/ifCond}}
         </tbody>
       </table>
     </section>

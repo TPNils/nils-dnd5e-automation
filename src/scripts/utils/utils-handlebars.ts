@@ -139,6 +139,13 @@ export class UtilsHandlebars {
     return new Roll(parts.join(' ')).roll({async: false}).total;
   }
 
+  public static capitalize(value: string): string {
+    if (typeof value !== 'string') {
+      return value;
+    }
+    return value.toLocaleLowerCase().capitalize();
+  }
+
   public static registerHooks(): void {
     Hooks.on("init", () => {
       Handlebars.registerHelper(`${staticValues.code}Concat`, UtilsHandlebars.concat);
@@ -147,6 +154,7 @@ export class UtilsHandlebars {
       Handlebars.registerHelper(`${staticValues.code}CardCollapse`, UtilsHandlebars.isCardCollapse);
       Handlebars.registerHelper(`${staticValues.code}TranslateProperty`, UtilsHandlebars.translateProperty);
       Handlebars.registerHelper(`${staticValues.code}Math`, UtilsHandlebars.math);
+      Handlebars.registerHelper(`${staticValues.code}Capitalize`, UtilsHandlebars.capitalize);
     });
   }
 

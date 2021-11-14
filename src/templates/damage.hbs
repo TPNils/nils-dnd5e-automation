@@ -27,7 +27,7 @@
     </button>
     
     {{#if (eq dmg.phase "bonus-input")}}
-      <input placeholder="{{localize "DND5E.Bonus"}}: e.g. 1d4" type="text" value="{{dmg.userBonus}}" data-{{moduleName}}-action="{{actionBase}}-bonus" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}/>
+      <input placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{dmg.userBonus}}" data-{{moduleName}}-action="{{actionBase}}-bonus" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}/>
     {{/if}}
   {{/if}}
   
