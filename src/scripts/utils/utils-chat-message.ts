@@ -125,6 +125,7 @@ export interface ItemCardData {
       temp?: number;
     },
     dmg?: {
+      avoided: boolean;
       applied: boolean,
       appliedDmg: number,
       rawDmg: number;
@@ -1561,7 +1562,6 @@ class DmlTriggerUser implements IDmlTrigger<User> {
     let messageData = InternalFunctions.getItemCardData(chatMessage);
     for (let itemIndex = messageData.items.length - 1; itemIndex >= 0; itemIndex--) {
       const item = messageData.items[itemIndex];
-      console.log(item);
       if (item.canChangeTargets) {
         // Re-evaluate the targets, the user may have changed targets
         const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
@@ -1603,9 +1603,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
             }
             
             messageData.items[itemIndex] = await UtilsChatMessage.setTargets(messageData.items[itemIndex], targetsUuids)
-            console.log('before', deepClone(messageData));
             messageData = await InternalFunctions.calculateTargetResult(messageData);
-            console.log('after', deepClone(messageData));
             await InternalFunctions.saveItemCardData(chatMessage.id, messageData);
             // Only retarget 1 item
             return;
@@ -2179,7 +2177,7 @@ class InternalFunctions {
     if (messageData.targetAggregate) {
       // If an aggregate was shown, make sure it will always be shown to make sure it can be reset back to the original state
       for (const oldAggregate of messageData.targetAggregate) {
-        if (!oldAggregate.dmg?.appliedDmg && !oldAggregate.dmg?.applied) {
+        if (!oldAggregate.dmg?.appliedDmg) {
           continue;
         }
         aggregates.set(oldAggregate.uuid, {
@@ -2188,6 +2186,7 @@ class InternalFunctions {
           img: oldAggregate.img,
           hpSnapshot: oldAggregate.hpSnapshot,
           dmg: {
+            avoided: true,
             applied: false,
             appliedDmg: oldAggregate.dmg?.appliedDmg || 0,
             rawDmg: 0,
@@ -2208,21 +2207,23 @@ class InternalFunctions {
             img: target.img,
             hpSnapshot: target.hpSnapshot,
             dmg: {
+              avoided: true,
               applied: false,
               appliedDmg: 0,
               rawDmg: 0,
               calcDmg: 0,
-              calcHp: 0,
-              calcTemp: 0,
+              calcHp: Number(target.hpSnapshot.hp),
+              calcTemp: Number(target.hpSnapshot.temp),
             }
           });
         }
       }
     }
 
-    const applyDmg = async (aggregate: ItemCardData['targetAggregate'][0], amount: number) => {
+    const applyDmg = (aggregate: ItemCardData['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {
         aggregate.dmg = {
+          avoided: true,
           applied: false,
           appliedDmg: 0,
           rawDmg: 0,
@@ -2236,18 +2237,19 @@ class InternalFunctions {
       const minDmg = 0;
       let dmg = Math.min(maxDmg, Math.max(minDmg, amount));
       
+      aggregate.dmg.calcDmg += dmg;
       if (dmg > 0) {
         let tempDmg = Math.min(Number(aggregate.dmg.calcTemp), dmg);
         aggregate.dmg.calcTemp -= tempDmg;
         dmg -= tempDmg;
       }
-      aggregate.dmg.calcDmg += dmg;
       aggregate.dmg.calcHp -= dmg;
     }
     
     const applyHeal = async (aggregate: ItemCardData['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {
         aggregate.dmg = {
+          avoided: true,
           applied: false,
           appliedDmg: 0,
           rawDmg: 0,
@@ -2346,6 +2348,7 @@ class InternalFunctions {
               const aggregate = aggregates.get(target.uuid);
               if (aggregate.dmg == null) {
                 aggregate.dmg = {
+                  avoided: true,
                   applied: false,
                   appliedDmg: 0,
                   rawDmg: 0,
@@ -2361,9 +2364,19 @@ class InternalFunctions {
               } else if (InternalFunctions.healingDamageTypes.includes(target.result.dmg.type)) {
                 await applyHeal(aggregate, target.result.dmg.calcNumber);
               } else {
-                await applyDmg(aggregate, target.result.dmg.calcNumber);
+                applyDmg(aggregate, target.result.dmg.calcNumber);
               }
             }
+          }
+        }
+      }
+    }
+
+    for (const item of items) {
+      for (const target of item.targets ?? []) {
+        if ((item.attack && target.result.hit) || (item.check && !target.result.checkPass)) {
+          if (aggregates.get(target.uuid).dmg) {
+            aggregates.get(target.uuid).dmg.avoided = false;
           }
         }
       }
@@ -2438,6 +2451,9 @@ class InternalFunctions {
           return false;
         }
         if (target.result.applyDmg) {
+          return false;
+        }
+        if (target.result.appliedActiveEffects) {
           return false;
         }
       }
