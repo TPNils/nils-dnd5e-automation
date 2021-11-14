@@ -14,21 +14,24 @@
     {{/if}}
   {{else}}
   
-    <button data-{{moduleName}}-action="{{actionBase}}" class="{{moduleName}}-item-damage" {{#if interactionPermission}}{{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}{{/if}}>
-      {{#if (eq dmg.mode 'critical')}}
-        {{localize "DND5E.Critical"}}
-      {{else}}
-        {{#if dmg.label}}
-          {{dmg.label}}
+    <div class="{{moduleName}}-bonus-container">
+      <button data-{{moduleName}}-action="{{actionBase}}" class="{{moduleName}}-item-damage" {{#if interactionPermission}}{{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}{{/if}}>
+        {{#if (eq dmg.mode 'critical')}}
+          {{localize "DND5E.Critical"}}
         {{else}}
-          {{localize "DND5E.Damage"}}
+          {{#if dmg.label}}
+            {{dmg.label}}
+          {{else}}
+            {{localize "DND5E.Damage"}}
+          {{/if}}
         {{/if}}
+      </button>
+
+      {{#if (eq dmg.phase "bonus-input")}}
+        <input class="{{moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{dmg.userBonus}}" data-{{moduleName}}-action="{{actionBase}}-bonus" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}/>
       {{/if}}
-    </button>
+    </div>
     
-    {{#if (eq dmg.phase "bonus-input")}}
-      <input placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{dmg.userBonus}}" data-{{moduleName}}-action="{{actionBase}}-bonus" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}/>
-    {{/if}}
   {{/if}}
   
   {{#if interactionPermission}}
