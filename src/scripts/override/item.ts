@@ -33,7 +33,6 @@ async function roll(this: MyItem, {configureDialog=true, rollMode, createMessage
   // Display a configuration dialog to customize the usage
   const needsConfiguration = createMeasuredTemplate || consumeRecharge || consumeResource || consumeSpellSlot || consumeUsage;
   if (configureDialog && needsConfiguration) {
-    // TODO replace
     const configuration = await LimitedAbilityUseDialog.create(this);
     if (!configuration) {
       return;
