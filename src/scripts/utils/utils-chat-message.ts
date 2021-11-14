@@ -1671,9 +1671,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
-  /**
-   * @returns which messages should be updated
-   */
   private async applyActiveEffects(chatMessages: ChatMessage[]): Promise<void> {
     const chatMessageDatas: ItemCardData[] = [];
     const chatMessageDatasByUuid = new Map<string, ItemCardData>();
@@ -1688,7 +1685,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       } else {
         return target.result.checkPass === false || target.result.hit === true;
       }
-      return false;
     }
     const effectsByTargetUuid = new Map<string, {chatMessageIndex: number, itemIndex: number, apply: boolean}[]>();
     for (let chatMessageIndex = 0; chatMessageIndex < chatMessageDatas.length; chatMessageIndex++) {
