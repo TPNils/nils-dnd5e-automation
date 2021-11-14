@@ -3,6 +3,7 @@ import { DamageType, MyActor, MyActorData, MyItemData } from "../types/fixed-typ
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
 
 const validDamageTypes: DamageType[] = ['' /* none */, 'acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder', 'healing', 'temphp'];
+const negativeFormulaPattern = /^ *- *(.*)/;
 
 export class UtilsRoll {
 
@@ -19,17 +20,13 @@ export class UtilsRoll {
 
   public static damagePartsToRoll(parts: MyItemData['data']['damage']['parts'], rollData?: any): Roll {
     // TODO can be improved when the first formula is a negative number, don't need to join with a +
-    return UtilsRoll.damageFormulaToRoll(parts.map(([formula, damageType]) => {
+    return new Roll(parts.map(([formula, damageType]) => {
       if (damageType) {
         return `${formula}[${damageType.toLowerCase()}]`
       } else {
         return formula;
       }
     }).join(' + '), rollData);
-  }
-
-  public static damageFormulaToRoll(damageFormula: string, rollData?: any): Roll {
-    return new Roll(damageFormula, rollData);
   }
 
   public static damageFormulaToDamageParts(formula: string): MyItemData['data']['damage']['parts'] {
@@ -326,6 +323,33 @@ export class UtilsRoll {
     }
 
     return Roll.fromTerms(baseTerms.map(t => RollTerm.fromJSON(JSON.stringify(t.toJSON()))));
+  }
+
+  public static simplifyRoll(roll: Roll): Roll {
+    let terms: (RollTerm & {operator?: string})[] = [];
+    for (const term of roll.terms as (RollTerm & {operator?: string})[]) {
+      if (terms.length > 0) {
+        if (term.operator === '+') {
+          if (terms[terms.length-1].operator) {
+            // An operator with an additional '+' does nothing => visual clutter
+            continue;
+          }
+        } else if (term.operator === '-') {
+          if (terms[terms.length-1].operator === '+') {
+            // invert +
+            terms[terms.length-1] = term;
+            continue;
+          } else if (terms[terms.length-1].operator === '-') {
+            // invert -
+            terms[terms.length-1] = new OperatorTerm({operator: '+', options: term.options});
+            continue;
+          }
+        }
+      }
+      terms.push(term);
+    }
+
+    return Roll.fromTerms(terms)
   }
 
 }

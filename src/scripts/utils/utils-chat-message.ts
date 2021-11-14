@@ -996,7 +996,7 @@ export class UtilsChatMessage {
     }
     
 
-    const roll = await new Roll(parts.join(' + ')).roll({async: true});
+    const roll = await UtilsRoll.simplifyRoll(new Roll(parts.join(' + '))).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: roll});
     attack.evaluatedRoll = roll.toJSON();
     attack.phase = 'result';
@@ -1190,7 +1190,7 @@ export class UtilsChatMessage {
       roll = new Roll(roll.formula + ' + ' + target.check.userBonus);
     }
     roll = await UtilsRoll.setRollMode(roll, target.check.mode);
-    roll = await roll.roll({async: true});
+    roll = await UtilsRoll.simplifyRoll(roll).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: roll});
 
     target.check.evaluatedRoll = roll.toJSON();
@@ -1294,7 +1294,10 @@ export class UtilsChatMessage {
       let normalRoll = Roll.fromJSON(JSON.stringify(dmg.normalRoll));
       const normalRollEvaluated = dmg.normalRoll.evaluated;
       if (dmg.userBonus && !normalRollEvaluated) {
-        normalRoll = new Roll(normalRoll.formula + ' + ' + dmg.userBonus)
+        normalRoll = UtilsRoll.simplifyRoll(UtilsRoll.damagePartsToRoll([
+          ...UtilsRoll.rollToDamageParts(normalRoll),
+          ...UtilsRoll.rollToDamageParts(new Roll(dmg.userBonus, normalRoll.data))
+        ]));
       }
       const normalPromise = normalRollEvaluated ? Promise.resolve(normalRoll) : normalRoll.roll({async: true});
       const critBonusPromise = UtilsRoll.getCriticalBonusRoll(new Roll(normalRoll.formula)).roll({async: true});
@@ -1321,7 +1324,10 @@ export class UtilsChatMessage {
       let normalRoll = Roll.fromJSON(JSON.stringify(dmg.normalRoll));
       const normalRollEvaluated = dmg.normalRoll.evaluated;
       if (dmg.userBonus && !normalRollEvaluated) {
-        normalRoll = new Roll(normalRoll.formula + ' + ' + dmg.userBonus)
+        normalRoll = UtilsRoll.simplifyRoll(UtilsRoll.damagePartsToRoll([
+          ...UtilsRoll.rollToDamageParts(normalRoll),
+          ...UtilsRoll.rollToDamageParts(new Roll(dmg.userBonus, normalRoll.data))
+        ]))
       }
   
       normalRoll = await normalRoll.roll({async: true});
