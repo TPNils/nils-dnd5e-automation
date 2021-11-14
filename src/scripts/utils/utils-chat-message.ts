@@ -2014,7 +2014,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
         setProperty(updates, consumeResource.path, consumeResource.original);
       } else {
         // toggle => apply
-        setProperty(updates, consumeResource.path, consumeResource.original - consumeResource.amount);
+        setProperty(updates, consumeResource.path, Math.max(0, consumeResource.original - consumeResource.amount));
       }
       consumeResource.applied = !consumeResource.applied;
     }
