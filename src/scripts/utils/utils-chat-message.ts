@@ -1587,6 +1587,9 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       return;
     }
     const chatMessages = this.filterItemCardsOnly(context);
+    if (chatMessages.length > 0) {
+      this.applyActiveEffects(chatMessages);
+    }
     for (const chatMessage of chatMessages) {
       let clonedMessageData = deepClone(InternalFunctions.getItemCardData(chatMessage));
       let changed = false;
@@ -1610,7 +1613,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
       this.calcAllConsumeResourcesApplied(itemCards);
-      this.applyActiveEffects(itemCards);
     }
   }
   
