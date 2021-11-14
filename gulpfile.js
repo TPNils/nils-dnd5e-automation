@@ -21,6 +21,13 @@ const argv = require('yargs').argv;
 
 sass.compiler = require('sass');
 
+/**
+ * @returns {{
+ * 	dataPath: string,
+ * 	foundryPath: string,
+ * 	githubRepository: string
+ * }}
+ */
 function getConfig() {
 	const configPath = path.resolve(process.cwd(), 'foundryconfig.json');
 	let config;
@@ -362,116 +369,104 @@ async function packageBuild() {
 	});
 }
 
-/*********************/
-/*		PACKAGE		 */
-/*********************/
+/**
+ * @param {string} currentVersion
+ * @returns {string} version name
+ */
+function getVersionFromArgs(currentVersion) {
+  const version = argv.update || argv.u;
+  if (!version) {
+    throw new Error('Missing version number. Use -v <version> to specify a version.');
+  }
+
+  const versionMatch = /^v?(\d{1,}).(\d{1,}).(\d{1,})(-.+)?$/;
+  let targetVersion = null;
+
+  if (versionMatch.test(version)) {
+    targetVersion = version;
+  } else {
+    targetVersion = currentVersion.replace(
+      versionMatch,
+      (substring, major, minor, patch, addon) => {
+        let target = null;
+        if (version.toLowerCase() === 'major') {
+          target = `${Number(major) + 1}.0.0`;
+        } else if (version.toLowerCase() === 'minor') {
+          target = `${major}.${Number(minor) + 1}.0`;
+        } else if (version.toLowerCase() === 'patch') {
+          target = `${major}.${minor}.${Number(patch) + 1}`;
+        }
+
+        if (addon) {
+          target += addon;
+        }
+
+        return target;
+      }
+    );
+  }
+
+  if (targetVersion == null) {
+    throw new Error(chalk.red('Error: Incorrect version arguments. Accepts the following:\n- major\n- minor\n- patch\n- the following patterns: 1.0.0 | 1.0.0-beta'));
+  }
+  return targetVersion;
+}
 
 /**
  * Update version and URLs in the manifest JSON
  */
-function updateManifest(cb) {
+function updateGithubManifest(cb) {
 	const packageJson = fs.readJSONSync('package.json');
-	const config = getConfig(),
-		manifest = getManifest(),
-		rawURL = config.rawURL,
-		repoURL = config.repository,
-		manifestRoot = manifest.root;
+	const config = getConfig();
+	const manifest = getManifest();
 
-	if (!config) cb(Error(chalk.red('foundryconfig.json not found')));
-	if (!manifest) cb(Error(chalk.red('Manifest JSON not found')));
-	if (!rawURL || !repoURL)
-		cb(
-			Error(
-				chalk.red(
-					'Repository URLs not configured in foundryconfig.json'
-				)
-			)
-		);
+	if (!config) {
+		return cb(Error(chalk.red('foundryconfig.json not found in the ./ (root) folder')));
+	}
+	if (!manifest) {
+		return cb(Error(chalk.red('Manifest JSON not found in the ./src folder')));
+	}
+	if (!config.githubRepository) {
+		return cb(Error(chalk.red('Missing "githubRepository" property in ./foundryconfig.json. Epxected format: <githubUsername>/<githubRepo>')));
+	}
 
 	try {
-		const version = argv.update || argv.u;
+    const currentVersion = manifest.file.version;
+		let targetVersion = getVersionFromArgs(currentVersion)
 
-		/* Update version */
+    if (targetVersion.startsWith('v')) {
+      targetVersion = targetVersion.substring(1);
+    }
+    
+    // Don't allow the same version for explicit verions (not 'latest')
+    if (targetVersion === currentVersion) {
+      return cb(Error(chalk.red('Error: Target version is identical to current version.')));
+    }
 
-		const versionMatch = /^(\d{1,}).(\d{1,}).(\d{1,})$/;
-		const currentVersion = manifest.file.version;
-		let targetVersion = '';
-
-		if (!version) {
-			cb(Error('Missing version number'));
-		}
-
-		if (versionMatch.test(version)) {
-			targetVersion = version;
-		} else {
-			targetVersion = currentVersion.replace(
-				versionMatch,
-				(substring, major, minor, patch) => {
-					console.log(
-						substring,
-						Number(major) + 1,
-						Number(minor) + 1,
-						Number(patch) + 1
-					);
-					if (version === 'major') {
-						return `${Number(major) + 1}.0.0`;
-					} else if (version === 'minor') {
-						return `${major}.${Number(minor) + 1}.0`;
-					} else if (version === 'patch') {
-						return `${major}.${minor}.${Number(patch) + 1}`;
-					} else {
-						return '';
-					}
-				}
-			);
-		}
-
-		if (targetVersion === '') {
-			return cb(Error(chalk.red('Error: Incorrect version arguments.')));
-		}
-
-		if (targetVersion === currentVersion) {
-			return cb(
-				Error(
-					chalk.red(
-						'Error: Target version is identical to current version.'
-					)
-				)
-			);
-		}
 		console.log(`Updating version number to '${targetVersion}'`);
 
 		packageJson.version = targetVersion;
+
 		manifest.file.version = targetVersion;
+		manifest.file.url = `https://github.com/${config.githubRepository}`;
+		manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.json`;
+		manifest.file.download = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.zip`;
 
-		/* Update URLs */
-
-		const result = `${rawURL}/v${manifest.file.version}/package/${manifest.file.name}-v${manifest.file.version}.zip`;
-
-		manifest.file.url = repoURL;
-		manifest.file.manifest = `${rawURL}/master/${manifestRoot}/${manifest.name}`;
-		manifest.file.download = result;
-
-		const prettyProjectJson = stringify(manifest.file, {
-			maxLength: 35,
-			indent: '\t',
-		});
-
-		fs.writeJSONSync('package.json', packageJson, { spaces: '\t' });
+		fs.writeFileSync(
+			'package.json',
+			stringify(packageJson, {indent: '  '}),
+			'utf8'
+		);
 		fs.writeFileSync(
 			path.join(manifest.root, manifest.name),
-			prettyProjectJson,
+			stringify(manifest.file, {indent: '  '}),
 			'utf8'
 		);
 
 		return cb();
 	} catch (err) {
-		cb(err);
+		return cb(err);
 	}
-}
-
-function gitAdd() {
-	return gulp.src('package').pipe(git.add({ args: '--no-all' }));
 }
 
 function gitCommit() {
@@ -522,10 +517,10 @@ exports.watch = buildWatch;
 exports.clean = clean;
 exports.link = linkUserData;
 exports.package = packageBuild;
-exports.update = updateManifest;
+exports.updateManifest = updateGithubManifest;
 exports.publish = gulp.series(
 	clean,
-	updateManifest,
+	updateGithubManifest,
 	execBuild,
 	packageBuild,
 	execGit
