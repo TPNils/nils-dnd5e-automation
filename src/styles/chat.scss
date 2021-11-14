@@ -101,11 +101,19 @@
       line-height: 20px;
     }
 
+    .dice-roll .dice-flavor {
+      text-align: center;
+    }
+
     .dice-rolls {
       list-style: none;
       margin: 5px 0;
       padding: 0;
       overflow: hidden;
+
+      .dice-flavor {
+        text-align: center;
+      }
     }
 
     .#{$module-name}-flavor {
@@ -199,7 +207,6 @@
     .#{$module-name}-header, .#{$module-name}-section {
       margin: 5px 0;
     }
-
     
     .#{$module-name}-apply,
     .#{$module-name}-undo {

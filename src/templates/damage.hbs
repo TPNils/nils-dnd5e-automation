@@ -8,9 +8,9 @@
 <div class="{{moduleName}}-roll-wrapper">
   {{#if (eq dmg.phase "result")}}
     {{#if (and dmg.normalRoll.evaluated (eq dmg.mode 'normal'))}}
-      {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=flavor overrideFormula=dmg.displayFormula roll=dmg.normalRoll}}
+      {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=dmg.displayDamageTypes overrideFormula=dmg.displayFormula roll=dmg.normalRoll}}
     {{else if (and dmg.criticalRoll.evaluated (eq dmg.mode 'critical'))}}
-      {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=flavor overrideFormula=dmg.displayFormula roll=dmg.criticalRoll}}
+      {{> modules/nils-automated-compendium/templates/roll/roll.hbs flavor=dmg.displayDamageTypes overrideFormula=dmg.displayFormula roll=dmg.criticalRoll}}
     {{/if}}
   {{else}}
   
