@@ -489,7 +489,7 @@ function gitTag() {
 	);
 }
 
-const execGit = gulp.series(gitAdd, gitCommit, gitTag);
+const execGit = gulp.series(gitCommit, gitTag);
 
 const execBuild = gulp.parallel(buildTS, buildLess, buildSASS, createCopyFiles([...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs']}]));
 
