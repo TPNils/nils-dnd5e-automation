@@ -56,8 +56,8 @@ export class UtilsHandlebars {
             } else {
               game.actors.get(documentMatch[5]);
             }
-            // always show missing/invalid/deleted/null actors
-            if (actor == null) {
+            // always show missing/invalid/deleted/null actors for gms
+            if (actor == null && game.user.isGM) {
               return true;
             } else {
               const exactMatch = documentMatch[2] != null;
