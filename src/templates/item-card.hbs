@@ -227,7 +227,7 @@
               <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
               <td> {{#if target.dmg.avoided}}<i style="color: green" class="fas fa-check"></i>{{else}}<i style="color: #d03333" class="fas fa-times-circle"></i>{{/if}} {{target.name}}</td>
               <td style="text-align: center; white-space: nowrap;">
-                <span title="{{ localize "DND5E.HP" }}">{{target.hpSnapshot.hp}}</span>{{#if target.hpSnapshot.temp}}<span title="{{ localize "DND5E.Temp" }}">[{{target.hpSnapshot.temp}}]</span>{{/if}}-{{target.dmg.calcDmg}}=<b><u>{{target.dmg.calcHp}}{{#if (or target.dmg.calcTemp target.hpSnapshot.temp)}}[{{target.dmg.calcTemp}}]{{/if}}</u></b>
+                <span title="{{ localize "DND5E.HP" }}">{{target.hpSnapshot.hp}}</span>{{#if target.hpSnapshot.temp}}<span title="{{ localize "DND5E.Temp" }}">[{{target.hpSnapshot.temp}}]</span>{{/if}}{{#ifCond target.dmg.calcDmg '>' 0}}-{{target.dmg.calcDmg}}{{else}}+{{nacMath '-' target.dmg.calcDmg}}{{/ifCond}}=<b><u>{{target.dmg.calcHp}}{{#if (or target.dmg.calcTemp target.hpSnapshot.temp)}}[{{target.dmg.calcTemp}}]{{/if}}</u></b>
               </td>
               <td class="{{@root.staticValues.moduleName}}-target-actions">
                 <div style="display: flex;">
