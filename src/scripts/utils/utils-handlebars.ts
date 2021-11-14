@@ -31,21 +31,24 @@ export class UtilsHandlebars {
   private static documentPermission = /(actor)(exact)?(owner|observer|limited|none)(uuid|id):(.*)/i;
   private static hasPermissionCheck(secretFilters: string[]): boolean {
     // no filters = always visible
-    let matchesFilter = secretFilters.length === 0;
+    if (secretFilters.length === 0) {
+      return true;
+    }
 
     for (const filter of secretFilters) {
       if ((filter.toLowerCase() === 'gm' || filter.toLowerCase() === 'dm') && game.user.isGM) {
-        matchesFilter = true;
+        return true;
       }
       if (filter.toLowerCase() === 'player' && !game.user.isGM) {
-        matchesFilter = true;
+        return true;
       }
       if (filter.toLowerCase().startsWith('user:') && filter.substring(5) === game.userId) {
-        matchesFilter = true;
+        return true;
       }
       const documentMatch = UtilsHandlebars.documentPermission.exec(filter);
       if (documentMatch) {
         switch (documentMatch[1].toLocaleLowerCase()) {
+          // Don't support token owner filter. They are too short lived and are based on actor anyway
           case 'actor': {
             let actor: MyActor;
             if (documentMatch[4].toLocaleLowerCase() === 'uuid') {
@@ -55,25 +58,20 @@ export class UtilsHandlebars {
             }
             // always show missing/invalid/deleted/null actors
             if (actor == null) {
-              matchesFilter = true;
+              return true;
             } else {
               const exactMatch = documentMatch[2] != null;
               if (actor.testUserPermission(game.user, CONST.ENTITY_PERMISSIONS[documentMatch[3].toLocaleLowerCase().toUpperCase()], exactMatch)) {
-                matchesFilter = true;
+                return true;
               }
             }
             break;
           }
         }
       }
-      // Don't support token owner filter. They are too short lived and are based on actor anyway
-
-      if (matchesFilter) {
-        break;
-      }
     }
 
-    return matchesFilter;
+    return false;
   }
 
   public static hasPermission(...args: any[]): any {
