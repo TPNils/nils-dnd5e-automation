@@ -1,5 +1,3 @@
-import { documents } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
-
 export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
   readonly type: {new(...args: any[]): T, documentName: string};
   
@@ -135,6 +133,18 @@ export class DmlTrigger {
         id: Hooks.on(`delete${trigger.type.documentName}`, wrapAfterDelete(trigger.afterDelete.bind(trigger))),
       });
     }
+
+    // Special usecases
+    // @ts-ignore
+    if (trigger.type === User) {
+      // I am unsure if targetToken allows 'before' functionality (editing the record), to be save, only tigger after
+      if (typeof trigger.afterUpdate === 'function') {
+        hooks.push({
+          hook: `targetToken`,
+          id: Hooks.on(`targetToken`, wrapTargetToken(trigger.afterUpdate.bind(trigger))),
+        });
+      }
+    }
   
     return new UnregisterTrigger(hooks);
   }
@@ -191,3 +201,13 @@ function wrapAfterUpdate<T extends foundry.abstract.Document<any, any>>(callback
   }
 }
 const wrapAfterDelete = wrapAfterCreate;
+
+function wrapTargetToken<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => void | Promise<void>): (user: T, token: TokenDocument, arg3: boolean) => void {
+  return (user: T, token: TokenDocument, arg3: boolean) => {
+    return callback({
+      rows: [user],
+      options: {},
+      userId: user.id
+    });
+  }
+}

@@ -1,5 +1,6 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
+import { data } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
 import { IDmlContext, DmlTrigger, IDmlTrigger } from "../dml-trigger/dml-trigger";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
@@ -263,6 +264,7 @@ export class UtilsChatMessage {
     
     DmlTrigger.registerTrigger(new DmlTriggerChatMessage());
     DmlTrigger.registerTrigger(new DmlTriggerTemplate());
+    DmlTrigger.registerTrigger(new DmlTriggerUser());
     
     provider.getSocket().then(socket => {
       socket.register('onInteraction', (params: Parameters<typeof UtilsChatMessage['onInteractionProcessor']>[0]) => {
@@ -951,51 +953,6 @@ export class UtilsChatMessage {
     if (!attack || attack.evaluatedRoll) {
       return;
     }
-
-    // TODO this implementation does not work and should also account for checks along side the attack
-    if (InternalFunctions.canChangeTargets(messageData.items[itemIndex])) {
-      // Re-evaluate the targets, the user may have changed targets
-      const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
-
-      // Assume targets did not changes when non are selected at this time
-      if (currentTargetUuids.size !== 0) {
-        const itemTargetUuids = new Set<string>();
-        if (messageData.items[itemIndex].targets) {
-          for (const target of messageData.items[itemIndex].targets) {
-            itemTargetUuids.add(target.uuid);
-          }
-        }
-
-        let targetsChanged = itemTargetUuids.size !== currentTargetUuids.size;
-        
-        if (!targetsChanged) {
-          for (const uuid of itemTargetUuids.values()) {
-            if (!currentTargetUuids.has(uuid)) {
-              targetsChanged = true;
-              break;
-            }
-          }
-        }
-
-        if (targetsChanged) {
-          const response = await UtilsInput.targets(Array.from(currentTargetUuids), {
-            nrOfTargets: messageData.items[itemIndex].targets == null ? 0 : messageData.items[itemIndex].targets.length,
-            allowSameTarget: true, // TODO
-            allPossibleTargets: game.scenes.get(game.user.viewedScene).getEmbeddedCollection('Token').map(token => {
-              return {
-                uuid: (token as any).uuid,
-                type: 'within-range'
-              }
-            }),
-          });
-
-          if (response.cancelled == true) {
-            return;
-          }
-          messageData.items[itemIndex] = await UtilsChatMessage.setTargets(messageData.items[itemIndex], response.data.tokenUuids)
-        }
-      }
-    }
     
     const actor: MyActor = messageData.token?.uuid == null ? null : (await UtilsDocument.tokenFromUuid(messageData.token?.uuid)).getActor();
     let baseRoll = new Die();
@@ -1572,6 +1529,91 @@ export class UtilsChatMessage {
   }
   //#endregion
 
+}
+
+class DmlTriggerUser implements IDmlTrigger<User> {
+
+  get type(): typeof User {
+    return User;
+  }
+
+  public async afterUpdate(context: IDmlContext<User>): Promise<void> {
+    await this.recalcTargets(context);
+  }
+
+  private async recalcTargets(context: IDmlContext<User>): Promise<void> {
+    let thisUserChanged = false;
+    for (const user of context.rows) {
+      if (user.id === game.userId) {
+        thisUserChanged = true;
+        break;
+      }
+    }
+    if (!thisUserChanged) {
+      return;
+    }
+
+    const chatMessage = InternalFunctions.getLatestMessage();
+    if (!chatMessage) {
+      return;
+    }
+
+    let messageData = InternalFunctions.getItemCardData(chatMessage);
+    for (let itemIndex = messageData.items.length - 1; itemIndex >= 0; itemIndex--) {
+      const item = messageData.items[itemIndex];
+      console.log(item);
+      if (item.canChangeTargets) {
+        // Re-evaluate the targets, the user may have changed targets
+        const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
+
+        // Assume targets did not changes when non are selected at this time
+        if (currentTargetUuids.size !== 0) {
+          const itemTargetUuids = new Set<string>();
+          if (messageData.items[itemIndex].targets) {
+            for (const target of messageData.items[itemIndex].targets) {
+              itemTargetUuids.add(target.uuid);
+            }
+          }
+
+          let targetsChanged = itemTargetUuids.size !== currentTargetUuids.size;
+          
+          if (!targetsChanged) {
+            for (const uuid of itemTargetUuids.values()) {
+              if (!currentTargetUuids.has(uuid)) {
+                targetsChanged = true;
+                break;
+              }
+            }
+          }
+
+          if (targetsChanged) {
+            const targetsUuids: string[] = [];
+            if (messageData.items[itemIndex].targets) {
+              for (const target of messageData.items[itemIndex].targets) {
+                // The same target could have been originally targeted twice, keep that amount
+                if (currentTargetUuids.has(target.uuid)) {
+                  targetsUuids.push(target.uuid);
+                }
+              }
+            }
+            for (const currentTargetUuid of currentTargetUuids) {
+              if (!targetsUuids.includes(currentTargetUuid)) {
+                targetsUuids.push(currentTargetUuid);
+              }
+            }
+            
+            messageData.items[itemIndex] = await UtilsChatMessage.setTargets(messageData.items[itemIndex], targetsUuids)
+            console.log('before', deepClone(messageData));
+            messageData = await InternalFunctions.calculateTargetResult(messageData);
+            console.log('after', deepClone(messageData));
+            await InternalFunctions.saveItemCardData(chatMessage.id, messageData);
+            // Only retarget 1 item
+            return;
+          }
+        }
+      }
+    }
+  }
 }
 
 class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
@@ -2401,6 +2443,18 @@ class InternalFunctions {
       }
     }
     return true;
+  }
+  
+  public static getLatestMessage(): ChatMessage | null {
+    for (let messageIndex = game.messages.contents.length - 1; messageIndex >= 0; messageIndex--) {
+      const chatMessage = game.messages.contents[messageIndex];
+      const data = InternalFunctions.getItemCardData(chatMessage);
+      if (!data) {
+        continue;
+      }
+      return chatMessage;
+    }
+    return null;
   }
 
 }
