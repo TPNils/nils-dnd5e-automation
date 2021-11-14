@@ -40,24 +40,17 @@ export interface TargetResponse {
   spellLevel: number | null;
 }
 
-export type UserInputResponse<T> = {
-  cancelled: true;
-} | {
-  cancelled: false;
-  data: T
-}
-
 export class UtilsInput {
 
   /**
    * @returns an array of token UUIDs of the targeted tokens.
    */
-  public static targets(targetTokenUuids: string[], args: TargetRequest): Promise<UserInputResponse<TargetResponse>> {
+  public static targets(targetTokenUuids: string[], args: TargetRequest): Promise<TargetResponse> {
     if (args.nrOfTargets < 1) {
-      return Promise.resolve({cancelled: false, data: {
+      return Promise.resolve({
         tokenUuids: [],
         spellLevel: null
-      }});
+      });
     }
     let targetsToAutoResolve = args.nrOfTargets;
     if (args.scaling) {
@@ -70,16 +63,16 @@ export class UtilsInput {
     }
 
     if (targetTokenUuids.length === targetsToAutoResolve) {
-      return Promise.resolve({cancelled: false, data: {
+      return Promise.resolve({
         tokenUuids: targetTokenUuids,
         spellLevel: null
-      }});
+      });
     }
 
     return UtilsInput.targetDialog(targetTokenUuids, args);
   }
 
-  private static async targetDialog(preselectedTargets: string[], args: TargetRequest): Promise<UserInputResponse<TargetResponse>> {
+  private static async targetDialog(preselectedTargets: string[], args: TargetRequest): Promise<TargetResponse> {
     const fetchedTargets = await Promise.all(args.allPossibleTargets.map(target => fromUuid(target.uuid)));
     // If exacly 1 target was selected, preselect it for all possible targets
     if (preselectedTargets.length === 1 && args.nrOfTargets > 1) {
@@ -160,8 +153,7 @@ export class UtilsInput {
       }),
     });
 
-    return new Promise<UserInputResponse<TargetResponse>>((resolve, reject) => {
-      let submitCalled = false;
+    return new Promise<TargetResponse>((resolve, reject) => {
       const dialog = new Dialog({
         title: 'Select targets',
         content: dialogHtml,
@@ -181,7 +173,7 @@ export class UtilsInput {
               if (args.scaling) {
                 response.spellLevel = args.scaling.startLevel + (Math.max(0, selectedTokenUuids.length - args.nrOfTargets))
               }
-              resolve({cancelled: false, data: response});
+              resolve(response);
             }
           },
           "cancel": {
@@ -236,12 +228,6 @@ export class UtilsInput {
             const dialogWrapper = html[0].parentElement.parentElement;
             dialogWrapper.style.width = 'max-content';
           }, 0);
-        },
-        close: () => {
-          if (!submitCalled) {
-            // TODO this should just be a cancel, not an error
-            resolve({cancelled: true});
-          }
         },
         default: 'submit'
       });

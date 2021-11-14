@@ -4,16 +4,16 @@ import { staticValues } from "../static-values";
 import { MyItem } from "../types/fixed-types";
 import { UtilsChatMessage } from "../utils/utils-chat-message";
 import { UtilsDocument } from "../utils/utils-document";
-import { TargetRequest, TargetResponse, UserInputResponse, UtilsInput } from "../utils/utils-input";
+import { TargetRequest, TargetResponse, UtilsInput } from "../utils/utils-input";
 import { TemplateDetails, UtilsTemplate } from "../utils/utils-template";
 
 interface MagicMissileData {
-  targets: UserInputResponse<TargetResponse>;
+  targets: TargetResponse;
 }
 
 export class MagicMissile implements IMacro<MagicMissileData> {
 
-  public async macroData(context: MacroContext): Promise<any> {
+  public async macroData(context: MacroContext): Promise<MagicMissileData> {
     if (!context.tokenUuid) {
       throw new Error('Select a token first');
     }
@@ -80,9 +80,6 @@ export class MagicMissile implements IMacro<MagicMissileData> {
   
   public async run(context: MacroContext, data: MagicMissileData): Promise<void> {
     console.log(context, data);
-    if (data.targets.cancelled === true) {
-      return;
-    }
     // Default magic missile item
     const item = await this.getItem(context);
 
@@ -91,21 +88,21 @@ export class MagicMissile implements IMacro<MagicMissileData> {
     // Spell scaling could be different than the damage formula
     const baseDamageFormula = damageParts.map(part => `(${part[0]})[${part[1]}]`).join(' + ');
     const perTargetDamageFormula = new Map<string, string[]>();
-    for (const targetUuid of data.targets.data.tokenUuids) {
+    for (const targetUuid of data.targets.tokenUuids) {
       if (!perTargetDamageFormula.has(targetUuid)) {
         perTargetDamageFormula.set(targetUuid, []);
       }
       perTargetDamageFormula.get(targetUuid).push(baseDamageFormula);
     }
     // TODO item data
-    const damageResults = await Promise.all(data.targets.data.tokenUuids.map(() => new Roll(baseDamageFormula).roll({async: true})));
+    const damageResults = await Promise.all(data.targets.tokenUuids.map(() => new Roll(baseDamageFormula).roll({async: true})));
     
     const actor = context.actorUuid == null ? null : (await UtilsDocument.actorFromUuid(context.actorUuid));
     const itemCardData = await UtilsChatMessage.createDefaultItemData({
       actor: actor,
       item: item,
     });
-    UtilsChatMessage.setTargets(itemCardData, data.targets.data.tokenUuids);
+    UtilsChatMessage.setTargets(itemCardData, data.targets.tokenUuids);
     UtilsChatMessage.createCard({
       actor: context.actorUuid == null ? null : {uuid: context.actorUuid},
       token: context.tokenUuid == null ? null : {uuid: context.tokenUuid},

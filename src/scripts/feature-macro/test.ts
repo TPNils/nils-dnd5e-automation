@@ -4,9 +4,9 @@ import { UtilsInput } from "../utils/utils-input";
 
 let calls = 0;
 
-export class Test implements IMacro {
+export class Test implements IMacro<ReturnType<typeof UtilsInput['targets']>> {
 
-  public async macroData(context: MacroContext): Promise<any> {
+  public async macroData(context: MacroContext): Promise<ReturnType<typeof UtilsInput['targets']>> {
     return UtilsInput.targets(context.targetTokenUuids, {
       nrOfTargets: 3,
       allowSameTarget: calls++ % 2 == 1,
@@ -19,7 +19,7 @@ export class Test implements IMacro {
     });
   }
   
-  public async run(context: MacroContext, data: any): Promise<void> {
+  public async run(context: MacroContext, data: ReturnType<typeof UtilsInput['targets']>): Promise<void> {
     console.debug('run test macro', {context, data});
   }
 

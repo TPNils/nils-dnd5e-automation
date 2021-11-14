@@ -1,6 +1,5 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
-import { data } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
 import { IDmlContext, DmlTrigger, IDmlTrigger } from "../dml-trigger/dml-trigger";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
@@ -9,8 +8,6 @@ import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyActorData, MyItem, MyItemData } from "../types/fixed-types";
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
 import { UtilsDocument } from "./utils-document";
-import { UtilsHandlebars } from "./utils-handlebars";
-import { UtilsInput } from "./utils-input";
 import { UtilsRoll } from "./utils-roll";
 import { UtilsTemplate } from "./utils-template";
 

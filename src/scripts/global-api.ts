@@ -113,6 +113,12 @@ async function callMacroFromSocket(itemType: keyof typeof collections, macroName
 
 class GlobalApi {
 
+  /**
+   * Example usage with item macros
+   * ```js
+   * game['nils-automated-compendium'].api.callMacro.call(this, 'type', 'macroName', arguments)
+   * ```
+   */
   public static async callMacro(itemType: keyof typeof collections, macroName: string, macroArguments: MacroArguments): Promise<void> {
     const context = macroContextFromArgs(macroArguments);
     try {
