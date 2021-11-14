@@ -998,14 +998,9 @@ export class UtilsChatMessage {
       parts.push(attack.rollBonus);
     }
     
-    if (!Roll.validate(attack.userBonus)) {
-      // TODO error
-    } else {
-      if (attack.userBonus) {
-        parts.push(attack.userBonus);
-      }
+    if (attack.userBonus && Roll.validate(attack.userBonus)) {
+      parts.push(attack.userBonus);
     }
-    
 
     const roll = await UtilsRoll.simplifyRoll(new Roll(parts.join(' + '))).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: roll});
