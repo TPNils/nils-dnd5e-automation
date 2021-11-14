@@ -25,7 +25,6 @@ export class MemoryStorageService {
   }
 
   public static setFocusedElementSelector(selector: string): void {
-    console.log('setFocusedElementSelector', selector);
     this.properties.set(`focusedElementSelector`, selector);
   }
 

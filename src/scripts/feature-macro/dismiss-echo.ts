@@ -53,7 +53,6 @@ export class DismissEcho implements IMacro {
       }
     }
   
-    console.log('delete', deleteTokenIds)
     currentScene.deleteEmbeddedDocuments('Token', deleteTokenIds);
   }
 
