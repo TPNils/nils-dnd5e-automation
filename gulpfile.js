@@ -501,7 +501,15 @@ function gitTag() {
 	);
 }
 
-const execGit = gulp.series(gitCommit, gitTag);
+function gitPush() {
+	return git.push('origin', (err) => {
+    if (err) {
+			throw err;
+		}
+  });
+}
+
+const execGit = gulp.series(gitCommit, gitTag, gitPush);
 
 const execBuild = gulp.parallel(buildTS, buildLess, buildSASS, createCopyFiles([...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs']}]));
 
@@ -530,11 +538,10 @@ exports.clean = clean;
 exports.link = linkUserData;
 exports.package = packageBuild;
 exports.updateManifest = updateGithubManifest;
+exports.test = gitPush;
 exports.publish = gulp.series(
 	clean,
 	validateCleanRepo,
 	updateGithubManifest,
-	execBuild,
-	packageBuild,
 	execGit
 );
