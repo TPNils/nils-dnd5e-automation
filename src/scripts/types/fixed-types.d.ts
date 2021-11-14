@@ -185,7 +185,7 @@ export type MyItemData = {
       formula?: string;
     };
     uses?: {
-      max?: string;
+      max?: string | number;
       value?: number;
       per?: 'sr' | 'lr' | 'day' | 'charges' | '';
       autoDestroy?: boolean;
@@ -194,6 +194,7 @@ export type MyItemData = {
 }
 
 export type MyItem = Item & BaseDocument<MyItemData> & {
+  name: string;
   parent: MyActor;
   getChatData: () => any;
   roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;

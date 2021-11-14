@@ -1,9 +1,8 @@
+import { LimitedAbilityUseDialog } from "../app/limited-ability-use-dialog";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { ItemCardData, UtilsChatMessage } from "../utils/utils-chat-message";
-// @ts-expect-error
-import AbilityUseDialog from "/systems/dnd5e/module/apps/ability-use-dialog.js";
 
 // Source: https://gitlab.com/foundrynet/dnd5e/-/blob/e0e7ac62469046b0bf51a2fa933b7be34a476b2e/module/item/entity.js#L415
 async function roll(this: MyItem, {configureDialog=true, rollMode, createMessage=true}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}) {
@@ -35,17 +34,13 @@ async function roll(this: MyItem, {configureDialog=true, rollMode, createMessage
   const needsConfiguration = createMeasuredTemplate || consumeRecharge || consumeResource || consumeSpellSlot || consumeUsage;
   if (configureDialog && needsConfiguration) {
     // TODO replace
-    const configuration = await AbilityUseDialog.create(this);
+    const configuration = await LimitedAbilityUseDialog.create(this);
     if (!configuration) {
       return;
     }
 
     // Determine consumption preferences
     createMeasuredTemplate = Boolean(configuration.placeTemplate);
-    consumeUsage = Boolean(configuration.consumeUse);
-    consumeRecharge = Boolean(configuration.consumeRecharge);
-    consumeResource = Boolean(configuration.consumeResource);
-    consumeSpellSlot = Boolean(configuration.consumeSlot);
 
     // Handle spell upcasting
     if ( requireSpellSlot ) {
