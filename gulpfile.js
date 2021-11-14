@@ -484,21 +484,19 @@ function validateCleanRepo(cb) {
 }
 
 function gitCommit() {
-	return gulp.src('./*').pipe(
-		git.commit(`v${getManifest().file.version}`, {
-			args: '-a',
-			disableAppendPaths: true,
-		})
-	);
+  let newVersion = 'v' + getManifest().file.version;
+	return gulp.src('.').pipe(git.commit(`Updated to ${newVersion}`));
 }
 
 function gitTag() {
-	const manifest = getManifest();
+  let newVersion = 'v' + getManifest().file.version;
 	return git.tag(
-		`v${manifest.file.version}`,
-		`Updated to ${manifest.file.version}`,
+		`v${newVersion}`,
+		`Updated to ${newVersion}`,
 		(err) => {
-			if (err) throw err;
+			if (err) {
+				throw err;
+			}
 		}
 	);
 }
@@ -531,9 +529,10 @@ exports.watch = buildWatch;
 exports.clean = clean;
 exports.link = linkUserData;
 exports.package = packageBuild;
-exports.updateManifest = gulp.series(validateCleanRepo, updateGithubManifest);
+exports.updateManifest = updateGithubManifest;
 exports.publish = gulp.series(
 	clean,
+	validateCleanRepo,
 	updateGithubManifest,
 	execBuild,
 	packageBuild,
