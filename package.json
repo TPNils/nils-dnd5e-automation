@@ -1,6 +1,6 @@
 {
   "name": "nils-automated-compendium",
-  "version": "1.1.1-beta",
+  "version": "1.1.2-beta",
   "description": "",
   "scripts": {
     "build": "gulp build",
