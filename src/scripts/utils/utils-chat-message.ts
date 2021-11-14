@@ -2137,6 +2137,9 @@ class InternalFunctions {
     if (messageData.targetAggregate) {
       // If an aggregate was shown, make sure it will always be shown to make sure it can be reset back to the original state
       for (const oldAggregate of messageData.targetAggregate) {
+        if (!oldAggregate.dmg?.appliedDmg && !oldAggregate.dmg?.applied) {
+          continue;
+        }
         aggregates.set(oldAggregate.uuid, {
           uuid: oldAggregate.uuid,
           name: oldAggregate.name,
@@ -2151,6 +2154,27 @@ class InternalFunctions {
             calcTemp: oldAggregate.hpSnapshot.temp,
           }
         })
+      }
+    }
+
+    for (const item of items) {
+      for (const target of item.targets) {
+        if (!aggregates.has(target.uuid)) {
+          aggregates.set(target.uuid, {
+            uuid: target.uuid,
+            name: target.name,
+            img: target.img,
+            hpSnapshot: target.hpSnapshot,
+            dmg: {
+              applied: false,
+              appliedDmg: 0,
+              rawDmg: 0,
+              calcDmg: 0,
+              calcHp: 0,
+              calcTemp: 0,
+            }
+          });
+        }
       }
     }
 
