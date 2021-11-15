@@ -10,7 +10,7 @@
       </thead>
       <tbody>
         {{#each targets as |target|}}
-          <tr {{@root.staticValues.moduleName}}-highlight-token="{{target.uuid}}" {{#ifCond target.type '===' 'outside-range'}}style="opacity: 0.5" title="outside-range"{{/ifCond}}>
+          <tr {{@root.staticValues.moduleName}}-highlight-token="{{target.uuid}}" {{#nacExpr target.type '===' 'outside-range'}}style="opacity: 0.5" title="outside-range"{{/nacExpr}}>
             <td><img src="{{target.img}}" style="width: 28px; height: 28px; border: 0;"/></td>
             <td>{{target.name}}</td>
             {{#each target.selected as |selectedData|}}

@@ -90,6 +90,47 @@ export class UtilsHandlebars {
     }
   }
 
+  public static expressionCheck(v1: any, operator: string, v2: any): boolean {
+    switch (operator) {
+        case '==':
+            return v1 == v2;
+        case '===':
+            return v1 === v2;
+        case '!=':
+            return v1 != v2;
+        case '!==':
+            return v1 !== v2;
+        case '<':
+            return v1 < v2;
+        case '<=':
+            return v1 <= v2;
+        case '>':
+            return v1 > v2;
+        case '>=':
+            return v1 >= v2;
+        case '&&':
+            return v1 && v2;
+        case '||':
+            return v1 || v2;
+        default:
+            return false;
+    }
+  }
+  
+  public static expression(v1: any, operator: string, v2: any, options: Options): any {
+    const pass = UtilsHandlebars.expressionCheck(v1, operator, v2);
+    
+    if (!UtilsHandlebars.isBlockHelper(options)) {
+      return pass;
+    }
+
+    if (pass) {
+      return options.fn(this);
+    } else {
+      return options.inverse(this);
+    }
+  }
+
   public static missingPermission(...args: any[]): any {
     const secretFilters: string[] = args.slice(0, args.length - 1);
     const options: Options = args[args.length - 1];
@@ -149,6 +190,7 @@ export class UtilsHandlebars {
       Handlebars.registerHelper(`${staticValues.code}Concat`, UtilsHandlebars.concat);
       Handlebars.registerHelper(`${staticValues.code}Perm`, UtilsHandlebars.hasPermission);
       Handlebars.registerHelper(`${staticValues.code}MisPerm`, UtilsHandlebars.missingPermission);
+      Handlebars.registerHelper(`${staticValues.code}Expr`, UtilsHandlebars.expression);
       Handlebars.registerHelper(`${staticValues.code}CardCollapse`, UtilsHandlebars.isCardCollapse);
       Handlebars.registerHelper(`${staticValues.code}TranslateProperty`, UtilsHandlebars.translateProperty);
       Handlebars.registerHelper(`${staticValues.code}Math`, UtilsHandlebars.math);
