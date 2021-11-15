@@ -1573,8 +1573,11 @@ class DmlTriggerUser implements IDmlTrigger<User> {
       return;
     }
 
+    // Specifically the last general message, not of the user.
+    // There needs to be some way of cutting off the ability to retarget when they are not relevant anymore
+    // TODO this should probably be improved
     const chatMessage = InternalFunctions.getLatestMessage();
-    if (!chatMessage) {
+    if (!chatMessage && chatMessage.data.user === context.userId) {
       return;
     }
 
@@ -2462,6 +2465,9 @@ class InternalFunctions {
     if (!itemData.targets) {
       return true;
     }
+
+
+
     // A target has rolled a save or damage has been applied
     if (itemData.targets) {
       for (const target of itemData.targets) {
