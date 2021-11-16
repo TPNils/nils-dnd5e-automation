@@ -13,10 +13,6 @@ import { UtilsTemplate } from "./utils-template";
 
 export interface ItemCardActorData {
   uuid: string;
-  consume?: {
-    attribute: string;
-    amount: number;
-  }[];
 }
 
 export type RollJson = ReturnType<Roll['toJSON']>
