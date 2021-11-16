@@ -1334,7 +1334,7 @@ export class UtilsChatMessage {
       normalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.normalRoll)));
     } else {
       const dmgParts: MyItemData['data']['damage']['parts'] = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.baseRoll)));
-      const upcastLevel = Math.max(item.level, item.selectedlevel === 'pact' ? (messageData.actor?.level ?? 0) : item.selectedlevel);
+      const upcastLevel = Math.max(item.level, item.selectedlevel === 'pact' ? (messageData.actor?.pactLevel ?? 0) : item.selectedlevel);
       if (upcastLevel > item.level) {
         if (dmg.upcastRoll) {
           const upcastRoll = Roll.fromJSON(JSON.stringify(dmg.upcastRoll)).alter(upcastLevel - item.level, 0, {multiplyNumeric: true})
