@@ -1,5 +1,5 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
-import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
+import { ActiveEffectData, ItemData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 import { IDmlContext, DmlTrigger, IDmlTrigger } from "../dml-trigger/dml-trigger";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
@@ -13,6 +13,8 @@ import { UtilsTemplate } from "./utils-template";
 
 export interface ItemCardActorData {
   uuid: string;
+  level: number;
+  rollData: ReturnType<MyActor['getRollData']>;
 }
 
 export type RollJson = ReturnType<Roll['toJSON']>
@@ -22,6 +24,9 @@ export interface ItemCardItemData {
   uuid: string;
   name: string;
   img: string;
+  type: string;
+  level?: number | 'pact';
+  selectedlevel?: number | 'pact';
   description?: string;
   materials?: string;
   properties?: string[];
@@ -69,6 +74,9 @@ export interface ItemCardItemData {
     phase: RollPhase;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     mode: 'normal' | 'critical';
+    //rawDmgParts: MyItemData['data']['damage'];
+    //rawScaling?: MyItemData['data']['scaling'];
+    //actorBonusFormula?: string;
     normalRoll: RollJson;
     criticalRoll?: RollJson;
     userBonus: string;
@@ -87,6 +95,7 @@ export interface ItemCardItemData {
     createdTemplateUuid?: string;
   } & MyItemData['data']['target'];
   allConsumeResourcesApplied: boolean;
+  canChangeLevel: boolean;
   consumeResources: {
     uuid: string;
     path: string;
@@ -177,6 +186,11 @@ export class UtilsChatMessage {
       execute: ({keyEvent, regexResult, inputValue, messageData}) => UtilsChatMessage.processItemAttackBonus(keyEvent, Number(regexResult[1]), inputValue as string, messageData),
     },
     {
+      regex: /^item-([0-9]+)-upcastlevel$/,
+      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
+      execute: ({regexResult, inputValue, messageData}) => UtilsChatMessage.upcastlevelChange(Number(regexResult[1]), inputValue as string, messageData),
+    },
+    {
       regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemAttackMode(clickEvent, Number(regexResult[1]), regexResult[2] as ('plus' | 'minus'), messageData),
@@ -231,10 +245,6 @@ export class UtilsChatMessage {
     },
   ];
 
-  private static get healingDamageTypes(): DamageType[] {
-    return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
-  }
-
   private static get spellUpcastModes(): Array<MyItemData['data']['preparation']['mode']> {
     return (CONFIG as any).DND5E.spellUpcastModes;
   }
@@ -245,6 +255,7 @@ export class UtilsChatMessage {
       chatElement.addEventListener('click', event => UtilsChatMessage.onClick(event));
       chatElement.addEventListener('focusout', event => UtilsChatMessage.onBlur(event));
       chatElement.addEventListener('keydown', event => UtilsChatMessage.onKeyDown(event));
+      chatElement.addEventListener('change', event => UtilsChatMessage.onChange(event));
     });
 
     Hooks.on("init", () => {
@@ -268,16 +279,27 @@ export class UtilsChatMessage {
   }
 
   //#region public conversion utils
-  public static async createCard(data: ItemCardData, insert: boolean = true): Promise<ChatMessage> {
+  public static async createCard(data: {actor?: MyActor, token?: TokenDocument, items: ItemCardItemData[]}, insert: boolean = true): Promise<ChatMessage> {
     // I expect actor & token to sometimes include the whole actor/token document by accident
     // While I would prefer a full type validation, it is the realistic approach
+    const card: ItemCardData = {
+      items: data.items
+    }
     if (data.actor) {
-      data.actor = {
-        uuid: data.actor.uuid
+      let actorLevel = 0;
+      if (data.actor.type === "character") {
+        actorLevel = data.actor.data.data.details.level;
+      } else {
+        actorLevel = Math.ceil(data.actor.data.data.details.cr);
+      }
+      card.actor = {
+        level: actorLevel,
+        uuid: data.actor.uuid,
+        rollData: data.actor.getRollData()
       }
     }
     if (data.token) {
-      data.token = {
+      card.token = {
         uuid: data.token.uuid
       }
     }
@@ -289,7 +311,7 @@ export class UtilsChatMessage {
           clientTemplate: `modules/${staticValues.moduleName}/templates/item-card.hbs`,
           clientTemplateData: {
             staticValues: staticValues,
-            data: data,
+            data: card,
           }
         }
       }
@@ -302,11 +324,14 @@ export class UtilsChatMessage {
     }
   }
 
-  public static async createDefaultItemData({item, level, overrideItemScaling, actor}: {item: MyItem, level?: number, overrideItemScaling?: MyItem['data']['data']['scaling'], actor?: MyActor}): Promise<ItemCardItemData> {
+  public static async createDefaultItemData({item, actor}: {item: MyItem, actor?: MyActor}): Promise<ItemCardItemData> {
     const itemCardData: ItemCardItemData = {
       uuid: item.uuid,
       name: item.data.name,
       img: item.img,
+      type: item.type,
+      level: item.data.data?.preparation?.mode === 'pact' ? 'pact' : item.data.data.level,
+      selectedlevel: item.data.data?.preparation?.mode === 'pact' ? 'pact' : item.data.data.level,
       canChangeTargets: true,
       targetDefinition: {
         // @ts-expect-error
@@ -314,6 +339,7 @@ export class UtilsChatMessage {
         ...item.data.data.target,
       },
       allConsumeResourcesApplied: true,
+      canChangeLevel: true,
       consumeResources: [],
       activeEffectsData:  Array.from(item.effects.values())
         .map(effect => {
@@ -324,12 +350,11 @@ export class UtilsChatMessage {
         .filter(effectData => !effectData.transfer),
     };
     const isSpell = item.type === "spell";
-    if (level == null) {
-      level = item.data.data.level;
-    }
-    let originalLevel = level;
     if (item.uuid) {
-      originalLevel = (await UtilsDocument.itemFromUuid(item.uuid)).data.data.level;
+      // Items passed by external sources (like external calls to Item.displayCard) may pass an upcasted version of the item.
+      // Fetch the original item to know what the original level
+      const queriedItem = await UtilsDocument.itemFromUuid(item.uuid);
+      itemCardData.level = queriedItem.data.data.level;
     }
 
     if (item.data.data.description?.value) {
@@ -388,7 +413,8 @@ export class UtilsChatMessage {
       };
     }
 
-    // damage    
+    // damage
+    // TODO recalc after level change
     {
       const inputDamages: Array<Omit<ItemCardItemData['damages'][0], 'damageTypes' | 'displayFormula'>> = [];
       // Main damage
@@ -398,11 +424,13 @@ export class UtilsChatMessage {
         mainDamage = {
           mode: 'normal',
           phase: 'mode-select',
+          //rawDmgParts: damageParts,
+          //rawScaling: item.data.data.scaling,
           normalRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON(),
           userBonus: "",
         }
         // Consider it healing if all damage types are healing
-        const isHealing = damageParts.filter(roll => UtilsChatMessage.healingDamageTypes.includes(roll[1])).length === damageParts.length;
+        const isHealing = damageParts.filter(roll => InternalFunctions.healingDamageTypes.includes(roll[1])).length === damageParts.length;
         if (isHealing) {
           mainDamage.label = game.i18n.localize('DND5E.Healing');
         }
@@ -418,10 +446,12 @@ export class UtilsChatMessage {
       }
   
       // Spell scaling
-      const scaling = overrideItemScaling || item.data.data.scaling;
+      const scaling = item.data.data.scaling;
+      const level = itemCardData.level === 'pact' ? actor.data.data.spells.pact.level : itemCardData.level;
+      const upcastLevel = itemCardData.selectedlevel === 'pact' ? actor.data.data.spells.pact.level : itemCardData.selectedlevel;
       let applyScalingXTimes = 0;
       if (scaling?.mode === 'level') {
-        applyScalingXTimes = level - originalLevel;
+        applyScalingXTimes = upcastLevel - level;
       } else if (scaling?.mode === 'cantrip' && actor) {
         let actorLevel = 0;
         if (actor.type === "character") {
@@ -433,12 +463,6 @@ export class UtilsChatMessage {
         }
         applyScalingXTimes = Math.floor((actorLevel + 1) / 6);
       }
-      console.log('scaling', {
-        applyScalingXTimes,
-        scaling,
-        originalLevel,
-        level
-      })
       if (applyScalingXTimes > 0) {
         const scalingRollFormula = new Roll(scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true}).formula;
   
@@ -509,9 +533,9 @@ export class UtilsChatMessage {
 
     // Consume actor resources
     if (actor) {
-      const requireSpellSlot = isSpell && level > 0 && UtilsChatMessage.spellUpcastModes.includes(item.data.data.preparation.mode);
+      const requireSpellSlot = isSpell && itemCardData.level > 0 && UtilsChatMessage.spellUpcastModes.includes(item.data.data.preparation.mode);
       if (requireSpellSlot) {
-        let spellPropertyName = item.data.data.preparation.mode === "pact" ? "pact" : `spell${level}`;
+        let spellPropertyName = item.data.data.preparation.mode === "pact" ? "pact" : `spell${itemCardData.level}`;
         itemCardData.consumeResources.push({
           uuid: actor.uuid,
           path: `data.spells.${spellPropertyName}.value`,
@@ -653,6 +677,9 @@ export class UtilsChatMessage {
         return;
       }
     }
+    if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLOptionElement) {
+      return;
+    }
     if (event.target instanceof Node) {
       UtilsChatMessage.onInteraction({
         clickEvent: event,
@@ -683,6 +710,14 @@ export class UtilsChatMessage {
         keyEvent: {
           key: event.key as KeyEvent['key']
         },
+      });
+    }
+  }
+
+  private static async onChange(event: Event): Promise<void> {
+    if (event.target instanceof Node) {
+      UtilsChatMessage.onInteraction({
+        element: event.target as Node
       });
     }
   }
@@ -718,6 +753,8 @@ export class UtilsChatMessage {
             } else {
               inputValue = currentElement.value;
             }
+          } else if (currentElement instanceof HTMLSelectElement) {
+            inputValue = currentElement.value;
           }
         }
       }
@@ -1342,7 +1379,7 @@ export class UtilsChatMessage {
       const damageTypes = UtilsRoll.rollToDamageResults(normalRoll);
       let isHealing = true;
       for (const type of damageTypes.keys()) {
-        if (!UtilsChatMessage.healingDamageTypes.includes(type)) {
+        if (!InternalFunctions.healingDamageTypes.includes(type)) {
           isHealing = false;
           break;
         }
@@ -1454,6 +1491,23 @@ export class UtilsChatMessage {
     }
     await UtilsDocument.updateTokenActors(tokenActorUpdates);
     return messageData;
+  }
+  
+  private static async upcastlevelChange(itemIndex: number, level: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+    const item = messageData.items?.[itemIndex];
+    if (!item || !item.canChangeLevel) {
+      return;
+    }
+
+    const oldLevel = item.selectedlevel;
+    item.selectedlevel = level === 'pact' ? level : Number.parseInt(level);
+    if (Number.isNaN(item.selectedlevel)) {
+      item.selectedlevel = oldLevel;
+    }
+
+    if (item.selectedlevel !== oldLevel) {
+      return messageData;
+    }
   }
   //#endregion
 
@@ -1674,6 +1728,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     if (itemCards.length > 0) {
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
+      this.calcCanChangeSpellLevel(itemCards);
       this.calcAllConsumeResourcesApplied(itemCards);
     }
   }
@@ -1706,6 +1761,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
         }
 
         item.damages = item.damages.map(damage => {
+          // Diplay formula
           let displayFormula = damage.mode === 'critical' ? damage.criticalRoll?.formula : damage.normalRoll.formula;
           const damageTypes: DamageType[] = [];
           if (displayFormula) {
@@ -1735,6 +1791,38 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
         item.canChangeTargets = InternalFunctions.canChangeTargets(item);
       }
       InternalFunctions.setItemCardData(chatMessage, data);
+    }
+  }
+  
+  private calcCanChangeSpellLevel(chatMessages: ChatMessage[]): void {
+    for (const chatMessage of chatMessages) {
+      const data: ItemCardData = InternalFunctions.getItemCardData(chatMessage);
+      for (const item of data.items) {
+        item.canChangeLevel = item.level > 0;
+        if (!item.canChangeLevel) {
+          continue;
+        }
+
+        for (const damage of item.damages ?? []) {
+          if (damage.normalRoll.evaluated || damage.criticalRoll?.evaluated) {
+            item.canChangeLevel = false;
+            break;
+          }
+        }
+        if (!item.canChangeLevel) {
+          continue;
+        }
+        
+        for (const consumeResource of item.consumeResources) {
+          if (consumeResource.applied) {
+            item.canChangeLevel = false;
+            break;
+          }
+        }
+        if (!item.canChangeLevel) {
+          continue;
+        }
+      }
     }
   }
   
@@ -2461,8 +2549,6 @@ class InternalFunctions {
     if (!itemData.targets) {
       return true;
     }
-
-
 
     // A target has rolled a save or damage has been applied
     if (itemData.targets) {

@@ -21,6 +21,20 @@
         </div>
       {{/unless}}
 
+      {{#if (and (nacExpr item.type '===' 'spell') (nacExpr item.level '>' 0) )}}
+        {{#nacSpellLevels actorUuid=@root.data.actor.uuid minLevel=item.level}}
+          <select class="form-fields" {{#unless item.canChangeLevel}}disabled{{/unless}} data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-upcastlevel">
+            {{#each this}}
+              {{#nacExpr this.type '===' 'spell'}}
+                <option {{#nacExpr item.selectedlevel '===' this.level}}selected{{/nacExpr}} value="{{this.level}}">{{ localize "DND5E.SpellLevelSlot" level=(localize (nacConcat "DND5E.SpellLevel" this.level)) n=this.availableSlots }}</option>
+              {{else}} 
+                <option {{#nacExpr item.selectedlevel '===' 'pact'}}selected{{/nacExpr}} value="pact">{{ localize "DND5E.SpellLevelPact" level=this.level n=this.availableSlots }}</option>
+              {{/nacExpr}}
+            {{/each}}
+          </select>
+        {{/nacSpellLevels}}
+      {{/if}}
+
       <div class="{{@root.staticValues.moduleName}}-section">
         <div style="display: flex; align-items: end;">
           {{#if item.attack}}

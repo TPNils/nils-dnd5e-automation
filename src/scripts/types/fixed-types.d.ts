@@ -26,6 +26,12 @@ export interface ActorAbility {
   saveBonus: number; // Not sure what this is?
 }
 
+interface SpellData {
+  max: number;
+  override?: number | null;
+  slotsAvailable: boolean;
+  value: number;
+}
 export type MyActorData = {
   [key: string]: any;
   name: string;
@@ -97,6 +103,20 @@ export type MyActorData = {
     }
     mod: number;
     prof: number;
+    spells: {
+      pact: SpellData & {
+        level: number;
+      }
+      spell1: SpellData;
+      spell2: SpellData;
+      spell3: SpellData;
+      spell4: SpellData;
+      spell5: SpellData;
+      spell6: SpellData;
+      spell7: SpellData;
+      spell8: SpellData;
+      spell9: SpellData;
+    }
     traits: {
       armorProf: {
         custom: string;

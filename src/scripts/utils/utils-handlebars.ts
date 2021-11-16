@@ -1,12 +1,8 @@
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
-import { MyActor } from "../types/fixed-types";
+import { MyActor, MyActorData, SpellData } from "../types/fixed-types";
 import { UtilsDocument } from "./utils-document";
 
-interface BlockHelperOptions {
-  fn: (argThis: any) => any;
-  inverse: (argThis: any) => any
-};
 interface InlineHelperOption {
   blockParams: any;
   data: {[key: string]: any, root: any};
@@ -17,6 +13,10 @@ interface InlineHelperOption {
   };
   lookupProperty: (a: any, b: any) => any
   name: string;
+};
+interface BlockHelperOptions extends InlineHelperOption {
+  fn: (argThis: any) => any;
+  inverse: (argThis: any) => any
 };
 type Options = BlockHelperOptions | InlineHelperOption;
 
@@ -117,6 +117,52 @@ export class UtilsHandlebars {
     }
   }
   
+  public static spellLevels(options: Options): any {
+    const actor = UtilsDocument.actorFromUuid(options.hash.actorUuid, {sync: true});
+    let spellLevels: {type: 'pact' | 'spell', level: number, maxSlots: number; availableSlots: number;}[] = [];
+
+    for (const spellKey in actor.data.data.spells) {
+      const spellData: SpellData = actor.data.data.spells[spellKey];
+      if (spellData.max <= 0) {
+        continue;
+      }
+      if (spellKey.startsWith('spell')) {
+        spellLevels.push({
+          type: 'spell',
+          level: Number.parseInt(spellKey.substring(5)),
+          maxSlots: spellData.max,
+          availableSlots: spellData.value
+        });
+      } else if (spellKey === 'pact') {
+        spellLevels.push({
+          type: 'pact',
+          level: (spellData as MyActorData['data']['spells']['pact']).level,
+          maxSlots: spellData.max,
+          availableSlots: spellData.value
+        });
+      }
+    }
+
+    // Sort pact before spell levels
+    spellLevels = spellLevels.sort((a, b) => {
+      let diff = a.type.localeCompare(b.type);
+      if (diff) {
+        return diff;
+      }
+      return a.level - b.level;
+    });
+
+    if (options.hash.minLevel != null) {
+      spellLevels = spellLevels.filter(lvl => lvl.level >= options.hash.minLevel);
+    }
+
+    if (UtilsHandlebars.isBlockHelper(options)) {
+      return options.fn(spellLevels);
+    } else {
+      return spellLevels;
+    }
+  }
+  
   public static expression(v1: any, operator: string, v2: any, options: Options): any {
     const pass = UtilsHandlebars.expressionCheck(v1, operator, v2);
     
@@ -195,6 +241,7 @@ export class UtilsHandlebars {
       Handlebars.registerHelper(`${staticValues.code}TranslateProperty`, UtilsHandlebars.translateProperty);
       Handlebars.registerHelper(`${staticValues.code}Math`, UtilsHandlebars.math);
       Handlebars.registerHelper(`${staticValues.code}Capitalize`, UtilsHandlebars.capitalize);
+      Handlebars.registerHelper(`${staticValues.code}SpellLevels`, UtilsHandlebars.spellLevels);
     });
   }
 
