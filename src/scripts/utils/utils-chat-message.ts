@@ -305,7 +305,6 @@ export class UtilsChatMessage {
     }
 
     const chatMessageData: ChatMessageDataConstructorData = {
-      content: `The ${staticValues.moduleName} module is required to render this message.`,
       flags: {
         [staticValues.moduleName]: {
           clientTemplate: `modules/${staticValues.moduleName}/templates/item-card.hbs`,
@@ -1728,6 +1727,10 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   public beforeUpsert(context: IDmlContext<ChatMessage>): boolean | void {
     const itemCards = this.filterItemCardsOnly(context);
     if (itemCards.length > 0) {
+      for (const itemCard of itemCards) {
+        itemCard.data.content = `The ${staticValues.moduleName} module is required to render this message.`
+        console.log(itemCard.id);
+      }
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
       this.calcCanChangeSpellLevel(itemCards);
