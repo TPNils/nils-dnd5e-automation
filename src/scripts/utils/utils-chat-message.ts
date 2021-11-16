@@ -2029,6 +2029,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     // TODO try to do dmls across all functions in a central place
     const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
     const consumeResourcesToToggle: ItemCardData['items'][0]['consumeResources'] = [];
+    const bulkUpdate: Parameters<typeof UtilsDocument['bulkUpdate']>[0] = [];
     {
       const promisesByUuid = new Map<string, Promise<{uuid: string, document: foundry.abstract.Document<any, any>}>>();
       for (const item of messageData.items) {
@@ -2109,11 +2110,15 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
 
     for (const uuid of documentsByUuid.keys()) {
-      // TODO should add a bulk update to UtilsDocument
       if (updatesByUuid.has(uuid)) {
-        await documentsByUuid.get(uuid).update(updatesByUuid.get(uuid))
+        bulkUpdate.push({
+          document: documentsByUuid.get(uuid) as any,
+          data: updatesByUuid.get(uuid)
+        })
       }
     }
+
+    await UtilsDocument.bulkUpdate(bulkUpdate);
 
     return messageData;
   }
