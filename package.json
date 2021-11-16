@@ -7,7 +7,7 @@
     "package": "gulp package",
     "foundry": "gulp link",
     "dev": "gulp watch",
-    "release": "git checkout master && git pull && git merge dev && git push && git checkout dev",
+    "publish": "gulp publish",
     "updateSrcPacks": "gulp updateSrcPacks"
   },
   "author": "TPNils",
