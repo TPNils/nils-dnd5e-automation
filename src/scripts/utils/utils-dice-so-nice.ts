@@ -6,9 +6,12 @@ export interface ShowRollRequest {
 
 export class UtilsDiceSoNice {
 
-  public static showRoll({roll, user, rollMode}: ShowRollRequest) {
+  /**
+  * @returns {Promise<boolean>} when resolved true if the animation was displayed, false if not.
+   */
+  public static async showRoll({roll, user, rollMode}: ShowRollRequest): Promise<boolean> {
     if (!(game as any).dice3d) {
-      return;
+      return false;
     }
     if (user == null) {
       user = game.user;
@@ -29,7 +32,7 @@ export class UtilsDiceSoNice {
       }
     }
 
-    (game as any).dice3d.showForRoll(roll, user, synchronize, whispers, blind)
+    return (game as any).dice3d.showForRoll(roll, user, synchronize, whispers, blind);
   }
 
 }
