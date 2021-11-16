@@ -1831,25 +1831,27 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   private calcConsumeResources(context: IDmlContext<ChatMessage>): void {
     for (let rowIndex = 0; rowIndex < context.rows.length; rowIndex++) {
       const data = InternalFunctions.getItemCardData(context.rows[rowIndex]);
-      const oldData = InternalFunctions.getItemCardData(context.oldRows[rowIndex]);
-      
-      for (let itemIndex = 0; itemIndex < data.items.length; itemIndex++) {
-        const item = data.items[itemIndex];
-        const oldItem = oldData.items[itemIndex];
+      if (context.oldRows) {
+        const oldData = InternalFunctions.getItemCardData(context.oldRows[rowIndex]);
         
-        let effectiveSelectedLevel = item.selectedlevel === 'pact' ? (data.actor?.pactLevel ?? 0) : item.selectedlevel;
-        if (item.level > effectiveSelectedLevel) {
-          effectiveSelectedLevel = item.level;
-          item.selectedlevel = effectiveSelectedLevel;
-        }
-        
-        if (item.selectedlevel !== oldItem.selectedlevel) {
-          const newSpellPropertyName = item.selectedlevel === 'pact' ? item.selectedlevel : `spell${item.selectedlevel}`;
-          const oldSpellPropertyName = oldItem.selectedlevel === 'pact' ? oldItem.selectedlevel : `spell${oldItem.selectedlevel}`;
-          for (const consumedResource of item.consumeResources) {
-            if (!consumedResource.applied && consumedResource.uuid === data.actor?.uuid && consumedResource.path === `data.spells.${oldSpellPropertyName}.value`) {
-              consumedResource.path = `data.spells.${newSpellPropertyName}.value`;
-              consumedResource.original = UtilsDocument.actorFromUuid(consumedResource.uuid, {sync: true}).data.data.spells[newSpellPropertyName].value;
+        for (let itemIndex = 0; itemIndex < data.items.length; itemIndex++) {
+          const item = data.items[itemIndex];
+          const oldItem = oldData.items[itemIndex];
+          
+          let effectiveSelectedLevel = item.selectedlevel === 'pact' ? (data.actor?.pactLevel ?? 0) : item.selectedlevel;
+          if (item.level > effectiveSelectedLevel) {
+            effectiveSelectedLevel = item.level;
+            item.selectedlevel = effectiveSelectedLevel;
+          }
+          
+          if (item.selectedlevel !== oldItem.selectedlevel) {
+            const newSpellPropertyName = item.selectedlevel === 'pact' ? item.selectedlevel : `spell${item.selectedlevel}`;
+            const oldSpellPropertyName = oldItem.selectedlevel === 'pact' ? oldItem.selectedlevel : `spell${oldItem.selectedlevel}`;
+            for (const consumedResource of item.consumeResources) {
+              if (!consumedResource.applied && consumedResource.uuid === data.actor?.uuid && consumedResource.path === `data.spells.${oldSpellPropertyName}.value`) {
+                consumedResource.path = `data.spells.${newSpellPropertyName}.value`;
+                consumedResource.original = UtilsDocument.actorFromUuid(consumedResource.uuid, {sync: true}).data.data.spells[newSpellPropertyName].value;
+              }
             }
           }
         }
