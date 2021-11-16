@@ -14,7 +14,7 @@ import { UtilsTemplate } from "./utils-template";
 export interface ItemCardActorData {
   uuid: string;
   level: number;
-  rollData: ReturnType<MyActor['getRollData']>;
+  pactLevel: number;
 }
 
 export type RollJson = ReturnType<Roll['toJSON']>
@@ -25,7 +25,7 @@ export interface ItemCardItemData {
   name: string;
   img: string;
   type: string;
-  level?: number | 'pact';
+  level?: number;
   selectedlevel?: number | 'pact';
   description?: string;
   materials?: string;
@@ -74,10 +74,10 @@ export interface ItemCardItemData {
     phase: RollPhase;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     mode: 'normal' | 'critical';
-    //rawDmgParts: MyItemData['data']['damage'];
-    //rawScaling?: MyItemData['data']['scaling'];
-    //actorBonusFormula?: string;
-    normalRoll: RollJson;
+    baseRoll: RollJson;
+    upcastRoll?: RollJson;
+    actorBonusRoll?: RollJson;
+    normalRoll?: RollJson;
     criticalRoll?: RollJson;
     userBonus: string;
     displayDamageTypes?: string;
@@ -295,7 +295,7 @@ export class UtilsChatMessage {
       card.actor = {
         level: actorLevel,
         uuid: data.actor.uuid,
-        rollData: data.actor.getRollData()
+        pactLevel: data.actor.data.data?.spells?.pact?.level ?? 0,
       }
     }
     if (data.token) {
@@ -330,7 +330,7 @@ export class UtilsChatMessage {
       name: item.data.name,
       img: item.img,
       type: item.type,
-      level: item.data.data?.preparation?.mode === 'pact' ? 'pact' : item.data.data.level,
+      level: item.data.data.level,
       selectedlevel: item.data.data?.preparation?.mode === 'pact' ? 'pact' : item.data.data.level,
       canChangeTargets: true,
       targetDefinition: {
@@ -424,9 +424,7 @@ export class UtilsChatMessage {
         mainDamage = {
           mode: 'normal',
           phase: 'mode-select',
-          //rawDmgParts: damageParts,
-          //rawScaling: item.data.data.scaling,
-          normalRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON(),
+          baseRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON(),
           userBonus: "",
         }
         // Consider it healing if all damage types are healing
@@ -441,17 +439,26 @@ export class UtilsChatMessage {
       if (mainDamage && item.data.data.damage?.versatile) {
         const versatileDamage = deepClone(mainDamage);
         versatileDamage.label = game.i18n.localize('DND5E.Versatile');
-        versatileDamage.normalRoll = new Roll(item.data.data.damage.versatile, rollData).toJSON();
+        versatileDamage.baseRoll = new Roll(item.data.data.damage.versatile, rollData).toJSON();
         inputDamages.push(versatileDamage);
       }
   
       // Spell scaling
       const scaling = item.data.data.scaling;
-      const level = itemCardData.level === 'pact' ? actor.data.data.spells.pact.level : itemCardData.level;
-      const upcastLevel = itemCardData.selectedlevel === 'pact' ? actor.data.data.spells.pact.level : itemCardData.selectedlevel;
-      let applyScalingXTimes = 0;
-      if (scaling?.mode === 'level') {
-        applyScalingXTimes = upcastLevel - level;
+      if (scaling?.mode === 'level' && scaling.formula) {
+        const scalingRollJson: RollJson = new Roll(scaling.formula, rollData).toJSON();
+        if (inputDamages.length === 0) {
+          // when only dealing damage by upcasting? not sure if that ever happens
+          inputDamages.push({
+            mode: 'normal',
+            phase: 'mode-select',
+            baseRoll: new Roll('0').toJSON(),
+            userBonus: "",
+          });
+        }
+        for (const damage of inputDamages) {
+          damage.upcastRoll = scalingRollJson;
+        }
       } else if (scaling?.mode === 'cantrip' && actor) {
         let actorLevel = 0;
         if (actor.type === "character") {
@@ -461,32 +468,24 @@ export class UtilsChatMessage {
         } else {
           actorLevel = actor.data.data.details.spellLevel;
         }
-        applyScalingXTimes = Math.floor((actorLevel + 1) / 6);
-      }
-      if (applyScalingXTimes > 0) {
-        const scalingRollFormula = new Roll(scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true}).formula;
+        const applyScalingXTimes = Math.floor((actorLevel + 1) / 6);
+
+        if (applyScalingXTimes > 0) {
+          if (inputDamages.length === 0) {
+            // when only dealing damage by upcasting? not sure if that ever happens
+            inputDamages.push({
+              mode: 'normal',
+              phase: 'mode-select',
+              baseRoll: new Roll('0').toJSON(),
+              userBonus: "",
+            });
+          }
   
-        if (inputDamages.length === 0) {
-          // when only dealing damage by upcasting? not sure if that ever happens
-          inputDamages.push({
-            mode: 'normal',
-            phase: 'mode-select',
-            normalRoll: new Roll(scalingRollFormula, rollData).toJSON(),
-            userBonus: "",
-          });
-        } else {
           for (const damage of inputDamages) {
-            const originalDamageParts = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(damage.normalRoll)));
-            const damageType: DamageType = originalDamageParts.length > 0 ? originalDamageParts[0][1] : ''
-            const scalingParts = UtilsRoll.damageFormulaToDamageParts(scalingRollFormula);
-            for (const part of scalingParts) {
-              if (part[1] === '') {
-                // Copy the first original damage type when a type is missing
-                part[1] = damageType;
-              }
-            }
-            
-            damage.normalRoll = UtilsRoll.damagePartsToRoll([...originalDamageParts, ...scalingParts], rollData).toJSON();
+            // DND5e spell compendium has cantrip formula empty => default to the base damage formula
+            const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? damage.baseRoll.formula : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
+            // Override normal roll since cantrip scaling is static, not dynamic like level scaling
+            damage.baseRoll = UtilsRoll.mergeRolls(Roll.fromJSON(JSON.stringify(damage.baseRoll)), scalingRoll).toJSON();
           }
         }
       }
@@ -496,9 +495,7 @@ export class UtilsChatMessage {
         const actorBonus = actor.data.data.bonuses?.[item.data.data.actionType];
         if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
           for (const damage of inputDamages) {
-            const originalDamageParts = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(damage.normalRoll)));
-            const damageType: DamageType = originalDamageParts.length > 0 ? originalDamageParts[0][1] : ''
-            damage.normalRoll = UtilsRoll.damagePartsToRoll([...originalDamageParts, [String(actorBonus.damage), damageType]], rollData).toJSON();
+            damage.actorBonusRoll = new Roll(actorBonus.damage, rollData).toJSON();
           }
         }
       }
@@ -1275,7 +1272,7 @@ export class UtilsChatMessage {
     }
     dmg.mode = order[newIndex];
 
-    if (event.shiftKey || (dmg.normalRoll.evaluated && (dmg.mode === 'critical' && !dmg.criticalRoll?.evaluated))) {
+    if (event.shiftKey || (dmg.normalRoll?.evaluated && (dmg.mode === 'critical' && !dmg.criticalRoll?.evaluated))) {
       const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData, messageId);
       if (response) {
         return response;
@@ -1327,74 +1324,79 @@ export class UtilsChatMessage {
       return;
     }
     dmg.phase = 'result';
-    if (dmg.mode === 'critical') {
-      if (dmg.criticalRoll?.evaluated) {
-        return;
-      }
-
-      let normalRoll = Roll.fromJSON(JSON.stringify(dmg.normalRoll));
-      const normalRollEvaluated = dmg.normalRoll.evaluated;
-      if (dmg.userBonus && !normalRollEvaluated) {
-        normalRoll = UtilsRoll.simplifyRoll(UtilsRoll.damagePartsToRoll([
-          ...UtilsRoll.rollToDamageParts(normalRoll),
-          ...UtilsRoll.rollToDamageParts(new Roll(dmg.userBonus, normalRoll.data))
-        ]));
-      }
-      const normalPromise = normalRollEvaluated ? Promise.resolve(normalRoll) : normalRoll.roll({async: true});
-      const critBonusPromise = UtilsRoll.getCriticalBonusRoll(new Roll(normalRoll.formula)).roll({async: true});
-
-      const [normalResolved, critBonusResolved] = await Promise.all([normalPromise, critBonusPromise]);
-      const critResolved = UtilsRoll.mergeRolls(normalResolved, critBonusResolved);
-      if (!normalRollEvaluated) {
-        dmg.normalRoll = normalResolved.toJSON();
-      }
-      dmg.criticalRoll = critResolved.toJSON();
-      if (normalRollEvaluated) {
-        // If normal was already rolled, only roll crit die
-        UtilsDiceSoNice.showRoll({roll: critBonusResolved});
-      } else {
-        // If normal was not yet rolled, roll all dice
-        UtilsDiceSoNice.showRoll({roll: critResolved});
-      }
-      return messageData;
+    
+    const normalRollEvaluated = !!dmg.normalRoll?.evaluated;
+    const criticalRollEvaluated = !!dmg.criticalRoll?.evaluated;
+    let normalRollFormula: string;
+    let normalRollPromise: Promise<Roll>;
+    if (normalRollEvaluated) {
+      normalRollFormula = dmg.normalRoll.formula;
+      normalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.normalRoll)));
     } else {
-      if (dmg.normalRoll.evaluated) {
-        return;
-      }
-      
-      let normalRoll = Roll.fromJSON(JSON.stringify(dmg.normalRoll));
-      const normalRollEvaluated = dmg.normalRoll.evaluated;
-      if (dmg.userBonus && !normalRollEvaluated) {
-        normalRoll = UtilsRoll.simplifyRoll(UtilsRoll.damagePartsToRoll([
-          ...UtilsRoll.rollToDamageParts(normalRoll),
-          ...UtilsRoll.rollToDamageParts(new Roll(dmg.userBonus, normalRoll.data))
-        ]))
-      }
-  
-      normalRoll = await normalRoll.roll({async: true});
-      UtilsDiceSoNice.showRoll({roll: normalRoll});
-      dmg.normalRoll = normalRoll.toJSON();
-      
-      // Auto apply healing since it very rarely gets modified
-      const damageTypes = UtilsRoll.rollToDamageResults(normalRoll);
-      let isHealing = true;
-      for (const type of damageTypes.keys()) {
-        if (!InternalFunctions.healingDamageTypes.includes(type)) {
-          isHealing = false;
-          break;
+      const dmgParts: MyItemData['data']['damage']['parts'] = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.baseRoll)));
+      const upcastLevel = Math.max(item.level, item.selectedlevel === 'pact' ? (messageData.actor?.level ?? 0) : item.selectedlevel);
+      if (upcastLevel > item.level) {
+        if (dmg.upcastRoll) {
+          const upcastRoll = Roll.fromJSON(JSON.stringify(dmg.upcastRoll)).alter(upcastLevel - item.level, 0, {multiplyNumeric: true})
+          dmgParts.push(...UtilsRoll.rollToDamageParts(upcastRoll));
         }
       }
-
-      if (isHealing && item.targets) {
-        messageData = await InternalFunctions.calculateTargetResult(messageData);
-        const response = await UtilsChatMessage.applyDamage(item.targets.map(t => t.uuid), messageData, messageId);
-        if (response) {
-          messageData = response;
-        }
+      if (dmg.actorBonusRoll) {
+        dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.actorBonusRoll))))
       }
-  
-      return messageData;
+      if (dmg.userBonus) {
+        dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.userBonus))))
+      }
+      
+      const normalRoll = UtilsRoll.simplifyRoll(UtilsRoll.damagePartsToRoll(dmgParts));
+      normalRollFormula = normalRoll.formula;
+      normalRollPromise = normalRoll.roll({async: true});
     }
+
+    let criticalRollPromise: Promise<Roll | false>;
+    if (criticalRollEvaluated) {
+      criticalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.criticalRoll)));
+    } else if (dmg.mode === 'critical') {
+      criticalRollPromise = UtilsRoll.getCriticalBonusRoll(new Roll(normalRollFormula)).roll({async: true});
+    } else {
+      criticalRollPromise = Promise.resolve(false);
+    }
+
+    const [normalResolved, critBonusResolved] = await Promise.all([normalRollPromise, criticalRollPromise]);
+    const newRolls: Roll[] = [];
+    if (!normalRollEvaluated) {
+      newRolls.push(normalResolved);
+      dmg.normalRoll = normalResolved.toJSON();
+    }
+    if (!criticalRollEvaluated && critBonusResolved) {
+      newRolls.push(critBonusResolved);
+      dmg.criticalRoll = UtilsRoll.mergeRolls(normalResolved, critBonusResolved).toJSON();
+    }
+
+    if (newRolls.length > 0) {
+      // Don't wait for the roll animation to finish
+      UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...newRolls)});
+    }
+    
+    // Auto apply healing since it very rarely gets modified
+    const damageTypes = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(dmg.criticalRoll?.evaluated ? dmg.criticalRoll : dmg.normalRoll)));
+    let isHealing = true;
+    for (const type of damageTypes.keys()) {
+      if (!InternalFunctions.healingDamageTypes.includes(type)) {
+        isHealing = false;
+        break;
+      }
+    }
+
+    if (isHealing && item.targets) {
+      messageData = await InternalFunctions.calculateTargetResult(messageData);
+      const response = await UtilsChatMessage.applyDamage(item.targets.map(t => t.uuid), messageData, messageId);
+      if (response) {
+        messageData = response;
+      }
+    }
+
+    return messageData;
   }
   
   private static async applyDamage(tokenUuid: (string | '*')[], messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
@@ -1762,7 +1764,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
 
         item.damages = item.damages.map(damage => {
           // Diplay formula
-          let displayFormula = damage.mode === 'critical' ? damage.criticalRoll?.formula : damage.normalRoll.formula;
+          let displayFormula = damage.mode === 'critical' ? damage.criticalRoll?.formula : damage.normalRoll?.formula;
           const damageTypes: DamageType[] = [];
           if (displayFormula) {
             for (const damageType of UtilsRoll.getValidDamageTypes()) {
@@ -1804,7 +1806,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
         }
 
         for (const damage of item.damages ?? []) {
-          if (damage.normalRoll.evaluated || damage.criticalRoll?.evaluated) {
+          if (damage.normalRoll?.evaluated || damage.criticalRoll?.evaluated) {
             item.canChangeLevel = false;
             break;
           }
@@ -2052,7 +2054,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
               }
               case 'damage': {
                 for (const damage of (item.damages ?? [])) {
-                  if (damage.normalRoll.evaluated === true || damage.criticalRoll?.evaluated === true) {
+                  if (damage.normalRoll?.evaluated === true || damage.criticalRoll?.evaluated === true) {
                     shouldApply = true;
                     break;
                   }
@@ -2399,7 +2401,7 @@ class InternalFunctions {
       const calcDmgForTargets = item.targets.filter(target => target.result.hit !== false && (!item.check || target.check?.evaluatedRoll?.evaluated));
 
       // Damage
-      const evaluatedDamageRolls = item.damages ? item.damages.filter(dmg => dmg.mode === 'critical' ? dmg.criticalRoll?.evaluated : dmg.normalRoll.evaluated) : [];
+      const evaluatedDamageRolls = item.damages ? item.damages.filter(dmg => dmg.mode === 'critical' ? dmg.criticalRoll?.evaluated : dmg.normalRoll?.evaluated) : [];
       if (calcDmgForTargets.length > 0 && evaluatedDamageRolls.length > 0) {
         for (const damage of evaluatedDamageRolls) {
           const damageResults = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(damage.mode === 'critical' ? damage.criticalRoll : damage.normalRoll)));
