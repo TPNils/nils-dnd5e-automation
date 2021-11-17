@@ -415,7 +415,6 @@ export class UtilsChatMessage {
     }
 
     // damage
-    // TODO recalc after level change
     {
       const inputDamages: Array<Omit<ItemCardItemData['damages'][0], 'damageTypes' | 'displayFormula'>> = [];
       // Main damage

@@ -18,7 +18,6 @@ export class UtilsRoll {
   }
 
   public static damagePartsToRoll(parts: MyItemData['data']['damage']['parts'], rollData?: any): Roll {
-    // TODO can be improved when the first formula is a negative number, don't need to join with a +
     return new Roll(parts.map(([formula, damageType]) => {
       if (damageType) {
         return `${formula}[${damageType.toLowerCase()}]`
