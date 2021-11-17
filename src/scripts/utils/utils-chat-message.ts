@@ -37,6 +37,7 @@ export interface ItemCardItemData {
     img?: string;
     name?: string;
     hpSnapshot: {
+      maxHp: number;
       hp: number;
       temp?: number;
     },
@@ -123,6 +124,7 @@ export interface ItemCardData {
     img?: string;
     name?: string;
     hpSnapshot: {
+      maxHp: number;
       hp: number;
       temp?: number;
     },
@@ -641,6 +643,7 @@ export class UtilsChatMessage {
         resistances: [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))],
         vulnerabilities: [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))],
         hpSnapshot: {
+          maxHp: actor.data.data.attributes.hp.max,
           hp: actor.data.data.attributes.hp.value,
           temp: actor.data.data.attributes.hp.temp
         },
@@ -1676,7 +1679,6 @@ class DmlTriggerUser implements IDmlTrigger<User> {
             }
             
             messageData.items[itemIndex] = await UtilsChatMessage.setTargets(messageData.items[itemIndex], targetsUuids)
-            messageData = await InternalFunctions.calculateTargetResult(messageData);
             await InternalFunctions.saveItemCardData(chatMessage.id, messageData);
             // Only retarget 1 item
             return;
@@ -1744,6 +1746,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       this.calcItemCardCanChangeTargets(itemCards);
       this.calcCanChangeSpellLevel(itemCards);
       this.calcConsumeResources(context);
+      this.calculateTargetResult(itemCards)
     }
   }
 
@@ -1762,6 +1765,16 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   
       if (deleteTemplateUuids.size > 0) {
         UtilsDocument.bulkDelete(((await UtilsDocument.templatesFromUuid(deleteTemplateUuids)).map(doc => {return {document: doc}})))
+      }
+    }
+  }
+
+  private calculateTargetResult(chatMessages: ChatMessage[]): void {
+    for (const chatMessage of chatMessages) {
+      const messageData = InternalFunctions.getItemCardData(chatMessage);
+      let update = InternalFunctions.calculateTargetResult(messageData);
+      if (update) {
+        InternalFunctions.setItemCardData(chatMessage, update);
       }
     }
   }
@@ -2303,7 +2316,7 @@ class InternalFunctions {
     return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
   }
 
-  public static async calculateTargetResult(messageData: ItemCardData): Promise<ItemCardData> {
+  public static calculateTargetResult(messageData: ItemCardData): ItemCardData {
     const items = messageData.items.filter(item => item.targets?.length);
 
     // Prepare data
@@ -2397,7 +2410,7 @@ class InternalFunctions {
       aggregate.dmg.calcHp -= dmg;
     }
     
-    const applyHeal = async (aggregate: ItemCardData['targetAggregate'][0], amount: number) => {
+    const applyHeal = (aggregate: ItemCardData['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {
         aggregate.dmg = {
           avoided: true,
@@ -2410,8 +2423,10 @@ class InternalFunctions {
         }
       }
 
-      const tokenActor = await UtilsDocument.actorFromUuid(aggregate.uuid);
-      const maxHeal = Math.max(0, tokenActor.data.data.attributes.hp.max - aggregate.hpSnapshot.hp);
+      // Get the current max HP since the max HP may have changed with active effects
+      // In the rare usecase where sync actor fetching is not possible, fallback to the snapshot
+      const tokenActor = UtilsDocument.actorFromUuid(aggregate.uuid, {sync: true});
+      const maxHeal = Math.max(0, tokenActor == null ? aggregate.hpSnapshot.maxHp : tokenActor.data.data.attributes.hp.max - aggregate.hpSnapshot.hp);
       const minHeal = 0;
       const heal = Math.min(maxHeal, Math.max(minHeal, amount));
       aggregate.dmg.calcDmg -= heal;
@@ -2512,7 +2527,7 @@ class InternalFunctions {
               if (target.result.dmg.type === 'temphp') {
                 aggregate.dmg.calcTemp += target.result.dmg.calcNumber;
               } else if (InternalFunctions.healingDamageTypes.includes(target.result.dmg.type)) {
-                await applyHeal(aggregate, target.result.dmg.calcNumber);
+                applyHeal(aggregate, target.result.dmg.calcNumber);
               } else {
                 applyDmg(aggregate, target.result.dmg.calcNumber);
               }
@@ -2533,10 +2548,6 @@ class InternalFunctions {
     }
 
     messageData.targetAggregate = Array.from(aggregates.values()).sort((a, b) => (a.name || '').localeCompare((b.name || '')));
-    const targetActors = new Map<string, MyActor>();
-    for (const token of (await UtilsDocument.tokensFromUuid(messageData.targetAggregate.map(t => t.uuid)))) {
-      targetActors.set(token.uuid, token.getActor());
-    }
     for (const aggregate of messageData.targetAggregate) {
       if (aggregate.dmg) {
         aggregate.dmg.applied = aggregate.dmg.calcDmg === aggregate.dmg.appliedDmg;
@@ -2562,7 +2573,6 @@ class InternalFunctions {
   }
 
   public static async saveItemCardData(messageId: string, data: ItemCardData): Promise<void> {
-    data = await InternalFunctions.calculateTargetResult(data);
     await ChatMessage.updateDocuments([{
       _id: messageId,
       flags: {
