@@ -1728,8 +1728,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     const itemCards = this.filterItemCardsOnly(context);
     if (itemCards.length > 0) {
       for (const itemCard of itemCards) {
-        itemCard.data.content = `The ${staticValues.moduleName} module is required to render this message.`
-        console.log(itemCard.id);
+        itemCard.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
       }
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
