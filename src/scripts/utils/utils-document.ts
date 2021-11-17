@@ -1,49 +1,52 @@
-import { documents } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
 import { MyActor, MyActorData, MyItem } from "../types/fixed-types";
 
 type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
 
+class MaybePromise<T> {
+  constructor(private value: T | Promise<T>){}
+
+  public then<R>(func: (value: T) => R): MaybePromise<R> {
+    if (this.value instanceof Promise) {
+      return new MaybePromise(this.value.then(func));
+    } else {
+      return new MaybePromise(func(this.value));
+    }
+  }
+
+  public getValue(): T | Promise<T> {
+    return this.value;
+  }
+}
+
+export interface QueryOptions {
+  sync?: boolean;
+}
+
 export class UtilsDocument {
 
-  public static actorFromUuid(uuid: string): Promise<MyActor>
-  public static actorFromUuid(uuid: string, options: {sync: true}): MyActor
-  public static actorFromUuid(uuid: string, options: {sync?: boolean} = {}): MyActor | Promise<MyActor> {
-    try {
-      if (options.sync === true) {
-        const directActorRegex = uuid.match(new RegExp(`^${(Actor as any).documentName}.([^\\.]+)$`))
-        if (directActorRegex) {
-          return game.actors.get(directActorRegex[1]);
-        }
-        const tokenActorRegex = uuid.match(new RegExp(`^${(Scene as any).documentName}.([^\\.]+).${(TokenDocument as any).documentName}.([^\\.]+)$`))
-        if (tokenActorRegex) {
-          return (game.scenes.get(tokenActorRegex[1]).getEmbeddedDocument('Token', tokenActorRegex[2]) as TokenDocument).getActor();
-        }
-
-        console.warn(`${(Actor as any).documentName} uuid not supported for sync calls`)
-        return null;
-      }
-
-      return fromUuid(uuid).then(document => {
+  public static actorFromUuid(inputUuid: string): Promise<MyActor>
+  public static actorFromUuid(inputUuid: Iterable<string>): Promise<MyActor[]>
+  public static actorFromUuid(inputUuid: string, options: {sync: true, deduplciate?: boolean}): MyActor
+  public static actorFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): MyActor
+  public static actorFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): MyActor | MyActor[] | Promise<MyActor> | Promise<MyActor[]> {
+    // @ts-ignore
+    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
+    if (options.deduplciate) {
+      uuids = new Set<string>(uuids);
+    }
+    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+      const actors: MyActor[] = [];
+      for (let document of response.values()) {
         if (document.documentName === (TokenDocument as any).documentName) {
           document = (document as TokenDocument).getActor();
         }
         if (document.documentName !== (Actor as any).documentName) {
-          throw new Error(`UUID '${uuid}' is not an ${(Actor as any).documentName}. In stead found: ${document.documentName}`)
+          throw new Error(`UUID '${document.uuid}' is not an ${(Actor as any).documentName}. In stead found: ${document.documentName}`)
         }
-        return document as any as MyActor;
-      }).catch(e => null);
-    } catch {
-      return null;
-    }
-  }
-
-  public static actorsFromUuid(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<MyActor[]> {
-    if (options.deduplciate) {
-      uuids = new Set<string>(uuids);
-    }
-    return Promise.all(Array.from(uuids).map(tokenUuid => {
-      return UtilsDocument.actorFromUuid(tokenUuid);
-    }));
+        actors.push(document as any as MyActor);
+      }
+      return Array.isArray(inputUuid) ? actors : actors[0];
+    }).getValue() as any;
   }
 
   public static async tokenFromUuid(uuid: string): Promise<TokenDocument> {
@@ -302,6 +305,76 @@ export class UtilsDocument {
     }
 
      return dmlsPerDocumentName;
+  }
+
+  private static fromUuid(uuids: Iterable<string>): Promise<Map<string, FoundryDocument>>
+  private static fromUuid(uuids: Iterable<string>, options: {sync: true}): Map<string, FoundryDocument>
+  private static fromUuid(uuids: Iterable<string>, options: {sync?: boolean} = {}): Promise<Map<string, FoundryDocument>> | Map<string, FoundryDocument> {
+    const getIdsPerPack = new Map<string, string[]>();
+    const documentsByUuid = new Map<string, FoundryDocument>();
+    for (const uuid of uuids) {
+      let parts = uuid.split(".");
+
+      // Compendium is always the root
+      if (parts[0] === "Compendium") {
+        if (options.sync === true) {
+          throw new Error(`${uuid} not supported for sync calls`);
+        }
+
+        const pack = `${parts[1]}.${parts[2]}`
+        if (!getIdsPerPack.has(pack)) {
+          getIdsPerPack.set(pack, []);
+        }
+        getIdsPerPack.get(pack).push(parts[3])
+      }
+    }
+
+    const documentPromises: Promise<FoundryDocument[]>[] = [];
+    for (const [packName, ids] of getIdsPerPack.entries()) {
+      documentPromises.push(game.packs.get(`${packName}`).getDocuments({_id: {$in: ids}} as any));
+    }
+
+    for (const uuid of uuids) {
+      let parts = uuid.split(".");
+      let document: FoundryDocument;
+  
+      if (parts[0] === "Compendium") {
+        // Only handle sync calls here
+        continue;
+      }
+      
+      for (let i = 0; i < parts.length; i = i+2) {
+        const documentName = parts[i];
+        const id = parts[i+1];
+        
+        if (document == null) {
+          document = CONFIG[documentName].collection.instance.get(id);
+        } else {
+          document = document.getEmbeddedDocument(documentName, id) as FoundryDocument;
+        }
+        if (document == null) {
+          break;
+        }
+      }
+
+      if (document != null) {
+        documentsByUuid.set(uuid, document);
+      }
+    }
+
+    // When async, always return a promise, even when there are no 'documentPromises'
+    if (options.sync !== true) {
+      return Promise.all(documentPromises).then(queryResponses => {
+        for (const documents of queryResponses) {
+          for (const document of documents) {
+            documentsByUuid.set(document.uuid, document);
+          }
+        }
+        return documentsByUuid;
+      });
+    } else {
+      return documentsByUuid;
+    }  
   }
 
 }
