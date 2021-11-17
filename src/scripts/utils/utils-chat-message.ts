@@ -1733,6 +1733,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
 
   public beforeUpdate(context: IDmlContext<ChatMessage>): void {
     this.onBonusChange(context);
+    // TODO recalc whole item on level change to support custom scaling level scaling formulas
   }
 
   public beforeUpsert(context: IDmlContext<ChatMessage>): boolean | void {
