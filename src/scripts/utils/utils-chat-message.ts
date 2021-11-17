@@ -1720,6 +1720,16 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
+  public afterUpdate(context: IDmlContext<ChatMessage>): void {
+    const log = document.querySelector("#chat-log");
+    const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
+    if (isAtBottom) {
+      setTimeout(() => {
+        (ui.chat as any).scrollBottom();
+      }, 0);
+    }
+  }
+
   public beforeUpdate(context: IDmlContext<ChatMessage>): void {
     this.onBonusChange(context);
   }
@@ -2552,10 +2562,6 @@ class InternalFunctions {
   }
 
   public static async saveItemCardData(messageId: string, data: ItemCardData): Promise<void> {
-    // TODO add "go to bottom" logic to a chat message update hook
-    const log = document.querySelector("#chat-log");
-    const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
-
     data = await InternalFunctions.calculateTargetResult(data);
     await ChatMessage.updateDocuments([{
       _id: messageId,
@@ -2567,9 +2573,6 @@ class InternalFunctions {
         }
       }
     }]);
-    if (isAtBottom) {
-      (ui.chat as any).scrollBottom();
-    }
   }
 
   public static getItemCardData(message: ChatMessage): ItemCardData {
