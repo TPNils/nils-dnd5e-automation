@@ -1617,7 +1617,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
   private async recalcTargets(context: IDmlContext<User>): Promise<void> {
     let thisUserChanged = false;
     for (const user of context.rows) {
-      if (user.id === game.userId) {
+      if (user.newRow.id === game.userId) {
         thisUserChanged = true;
         break;
       }
@@ -1854,10 +1854,10 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
   
   private calcConsumeResources(context: IDmlContext<ChatMessage>): void {
-    for (let rowIndex = 0; rowIndex < context.rows.length; rowIndex++) {
-      const data = InternalFunctions.getItemCardData(context.rows[rowIndex]);
-      if (context.oldRows) {
-        const oldData = InternalFunctions.getItemCardData(context.oldRows[rowIndex]);
+    for (const {newRow, oldRow} of context.rows) {
+      const data = InternalFunctions.getItemCardData(newRow);
+      if (oldRow) {
+        const oldData = InternalFunctions.getItemCardData(oldRow);
         
         for (let itemIndex = 0; itemIndex < data.items.length; itemIndex++) {
           const item = data.items[itemIndex];
@@ -1891,17 +1891,20 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
           }
         }
       }
-      InternalFunctions.setItemCardData(context.rows[rowIndex], data);
+      InternalFunctions.setItemCardData(newRow, data);
     }
   }
   
   private onBonusChange(context: IDmlContext<ChatMessage>): void {
-    if (context.userId !== game.userId || !context.oldRows) {
+    if (context.userId !== game.userId) {
       return;
     }
-    for (let rowIndex = 0; rowIndex < context.rows.length; rowIndex++) {
-      const data: ItemCardData = InternalFunctions.getItemCardData(context.rows[rowIndex]);
-      const oldData: ItemCardData = InternalFunctions.getItemCardData(context.oldRows[rowIndex]);
+    for (const {newRow, oldRow} of context.rows) {
+      if (!oldRow) {
+        continue;
+      }
+      const data: ItemCardData = InternalFunctions.getItemCardData(newRow);
+      const oldData: ItemCardData = InternalFunctions.getItemCardData(oldRow);
       for (let itemIndex = 0; itemIndex < data.items.length; itemIndex++) {
         const item = data.items[itemIndex];
         const oldItem = oldData.items.length <= itemIndex ? null : oldData.items[itemIndex];
@@ -2176,9 +2179,9 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   
   private filterItemCardsOnly(context: IDmlContext<ChatMessage>): ChatMessage[] {
     const itemCards: ChatMessage[] = [];
-    for (const row of context.rows) {
-      if (row.getFlag(staticValues.moduleName, 'clientTemplate') === `modules/${staticValues.moduleName}/templates/item-card.hbs`) {
-        itemCards.push(row);
+    for (const {newRow} of context.rows) {
+      if (newRow.getFlag(staticValues.moduleName, 'clientTemplate') === `modules/${staticValues.moduleName}/templates/item-card.hbs`) {
+        itemCards.push(newRow);
       }
     }
     return itemCards;
@@ -2196,7 +2199,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
     if (game.userId !== context.userId) {
       return;
     }
-    for (const template of context.rows) {
+    for (const {newRow: template} of context.rows) {
       const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
       if (!messageId || !game.messages.has(messageId)) {
         continue;
@@ -2244,7 +2247,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
       return;
     }
 
-    for (const template of context.rows) {
+    for (const {newRow: template} of context.rows) {
       const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
       if (!messageId || !game.messages.has(messageId)) {
         continue;

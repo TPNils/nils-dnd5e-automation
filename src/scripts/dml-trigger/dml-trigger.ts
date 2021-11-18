@@ -50,8 +50,10 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
 }
 
 export interface IDmlContext<T extends foundry.abstract.Document<any, any>> {
-  readonly rows: ReadonlyArray<T>;
-  readonly oldRows?: ReadonlyArray<T>;
+  readonly rows: ReadonlyArray<{
+    newRow: T,
+    oldRow?: T
+  }>;
   readonly options: {[key: string]: any};
   readonly userId: string;
 }
@@ -153,7 +155,7 @@ export class DmlTrigger {
 function wrapBeforeCreate<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => boolean | void): (document: T, options: IDmlContext<T>['options'], userId: string) => void {
   return (document: T, options: IDmlContext<T>['options'], userId: string) => {
     return callback({
-      rows: [document],
+      rows: [{newRow: document}],
       options: options,
       userId: userId
     });
@@ -164,8 +166,7 @@ function wrapBeforeUpdate<T extends foundry.abstract.Document<any, any>>(callbac
     const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     const response = callback({
-      rows: [modifiedDocument],
-      oldRows: [document],
+      rows: [{newRow: modifiedDocument, oldRow: document}],
       options: options,
       userId: userId
     });
@@ -183,7 +184,7 @@ const wrapBeforeDelete = wrapBeforeCreate;
 function wrapAfterCreate<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => void | Promise<void>): (document: T, options: IDmlContext<T>['options'], userId: string) => void {
   return (document: T, options: IDmlContext<T>['options'], userId: string) => {
     return callback({
-      rows: [document],
+      rows: [{newRow: document}],
       options: options,
       userId: userId
     });
@@ -194,7 +195,7 @@ function wrapAfterUpdate<T extends foundry.abstract.Document<any, any>>(callback
     const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     return callback({
-      rows: [modifiedDocument],
+      rows: [{newRow: modifiedDocument}],
       options: options,
       userId: userId
     });
@@ -205,7 +206,7 @@ const wrapAfterDelete = wrapAfterCreate;
 function wrapTargetToken<T extends foundry.abstract.Document<any, any>>(callback: (context: IDmlContext<T>) => void | Promise<void>): (user: T, token: TokenDocument, arg3: boolean) => void {
   return (user: T, token: TokenDocument, arg3: boolean) => {
     return callback({
-      rows: [user],
+      rows: [{newRow: user}],
       options: {},
       userId: user.id
     });
