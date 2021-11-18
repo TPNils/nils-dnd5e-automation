@@ -18,10 +18,6 @@ class MaybePromise<T> {
   }
 }
 
-export interface QueryOptions {
-  sync?: boolean;
-}
-
 export class UtilsDocument {
 
   //#region query
@@ -71,7 +67,6 @@ export class UtilsDocument {
       return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
     }).getValue() as any;
   }
-  
 
   public static activeEffectFromUuid(inputUuid: string): Promise<ActiveEffect>
   public static activeEffectFromUuid(inputUuid: Iterable<string>, options?: {sync?: false, deduplciate?: boolean}): Promise<ActiveEffect[]>
@@ -94,7 +89,6 @@ export class UtilsDocument {
       return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
     }).getValue() as any;
   }
-  
 
   public static itemFromUuid(inputUuid: string): Promise<MyItem>
   public static itemFromUuid(inputUuid: Iterable<string>, options?: {sync?: false, deduplciate?: boolean}): Promise<MyItem[]>
@@ -139,7 +133,6 @@ export class UtilsDocument {
       return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
     }).getValue() as any;
   }
-  
   
   public static templateFromUuid(inputUuid: string): Promise<MeasuredTemplateDocument>
   public static templateFromUuid(inputUuid: Iterable<string>, options?: {sync?: false, deduplciate?: boolean}): Promise<MeasuredTemplateDocument[]>

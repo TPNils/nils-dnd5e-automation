@@ -8,7 +8,6 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
   // Con: 
   // - Extra CPU power required by the client
   // - Templates won't be shown properly once the module is uninstalled => would be an issue anyway, this might even be cleaner
-  console.log('getHtml')
   const clientTemplate = this.getFlag(staticValues.moduleName, 'clientTemplate') as string;
   const clientTemplateData = this.getFlag(staticValues.moduleName, 'clientTemplateData') as any;
   if (clientTemplate && clientTemplateData) {
