@@ -24,10 +24,11 @@ export interface QueryOptions {
 
 export class UtilsDocument {
 
+  //#region query
   public static actorFromUuid(inputUuid: string): Promise<MyActor>
-  public static actorFromUuid(inputUuid: Iterable<string>): Promise<MyActor[]>
-  public static actorFromUuid(inputUuid: string, options: {sync: true, deduplciate?: boolean}): MyActor
-  public static actorFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): MyActor
+  public static actorFromUuid(inputUuid: Iterable<string>, options?: {sync?: false, deduplciate?: boolean}): Promise<MyActor[]>
+  public static actorFromUuid(inputUuid: string, options: {sync: true}): MyActor
+  public static actorFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): MyActor[]
   public static actorFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): MyActor | MyActor[] | Promise<MyActor> | Promise<MyActor[]> {
     // @ts-ignore
     let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
@@ -35,7 +36,7 @@ export class UtilsDocument {
       uuids = new Set<string>(uuids);
     }
     return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
-      const actors: MyActor[] = [];
+      const responseDocuments: MyActor[] = [];
       for (let document of response.values()) {
         if (document.documentName === (TokenDocument as any).documentName) {
           document = (document as TokenDocument).getActor();
@@ -43,117 +44,197 @@ export class UtilsDocument {
         if (document.documentName !== (Actor as any).documentName) {
           throw new Error(`UUID '${document.uuid}' is not an ${(Actor as any).documentName}. In stead found: ${document.documentName}`)
         }
-        actors.push(document as any as MyActor);
+        responseDocuments.push(document as any as MyActor);
       }
-      return Array.isArray(inputUuid) ? actors : actors[0];
+      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
     }).getValue() as any;
   }
 
-  public static async tokenFromUuid(uuid: string): Promise<TokenDocument> {
-    try {
-      let document = await fromUuid(uuid);
-      if (document.documentName !== (TokenDocument as any).documentName) {
-        throw new Error(`UUID '${uuid}' is not a ${(TokenDocument as any).documentName}. In stead found: ${document.documentName}`)
-      }
-      return document as TokenDocument;
-    } catch {
-      return null;
-    }
-  }
-
-  public static tokensFromUuid(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<TokenDocument[]> {
+  public static tokenFromUuid(inputUuid: string): Promise<TokenDocument>
+  public static tokenFromUuid(inputUuid: Iterable<string>, options?: {sync?: false, deduplciate?: boolean}): Promise<TokenDocument[]>
+  public static tokenFromUuid(inputUuid: string, options: {sync: true}): TokenDocument
+  public static tokenFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): TokenDocument[]
+  public static tokenFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): TokenDocument | TokenDocument[] | Promise<TokenDocument> | Promise<TokenDocument[]> {
+    // @ts-ignore
+    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
-    return Promise.all(Array.from(uuids).map(tokenUuid => {
-      return UtilsDocument.tokenFromUuid(tokenUuid);
-    }));
-  }
-
-  public static async activeEffectFromUuid(uuid: string): Promise<ActiveEffect> {
-    try {
-      let document = await fromUuid(uuid);
-      if (document.documentName !== (ActiveEffect as any).documentName) {
-        throw new Error(`UUID '${uuid}' is not an ${(ActiveEffect as any).documentName}. In stead found: ${document.documentName}`)
+    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+      const responseDocuments: TokenDocument[] = [];
+      for (let document of response.values()) {
+        if (document.documentName !== (TokenDocument as any).documentName) {
+          throw new Error(`UUID '${document.uuid}' is not an ${(TokenDocument as any).documentName}. In stead found: ${document.documentName}`)
+        }
+        responseDocuments.push(document as TokenDocument);
       }
-      return document as any as ActiveEffect;
-    } catch {
-      return null;
-    }
+      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+    }).getValue() as any;
   }
+  
 
-  public static activeEffectFromUuids(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<ActiveEffect[]> {
+  public static activeEffectFromUuid(inputUuid: string): Promise<ActiveEffect>
+  public static activeEffectFromUuid(inputUuid: Iterable<string>, options?: {sync?: false, deduplciate?: boolean}): Promise<ActiveEffect[]>
+  public static activeEffectFromUuid(inputUuid: string, options: {sync: true}): ActiveEffect
+  public static activeEffectFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): ActiveEffect[]
+  public static activeEffectFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): ActiveEffect | ActiveEffect[] | Promise<ActiveEffect> | Promise<ActiveEffect[]> {
+    // @ts-ignore
+    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
-    return Promise.all(Array.from(uuids).map(uuid => {
-      return UtilsDocument.activeEffectFromUuid(uuid);
-    }));
-  }
-
-  public static async itemFromUuid(uuid: string): Promise<MyItem> {
-    try {
-      let document = await fromUuid(uuid);
-      if (document.documentName !== (Item as any).documentName) {
-        throw new Error(`UUID '${uuid}' is not an ${(Item as any).documentName}. In stead found: ${document.documentName}`)
+    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+      const responseDocuments: ActiveEffect[] = [];
+      for (let document of response.values()) {
+        if (document.documentName !== (ActiveEffect as any).documentName) {
+          throw new Error(`UUID '${document.uuid}' is not an ${(ActiveEffect as any).documentName}. In stead found: ${document.documentName}`)
+        }
+        responseDocuments.push(document as ActiveEffect);
       }
-      return document as any as MyItem;
-    } catch {
-      return null;
-    }
+      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+    }).getValue() as any;
   }
+  
 
-  public static itemsFromUuid(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<MyItem[]> {
+  public static itemFromUuid(inputUuid: string): Promise<MyItem>
+  public static itemFromUuid(inputUuid: Iterable<string>, options?: {sync?: false, deduplciate?: boolean}): Promise<MyItem[]>
+  public static itemFromUuid(inputUuid: string, options: {sync: true}): MyItem
+  public static itemFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): MyItem[]
+  public static itemFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): MyItem | MyItem[] | Promise<MyItem> | Promise<MyItem[]> {
+    // @ts-ignore
+    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
-    return Promise.all(Array.from(uuids).map(uuid => {
-      return UtilsDocument.itemFromUuid(uuid);
-    }));
-  }
-
-  public static async sceneFromUuid(uuid: string): Promise<Scene> {
-    try {
-      let document = await fromUuid(uuid);
-      if (document.documentName !== (Scene as any).documentName) {
-        throw new Error(`UUID '${uuid}' is not an ${(Scene as any).documentName}. In stead found: ${document.documentName}`)
+    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+      const responseDocuments: MyItem[] = [];
+      for (let document of response.values()) {
+        if (document.documentName !== (Item as any).documentName) {
+          throw new Error(`UUID '${document.uuid}' is not an ${(Item as any).documentName}. In stead found: ${document.documentName}`)
+        }
+        responseDocuments.push(document as any as MyItem);
       }
-      return document as Scene;
-    } catch {
-      return null;
-    }
+      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+    }).getValue() as any;
   }
-
-  public static scenesFromUuid(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<Scene[]> {
+  
+  public static sceneFromUuid(inputUuid: string): Promise<Scene>
+  public static sceneFromUuid(inputUuid: Iterable<string>, options?: {sync?: false, deduplciate?: boolean}): Promise<Scene[]>
+  public static sceneFromUuid(inputUuid: string, options: {sync: true}): Scene
+  public static sceneFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): Scene[]
+  public static sceneFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): Scene | Scene[] | Promise<Scene> | Promise<Scene[]> {
+    // @ts-ignore
+    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
-    return Promise.all(Array.from(uuids).map(uuid => {
-      return UtilsDocument.sceneFromUuid(uuid);
-    }));
-  }
-
-  public static async templateFromUuid(uuid: string): Promise<MeasuredTemplateDocument> {
-    try {
-      let document = await fromUuid(uuid);
-      if (document.documentName !== (MeasuredTemplateDocument as any).documentName) {
-        throw new Error(`UUID '${uuid}' is not an ${(MeasuredTemplateDocument as any).documentName}. In stead found: ${document.documentName}`)
+    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+      const responseDocuments: Scene[] = [];
+      for (let document of response.values()) {
+        if (document.documentName !== (Scene as any).documentName) {
+          throw new Error(`UUID '${document.uuid}' is not an ${(Scene as any).documentName}. In stead found: ${document.documentName}`)
+        }
+        responseDocuments.push(document as Scene);
       }
-      return document as MeasuredTemplateDocument;
-    } catch {
-      return null;
-    }
+      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+    }).getValue() as any;
   }
-
-  public static templatesFromUuid(uuids: Iterable<string>, options: {deduplciate?: boolean} = {}): Promise<MeasuredTemplateDocument[]> {
+  
+  
+  public static templateFromUuid(inputUuid: string): Promise<MeasuredTemplateDocument>
+  public static templateFromUuid(inputUuid: Iterable<string>, options?: {sync?: false, deduplciate?: boolean}): Promise<MeasuredTemplateDocument[]>
+  public static templateFromUuid(inputUuid: string, options: {sync: true}): MeasuredTemplateDocument
+  public static templateFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): MeasuredTemplateDocument[]
+  public static templateFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): MeasuredTemplateDocument | MeasuredTemplateDocument[] | Promise<MeasuredTemplateDocument> | Promise<MeasuredTemplateDocument[]> {
+    // @ts-ignore
+    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
-    return Promise.all(Array.from(uuids).map(uuid => {
-      return UtilsDocument.templateFromUuid(uuid);
-    }));
+    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+      const responseDocuments: MeasuredTemplateDocument[] = [];
+      for (let document of response.values()) {
+        if (document.documentName !== (MeasuredTemplateDocument as any).documentName) {
+          throw new Error(`UUID '${document.uuid}' is not an ${(MeasuredTemplateDocument as any).documentName}. In stead found: ${document.documentName}`)
+        }
+        responseDocuments.push(document as MeasuredTemplateDocument);
+      }
+      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+    }).getValue() as any;
   }
 
+  private static fromUuid(uuids: Iterable<string>): Promise<Map<string, FoundryDocument>>
+  private static fromUuid(uuids: Iterable<string>, options: {sync: true}): Map<string, FoundryDocument>
+  private static fromUuid(uuids: Iterable<string>, options: {sync?: boolean} = {}): Promise<Map<string, FoundryDocument>> | Map<string, FoundryDocument> {
+    const getIdsPerPack = new Map<string, string[]>();
+    const documentsByUuid = new Map<string, FoundryDocument>();
+    for (const uuid of uuids) {
+      let parts = uuid.split(".");
+
+      // Compendium is always the root
+      if (parts[0] === "Compendium") {
+        if (options.sync === true) {
+          throw new Error(`${uuid} not supported for sync calls`);
+        }
+
+        const pack = `${parts[1]}.${parts[2]}`
+        if (!getIdsPerPack.has(pack)) {
+          getIdsPerPack.set(pack, []);
+        }
+        getIdsPerPack.get(pack).push(parts[3])
+      }
+    }
+
+    const documentPromises: Promise<FoundryDocument[]>[] = [];
+    for (const [packName, ids] of getIdsPerPack.entries()) {
+      documentPromises.push(game.packs.get(`${packName}`).getDocuments({_id: {$in: ids}} as any));
+    }
+
+    for (const uuid of uuids) {
+      let parts = uuid.split(".");
+      let document: FoundryDocument;
+  
+      if (parts[0] === "Compendium") {
+        // Only handle sync calls here
+        continue;
+      }
+      
+      for (let i = 0; i < parts.length; i = i+2) {
+        const documentName = parts[i];
+        const id = parts[i+1];
+        
+        if (document == null) {
+          document = CONFIG[documentName].collection.instance.get(id);
+        } else {
+          document = document.getEmbeddedDocument(documentName, id) as FoundryDocument;
+        }
+        if (document == null) {
+          break;
+        }
+      }
+
+      if (document != null) {
+        documentsByUuid.set(uuid, document);
+      }
+    }
+
+    // When async, always return a promise, even when there are no 'documentPromises'
+    if (options.sync !== true) {
+      return Promise.all(documentPromises).then(queryResponses => {
+        for (const documents of queryResponses) {
+          for (const document of documents) {
+            documentsByUuid.set(document.uuid, document);
+          }
+        }
+        return documentsByUuid;
+      });
+    } else {
+      return documentsByUuid;
+    }  
+  }
+  //#endregion
+
+  //#region dml
   public static async bulkUpdate(inputDocuments: Array<{document: FoundryDocument, data: any}>): Promise<void> {
     const documentsByUuid = new Map<string, {document: FoundryDocument, data: any}>();
     for (const document of inputDocuments) {
@@ -243,7 +324,7 @@ export class UtilsDocument {
 
   public static async updateTokenActors(actorDataByTokenUuid: Map<string, DeepPartial<MyActorData>>): Promise<void> {
     const tokensByUuid = new Map<string, TokenDocument>();
-    for (const token of (await UtilsDocument.tokensFromUuid(Array.from(actorDataByTokenUuid.keys())))) {
+    for (const token of (await UtilsDocument.tokenFromUuid(actorDataByTokenUuid.keys()))) {
       tokensByUuid.set(token.uuid, token);
     }
     
@@ -306,76 +387,7 @@ export class UtilsDocument {
 
      return dmlsPerDocumentName;
   }
-
-  private static fromUuid(uuids: Iterable<string>): Promise<Map<string, FoundryDocument>>
-  private static fromUuid(uuids: Iterable<string>, options: {sync: true}): Map<string, FoundryDocument>
-  private static fromUuid(uuids: Iterable<string>, options: {sync?: boolean} = {}): Promise<Map<string, FoundryDocument>> | Map<string, FoundryDocument> {
-    const getIdsPerPack = new Map<string, string[]>();
-    const documentsByUuid = new Map<string, FoundryDocument>();
-    for (const uuid of uuids) {
-      let parts = uuid.split(".");
-
-      // Compendium is always the root
-      if (parts[0] === "Compendium") {
-        if (options.sync === true) {
-          throw new Error(`${uuid} not supported for sync calls`);
-        }
-
-        const pack = `${parts[1]}.${parts[2]}`
-        if (!getIdsPerPack.has(pack)) {
-          getIdsPerPack.set(pack, []);
-        }
-        getIdsPerPack.get(pack).push(parts[3])
-      }
-    }
-
-    const documentPromises: Promise<FoundryDocument[]>[] = [];
-    for (const [packName, ids] of getIdsPerPack.entries()) {
-      documentPromises.push(game.packs.get(`${packName}`).getDocuments({_id: {$in: ids}} as any));
-    }
-
-    for (const uuid of uuids) {
-      let parts = uuid.split(".");
-      let document: FoundryDocument;
-  
-      if (parts[0] === "Compendium") {
-        // Only handle sync calls here
-        continue;
-      }
-      
-      for (let i = 0; i < parts.length; i = i+2) {
-        const documentName = parts[i];
-        const id = parts[i+1];
-        
-        if (document == null) {
-          document = CONFIG[documentName].collection.instance.get(id);
-        } else {
-          document = document.getEmbeddedDocument(documentName, id) as FoundryDocument;
-        }
-        if (document == null) {
-          break;
-        }
-      }
-
-      if (document != null) {
-        documentsByUuid.set(uuid, document);
-      }
-    }
-
-    // When async, always return a promise, even when there are no 'documentPromises'
-    if (options.sync !== true) {
-      return Promise.all(documentPromises).then(queryResponses => {
-        for (const documents of queryResponses) {
-          for (const document of documents) {
-            documentsByUuid.set(document.uuid, document);
-          }
-        }
-        return documentsByUuid;
-      });
-    } else {
-      return documentsByUuid;
-    }  
-  }
+  //#endregion
 
 }
 

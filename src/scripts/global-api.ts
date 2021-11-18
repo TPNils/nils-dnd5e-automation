@@ -11,6 +11,7 @@ import { MacroContext, macroContextFromArgs } from "./macro-context";
 import { provider } from "./provider/provider";
 import { MagicMissile } from "./spell-macro/magic-missile";
 import { staticValues } from "./static-values";
+import { UtilsDocument } from "./utils/utils-document";
 
 type MacroCollection = {[key: string]: IMacroConstructor};
 type MacroArguments = [PropertiesToSource<ChatSpeakerDataProperties>, Actor, Token, Actor];
@@ -141,6 +142,7 @@ export function registerHooks(): void {
     game[staticValues.moduleName].api = GlobalApi;
     if (location.hostname === 'localhost') {
       game[staticValues.moduleName].devTools = DevTools;
+      game[staticValues.moduleName].utilsDoc = UtilsDocument;
     }
   });
   

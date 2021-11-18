@@ -624,7 +624,7 @@ export class UtilsChatMessage {
 
   public static async setTargets(itemCardItemData: ItemCardItemData, targetUuids: string[]): Promise<ItemCardItemData> {
     const tokenMap = new Map<string, TokenDocument>();
-    for (const token of await UtilsDocument.tokensFromUuid(targetUuids, {deduplciate: true})) {
+    for (const token of UtilsDocument.tokenFromUuid(targetUuids, {sync: true, deduplciate: true})) {
       tokenMap.set(token.uuid, token);
     }
     
@@ -1764,7 +1764,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       deleteTemplateUuids.delete(undefined);
   
       if (deleteTemplateUuids.size > 0) {
-        UtilsDocument.bulkDelete(((await UtilsDocument.templatesFromUuid(deleteTemplateUuids)).map(doc => {return {document: doc}})))
+        UtilsDocument.bulkDelete(((await UtilsDocument.templateFromUuid(deleteTemplateUuids)).map(doc => {return {document: doc}})))
       }
     }
   }
@@ -1984,7 +1984,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
 
     const actorsByTokenUuid = new Map<string, MyActor>();
-    for (const token of (await UtilsDocument.tokensFromUuid(effectsByTargetUuid.keys()))) {
+    for (const token of (await UtilsDocument.tokenFromUuid(effectsByTargetUuid.keys()))) {
       actorsByTokenUuid.set(token.uuid, token.getActor());
     }
 
@@ -2230,7 +2230,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         Array.from(game.user.targets)[0].setTarget(false, {releaseOthers: true})
       }
       if (item.targets) {
-        const targetCanvasIds = (await UtilsDocument.tokensFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
+        const targetCanvasIds = (await UtilsDocument.tokenFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
         game.user.updateTokenTargets(targetCanvasIds);
         game.user.broadcastActivity({targets: targetCanvasIds});
       }
@@ -2272,7 +2272,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         Array.from(game.user.targets)[0].setTarget(false, {releaseOthers: true})
       }
       if (item.targets) {
-        const targetCanvasIds = (await UtilsDocument.tokensFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
+        const targetCanvasIds = (await UtilsDocument.tokenFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
         game.user.updateTokenTargets(targetCanvasIds);
         game.user.broadcastActivity({targets: targetCanvasIds});
       }
