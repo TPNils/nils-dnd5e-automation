@@ -2589,6 +2589,12 @@ class InternalFunctions {
   }
 
   public static getItemCardData(message: ChatMessage): ItemCardData {
+    if (message == null) {
+      return null;
+    }
+    if (message.getFlag(staticValues.moduleName, 'clientTemplate') === `modules/${staticValues.moduleName}/templates/item-card.hbs`) {
+      return null;
+    }
     return (message.getFlag(staticValues.moduleName, 'clientTemplateData') as any)?.data;
   }
 
