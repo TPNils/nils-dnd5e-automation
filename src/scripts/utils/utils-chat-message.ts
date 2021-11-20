@@ -71,7 +71,7 @@ export interface ItemCardItemData {
     evaluatedRoll?: RollJson
   },
   damages?: {
-    label?: string;
+    label: string;
     phase: RollPhase;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     mode: 'normal' | 'critical';
@@ -422,6 +422,7 @@ export class UtilsChatMessage {
       let mainDamage: typeof inputDamages[0];
       if (damageParts && damageParts.length > 0) {
         mainDamage = {
+          label: 'DND5E.Damage',
           mode: 'normal',
           phase: 'mode-select',
           baseRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON(),
@@ -430,7 +431,7 @@ export class UtilsChatMessage {
         // Consider it healing if all damage types are healing
         const isHealing = damageParts.filter(roll => InternalFunctions.healingDamageTypes.includes(roll[1])).length === damageParts.length;
         if (isHealing) {
-          mainDamage.label = game.i18n.localize('DND5E.Healing');
+          mainDamage.label = 'DND5E.Healing';
         }
         inputDamages.push(mainDamage);
       }
@@ -438,7 +439,7 @@ export class UtilsChatMessage {
       // Versatile damage
       if (mainDamage && item.data.data.damage?.versatile) {
         const versatileDamage = deepClone(mainDamage);
-        versatileDamage.label = game.i18n.localize('DND5E.Versatile');
+        versatileDamage.label = 'DND5E.Versatile';
         versatileDamage.baseRoll = new Roll(item.data.data.damage.versatile, rollData).toJSON();
         inputDamages.push(versatileDamage);
       }
@@ -450,6 +451,7 @@ export class UtilsChatMessage {
         if (inputDamages.length === 0) {
           // when only dealing damage by upcasting? not sure if that ever happens
           inputDamages.push({
+            label: 'DND5E.Damage',
             mode: 'normal',
             phase: 'mode-select',
             baseRoll: new Roll('0').toJSON(),
@@ -474,6 +476,7 @@ export class UtilsChatMessage {
           if (inputDamages.length === 0) {
             // when only dealing damage by upcasting? not sure if that ever happens
             inputDamages.push({
+              label: 'DND5E.Damage',
               mode: 'normal',
               phase: 'mode-select',
               baseRoll: new Roll('0').toJSON(),

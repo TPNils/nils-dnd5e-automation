@@ -21,11 +21,7 @@
           {{#if (eq dmg.mode 'critical')}}
             {{localize "DND5E.Critical"}}
           {{else}}
-            {{#if dmg.label}}
-              {{dmg.label}}
-            {{else}}
-              {{localize "DND5E.Damage"}}
-            {{/if}}
+            {{localize dmg.label}}
           {{/if}}
         </button>
 
