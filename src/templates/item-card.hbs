@@ -198,7 +198,7 @@
           <tbody>
             {{#each item.consumeResources as |consumeResource consumeResourceIndex|}}
               <tr {{#if consumeResource.calc$.applied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
-                <td>{{nacTranslateProperty consumeResource.calc$.path}}</td>
+                <td>{{nacTranslateUsage consumeResource}}</td>
                 <td>{{consumeResource.calc$.original}}-{{consumeResource.calc$.amount}}=<b {{#nacExpr (nacMath consumeResource.calc$.original '-' consumeResource.calc$.amount) '<' 0}}style="color: red;"{{/nacExpr}}><u>{{nacMath 'max(0, ' consumeResource.calc$.original '-' consumeResource.calc$.amount ')'}}</b></u></td>
                 <td>
                   <button data-{{@root.staticValues.moduleName}}-action="apply-consume-resource-{{itemIndex}}-{{consumeResourceIndex}}" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>

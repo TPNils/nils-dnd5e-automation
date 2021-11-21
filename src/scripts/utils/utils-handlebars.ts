@@ -1,6 +1,7 @@
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { MyActor, MyActorData, SpellData } from "../types/fixed-types";
+import { ItemCardItem } from "./utils-chat-message";
 import { UtilsDocument } from "./utils-document";
 
 interface InlineHelperOption {
@@ -197,26 +198,52 @@ export class UtilsHandlebars {
     return MemoryStorageService.isCardCollapsed(messageId);
   }
 
-  public static translateProperty(propertyPath: string): string {
-    const parts = propertyPath.split('.');
+  public static translateUsage(usage: ItemCardItem['consumeResources'][number]): string {
+    const uuidParts = usage.calc$.uuid.split('.');
+    const pathParts = usage.calc$.path.split('.');
 
-    switch (parts[0]) {
-      case 'data': {
-        switch (parts[1]) {
-          case 'spells': {
-            let spellLevel;
-            if (parts[2] === 'pact') {
-              spellLevel = game.i18n.localize('DND5E.PactMagic');
-            } else {
-              spellLevel = parts[2].substring(5);
+    const documentName = uuidParts[uuidParts.length - 2];
+    if (documentName === (Actor as any).documentName) {
+      switch (pathParts[0]) {
+        case 'data': {
+          switch (pathParts[1]) {
+            case 'attributes': {
+              if (pathParts[2] === 'hp') {
+                return `${game.i18n.localize('DND5E.HP')}`;
+              }
             }
-            return `${game.i18n.localize('DND5E.SpellLevel')}: ${spellLevel}`;
+            case 'currency': {
+              return `${game.i18n.localize('DND5E.Currency' + pathParts[2].capitalize())}`;
+            }
+            case 'resources': {
+              if (pathParts[3] === 'value') {
+                const actor = UtilsDocument.actorFromUuid(usage.calc$.uuid, {sync: true});
+                if (actor?.data?.data?.resources[pathParts[2]].label) {
+                  return actor.data.data.resources[pathParts[2]].label;
+                }
+                return `${game.i18n.localize('DND5E.Resource' + pathParts[2].capitalize())}`;
+              }
+            }
+            case 'spells': {
+              let spellLevel;
+              if (pathParts[2] === 'pact') {
+                spellLevel = game.i18n.localize('DND5E.PactMagic');
+              } else {
+                spellLevel = pathParts[2].substring(5);
+              }
+              return `${game.i18n.localize('DND5E.SpellLevel')}: ${spellLevel}`;
+            }
           }
         }
       }
+    } else if (documentName === (Item as any).documentName) {
+      const item = UtilsDocument.itemFromUuid(usage.calc$.uuid, {sync: true});
+      if (item) {
+        return item.name;
+      }
     }
 
-    return propertyPath;
+    return usage.calc$.path;
   }
 
   public static math(...args: any[]): number {
@@ -238,7 +265,7 @@ export class UtilsHandlebars {
       Handlebars.registerHelper(`${staticValues.code}MisPerm`, UtilsHandlebars.missingPermission);
       Handlebars.registerHelper(`${staticValues.code}Expr`, UtilsHandlebars.expression);
       Handlebars.registerHelper(`${staticValues.code}CardCollapse`, UtilsHandlebars.isCardCollapse);
-      Handlebars.registerHelper(`${staticValues.code}TranslateProperty`, UtilsHandlebars.translateProperty);
+      Handlebars.registerHelper(`${staticValues.code}TranslateUsage`, UtilsHandlebars.translateUsage);
       Handlebars.registerHelper(`${staticValues.code}Math`, UtilsHandlebars.math);
       Handlebars.registerHelper(`${staticValues.code}Capitalize`, UtilsHandlebars.capitalize);
       Handlebars.registerHelper(`${staticValues.code}SpellLevels`, UtilsHandlebars.spellLevels);

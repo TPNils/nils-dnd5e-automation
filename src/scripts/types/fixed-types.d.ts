@@ -103,6 +103,15 @@ export type MyActorData = {
     }
     mod: number;
     prof: number;
+    resources: {
+      [key: 'primary' | 'secondary' | 'tertiary']: {​​​​​
+        label: string;
+        max: number | string;
+        sr: boolean;
+        lr: false;
+        value: number | string;
+      }
+    }
     spells: {
       pact: SpellData & {
         level: number;
