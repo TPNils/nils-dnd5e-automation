@@ -2495,10 +2495,10 @@ class InternalFunctions {
                 modifier = 0;
               } else {
                 if (target.resistances.includes(dmgType)) {
-                  modifier -= .5;
+                  modifier /= 2;
                 }
                 if (target.vulnerabilities.includes(dmgType)) {
-                  modifier += .5;
+                  modifier *= 2;
                 }
               }
 
