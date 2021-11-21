@@ -1633,7 +1633,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
     // There needs to be some way of cutting off the ability to retarget when they are not relevant anymore
     // TODO this should probably be improved
     const chatMessage = InternalFunctions.getLatestMessage();
-    if (!chatMessage && chatMessage.data.user === context.userId) {
+    if (!chatMessage || chatMessage.data.user !== context.userId) {
       return;
     }
 
