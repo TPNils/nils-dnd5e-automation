@@ -26,8 +26,7 @@ export class UtilsDocument {
   public static actorFromUuid(inputUuid: string, options: {sync: true}): MyActor
   public static actorFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): MyActor[]
   public static actorFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): MyActor | MyActor[] | Promise<MyActor> | Promise<MyActor[]> {
-    // @ts-ignore
-    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
@@ -42,7 +41,7 @@ export class UtilsDocument {
         }
         responseDocuments.push(document as any as MyActor);
       }
-      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+      return typeof inputUuid === 'string' ? responseDocuments[0] : responseDocuments;
     }).getValue() as any;
   }
 
@@ -51,8 +50,7 @@ export class UtilsDocument {
   public static tokenFromUuid(inputUuid: string, options: {sync: true}): TokenDocument
   public static tokenFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): TokenDocument[]
   public static tokenFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): TokenDocument | TokenDocument[] | Promise<TokenDocument> | Promise<TokenDocument[]> {
-    // @ts-ignore
-    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
@@ -64,7 +62,7 @@ export class UtilsDocument {
         }
         responseDocuments.push(document as TokenDocument);
       }
-      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+      return typeof inputUuid === 'string' ? responseDocuments[0] : responseDocuments;
     }).getValue() as any;
   }
 
@@ -73,8 +71,7 @@ export class UtilsDocument {
   public static activeEffectFromUuid(inputUuid: string, options: {sync: true}): ActiveEffect
   public static activeEffectFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): ActiveEffect[]
   public static activeEffectFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): ActiveEffect | ActiveEffect[] | Promise<ActiveEffect> | Promise<ActiveEffect[]> {
-    // @ts-ignore
-    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
@@ -86,7 +83,7 @@ export class UtilsDocument {
         }
         responseDocuments.push(document as ActiveEffect);
       }
-      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+      return typeof inputUuid === 'string' ? responseDocuments[0] : responseDocuments;
     }).getValue() as any;
   }
 
@@ -95,8 +92,7 @@ export class UtilsDocument {
   public static itemFromUuid(inputUuid: string, options: {sync: true}): MyItem
   public static itemFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): MyItem[]
   public static itemFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): MyItem | MyItem[] | Promise<MyItem> | Promise<MyItem[]> {
-    // @ts-ignore
-    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
@@ -108,7 +104,7 @@ export class UtilsDocument {
         }
         responseDocuments.push(document as any as MyItem);
       }
-      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+      return typeof inputUuid === 'string' ? responseDocuments[0] : responseDocuments;
     }).getValue() as any;
   }
   
@@ -117,8 +113,7 @@ export class UtilsDocument {
   public static sceneFromUuid(inputUuid: string, options: {sync: true}): Scene
   public static sceneFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): Scene[]
   public static sceneFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): Scene | Scene[] | Promise<Scene> | Promise<Scene[]> {
-    // @ts-ignore
-    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
@@ -130,7 +125,7 @@ export class UtilsDocument {
         }
         responseDocuments.push(document as Scene);
       }
-      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+      return typeof inputUuid === 'string' ? responseDocuments[0] : responseDocuments;
     }).getValue() as any;
   }
   
@@ -139,8 +134,7 @@ export class UtilsDocument {
   public static templateFromUuid(inputUuid: string, options: {sync: true}): MeasuredTemplateDocument
   public static templateFromUuid(inputUuid: Iterable<string>, options: {sync: true, deduplciate?: boolean}): MeasuredTemplateDocument[]
   public static templateFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean, deduplciate?: boolean} = {}): MeasuredTemplateDocument | MeasuredTemplateDocument[] | Promise<MeasuredTemplateDocument> | Promise<MeasuredTemplateDocument[]> {
-    // @ts-ignore
-    let uuids: Iterable<string> = Array.isArray(inputUuid) ? inputUuid : [inputUuid];
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
     if (options.deduplciate) {
       uuids = new Set<string>(uuids);
     }
@@ -152,7 +146,7 @@ export class UtilsDocument {
         }
         responseDocuments.push(document as MeasuredTemplateDocument);
       }
-      return Array.isArray(inputUuid) ? responseDocuments : responseDocuments[0];
+      return typeof inputUuid === 'string' ? responseDocuments[0] : responseDocuments;
     }).getValue() as any;
   }
 
