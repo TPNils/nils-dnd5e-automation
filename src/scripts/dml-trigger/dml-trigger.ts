@@ -126,14 +126,14 @@ export class DmlTrigger {
       if (!DmlTrigger.afterWrappersByHook.has(hook)) {
         DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterCreate(hook));
       }
-      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterCreate));
+      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterCreate.bind(trigger)));
     }
     if (typeof trigger.afterUpdate === 'function') {
       const hook = `update${trigger.type.documentName}`;
       if (!DmlTrigger.afterWrappersByHook.has(hook)) {
         DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterUpdate(hook));
       }
-      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterUpdate));
+      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterUpdate.bind(trigger)));
     }
     if (typeof trigger.afterUpsert === 'function') {
       {
@@ -141,14 +141,14 @@ export class DmlTrigger {
         if (!DmlTrigger.afterWrappersByHook.has(hook)) {
           DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterCreate(hook));
         }
-        hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterUpsert));
+        hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterUpsert.bind(trigger)));
       }
       {
         const hook = `update${trigger.type.documentName}`;
         if (!DmlTrigger.afterWrappersByHook.has(hook)) {
           DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterUpdate(hook));
         }
-        hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterUpsert));
+        hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterUpsert.bind(trigger)));
       }
     }
     if (typeof trigger.afterDelete === 'function') {
@@ -156,7 +156,7 @@ export class DmlTrigger {
       if (!DmlTrigger.afterWrappersByHook.has(hook)) {
         DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterDelete(hook));
       }
-      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterDelete));
+      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterDelete.bind(trigger)));
     }
 
     // Special usecases
