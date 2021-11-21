@@ -6,13 +6,13 @@
   dmg=
 }}
 <div class="{{moduleName}}-item-{{itemIndex}}-damage-{{dmgIndex}}">
-  <div class="dice-flavor">{{dmg.displayDamageType}}</div>
+  <div class="dice-flavor">{{dmg.calc$.displayDamageType}}</div>
   <div class="{{moduleName}}-roll-wrapper">
     {{#if (eq dmg.phase "result")}}
-      {{#if (and dmg.normalRoll.evaluated (eq dmg.mode 'normal'))}}
-        {{> modules/nils-automated-compendium/templates/roll/roll.hbs overrideFormula=dmg.displayFormula roll=dmg.normalRoll}}
-      {{else if (and dmg.criticalRoll.evaluated (eq dmg.mode 'critical'))}}
-        {{> modules/nils-automated-compendium/templates/roll/roll.hbs overrideFormula=dmg.displayFormula roll=dmg.criticalRoll}}
+      {{#if (and dmg.calc$.normalRoll.evaluated (eq dmg.mode 'normal'))}}
+        {{> modules/nils-automated-compendium/templates/roll/roll.hbs overrideFormula=dmg.displayFormula roll=dmg.calc$.normalRoll}}
+      {{else if (and dmg.calc$.criticalRoll.evaluated (eq dmg.mode 'critical'))}}
+        {{> modules/nils-automated-compendium/templates/roll/roll.hbs overrideFormula=dmg.displayFormula roll=dmg.calc$.criticalRoll}}
       {{/if}}
     {{else}}
     
@@ -21,7 +21,7 @@
           {{#if (eq dmg.mode 'critical')}}
             {{localize "DND5E.Critical"}}
           {{else}}
-            {{localize dmg.label}}
+            {{localize dmg.calc$.label}}
           {{/if}}
         </button>
 

@@ -11,133 +11,149 @@ import { UtilsDocument } from "./utils-document";
 import { UtilsRoll } from "./utils-roll";
 import { UtilsTemplate } from "./utils-template";
 
-export interface ItemCardActorData {
+export interface ItemCardActor {
   uuid: string;
-  level: number;
-  pactLevel: number;
+  calc$?: {
+    level: number;
+    pactLevel: number;
+  }
 }
 
 export type RollJson = ReturnType<Roll['toJSON']>
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
-export interface ItemCardItemData {
+export interface ItemCardItem {
   uuid: string;
-  name: string;
-  img: string;
-  type: string;
-  level?: number;
   selectedlevel?: number | 'pact';
-  description?: string;
-  materials?: string;
-  properties?: string[];
+  attack?: {
+    phase: RollPhase;
+    mode: 'normal' | 'advantage' | 'disadvantage';
+    userBonus: string;
+    calc$: {
+      label?: string;
+      rollBonus?: string;
+      evaluatedRoll?: RollJson
+    }
+  },
+  damages?: {
+    phase: RollPhase;
+    mode: 'normal' | 'critical';
+    userBonus: string;
+    calc$: {
+      label: string;
+      modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
+      baseRoll: RollJson;
+      upcastRoll?: RollJson;
+      actorBonusRoll?: RollJson;
+      normalRoll?: RollJson;
+      criticalRoll?: RollJson;
+      displayDamageTypes?: string;
+      displayFormula?: string;
+    }
+  }[];
   targets?: {
     uuid: string;
-    actorUuid: string;
-    ac: number;
-    img?: string;
-    name?: string;
-    hpSnapshot: {
-      maxHp: number;
-      hp: number;
-      temp?: number;
-    },
-    immunities: string[];
-    resistances: string[];
-    vulnerabilities: string[];
     check?: {
-      evaluatedRoll?: RollJson;
       phase: RollPhase;
       userBonus: string;
       mode: 'normal' | 'advantage' | 'disadvantage';
+      calc$: {
+        evaluatedRoll?: RollJson;
+      }
     }
-    result: {
-      hit?: boolean;
-      checkPass?: boolean;
-      applyDmg?: boolean;
-      dmg?: {
-        type: DamageType;
-        rawNumber: number;
-        calcNumber: number;
+    applyDmg?: boolean;
+    calc$?: {
+      actorUuid: string;
+      ac: number;
+      img?: string;
+      name?: string;
+      hpSnapshot: {
+        maxHp: number;
+        hp: number;
+        temp?: number;
       },
-      appliedActiveEffects: boolean; // The UUIDs of the newly created effects
+      immunities: string[];
+      resistances: string[];
+      vulnerabilities: string[];
+      result: {
+        hit?: boolean;
+        checkPass?: boolean;
+        dmg?: {
+          type: DamageType;
+          rawNumber: number;
+          calcNumber: number;
+        },
+        appliedActiveEffects: boolean; // The UUIDs of the newly created effects
+      }
     }
   }[];
-  attack?: {
-    label?: string;
-    phase: RollPhase;
-    mode: 'normal' | 'advantage' | 'disadvantage';
-    rollBonus?: string;
-    userBonus: string;
-    evaluatedRoll?: RollJson
-  },
-  damages?: {
-    label: string;
-    phase: RollPhase;
-    modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
-    mode: 'normal' | 'critical';
-    baseRoll: RollJson;
-    upcastRoll?: RollJson;
-    actorBonusRoll?: RollJson;
-    normalRoll?: RollJson;
-    criticalRoll?: RollJson;
-    userBonus: string;
-    displayDamageTypes?: string;
-    displayFormula?: string;
-  }[];
-  check?: {
-    ability: keyof MyActor['data']['data']['abilities'];
-    dc: number;
-    label?: string;
-    skill?: string;
-    addSaveBonus?: boolean;
-  };
-  targetDefinition: {
-    hasAoe: boolean,
-    createdTemplateUuid?: string;
-  } & MyItemData['data']['target'];
-  allConsumeResourcesApplied: boolean;
-  canChangeLevel: boolean;
   consumeResources: {
-    uuid: string;
-    path: string;
-    amount: number;
-    original: number;
-    autoconsumeAfter?: 'init' | 'attack' | 'damage' | 'check' | 'template-placed';
     consumeResourcesAction?: 'undo' | 'manual-apply';
-    applied: boolean;
+    calc$: {
+      uuid: string;
+      path: string;
+      amount: number;
+      original: number;
+      autoconsumeAfter?: 'init' | 'attack' | 'damage' | 'check' | 'template-placed';
+      applied: boolean;
+    }
   }[];
-  canChangeTargets: boolean;
-  activeEffectsData: ActiveEffectData[];
+  calc$?: {
+    name: string;
+    img: string;
+    type: string;
+    level?: number;
+    description?: string;
+    materials?: string;
+    properties?: string[];
+    canChangeTargets: boolean;
+    activeEffectsData: ActiveEffectData[];
+    check?: {
+      ability: keyof MyActor['data']['data']['abilities'];
+      dc: number;
+      label?: string;
+      skill?: string;
+      addSaveBonus?: boolean;
+    };
+    targetDefinition: {
+      hasAoe: boolean,
+      createdTemplateUuid?: string;
+    } & MyItemData['data']['target'];
+    allConsumeResourcesApplied: boolean;
+    canChangeLevel: boolean;
+  }
 }
 
-export interface ItemCardTokenData {
+export interface ItemCardToken {
   uuid: string;
 }
 
-export interface ItemCardData {
-  actor?: ItemCardActorData;
-  items: ItemCardItemData[];
-  token?: ItemCardTokenData;
-  allDmgApplied?: boolean;
-  targetAggregate?: {
-    uuid: string;
-    img?: string;
-    name?: string;
-    hpSnapshot: {
-      maxHp: number;
-      hp: number;
-      temp?: number;
-    },
-    dmg?: {
-      avoided: boolean;
-      applied: boolean,
-      appliedDmg: number,
-      rawDmg: number;
-      calcDmg: number;
-      calcHp: number;
-      calcTemp: number;
-    },
-  }[];
+export interface ItemCard {
+  actor?: ItemCardActor;
+  items: ItemCardItem[];
+  token?: ItemCardToken;
+  calc$?: {
+    allDmgApplied?: boolean;
+    targetAggregate?: {
+      uuid: string;
+      img?: string;
+      name?: string;
+      hpSnapshot: {
+        maxHp: number;
+        hp: number;
+        temp?: number;
+      },
+      dmg?: {
+        avoided: boolean;
+        applied: boolean,
+        appliedDmg: number,
+        rawDmg: number;
+        calcDmg: number;
+        calcHp: number;
+        calcTemp: number;
+      },
+    }[];
+  }
 }
 
 interface ClickEvent {
@@ -150,9 +166,9 @@ interface KeyEvent {
   readonly key: 'Enter' | 'Escape';
 }
 type InteractionResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
-interface ActionParam {clickEvent: ClickEvent, userId: string, keyEvent?: KeyEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCardData, inputValue?: boolean | number | string};
+interface ActionParam {clickEvent: ClickEvent, userId: string, keyEvent?: KeyEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCard, inputValue?: boolean | number | string};
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean, onlyRunLocal?: boolean};
-type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCardData>;
+type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCard>;
 
 export class UtilsChatMessage {
 
@@ -281,10 +297,10 @@ export class UtilsChatMessage {
   }
 
   //#region public conversion utils
-  public static async createCard(data: {actor?: MyActor, token?: TokenDocument, items: ItemCardItemData[]}, insert: boolean = true): Promise<ChatMessage> {
+  public static async createCard(data: {actor?: MyActor, token?: TokenDocument, items: ItemCardItem[]}, insert: boolean = true): Promise<ChatMessage> {
     // I expect actor & token to sometimes include the whole actor/token document by accident
     // While I would prefer a full type validation, it is the realistic approach
-    const card: ItemCardData = {
+    const card: ItemCard = {
       items: data.items
     }
     if (data.actor) {
@@ -295,9 +311,11 @@ export class UtilsChatMessage {
         actorLevel = Math.ceil(data.actor.data.data.details.cr);
       }
       card.actor = {
-        level: actorLevel,
         uuid: data.actor.uuid,
-        pactLevel: data.actor.data.data?.spells?.pact?.level ?? 0,
+        calc$: {
+          level: actorLevel,
+          pactLevel: data.actor.data.data?.spells?.pact?.level ?? 0,
+        }
       }
     }
     if (data.token) {
@@ -325,50 +343,41 @@ export class UtilsChatMessage {
     }
   }
 
-  public static async createDefaultItemData({item, actor}: {item: MyItem, actor?: MyActor}): Promise<ItemCardItemData> {
-    const itemCardData: ItemCardItemData = {
+  public static async createDefaultItemData({item, actor}: {item: MyItem, actor?: MyActor}): Promise<ItemCardItem> {
+    const itemCardData: ItemCardItem = {
       uuid: item.uuid,
-      name: item.data.name,
-      img: item.img,
-      type: item.type,
-      level: item.data.data.level,
       selectedlevel: item.data.data?.preparation?.mode === 'pact' ? 'pact' : item.data.data.level,
-      canChangeTargets: true,
-      targetDefinition: {
-        // @ts-expect-error
-        hasAoe: CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type),
-        ...item.data.data.target,
-      },
-      allConsumeResourcesApplied: true,
-      canChangeLevel: true,
       consumeResources: [],
-      activeEffectsData:  Array.from(item.effects.values())
-        .map(effect => {
-          const data = deepClone(effect.data);
-          delete data._id;
-          return data;
-        })
-        .filter(effectData => !effectData.transfer),
+      calc$: {
+        name: item.data.name,
+        img: item.img,
+        type: item.type,
+        description: item.data.data.description?.value,
+        materials: item.data.data.materials?.value,
+        properties: item.getChatData().properties,
+        level: item.data.data.level,
+        canChangeTargets: true,
+        targetDefinition: {
+          // @ts-expect-error
+          hasAoe: CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type),
+          ...item.data.data.target,
+        },
+        allConsumeResourcesApplied: true,
+        canChangeLevel: true,
+        activeEffectsData:  Array.from(item.effects.values())
+          .map(effect => {
+            const data = deepClone(effect.data);
+            delete data._id;
+            return data;
+          })
+          .filter(effectData => !effectData.transfer),
+      }
     };
     const isSpell = item.type === "spell";
-    if (item.uuid) {
-      // Items passed by external sources (like external calls to Item.displayCard) may pass an upcasted version of the item.
-      // Fetch the original item to know what the original level
-      const queriedItem = await UtilsDocument.itemFromUuid(item.uuid);
-      itemCardData.level = queriedItem.data.data.level;
-    }
-
-    if (item.data.data.description?.value) {
-      itemCardData.description = item.data.data.description.value
-    }
-    if (item.data.data.materials?.value) {
-      itemCardData.materials = item.data.data.materials.value
-    }
-
-    {
-      const chatData = item.getChatData();
-      itemCardData.properties = chatData.properties;
-    }
+    // Items passed by external sources (like external calls to Item.displayCard) may pass an upcasted version of the item.
+    // Fetch the original item to know what the original level
+    const queriedItem = await UtilsDocument.itemFromUuid(item.uuid);
+    itemCardData.calc$.level = queriedItem.data.data.level;
 
     const rollData = actor == null ? {} : actor.getRollData();
     // attack
@@ -409,29 +418,33 @@ export class UtilsChatMessage {
       itemCardData.attack = {
         mode: 'normal',
         phase: 'mode-select',
-        rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
         userBonus: "",
+        calc$: {
+          rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
+        }
       };
     }
 
     // damage
     {
-      const inputDamages: Array<Omit<ItemCardItemData['damages'][0], 'damageTypes' | 'displayFormula'>> = [];
+      const inputDamages: Array<Omit<ItemCardItem['damages'][0], 'damageTypes' | 'displayFormula'>> = [];
       // Main damage
       const damageParts = item.data.data.damage?.parts;
       let mainDamage: typeof inputDamages[0];
       if (damageParts && damageParts.length > 0) {
         mainDamage = {
-          label: 'DND5E.Damage',
           mode: 'normal',
           phase: 'mode-select',
-          baseRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON(),
           userBonus: "",
+          calc$: {
+            label: 'DND5E.Damage',
+            baseRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON(),
+          }
         }
         // Consider it healing if all damage types are healing
         const isHealing = damageParts.filter(roll => InternalFunctions.healingDamageTypes.includes(roll[1])).length === damageParts.length;
         if (isHealing) {
-          mainDamage.label = 'DND5E.Healing';
+          mainDamage.calc$.label = 'DND5E.Healing';
         }
         inputDamages.push(mainDamage);
       }
@@ -439,8 +452,8 @@ export class UtilsChatMessage {
       // Versatile damage
       if (mainDamage && item.data.data.damage?.versatile) {
         const versatileDamage = deepClone(mainDamage);
-        versatileDamage.label = 'DND5E.Versatile';
-        versatileDamage.baseRoll = new Roll(item.data.data.damage.versatile, rollData).toJSON();
+        versatileDamage.calc$.label = 'DND5E.Versatile';
+        versatileDamage.calc$.baseRoll = new Roll(item.data.data.damage.versatile, rollData).toJSON();
         inputDamages.push(versatileDamage);
       }
   
@@ -451,15 +464,17 @@ export class UtilsChatMessage {
         if (inputDamages.length === 0) {
           // when only dealing damage by upcasting? not sure if that ever happens
           inputDamages.push({
-            label: 'DND5E.Damage',
             mode: 'normal',
             phase: 'mode-select',
-            baseRoll: new Roll('0').toJSON(),
             userBonus: "",
+            calc$: {
+              label: 'DND5E.Damage',
+              baseRoll: new Roll('0').toJSON(),
+            }
           });
         }
         for (const damage of inputDamages) {
-          damage.upcastRoll = scalingRollJson;
+          damage.calc$.upcastRoll = scalingRollJson;
         }
       } else if (scaling?.mode === 'cantrip' && actor) {
         let actorLevel = 0;
@@ -476,19 +491,21 @@ export class UtilsChatMessage {
           if (inputDamages.length === 0) {
             // when only dealing damage by upcasting? not sure if that ever happens
             inputDamages.push({
-              label: 'DND5E.Damage',
               mode: 'normal',
               phase: 'mode-select',
-              baseRoll: new Roll('0').toJSON(),
               userBonus: "",
+              calc$: {
+                label: 'DND5E.Damage',
+                baseRoll: new Roll('0').toJSON(),
+              }
             });
           }
   
           for (const damage of inputDamages) {
             // DND5e spell compendium has cantrip formula empty => default to the base damage formula
-            const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? damage.baseRoll.formula : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
+            const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? damage.calc$.baseRoll.formula : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
             // Override normal roll since cantrip scaling is static, not dynamic like level scaling
-            damage.baseRoll = UtilsRoll.mergeRolls(Roll.fromJSON(JSON.stringify(damage.baseRoll)), scalingRoll).toJSON();
+            damage.calc$.baseRoll = UtilsRoll.mergeRolls(Roll.fromJSON(JSON.stringify(damage.calc$.baseRoll)), scalingRoll).toJSON();
           }
         }
       }
@@ -498,7 +515,7 @@ export class UtilsChatMessage {
         const actorBonus = actor.data.data.bonuses?.[item.data.data.actionType];
         if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
           for (const damage of inputDamages) {
-            damage.actorBonusRoll = new Roll(actorBonus.damage, rollData).toJSON();
+            damage.calc$.actorBonusRoll = new Roll(actorBonus.damage, rollData).toJSON();
           }
         }
       }
@@ -508,7 +525,7 @@ export class UtilsChatMessage {
 
     // Saving throw
     if (item.data.data.save.dc != null && item.data.data.save.ability) {
-      itemCardData.check = {
+      itemCardData.calc$.check = {
         ability: item.data.data.save.ability,
         dc: item.data.data.save.dc,
         addSaveBonus: true,
@@ -516,8 +533,8 @@ export class UtilsChatMessage {
     }
 
     // Damage modifier
-    if (itemCardData.check && itemCardData.damages) {
-      let modfierRule: ItemCardItemData['damages'][0]['modfierRule'] = 'save-halve-dmg';
+    if (itemCardData.calc$.check && itemCardData.damages) {
+      let modfierRule: ItemCardItem['damages'][0]['calc$']['modfierRule'] = 'save-halve-dmg';
       if (item.type === 'spell') {
         if (item.data.data.level === 0) {
           // Official cantrips never deal half damage
@@ -527,21 +544,23 @@ export class UtilsChatMessage {
 
       // TODO be smart like midi-qol and inject add these type into the item sheet
       for (const damage of itemCardData.damages) {
-        damage.modfierRule = modfierRule;
+        damage.calc$.modfierRule = modfierRule;
       }
     }
 
     // Consume actor resources
     if (actor) {
-      const requireSpellSlot = isSpell && itemCardData.level > 0 && UtilsChatMessage.spellUpcastModes.includes(item.data.data.preparation.mode);
+      const requireSpellSlot = isSpell && itemCardData.calc$.level > 0 && UtilsChatMessage.spellUpcastModes.includes(item.data.data.preparation.mode);
       if (requireSpellSlot) {
-        let spellPropertyName = item.data.data.preparation.mode === "pact" ? "pact" : `spell${itemCardData.level}`;
+        let spellPropertyName = item.data.data.preparation.mode === "pact" ? "pact" : `spell${itemCardData.calc$.level}`;
         itemCardData.consumeResources.push({
-          uuid: actor.uuid,
-          path: `data.spells.${spellPropertyName}.value`,
-          amount: 1,
-          original: actor?.data?.data?.spells?.[spellPropertyName]?.value ?? 0,
-          applied: false
+          calc$: {
+            uuid: actor.uuid,
+            path: `data.spells.${spellPropertyName}.value`,
+            amount: 1,
+            original: actor?.data?.data?.spells?.[spellPropertyName]?.value ?? 0,
+            applied: false
+          }
         });
       }
 
@@ -550,11 +569,13 @@ export class UtilsChatMessage {
           if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
             let propertyPath = `data.${item.data.data.consume.target}`;
             itemCardData.consumeResources.push({
-              uuid: actor.uuid,
-              path: propertyPath,
-              amount: item.data.data.consume.amount,
-              original: getProperty(actor.data, propertyPath) ?? 0,
-              applied: false
+              calc$: {
+                uuid: actor.uuid,
+                path: propertyPath,
+                amount: item.data.data.consume.amount,
+                original: getProperty(actor.data, propertyPath) ?? 0,
+                applied: false
+              }
             });
           }
           break;
@@ -570,11 +591,13 @@ export class UtilsChatMessage {
           const targetItem = item.actor.items.get(item.data.data.consume.target);
           let propertyPath = `data.quantity`;
           itemCardData.consumeResources.push({
-            uuid: targetItem.uuid,
-            path: propertyPath,
-            amount: item.data.data.consume.amount,
-            original: getProperty(targetItem.data, propertyPath) ?? 0,
-            applied: false
+            calc$: {
+              uuid: targetItem.uuid,
+              path: propertyPath,
+              amount: item.data.data.consume.amount,
+              original: getProperty(targetItem.data, propertyPath) ?? 0,
+              applied: false
+            }
           });
         }
         break;
@@ -584,11 +607,13 @@ export class UtilsChatMessage {
           const targetItem = item.actor.items.get(item.data.data.consume.target);
           let propertyPath = `data.uses.value`;
           itemCardData.consumeResources.push({
-            uuid: targetItem.uuid,
-            path: propertyPath,
-            amount: item.data.data.consume.amount,
-            original: getProperty(targetItem.data, propertyPath) ?? 0,
-            applied: false
+            calc$: {
+              uuid: targetItem.uuid,
+              path: propertyPath,
+              amount: item.data.data.consume.amount,
+              original: getProperty(targetItem.data, propertyPath) ?? 0,
+              applied: false
+            }
           });
         }
         break;
@@ -598,26 +623,28 @@ export class UtilsChatMessage {
     if (item.data.data.uses?.per != null && item.data.data.uses?.per != '') {
       let propertyPath = `data.uses.value`;
       itemCardData.consumeResources.push({
-        uuid: item.uuid,
-        path: propertyPath,
-        amount: 1,
-        original: getProperty(item.data, propertyPath) ?? 0,
-        applied: false
+        calc$: {
+          uuid: item.uuid,
+          path: propertyPath,
+          amount: 1,
+          original: getProperty(item.data, propertyPath) ?? 0,
+          applied: false
+        }
       });
     }
 
     for (const consumeResource of itemCardData.consumeResources) {
-      if (consumeResource.autoconsumeAfter == null) {
+      if (consumeResource.calc$.autoconsumeAfter == null) {
         if (itemCardData.attack) {
-          consumeResource.autoconsumeAfter = 'attack';
+          consumeResource.calc$.autoconsumeAfter = 'attack';
         } else if (itemCardData.damages?.length) {
-          consumeResource.autoconsumeAfter = 'damage';
-        } else if (itemCardData.targetDefinition?.hasAoe) {
-          consumeResource.autoconsumeAfter = 'template-placed';
-        } else if (itemCardData.check) {
-          consumeResource.autoconsumeAfter = 'check';
+          consumeResource.calc$.autoconsumeAfter = 'damage';
+        } else if (itemCardData.calc$.targetDefinition?.hasAoe) {
+          consumeResource.calc$.autoconsumeAfter = 'template-placed';
+        } else if (itemCardData.calc$.check) {
+          consumeResource.calc$.autoconsumeAfter = 'check';
         } else {
-          consumeResource.autoconsumeAfter = 'init';
+          consumeResource.calc$.autoconsumeAfter = 'init';
         }
       }
     }
@@ -625,7 +652,7 @@ export class UtilsChatMessage {
     return itemCardData;
   }
 
-  public static async setTargets(itemCardItemData: ItemCardItemData, targetUuids: string[]): Promise<ItemCardItemData> {
+  public static async setTargets(itemCardItemData: ItemCardItem, targetUuids: string[]): Promise<ItemCardItem> {
     const tokenMap = new Map<string, TokenDocument>();
     for (const token of UtilsDocument.tokenFromUuid(targetUuids, {sync: true, deduplciate: true})) {
       tokenMap.set(token.uuid, token);
@@ -635,35 +662,38 @@ export class UtilsChatMessage {
     for (const targetUuid of targetUuids) {
       const token = tokenMap.get(targetUuid);
       const actor = (token.data.actorId ? game.actors.get(token.data.actorId) : token.getActor()) as MyActor;
-      const target: ItemCardItemData['targets'][0] = {
+      const target: ItemCardItem['targets'][0] = {
         uuid: targetUuid,
-        actorUuid: actor.uuid,
-        ac: actor.data.data.attributes.ac.value,
-        img: token.data.img,
-        name: token.data.name,
-        immunities: [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))],
-        resistances: [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))],
-        vulnerabilities: [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))],
-        hpSnapshot: {
-          maxHp: actor.data.data.attributes.hp.max,
-          hp: actor.data.data.attributes.hp.value,
-          temp: actor.data.data.attributes.hp.temp
-        },
-        result: {
-          appliedActiveEffects: false
+        calc$: {
+          actorUuid: actor.uuid,
+          ac: actor.data.data.attributes.ac.value,
+          img: token.data.img,
+          name: token.data.name,
+          immunities: [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))],
+          resistances: [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))],
+          vulnerabilities: [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))],
+          hpSnapshot: {
+            maxHp: actor.data.data.attributes.hp.max,
+            hp: actor.data.data.attributes.hp.value,
+            temp: actor.data.data.attributes.hp.temp
+          },
+          result: {
+            appliedActiveEffects: false
+          }
         }
       };
-      if (itemCardItemData.check) {
+      if (itemCardItemData.calc$.check) {
         // Don't prefil the roll, generate that at the moment the roll is made
         target.check = {
           mode: 'normal',
           phase: 'mode-select',
           userBonus: "",
+          calc$: {}
         };
       }
       itemCardItemData.targets.push(target);
     }
-    itemCardItemData.targets = itemCardItemData.targets.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    itemCardItemData.targets = itemCardItemData.targets.sort((a, b) => (a.calc$.name || '').localeCompare(b.calc$.name || ''));
 
     return itemCardItemData;
   }
@@ -884,7 +914,7 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, messageData: ItemCardData): Promise<{missingPermissions: boolean, onlyRunLocal: boolean, actionsToExecute: Array<{action: typeof UtilsChatMessage.actionMatches[0], regex: RegExpExecArray}>}> {
+  private static async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, messageData: ItemCard): Promise<{missingPermissions: boolean, onlyRunLocal: boolean, actionsToExecute: Array<{action: typeof UtilsChatMessage.actionMatches[0], regex: RegExpExecArray}>}> {
     if (!action) {
       return {
         missingPermissions: false,
@@ -943,7 +973,7 @@ export class UtilsChatMessage {
   //#endregion
 
   //#region attack
-  private static async processItemAttack(event: ClickEvent, itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttack(event: ClickEvent, itemIndex: number, messageData: ItemCard): Promise<void | ItemCard> {
     const attack = messageData.items?.[itemIndex]?.attack;
     if (!attack || attack.phase === 'result') {
       return;
@@ -966,9 +996,9 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async processItemAttackBonus(keyEvent: KeyEvent | null, itemIndex: number, attackBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttackBonus(keyEvent: KeyEvent | null, itemIndex: number, attackBonus: string, messageData: ItemCard): Promise<void | ItemCard> {
     const attack = messageData.items?.[itemIndex]?.attack;
-    if (!attack || attack.evaluatedRoll?.evaluated || attack.phase === 'result') {
+    if (!attack || attack.calc$.evaluatedRoll?.evaluated || attack.phase === 'result') {
       return;
     }
 
@@ -999,9 +1029,9 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async processItemAttackRoll(itemIndex: number, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttackRoll(itemIndex: number, messageData: ItemCard): Promise<void | ItemCard> {
     const attack = messageData.items?.[itemIndex]?.attack;
-    if (!attack || attack.evaluatedRoll) {
+    if (!attack || attack.calc$.evaluatedRoll) {
       return;
     }
     
@@ -1028,8 +1058,8 @@ export class UtilsChatMessage {
       baseRoll.modifiers.push('r1=1');
     }
     const parts: string[] = [baseRoll.formula];
-    if (attack.rollBonus) {
-      parts.push(attack.rollBonus);
+    if (attack.calc$.rollBonus) {
+      parts.push(attack.calc$.rollBonus);
     }
     
     if (attack.userBonus && Roll.validate(attack.userBonus)) {
@@ -1038,13 +1068,13 @@ export class UtilsChatMessage {
 
     const roll = await UtilsRoll.simplifyRoll(new Roll(parts.join(' + '))).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: roll});
-    attack.evaluatedRoll = roll.toJSON();
+    attack.calc$.evaluatedRoll = roll.toJSON();
     attack.phase = 'result';
 
     return messageData;
   }
 
-  private static async processItemAttackMode(event: ClickEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async processItemAttackMode(event: ClickEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCard): Promise<void | ItemCard> {
     const attack = messageData.items[itemIndex].attack;
     let modifier = modName === 'plus' ? 1 : -1;
     if (event.shiftKey && modifier > 0) {
@@ -1067,26 +1097,26 @@ export class UtilsChatMessage {
       }
     }
     
-    if (!attack.evaluatedRoll) {
+    if (!attack.calc$.evaluatedRoll) {
       return messageData;
     }
 
-    const originalRoll = Roll.fromJSON(JSON.stringify(attack.evaluatedRoll));
-    attack.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, attack.mode)).toJSON();
+    const originalRoll = Roll.fromJSON(JSON.stringify(attack.calc$.evaluatedRoll));
+    attack.calc$.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, attack.mode)).toJSON();
 
     return messageData;
   }
   //#endregion
 
   //#region check
-  private static async processItemCheck(event: ClickEvent, itemIndex: number, targetUuid: string, messageData: ItemCardData): Promise<void | ItemCardData> {
-    const itemCheck = messageData.items?.[itemIndex]?.check;
+  private static async processItemCheck(event: ClickEvent, itemIndex: number, targetUuid: string, messageData: ItemCard): Promise<void | ItemCard> {
+    const itemCheck = messageData.items?.[itemIndex]?.calc$?.check;
     if (!itemCheck) {
       console.warn('No check found')
       return;
     }
     
-    let target: ItemCardItemData['targets'][0];
+    let target: ItemCardItem['targets'][0];
     if (messageData.items[itemIndex].targets) {
       for (const t of messageData.items[itemIndex].targets) {
         if (t.uuid === targetUuid) {
@@ -1117,14 +1147,14 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async processItemCheckBonus(keyEvent: KeyEvent | null, itemIndex: number, targetUuid: string, attackBonus: string, messageData: ItemCardData): Promise<void | ItemCardData> {
-    const itemCheck = messageData.items?.[itemIndex]?.check;
+  private static async processItemCheckBonus(keyEvent: KeyEvent | null, itemIndex: number, targetUuid: string, attackBonus: string, messageData: ItemCard): Promise<void | ItemCard> {
+    const itemCheck = messageData.items?.[itemIndex]?.calc$?.check;
     if (!itemCheck) {
       console.warn('No check found')
       return;
     }
     
-    let target: ItemCardItemData['targets'][0];
+    let target: ItemCardItem['targets'][0];
     if (messageData.items[itemIndex].targets) {
       for (const t of messageData.items[itemIndex].targets) {
         if (t.uuid === targetUuid) {
@@ -1165,13 +1195,13 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async processItemCheckMode(event: ClickEvent, itemIndex: number, targetUuid: string, modName: 'plus' | 'minus', messageData: ItemCardData): Promise<void | ItemCardData> {
-    if (!messageData.items?.[itemIndex]?.check) {
+  private static async processItemCheckMode(event: ClickEvent, itemIndex: number, targetUuid: string, modName: 'plus' | 'minus', messageData: ItemCard): Promise<void | ItemCard> {
+    if (!messageData.items?.[itemIndex]?.calc$?.check) {
       console.warn('No check found')
       return;
     }
 
-    let target: ItemCardItemData['targets'][0];
+    let target: ItemCardItem['targets'][0];
     if (messageData.items[itemIndex].targets) {
       for (const t of messageData.items[itemIndex].targets) {
         if (t.uuid === targetUuid) {
@@ -1194,24 +1224,24 @@ export class UtilsChatMessage {
       return;
     }
     target.check.mode = order[newIndex];
-    if (!target.check.evaluatedRoll) {
+    if (!target.check.calc$.evaluatedRoll) {
       return messageData;
     }
 
-    const originalRoll = Roll.fromJSON(JSON.stringify(target.check.evaluatedRoll));
-    target.check.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, target.check.mode)).toJSON();
+    const originalRoll = Roll.fromJSON(JSON.stringify(target.check.calc$.evaluatedRoll));
+    target.check.calc$.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, target.check.mode)).toJSON();
 
     return messageData;
   }
 
-  private static async processItemCheckRoll(itemIndex: number, targetUuid: string, messageData: ItemCardData): Promise<void | ItemCardData> {
-    if (!messageData.items?.[itemIndex]?.check) {
+  private static async processItemCheckRoll(itemIndex: number, targetUuid: string, messageData: ItemCard): Promise<void | ItemCard> {
+    if (!messageData.items?.[itemIndex]?.calc$.check) {
       console.warn('No check found')
       return;
     }
     const targetActor = (await UtilsDocument.tokenFromUuid(targetUuid)).getActor() as MyActor;
 
-    let target: ItemCardItemData['targets'][0];
+    let target: ItemCardItem['targets'][0];
     if (messageData.items[itemIndex].targets) {
       for (const t of messageData.items[itemIndex].targets) {
         if (t.uuid === targetUuid) {
@@ -1220,11 +1250,11 @@ export class UtilsChatMessage {
         }
       }
     }
-    if (!target || target.check?.evaluatedRoll?.evaluated) {
+    if (!target || target.check?.calc$.evaluatedRoll?.evaluated) {
       return;
     }
     
-    const check = messageData.items[itemIndex].check;
+    const check = messageData.items[itemIndex].calc$.check;
 
     let roll = UtilsRoll.getAbilityRoll(targetActor, {ability: check.ability, skill: check.skill, addSaveBonus: check.addSaveBonus});
     if (target.check.userBonus) {
@@ -1234,7 +1264,8 @@ export class UtilsChatMessage {
     roll = await UtilsRoll.simplifyRoll(roll).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: roll});
 
-    target.check.evaluatedRoll = roll.toJSON();
+    target.check.calc$ = target.check.calc$ ?? {};
+    target.check.calc$.evaluatedRoll = roll.toJSON();
     target.check.phase = 'result';
 
     return messageData;
@@ -1242,7 +1273,7 @@ export class UtilsChatMessage {
   //#endregion
 
   //#region damage
-  private static async processItemDamage(event: ClickEvent, itemIndex: number, damageIndex: number, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
+  private static async processItemDamage(event: ClickEvent, itemIndex: number, damageIndex: number, messageData: ItemCard, messageId: string): Promise<void | ItemCard> {
     const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
     if (!dmg || dmg.phase === 'result') {
       return;
@@ -1265,18 +1296,18 @@ export class UtilsChatMessage {
     return messageData;
   }
 
-  private static async processItemDamageMode(event: ClickEvent, itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
+  private static async processItemDamageMode(event: ClickEvent, itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCard, messageId: string): Promise<void | ItemCard> {
     const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
     let modifier = modName === 'plus' ? 1 : -1;
     
-    const order: Array<ItemCardItemData['damages'][0]['mode']> = ['normal', 'critical'];
+    const order: Array<ItemCardItem['damages'][0]['mode']> = ['normal', 'critical'];
     const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(dmg.mode) + modifier));
     if (dmg.mode === order[newIndex]) {
       return;
     }
     dmg.mode = order[newIndex];
 
-    if (event.shiftKey || (dmg.normalRoll?.evaluated && (dmg.mode === 'critical' && !dmg.criticalRoll?.evaluated))) {
+    if (event.shiftKey || (dmg.calc$?.normalRoll?.evaluated && (dmg.mode === 'critical' && !dmg.calc$?.criticalRoll?.evaluated))) {
       const response = await UtilsChatMessage.processItemDamageRoll(itemIndex, damageIndex, messageData, messageId);
       if (response) {
         return response;
@@ -1285,9 +1316,9 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async processItemDamageBonus(keyEvent: KeyEvent | null, itemIndex: number, damageIndex: number, damageBonus: string, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
+  private static async processItemDamageBonus(keyEvent: KeyEvent | null, itemIndex: number, damageIndex: number, damageBonus: string, messageData: ItemCard, messageId: string): Promise<void | ItemCard> {
     const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
-    if (!dmg || dmg.normalRoll?.evaluated || dmg.phase === 'result') {
+    if (!dmg || dmg.calc$?.normalRoll?.evaluated || dmg.phase === 'result') {
       return;
     }
 
@@ -1318,7 +1349,7 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async processItemDamageRoll(itemIndex: number, damageIndex: number, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
+  private static async processItemDamageRoll(itemIndex: number, damageIndex: number, messageData: ItemCard, messageId: string): Promise<void | ItemCard> {
     const item = messageData.items?.[itemIndex];
     if (!item) {
       return;
@@ -1329,24 +1360,24 @@ export class UtilsChatMessage {
     }
     dmg.phase = 'result';
     
-    const normalRollEvaluated = !!dmg.normalRoll?.evaluated;
-    const criticalRollEvaluated = !!dmg.criticalRoll?.evaluated;
+    const normalRollEvaluated = !!dmg.calc$.normalRoll?.evaluated;
+    const criticalRollEvaluated = !!dmg.calc$.criticalRoll?.evaluated;
     let normalRollFormula: string;
     let normalRollPromise: Promise<Roll>;
     if (normalRollEvaluated) {
-      normalRollFormula = dmg.normalRoll.formula;
-      normalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.normalRoll)));
+      normalRollFormula = dmg.calc$.normalRoll.formula;
+      normalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.calc$.normalRoll)));
     } else {
-      const dmgParts: MyItemData['data']['damage']['parts'] = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.baseRoll)));
-      const upcastLevel = Math.max(item.level, item.selectedlevel === 'pact' ? (messageData.actor?.pactLevel ?? 0) : item.selectedlevel);
-      if (upcastLevel > item.level) {
-        if (dmg.upcastRoll) {
-          const upcastRoll = Roll.fromJSON(JSON.stringify(dmg.upcastRoll)).alter(upcastLevel - item.level, 0, {multiplyNumeric: true})
+      const dmgParts: MyItemData['data']['damage']['parts'] = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.calc$.baseRoll)));
+      const upcastLevel = Math.max(item.calc$?.level, item.selectedlevel === 'pact' ? (messageData.actor?.calc$?.pactLevel ?? 0) : item.selectedlevel);
+      if (upcastLevel > item.calc$.level) {
+        if (dmg.calc$?.upcastRoll) {
+          const upcastRoll = Roll.fromJSON(JSON.stringify(dmg.calc$?.upcastRoll)).alter(upcastLevel - item.calc$?.level, 0, {multiplyNumeric: true})
           dmgParts.push(...UtilsRoll.rollToDamageParts(upcastRoll));
         }
       }
-      if (dmg.actorBonusRoll) {
-        dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.actorBonusRoll))))
+      if (dmg.calc$.actorBonusRoll) {
+        dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.calc$.actorBonusRoll))))
       }
       if (dmg.userBonus) {
         dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.userBonus))))
@@ -1359,7 +1390,7 @@ export class UtilsChatMessage {
 
     let criticalRollPromise: Promise<Roll | false>;
     if (criticalRollEvaluated) {
-      criticalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.criticalRoll)));
+      criticalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.calc$.criticalRoll)));
     } else if (dmg.mode === 'critical') {
       criticalRollPromise = UtilsRoll.getCriticalBonusRoll(new Roll(normalRollFormula)).roll({async: true});
     } else {
@@ -1370,11 +1401,11 @@ export class UtilsChatMessage {
     const newRolls: Roll[] = [];
     if (!normalRollEvaluated) {
       newRolls.push(normalResolved);
-      dmg.normalRoll = normalResolved.toJSON();
+      dmg.calc$.normalRoll = normalResolved.toJSON();
     }
     if (!criticalRollEvaluated && critBonusResolved) {
       newRolls.push(critBonusResolved);
-      dmg.criticalRoll = UtilsRoll.mergeRolls(normalResolved, critBonusResolved).toJSON();
+      dmg.calc$.criticalRoll = UtilsRoll.mergeRolls(normalResolved, critBonusResolved).toJSON();
     }
 
     if (newRolls.length > 0) {
@@ -1383,7 +1414,7 @@ export class UtilsChatMessage {
     }
     
     // Auto apply healing since it very rarely gets modified
-    const damageTypes = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(dmg.criticalRoll?.evaluated ? dmg.criticalRoll : dmg.normalRoll)));
+    const damageTypes = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(dmg.calc$.criticalRoll?.evaluated ? dmg.calc$.criticalRoll : dmg.calc$.normalRoll)));
     let isHealing = true;
     for (const type of damageTypes.keys()) {
       if (!InternalFunctions.healingDamageTypes.includes(type)) {
@@ -1393,7 +1424,7 @@ export class UtilsChatMessage {
     }
 
     if (isHealing && item.targets) {
-      messageData = await InternalFunctions.calculateTargetResult(messageData);
+      messageData = InternalFunctions.calculateTargetResult(messageData);
       const response = await UtilsChatMessage.applyDamage(item.targets.map(t => t.uuid), messageData, messageId);
       if (response) {
         messageData = response;
@@ -1403,15 +1434,15 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async applyDamage(tokenUuid: (string | '*')[], messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
-    if (!messageData.targetAggregate) {
+  private static async applyDamage(tokenUuid: (string | '*')[], messageData: ItemCard, messageId: string): Promise<void | ItemCard> {
+    if (!messageData.calc$?.targetAggregate) {
       return;
     }
-    let targetAggregates: ItemCardData['targetAggregate'];
+    let targetAggregates: ItemCard['calc$']['targetAggregate'];
     if (tokenUuid.includes('*')) {
-      targetAggregates = messageData.targetAggregate;
+      targetAggregates = messageData.calc$.targetAggregate;
     } else {
-      targetAggregates = messageData.targetAggregate.filter(aggr => tokenUuid.includes(aggr.uuid));
+      targetAggregates = messageData.calc$.targetAggregate.filter(aggr => tokenUuid.includes(aggr.uuid));
     }
     if (!targetAggregates.length) {
       console.warn(`Could not find an aggregate for token "${tokenUuid}" with messageId "${messageId}"`);
@@ -1444,7 +1475,7 @@ export class UtilsChatMessage {
     for (const item of messageData.items) {
       for (const target of item.targets ?? []) {
         if (appliedToTokenUuids.includes(target.uuid)) {
-          target.result.applyDmg = true;
+          target.applyDmg = true;
         }
       }
     }
@@ -1452,15 +1483,15 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async undoDamage(tokenUuid: string, messageData: ItemCardData, messageId: string): Promise<void | ItemCardData> {
-    if (!messageData.targetAggregate) {
+  private static async undoDamage(tokenUuid: string, messageData: ItemCard, messageId: string): Promise<void | ItemCard> {
+    if (!messageData.calc$?.targetAggregate) {
       return;
     }
-    let targetAggregates: ItemCardData['targetAggregate'];
+    let targetAggregates: ItemCard['calc$']['targetAggregate'];
     if (tokenUuid === '*') {
-      targetAggregates = messageData.targetAggregate;
+      targetAggregates = messageData.calc$.targetAggregate;
     } else {
-      targetAggregates = messageData.targetAggregate.filter(aggr => aggr.uuid === tokenUuid);
+      targetAggregates = messageData.calc$.targetAggregate.filter(aggr => aggr.uuid === tokenUuid);
     }
     if (!targetAggregates.length) {
       console.warn(`Could not find an aggregate for token "${tokenUuid}" with messageId "${messageId}"`);
@@ -1491,7 +1522,7 @@ export class UtilsChatMessage {
     for (const item of messageData.items) {
       for (const target of item.targets ?? []) {
         if (appliedToTokenUuids.includes(target.uuid)) {
-          target.result.applyDmg = false;
+          target.applyDmg = false;
         }
       }
     }
@@ -1499,9 +1530,9 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async upcastlevelChange(itemIndex: number, level: string, messageData: ItemCardData): Promise<void | ItemCardData> {
+  private static async upcastlevelChange(itemIndex: number, level: string, messageData: ItemCard): Promise<void | ItemCard> {
     const item = messageData.items?.[itemIndex];
-    if (!item || !item.canChangeLevel) {
+    if (!item?.calc$?.canChangeLevel) {
       return;
     }
 
@@ -1518,8 +1549,8 @@ export class UtilsChatMessage {
   //#endregion
 
   //#region targeting
-  private static async processItemTemplate(itemIndex: number, messageData: ItemCardData, messageId: string): Promise<void> {
-    const targetDefinition = messageData.items?.[itemIndex]?.targetDefinition;
+  private static async processItemTemplate(itemIndex: number, messageData: ItemCard, messageId: string): Promise<void> {
+    const targetDefinition = messageData.items?.[itemIndex]?.calc$?.targetDefinition;
     if (!targetDefinition || !targetDefinition.hasAoe) {
       return;
     }
@@ -1541,8 +1572,8 @@ export class UtilsChatMessage {
   //#endregion
 
   //#region consume resources
-  private static async manualApplyConsumeResource(messageData: ItemCardData, itemIndex: number | '*', resourceIndex: number | '*'): Promise<ItemCardData | void> {
-    const consumeResources: ItemCardItemData['consumeResources'] = [];
+  private static async manualApplyConsumeResource(messageData: ItemCard, itemIndex: number | '*', resourceIndex: number | '*'): Promise<ItemCard | void> {
+    const consumeResources: ItemCardItem['consumeResources'] = [];
     {
       const items = itemIndex === '*' ? messageData.items : [messageData.items[itemIndex]];
       for (const item of items) {
@@ -1569,8 +1600,8 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async manualUndoConsumeResource(messageData: ItemCardData, itemIndex: number | '*', resourceIndex: number | '*'): Promise<ItemCardData | void> {
-    const consumeResources: ItemCardItemData['consumeResources'] = [];
+  private static async manualUndoConsumeResource(messageData: ItemCard, itemIndex: number | '*', resourceIndex: number | '*'): Promise<ItemCard | void> {
+    const consumeResources: ItemCardItem['consumeResources'] = [];
     {
       const items = itemIndex === '*' ? messageData.items : [messageData.items[itemIndex]];
       for (const item of items) {
@@ -1599,7 +1630,7 @@ export class UtilsChatMessage {
   //#endregion
 
   //#region misc
-  private static async toggleCollapse(messageId: string): Promise<ItemCardData | void> {
+  private static async toggleCollapse(messageId: string): Promise<ItemCard | void> {
     MemoryStorageService.setCardCollapse(messageId, !MemoryStorageService.isCardCollapsed(messageId));
     ui.chat.updateMessage(game.messages.get(messageId));
   }
@@ -1640,7 +1671,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
     let messageData = InternalFunctions.getItemCardData(chatMessage);
     for (let itemIndex = messageData.items.length - 1; itemIndex >= 0; itemIndex--) {
       const item = messageData.items[itemIndex];
-      if (item.canChangeTargets) {
+      if (item?.calc$.canChangeTargets) {
         // Re-evaluate the targets, the user may have changed targets
         const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
 
@@ -1758,9 +1789,9 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     if (context.userId === game.userId) {
       const deleteTemplateUuids = new Set<string>();
       for (const chatMessage of chatMessages) {
-        const data: ItemCardData = InternalFunctions.getItemCardData(chatMessage);
+        const data: ItemCard = InternalFunctions.getItemCardData(chatMessage);
         for (const item of data.items) {
-          deleteTemplateUuids.add(item.targetDefinition?.createdTemplateUuid);
+          deleteTemplateUuids.add(item?.calc$?.targetDefinition?.createdTemplateUuid);
         }
       }
       deleteTemplateUuids.delete(null);
@@ -1784,7 +1815,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   
   private calcItemCardDamageFormulas(chatMessages: ChatMessage[]): void {
     for (const chatMessage of chatMessages) {
-      const data: ItemCardData = InternalFunctions.getItemCardData(chatMessage);
+      const data: ItemCard = InternalFunctions.getItemCardData(chatMessage);
       for (const item of data.items) {
         if (!item.damages) {
           continue;
@@ -1792,7 +1823,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
 
         item.damages = item.damages.map(damage => {
           // Diplay formula
-          let displayFormula = damage.mode === 'critical' ? damage.criticalRoll?.formula : damage.normalRoll?.formula;
+          let displayFormula = damage.mode === 'critical' ? damage?.calc$.criticalRoll?.formula : damage?.calc$.normalRoll?.formula;
           const damageTypes: DamageType[] = [];
           if (displayFormula) {
             for (const damageType of UtilsRoll.getValidDamageTypes()) {
@@ -1816,9 +1847,9 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   
   private calcItemCardCanChangeTargets(chatMessages: ChatMessage[]): void {
     for (const chatMessage of chatMessages) {
-      const data: ItemCardData = InternalFunctions.getItemCardData(chatMessage);
+      const data: ItemCard = InternalFunctions.getItemCardData(chatMessage);
       for (const item of data.items) {
-        item.canChangeTargets = InternalFunctions.canChangeTargets(item);
+        item.calc$.canChangeTargets = InternalFunctions.canChangeTargets(item);
       }
       InternalFunctions.setItemCardData(chatMessage, data);
     }
@@ -1826,30 +1857,30 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   
   private calcCanChangeSpellLevel(chatMessages: ChatMessage[]): void {
     for (const chatMessage of chatMessages) {
-      const data: ItemCardData = InternalFunctions.getItemCardData(chatMessage);
+      const data: ItemCard = InternalFunctions.getItemCardData(chatMessage);
       for (const item of data.items) {
-        item.canChangeLevel = item.level > 0;
-        if (!item.canChangeLevel) {
+        item.calc$.canChangeLevel = item.calc$.level > 0;
+        if (!item.calc$.canChangeLevel) {
           continue;
         }
 
         for (const damage of item.damages ?? []) {
-          if (damage.normalRoll?.evaluated || damage.criticalRoll?.evaluated) {
-            item.canChangeLevel = false;
+          if (damage.calc$.normalRoll?.evaluated || damage.calc$.criticalRoll?.evaluated) {
+            item.calc$.canChangeLevel = false;
             break;
           }
         }
-        if (!item.canChangeLevel) {
+        if (!item.calc$.canChangeLevel) {
           continue;
         }
         
         for (const consumeResource of item.consumeResources) {
-          if (consumeResource.applied) {
-            item.canChangeLevel = false;
+          if (consumeResource.calc$.applied) {
+            item.calc$.canChangeLevel = false;
             break;
           }
         }
-        if (!item.canChangeLevel) {
+        if (!item.calc$.canChangeLevel) {
           continue;
         }
       }
@@ -1866,9 +1897,9 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
           const item = data.items[itemIndex];
           const oldItem = oldData.items[itemIndex];
           
-          let effectiveSelectedLevel = item.selectedlevel === 'pact' ? (data.actor?.pactLevel ?? 0) : item.selectedlevel;
-          if (item.level > effectiveSelectedLevel) {
-            effectiveSelectedLevel = item.level;
+          let effectiveSelectedLevel = item.selectedlevel === 'pact' ? (data.actor?.calc$?.pactLevel ?? 0) : item.selectedlevel;
+          if (item.calc$.level > effectiveSelectedLevel) {
+            effectiveSelectedLevel = item.calc$.level;
             item.selectedlevel = effectiveSelectedLevel;
           }
           
@@ -1876,9 +1907,9 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
             const newSpellPropertyName = item.selectedlevel === 'pact' ? item.selectedlevel : `spell${item.selectedlevel}`;
             const oldSpellPropertyName = oldItem.selectedlevel === 'pact' ? oldItem.selectedlevel : `spell${oldItem.selectedlevel}`;
             for (const consumedResource of item.consumeResources) {
-              if (!consumedResource.applied && consumedResource.uuid === data.actor?.uuid && consumedResource.path === `data.spells.${oldSpellPropertyName}.value`) {
-                consumedResource.path = `data.spells.${newSpellPropertyName}.value`;
-                consumedResource.original = UtilsDocument.actorFromUuid(consumedResource.uuid, {sync: true}).data.data.spells[newSpellPropertyName].value;
+              if (!consumedResource.calc$.applied && consumedResource.calc$.uuid === data.actor?.uuid && consumedResource.calc$.path === `data.spells.${oldSpellPropertyName}.value`) {
+                consumedResource.calc$.path = `data.spells.${newSpellPropertyName}.value`;
+                consumedResource.calc$.original = UtilsDocument.actorFromUuid(consumedResource.calc$.uuid, {sync: true}).data.data.spells[newSpellPropertyName].value;
               }
             }
           }
@@ -1886,10 +1917,10 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       }
 
       for (const item of data.items) {
-        item.allConsumeResourcesApplied = true;
+        item.calc$.allConsumeResourcesApplied = true;
         for (const consumedResource of item.consumeResources) {
-          if (!consumedResource.applied) {
-            item.allConsumeResourcesApplied = false;
+          if (!consumedResource.calc$.applied) {
+            item.calc$.allConsumeResourcesApplied = false;
             break;
           }
         }
@@ -1906,8 +1937,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       if (!oldRow) {
         continue;
       }
-      const data: ItemCardData = InternalFunctions.getItemCardData(newRow);
-      const oldData: ItemCardData = InternalFunctions.getItemCardData(oldRow);
+      const data: ItemCard = InternalFunctions.getItemCardData(newRow);
+      const oldData: ItemCard = InternalFunctions.getItemCardData(oldRow);
       for (let itemIndex = 0; itemIndex < data.items.length; itemIndex++) {
         const item = data.items[itemIndex];
         const oldItem = oldData.items.length <= itemIndex ? null : oldData.items[itemIndex];
@@ -1943,31 +1974,31 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
 
   private async applyActiveEffects(chatMessages: ChatMessage[]): Promise<void> {
-    const chatMessageDatas: ItemCardData[] = [];
-    const chatMessageDatasByUuid = new Map<string, ItemCardData>();
+    const chatMessageDatas: ItemCard[] = [];
+    const chatMessageDatasByUuid = new Map<string, ItemCard>();
     for (const chatMessage of chatMessages) {
       const data = InternalFunctions.getItemCardData(chatMessage);
       chatMessageDatas.push(data);
       chatMessageDatasByUuid.set(chatMessage.uuid, data);
     }
-    const shouldApply = (item: ItemCardItemData, target: ItemCardItemData['targets'][0]): boolean => {
+    const shouldApply = (item: ItemCardItem, target: ItemCardItem['targets'][0]): boolean => {
       if (item.damages?.length) {
-        if (!target.result.applyDmg) {
+        if (!target.applyDmg) {
           return false;
         }
       }
-      return target.result.checkPass === false || target.result.hit === true;
+      return target.calc$.result.checkPass === false || target.calc$.result.hit === true;
     }
     const effectsByTargetUuid = new Map<string, {chatMessageIndex: number, itemIndex: number, apply: boolean}[]>();
     for (let chatMessageIndex = 0; chatMessageIndex < chatMessageDatas.length; chatMessageIndex++) {
       const messageData = chatMessageDatas[chatMessageIndex];
       for (let itemIndex = 0; itemIndex < messageData.items.length; itemIndex++) {
         const item = messageData.items[itemIndex];
-        if (item.activeEffectsData.length > 0 && item.targets?.length > 0) {
+        if (item.calc$.activeEffectsData.length > 0 && item.targets?.length > 0) {
           for (const target of item.targets) {
             // TODO I am not happy with this, maybe this should be user input? but there is already enough user input
             let shouldApplyResult = shouldApply(item, target);
-            if (shouldApplyResult === target.result.appliedActiveEffects) {
+            if (shouldApplyResult === target.calc$.result.appliedActiveEffects) {
               continue;
             }
 
@@ -2020,7 +2051,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       for (const effect of effects) {
         if (!effect.apply) {
           const item = chatMessageDatas[effect.chatMessageIndex].items[effect.itemIndex];
-          for (let activeEffectsIndex = 0; activeEffectsIndex < item.activeEffectsData.length; activeEffectsIndex++) {
+          for (let activeEffectsIndex = 0; activeEffectsIndex < item.calc$.activeEffectsData.length; activeEffectsIndex++) {
             const origin = {
               messageUuid: chatMessages[effect.chatMessageIndex].uuid,
               itemIndex: effect.itemIndex,
@@ -2036,8 +2067,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       for (const effect of effects) {
         if (effect.apply) {
           const item = chatMessageDatas[effect.chatMessageIndex].items[effect.itemIndex];
-          for (let activeEffectsIndex = 0; activeEffectsIndex < item.activeEffectsData.length; activeEffectsIndex++) {
-            const activeEffectData = deepClone(item.activeEffectsData[activeEffectsIndex]);
+          for (let activeEffectsIndex = 0; activeEffectsIndex < item.calc$.activeEffectsData.length; activeEffectsIndex++) {
+            const activeEffectData = deepClone(item.calc$.activeEffectsData[activeEffectsIndex]);
             activeEffectData.flags = activeEffectData.flags ?? {};
             activeEffectData.flags[staticValues.moduleName] = activeEffectData.flags[staticValues.moduleName] ?? {};
             (activeEffectData.flags[staticValues.moduleName] as any).origin = {
@@ -2074,7 +2105,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       for (const item of data.items) {
         for (const target of item.targets ?? []) {
           // It should be applied by now
-          target.result.appliedActiveEffects = shouldApply(item, target);
+          target.calc$.result.appliedActiveEffects = shouldApply(item, target);
         }
       }
       InternalFunctions.setItemCardData(chatMessage, chatMessageDatasByUuid.get(chatMessage.uuid));
@@ -2082,10 +2113,10 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     ChatMessage.updateDocuments(chatMessages.map(message => message.data));
   }
 
-  private async applyConsumeResources(messageData: ItemCardData): Promise<ItemCardData> {
+  private async applyConsumeResources(messageData: ItemCard): Promise<ItemCard> {
     // TODO try to do dmls across all functions in a central place
     const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
-    const consumeResourcesToToggle: ItemCardData['items'][0]['consumeResources'] = [];
+    const consumeResourcesToToggle: ItemCard['items'][0]['consumeResources'] = [];
     const bulkUpdate: Parameters<typeof UtilsDocument['bulkUpdate']>[0] = [];
     {
       const promisesByUuid = new Map<string, Promise<{uuid: string, document: foundry.abstract.Document<any, any>}>>();
@@ -2097,22 +2128,22 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
           } else if (consumeResource.consumeResourcesAction === 'manual-apply') {
             shouldApply = true;
           } else {
-            switch (consumeResource.autoconsumeAfter) {
+            switch (consumeResource.calc$.autoconsumeAfter) {
               case 'init': {
                 shouldApply = true;
                 break;
               }
               case 'attack': {
-                shouldApply = item.attack?.evaluatedRoll?.evaluated === true;
+                shouldApply = item.attack?.calc$?.evaluatedRoll?.evaluated === true;
                 break;
               }
               case 'template-placed': {
-                shouldApply = item.targetDefinition?.createdTemplateUuid != null;
+                shouldApply = item?.calc$.targetDefinition?.createdTemplateUuid != null;
                 break;
               }
               case 'damage': {
                 for (const damage of (item.damages ?? [])) {
-                  if (damage.normalRoll?.evaluated === true || damage.criticalRoll?.evaluated === true) {
+                  if (damage?.calc$.normalRoll?.evaluated === true || damage?.calc$.criticalRoll?.evaluated === true) {
                     shouldApply = true;
                     break;
                   }
@@ -2121,7 +2152,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
               }
               case 'check': {
                 for (const target of (item.targets ?? [])) {
-                  if (target.check?.evaluatedRoll?.evaluated === true) {
+                  if (target?.check.calc$?.evaluatedRoll?.evaluated === true) {
                     shouldApply = true;
                     break;
                   }
@@ -2131,10 +2162,10 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
             }
           }
           
-          if (shouldApply !== consumeResource.applied) {
+          if (shouldApply !== consumeResource.calc$.applied) {
             consumeResourcesToToggle.push(consumeResource);
-            if (!promisesByUuid.has(consumeResource.uuid)) {
-              promisesByUuid.set(consumeResource.uuid, fromUuid(consumeResource.uuid).then(doc => {return {uuid: consumeResource.uuid, document: doc}}));
+            if (!promisesByUuid.has(consumeResource.calc$.uuid)) {
+              promisesByUuid.set(consumeResource.calc$.uuid, fromUuid(consumeResource.calc$.uuid).then(doc => {return {uuid: consumeResource.calc$.uuid, document: doc}}));
             }
           }
         }
@@ -2152,18 +2183,18 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
 
     const updatesByUuid = new Map<string, any>();
     for (const consumeResource of consumeResourcesToToggle) {
-      if (!updatesByUuid.has(consumeResource.uuid)) {
-        updatesByUuid.set(consumeResource.uuid, {});
+      if (!updatesByUuid.has(consumeResource.calc$.uuid)) {
+        updatesByUuid.set(consumeResource.calc$.uuid, {});
       }
-      const updates = updatesByUuid.get(consumeResource.uuid);
-      if (consumeResource.applied) {
+      const updates = updatesByUuid.get(consumeResource.calc$.uuid);
+      if (consumeResource.calc$.applied) {
         // toggle => refund to original
-        setProperty(updates, consumeResource.path, consumeResource.original);
+        setProperty(updates, consumeResource.calc$.path, consumeResource.calc$.original);
       } else {
         // toggle => apply
-        setProperty(updates, consumeResource.path, Math.max(0, consumeResource.original - consumeResource.amount));
+        setProperty(updates, consumeResource.calc$.path, Math.max(0, consumeResource.calc$.original - consumeResource.calc$.amount));
       }
-      consumeResource.applied = !consumeResource.applied;
+      consumeResource.calc$.applied = !consumeResource.calc$.applied;
     }
 
     for (const uuid of documentsByUuid.keys()) {
@@ -2219,15 +2250,15 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         continue;
       }
 
-      if (item.targetDefinition.createdTemplateUuid && item.targetDefinition.createdTemplateUuid !== template.uuid) {
-        fromUuid(item.targetDefinition.createdTemplateUuid).then(doc => {
+      if (item.calc$.targetDefinition.createdTemplateUuid && item.calc$.targetDefinition.createdTemplateUuid !== template.uuid) {
+        fromUuid(item.calc$.targetDefinition.createdTemplateUuid).then(doc => {
           if (doc != null) {
             doc.delete();
           }
         });
       }
 
-      item.targetDefinition.createdTemplateUuid = template.uuid;
+      item.calc$.targetDefinition.createdTemplateUuid = template.uuid;
 
       item = await this.setTargetsFromTemplate(item);
       messageData.items[itemIndex] = item;
@@ -2287,8 +2318,8 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
     }
   }
   
-  private async setTargetsFromTemplate(item: ItemCardItemData): Promise<ItemCardItemData> {
-    if (!item.targetDefinition?.createdTemplateUuid) {
+  private async setTargetsFromTemplate(item: ItemCardItem): Promise<ItemCardItem> {
+    if (!item?.calc$?.targetDefinition?.createdTemplateUuid) {
       return item;
     }
 
@@ -2296,7 +2327,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
       return item;
     }
 
-    const template = await UtilsDocument.templateFromUuid(item.targetDefinition.createdTemplateUuid);
+    const template = await UtilsDocument.templateFromUuid(item.calc$.targetDefinition.createdTemplateUuid);
     if (!template) {
       return item;
     }
@@ -2322,7 +2353,7 @@ class InternalFunctions {
     return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
   }
 
-  public static calculateTargetResult(messageData: ItemCardData): ItemCardData {
+  public static calculateTargetResult(messageData: ItemCard): ItemCard {
     const items = messageData.items.filter(item => item.targets?.length);
 
     // Prepare data
@@ -2331,11 +2362,11 @@ class InternalFunctions {
     const calculatedHealthModByTargetUuid = new Map<string, number>();
     for (const item of items) {
       for (const target of item.targets) {
-        target.result = !target.result ? {appliedActiveEffects: false} : {...target.result}
-        delete target.result.checkPass;
-        delete target.result.dmg;
-        delete target.result.hit;
-        tokenUuidToName.set(target.uuid, target.name || '');
+        target.calc$.result = !target.calc$.result ? {appliedActiveEffects: false} : {...target.calc$.result}
+        delete target.calc$.result.checkPass;
+        delete target.calc$.result.dmg;
+        delete target.calc$.result.hit;
+        tokenUuidToName.set(target.uuid, target.calc$.name || '');
         rawHealthModByTargetUuid.set(target.uuid, 0);
         calculatedHealthModByTargetUuid.set(target.uuid, 0);
       }
@@ -2343,10 +2374,10 @@ class InternalFunctions {
 
     
     // Reset aggregate
-    const aggregates = new Map<string, ItemCardData['targetAggregate'][0]>();
-    if (messageData.targetAggregate) {
+    const aggregates = new Map<string, ItemCard['calc$']['targetAggregate'][0]>();
+    if (messageData.calc$?.targetAggregate) {
       // If an aggregate was shown, make sure it will always be shown to make sure it can be reset back to the original state
-      for (const oldAggregate of messageData.targetAggregate) {
+      for (const oldAggregate of messageData.calc$.targetAggregate) {
         if (!oldAggregate.dmg?.appliedDmg) {
           continue;
         }
@@ -2373,24 +2404,24 @@ class InternalFunctions {
         if (!aggregates.has(target.uuid)) {
           aggregates.set(target.uuid, {
             uuid: target.uuid,
-            name: target.name,
-            img: target.img,
-            hpSnapshot: target.hpSnapshot,
+            name: target.calc$.name,
+            img: target.calc$.img,
+            hpSnapshot: target.calc$.hpSnapshot,
             dmg: {
               avoided: true,
               applied: false,
               appliedDmg: 0,
               rawDmg: 0,
               calcDmg: 0,
-              calcHp: Number(target.hpSnapshot.hp),
-              calcTemp: Number(target.hpSnapshot.temp),
+              calcHp: Number(target.calc$.hpSnapshot.hp),
+              calcTemp: Number(target.calc$.hpSnapshot.temp),
             }
           });
         }
       }
     }
 
-    const applyDmg = (aggregate: ItemCardData['targetAggregate'][0], amount: number) => {
+    const applyDmg = (aggregate: ItemCard['calc$']['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {
         aggregate.dmg = {
           avoided: true,
@@ -2416,7 +2447,7 @@ class InternalFunctions {
       aggregate.dmg.calcHp -= dmg;
     }
     
-    const applyHeal = (aggregate: ItemCardData['targetAggregate'][0], amount: number) => {
+    const applyHeal = (aggregate: ItemCard['calc$']['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {
         aggregate.dmg = {
           avoided: true,
@@ -2442,40 +2473,40 @@ class InternalFunctions {
     // Calculate
     for (const item of items) {
       // Attack
-      if (item.attack?.evaluatedRoll) {
-        const attackResult = item.attack.evaluatedRoll.total;
+      if (item.attack?.calc$.evaluatedRoll) {
+        const attackResult = item.attack.calc$.evaluatedRoll.total;
         for (const target of item.targets) {
-          target.result.hit = target.ac <= attackResult;
+          target.calc$.result.hit = target.calc$.ac <= attackResult;
         }
       }
 
       // Check
-      if (item.check) {
+      if (item.calc$.check) {
         for (const target of item.targets) {
-          if (!target.check?.evaluatedRoll?.evaluated) {
-            target.result.checkPass = null;
+          if (!target?.check.calc$?.evaluatedRoll?.evaluated) {
+            target.calc$.result.checkPass = null;
           } else {
-            target.result.checkPass = target.check.evaluatedRoll.total >= item.check.dc;
+            target.calc$.result.checkPass = target.check.calc$.evaluatedRoll.total >= item.calc$.check.dc;
           }
         }
       }
 
       // Include when no attack has happend (null) and when hit (true)
       // Include when no check is present in the item or the check happend (check passed/failed is handled later)
-      const calcDmgForTargets = item.targets.filter(target => target.result.hit !== false && (!item.check || target.check?.evaluatedRoll?.evaluated));
+      const calcDmgForTargets = item.targets.filter(target => target.calc$.result.hit !== false && (!item.calc$.check || target?.check.calc$?.evaluatedRoll?.evaluated));
 
       // Damage
-      const evaluatedDamageRolls = item.damages ? item.damages.filter(dmg => dmg.mode === 'critical' ? dmg.criticalRoll?.evaluated : dmg.normalRoll?.evaluated) : [];
+      const evaluatedDamageRolls = item.damages ? item.damages.filter(dmg => dmg.mode === 'critical' ? dmg.calc$?.criticalRoll?.evaluated : dmg?.calc$.normalRoll?.evaluated) : [];
       if (calcDmgForTargets.length > 0 && evaluatedDamageRolls.length > 0) {
         for (const damage of evaluatedDamageRolls) {
-          const damageResults = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(damage.mode === 'critical' ? damage.criticalRoll : damage.normalRoll)));
+          const damageResults = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(damage.mode === 'critical' ? damage.calc$.criticalRoll : damage.calc$.normalRoll)));
           for (const target of calcDmgForTargets) {
             for (const [dmgType, dmg] of damageResults.entries()) {
               let baseDmg = dmg;
-              if (item.check && target.result.checkPass) {
+              if (item?.calc$.check && target.calc$.result.checkPass) {
                 // If a creature or an object has resistance to a damage type, damage of that type is halved against it.
                 // I read that as, first apply the save modifier, not at the same time or not after res/vuln
-                switch (damage.modfierRule) {
+                switch (damage.calc$.modfierRule) {
                   case 'save-full-dmg': {
                     break;
                   }
@@ -2491,18 +2522,18 @@ class InternalFunctions {
                 }
               }
               let modifier = 1;
-              if (target.immunities.includes(dmgType)) {
+              if (target.calc$.immunities.includes(dmgType)) {
                 modifier = 0;
               } else {
-                if (target.resistances.includes(dmgType)) {
+                if (target.calc$.resistances.includes(dmgType)) {
                   modifier /= 2;
                 }
-                if (target.vulnerabilities.includes(dmgType)) {
+                if (target.calc$.vulnerabilities.includes(dmgType)) {
                   modifier *= 2;
                 }
               }
 
-              target.result.dmg = {
+              target.calc$.result.dmg = {
                 type: dmgType,
                 rawNumber: baseDmg,
                 calcNumber: Math.floor(baseDmg * modifier),
@@ -2511,9 +2542,9 @@ class InternalFunctions {
               if (!aggregates.get(target.uuid)) {
                 aggregates.set(target.uuid, {
                   uuid: target.uuid,
-                  hpSnapshot: target.hpSnapshot,
-                  name: target.name,
-                  img: target.img,
+                  hpSnapshot: target.calc$.hpSnapshot,
+                  name: target.calc$.name,
+                  img: target.calc$.img,
                 })
               }
               const aggregate = aggregates.get(target.uuid);
@@ -2530,12 +2561,12 @@ class InternalFunctions {
               }
 
               // Apply healing & dmg aggregate in the same order as the items
-              if (target.result.dmg.type === 'temphp') {
-                aggregate.dmg.calcTemp += target.result.dmg.calcNumber;
-              } else if (InternalFunctions.healingDamageTypes.includes(target.result.dmg.type)) {
-                applyHeal(aggregate, target.result.dmg.calcNumber);
+              if (target.calc$.result.dmg.type === 'temphp') {
+                aggregate.dmg.calcTemp += target.calc$.result.dmg.calcNumber;
+              } else if (InternalFunctions.healingDamageTypes.includes(target.calc$.result.dmg.type)) {
+                applyHeal(aggregate, target.calc$.result.dmg.calcNumber);
               } else {
-                applyDmg(aggregate, target.result.dmg.calcNumber);
+                applyDmg(aggregate, target.calc$.result.dmg.calcNumber);
               }
             }
           }
@@ -2545,7 +2576,7 @@ class InternalFunctions {
 
     for (const item of items) {
       for (const target of item.targets ?? []) {
-        if ((item.attack && target.result.hit) || (item.check && !target.result.checkPass)) {
+        if ((item.attack && target.calc$.result.hit) || (item.calc$.check && !target.calc$.result.checkPass)) {
           if (aggregates.get(target.uuid).dmg) {
             aggregates.get(target.uuid).dmg.avoided = false;
           }
@@ -2553,17 +2584,18 @@ class InternalFunctions {
       }
     }
 
-    messageData.targetAggregate = Array.from(aggregates.values()).sort((a, b) => (a.name || '').localeCompare((b.name || '')));
-    for (const aggregate of messageData.targetAggregate) {
+    messageData.calc$ = messageData.calc$ ?? {};
+    messageData.calc$.targetAggregate = Array.from(aggregates.values()).sort((a, b) => (a.name || '').localeCompare((b.name || '')));
+    for (const aggregate of messageData.calc$.targetAggregate) {
       if (aggregate.dmg) {
         aggregate.dmg.applied = aggregate.dmg.calcDmg === aggregate.dmg.appliedDmg;
       }
     }
 
-    messageData.allDmgApplied = messageData.targetAggregate != null && messageData.targetAggregate.filter(aggr => aggr.dmg?.applied).length === messageData.targetAggregate.length;
+    messageData.calc$.allDmgApplied = messageData.calc$.targetAggregate != null && messageData.calc$.targetAggregate.filter(aggr => aggr.dmg?.applied).length === messageData.calc$.targetAggregate.length;
     const appliedDmgTo = new Set<string>();
-    if (messageData.targetAggregate != null) {
-      for (const aggr of messageData.targetAggregate) {
+    if (messageData.calc$.targetAggregate != null) {
+      for (const aggr of messageData.calc$.targetAggregate) {
         if (aggr.dmg?.applied) {
           appliedDmgTo.add(aggr.uuid);
         }
@@ -2578,7 +2610,7 @@ class InternalFunctions {
     return messageData;
   }
 
-  public static async saveItemCardData(messageId: string, data: ItemCardData): Promise<void> {
+  public static async saveItemCardData(messageId: string, data: ItemCard): Promise<void> {
     await ChatMessage.updateDocuments([{
       _id: messageId,
       flags: {
@@ -2591,7 +2623,7 @@ class InternalFunctions {
     }]);
   }
 
-  public static getItemCardData(message: ChatMessage): ItemCardData {
+  public static getItemCardData(message: ChatMessage): ItemCard {
     if (message == null) {
       return null;
     }
@@ -2601,11 +2633,11 @@ class InternalFunctions {
     return (message.getFlag(staticValues.moduleName, 'clientTemplateData') as any)?.data;
   }
 
-  public static setItemCardData(message: ChatMessage, data: ItemCardData): void {
+  public static setItemCardData(message: ChatMessage, data: ItemCard): void {
     setProperty(message.data, `flags.${staticValues.moduleName}.clientTemplateData.data`, data);
   }
   
-  public static canChangeTargets(itemData: ItemCardItemData): boolean {
+  public static canChangeTargets(itemData: ItemCardItem): boolean {
     if (!itemData.targets) {
       return true;
     }
@@ -2613,13 +2645,13 @@ class InternalFunctions {
     // A target has rolled a save or damage has been applied
     if (itemData.targets) {
       for (const target of itemData.targets) {
-        if (target.result.checkPass != null) {
+        if (target?.calc$?.result?.checkPass != null) {
           return false;
         }
-        if (target.result.applyDmg) {
+        if (target.applyDmg) {
           return false;
         }
-        if (target.result.appliedActiveEffects) {
+        if (target?.calc$?.result?.appliedActiveEffects === true) {
           return false;
         }
       }

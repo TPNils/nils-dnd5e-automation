@@ -6,24 +6,24 @@
   {{#each data.items as |item itemIndex|}}
     <div>
       <div class="{{@root.staticValues.moduleName}}-header" data-{{@root.staticValues.moduleName}}-action="toggle-collapse">
-        <img src="{{item.img}}" title="{{item.name}}" width="36" height="36"/>
-        <h3 class="{{@root.staticValues.moduleName}}-item-name">{{item.name}}</h3>
+        <img src="{{item.calc$.img}}" title="{{item.calc$.name}}" width="36" height="36"/>
+        <h3 class="{{@root.staticValues.moduleName}}-item-name">{{item.calc$.name}}</h3>
       </div>
 
       {{#unless (nacCardCollapse @root.messageId)}}
         <div class="{{@root.staticValues.moduleName}}-section">
-          {{#if item.description}}
-            {{{item.description}}}
+          {{#if item.calc$.description}}
+            {{{item.calc$.description}}}
           {{/if}}
-          {{#if item.materials}}
-            <p><strong>{{ localize "DND5E.RequiredMaterials" }}.</strong> {{item.materials}}</p>
+          {{#if item.calc$.materials}}
+            <p><strong>{{ localize "DND5E.RequiredMaterials" }}.</strong> {{item.calc$.materials}}</p>
           {{/if}}
         </div>
       {{/unless}}
 
-      {{#if (and (nacExpr item.type '===' 'spell') (nacExpr item.level '>' 0) )}}
-        {{#nacSpellLevels actorUuid=@root.data.actor.uuid minLevel=item.level}}
-          <select class="form-fields" {{#unless item.canChangeLevel}}disabled{{/unless}} data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-upcastlevel">
+      {{#if (and (nacExpr item.calc$.type '===' 'spell') (nacExpr item.calc$.level '>' 0) )}}
+        {{#nacSpellLevels actorUuid=@root.data.actor.uuid minLevel=item.calc$.level}}
+          <select class="form-fields" {{#unless item.calc$.canChangeLevel}}disabled{{/unless}} data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-upcastlevel">
             {{#each this}}
               {{#nacExpr this.type '===' 'spell'}}
                 <option {{#nacExpr item.selectedlevel '===' this.level}}selected{{/nacExpr}} value="{{this.level}}">{{ localize "DND5E.SpellLevelSlot" level=(localize (nacConcat "DND5E.SpellLevel" this.level)) n=this.availableSlots }}</option>
@@ -40,20 +40,20 @@
           {{#if item.attack}}
             <div class="{{@root.staticValues.moduleName}}-attack">
               <div class="{{@root.staticValues.moduleName}}-flavor">
-                {{#if item.attack.evaluatedRoll}}
+                {{#if item.attack.calc$.evaluatedRoll}}
                   {{ localize (nacConcat "DND5E." (nacCapitalize item.attack.mode)) }}
                 {{/if}}
               </div>
               <div class="{{@root.staticValues.moduleName}}-roll-wrapper">
                 {{#if (eq item.attack.phase "result")}}
                   <div>
-                    {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=item.attack.evaluatedRoll}}
+                    {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=item.attack.calc$.evaluatedRoll}}
                   </div>
                 {{else}}
                   <div class="{{@root.staticValues.moduleName}}-bonus-container">
                     <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-attack" class="{{@root.staticValues.moduleName}}-item-attack" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" @root.data.actor.uuid)}}disabled{{/nacMisPerm}}>
                       {{#if (eq item.attack.mode 'normal')}}
-                        {{#if item.attack.label}}{{item.attack.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}
+                        {{#if item.attack.calc$.label}}{{item.attack.calc$.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}
                       {{else}}
                         {{ localize (nacConcat "DND5E." (nacCapitalize item.attack.mode)) }}
                       {{/if}}
@@ -75,10 +75,6 @@
           {{#if item.damages.[0]}}
             {{#with item.damages.[0]}}
             <div class="{{@root.staticValues.moduleName}}-first-dmg">
-              <div class="{{@root.staticValues.moduleName}}-flavor">
-                {{#if this.roll.evaluated}}{{this.displayDamageTypes}}{{/if}}
-              </div>
-              
               {{> modules/nils-automated-compendium/templates/damage.hbs 
                 moduleName=@root.staticValues.moduleName
                 itemIndex=itemIndex
@@ -103,22 +99,22 @@
           {{/if}}
         {{/each}}
         
-        {{#if (and item.check item.targets.length)}}
+        {{#if (and item.calc$.check item.targets.length)}}
           <table>
             <thead>
               <th style="width: 30px;">{{! img}}</th>
               <th>{{localize "Name"}}</th>
               <th class="{{@root.staticValues.moduleName}}-item-check">
-                {{#if item.check.skill}}
-                  {{localize (nacConcat "DND5E.Skill" (nacCapitalize item.check.skill))}}
+                {{#if item.calc$.check.skill}}
+                  {{localize (nacConcat "DND5E.Skill" (nacCapitalize item.calc$.check.skill))}}
                 {{else}}
-                  {{localize (nacConcat "DND5E.Ability" (nacCapitalize item.check.ability))}}
+                  {{localize (nacConcat "DND5E.Ability" (nacCapitalize item.calc$.check.ability))}}
                 {{/if}}
 
                 {{localize "DND5E.AbbreviationDC"}}:
 
                 {{#nacPerm (nacConcat "ActorOwnerUuid:" @root.data.actor.uuid)}}
-                  {{item.check.dc}}
+                  {{item.calc$.check.dc}}
                 {{else}}
                   {{localize "DND5E.SaveDC" dc="?" ability=""}}
                 {{/nacPerm}}
@@ -127,21 +123,21 @@
             <tbody>
               {{#each item.targets as |target targetIndex|}}
                 <tr class="{{@root.staticValues.moduleName}}-item-{{itemIndex}}-check-target-{{targetIndex}}">
-                  <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
-                  <td>{{target.name}}</td>
+                  <td>{{#if target.calc$.img}}<img src="{{target.calc$.img}}" height="20px" width="20px">{{/if}}</td>
+                  <td>{{target.calc$.name}}</td>
                   <td>
-                    <div class="{{@root.staticValues.moduleName}}-roll-wrapper" {{#nacPerm (nacConcat "ActorOwnerUuid:" target.actorUuid)}}title="{{target.check.evaluatedRoll.formula}}"{{/nacPerm}}>
+                    <div class="{{@root.staticValues.moduleName}}-roll-wrapper" {{#nacPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}title="{{target.check.calc$.evaluatedRoll.formula}}"{{/nacPerm}}>
                       {{#if (eq target.check.phase "result")}}
                         <div class="{{@root.staticValues.moduleName}}-check-{{#if target.result.checkPass}}pass{{else}}fail{{/if}}">
-                          {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=target.check.evaluatedRoll compact=true}}
+                          {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=target.check.calc$.evaluatedRoll compact=true}}
                         </div>
                       {{else}}
                         <div class="{{@root.staticValues.moduleName}}-bonus-container">
-                          <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" target.actorUuid)}}disabled{{/nacMisPerm}}>
+                          <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}disabled{{/nacMisPerm}}>
                             {{#if (eq target.check.mode 'normal')}}
-                              {{#if item.check.label}}
-                                {{item.check.label}}
-                              {{else if item.check.addSaveBonus}}
+                              {{#if item.calc$.check.label}}
+                                {{item.calc$.check.label}}
+                              {{else if item.calc$.check.addSaveBonus}}
                                 {{localize "DND5E.SavingThrow"}}
                               {{else}}
                                 {{localize "DND5E.Ability"}}
@@ -151,12 +147,12 @@
                             {{/if}}
                           </button>
                           
-                          {{#if (and (eq target.check.phase "bonus-input") (nacPerm (nacConcat "ActorOwnerUuid:" target.actorUuid)) )}}
-                            <input class="{{@root.staticValues.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{target.check.userBonus}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-bonus" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" target.actorUuid)}}disabled{{/nacMisPerm}}/>
+                          {{#if (and (eq target.check.phase "bonus-input") (nacPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)) )}}
+                            <input class="{{@root.staticValues.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{target.check.userBonus}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-bonus" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
                           {{/if}}
                         </div>
                       {{/if}}
-                      {{#nacPerm (nacConcat "ActorOwnerUuid:" target.actorUuid)}}
+                      {{#nacPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}
                         <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq target.check.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
                         <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq target.check.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
                       {{/nacPerm}}
@@ -168,16 +164,16 @@
         {{/if}}
       </div>
       
-      {{#if item.targetDefinition.hasAoe}}
+      {{#if item.calc$.targetDefinition.hasAoe}}
         <div class="{{@root.staticValues.moduleName}}-section">
-          <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-template" {{#if (or (not item.canChangeTargets) (nacMisPerm (nacConcat "ActorOwnerUuid:" @root.data.actor.uuid)))}}disabled{{/if}}>
+          <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-template" {{#if (or (not item.calc$.canChangeTargets) (nacMisPerm (nacConcat "ActorOwnerUuid:" @root.data.actor.uuid)))}}disabled{{/if}}>
             {{localize "DND5E.PlaceTemplate"}}
           </button> 
         </div>
       {{/if}}
 
       <div class="{{@root.staticValues.moduleName}}-footer">
-        {{#each item.properties}}
+        {{#each item.calc$.properties}}
           <span>{{this}}</span>
         {{/each}}
       </div>
@@ -189,8 +185,8 @@
             <tr>
               <th>{{ localize "Resources" }}</th>
               <th>{{ localize "DND5E.Uses" }}</th>
-              <th style="width: 50px;" {{#if item.allConsumeResourcesApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
-                {{#nacExpr item.consumeResources '>' 1}}
+              <th style="width: 50px;" {{#if item.calc$.allConsumeResourcesApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
+                {{#nacExpr item.consumeResources.length '>' 1}}
                   <div style="display: flex;" title="All">
                     <button data-{{@root.staticValues.moduleName}}-action="apply-consume-resource-*-*" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
                     <button data-{{@root.staticValues.moduleName}}-action="undo-consume-resource-*-*" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
@@ -201,9 +197,9 @@
           </thead>
           <tbody>
             {{#each item.consumeResources as |consumeResource consumeResourceIndex|}}
-              <tr {{#if consumeResource.applied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
-                <td>{{nacTranslateProperty consumeResource.path}}</td>
-                <td>{{consumeResource.original}}-{{consumeResource.amount}}=<b {{#nacExpr (nacMath consumeResource.original '-' consumeResource.amount) '<' 0}}style="color: red;"{{/nacExpr}}><u>{{nacMath 'max(0, ' consumeResource.original '-' consumeResource.amount ')'}}</b></u></td>
+              <tr {{#if consumeResource.calc$.applied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
+                <td>{{nacTranslateProperty consumeResource.calc$.path}}</td>
+                <td>{{consumeResource.calc$.original}}-{{consumeResource.calc$.amount}}=<b {{#nacExpr (nacMath consumeResource.calc$.original '-' consumeResource.calc$.amount) '<' 0}}style="color: red;"{{/nacExpr}}><u>{{nacMath 'max(0, ' consumeResource.calc$.original '-' consumeResource.calc$.amount ')'}}</b></u></td>
                 <td>
                   <button data-{{@root.staticValues.moduleName}}-action="apply-consume-resource-{{itemIndex}}-{{consumeResourceIndex}}" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
                   <button data-{{@root.staticValues.moduleName}}-action="undo-consume-resource-{{itemIndex}}-{{consumeResourceIndex}}" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
@@ -216,7 +212,7 @@
     </div>
   {{/each}}
 
-  {{#if data.targetAggregate.length}}
+  {{#if data.calc$.targetAggregate.length}}
   {{#nacPerm "gm"}}
     <section class="{{@root.staticValues.moduleName}}-gm-secret">
       <table class="{{@root.staticValues.moduleName}}-targets">
@@ -225,8 +221,8 @@
             <th style="width: 30px;"></th>
             <th>{{localize "Name"}}</th>
             <th style="width: 30px; text-align: center;">{{ localize "DND5E.HP" }}</th>
-            <th style="width: 50px;" {{#if @root.data.allDmgApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
-              {{#nacExpr data.targetAggregate.length '>' 1}}
+            <th style="width: 50px;" {{#if @root.data.calc$.allDmgApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
+              {{#nacExpr data.calc$.targetAggregate.length '>' 1}}
                 <div style="display: flex;" title="All">
                   <button data-{{@root.staticValues.moduleName}}-action="apply-damage-*" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
                   <button data-{{@root.staticValues.moduleName}}-action="undo-damage-*" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
@@ -236,7 +232,7 @@
           </tr>
         </thead>
         <tbody>
-          {{#each data.targetAggregate as |target|}}
+          {{#each data.calc$.targetAggregate as |target|}}
             <tr {{#if target.dmg.applied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
               <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
               <td> {{#if target.dmg.avoided}}<i style="color: green" class="fas fa-check"></i>{{else}}<i style="color: #d03333" class="fas fa-times-circle"></i>{{/if}} {{target.name}}</td>
