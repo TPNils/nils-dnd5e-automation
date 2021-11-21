@@ -174,7 +174,7 @@ function wrapBeforeUpdate<T extends foundry.abstract.Document<any, any>>(callbac
       return false;
     }
     
-    const diff: any = diffObject(document.toObject(), modifiedDocument.data, {inner: true});
+    const diff: any = diffObject(document.toObject(), modifiedDocument.data, {inner: false});
     mergeObject(change, diff);
   }
 }
