@@ -2595,7 +2595,7 @@ class InternalFunctions {
     if (message == null) {
       return null;
     }
-    if (message.getFlag(staticValues.moduleName, 'clientTemplate') === `modules/${staticValues.moduleName}/templates/item-card.hbs`) {
+    if (message.getFlag(staticValues.moduleName, 'clientTemplate') !== `modules/${staticValues.moduleName}/templates/item-card.hbs`) {
       return null;
     }
     return (message.getFlag(staticValues.moduleName, 'clientTemplateData') as any)?.data;
