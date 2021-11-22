@@ -336,6 +336,16 @@ export class UtilsChatMessage {
       }
     };
 
+    // TODO all roll modes
+    if (game.settings.get('core', 'rollMode') === 'gmroll') {
+      chatMessageData.whisper = [game.userId];
+      for (const user of game.users.values()) {
+        if (user.isGM) {
+          chatMessageData.whisper.push(user.id);
+        }
+      }
+    }
+
     if (insert) {
       return await ChatMessage.create(chatMessageData)
     } else {
