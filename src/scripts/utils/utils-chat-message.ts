@@ -398,7 +398,7 @@ export class UtilsChatMessage {
     const queriedItem = await UtilsDocument.itemFromUuid(item.uuid);
     itemCardData.calc$.level = queriedItem.data.data.level;
 
-    const rollData: {[key: string]: any} = actor == null ? {} : actor.getRollData();
+    const rollData: {[key: string]: any} = actor == null ? {} : item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
       rollData.prof = item.data.data.prof.term;
     }
