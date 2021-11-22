@@ -336,7 +336,6 @@ export class UtilsChatMessage {
       }
     };
 
-    // TODO all roll modes
     if (game.settings.get('core', 'rollMode') === 'gmroll') {
       chatMessageData.whisper = [game.userId];
       for (const user of game.users.values()) {
@@ -344,6 +343,16 @@ export class UtilsChatMessage {
           chatMessageData.whisper.push(user.id);
         }
       }
+    }
+    if (game.settings.get('core', 'rollMode') === 'blindroll') {
+      for (const user of game.users.values()) {
+        if (user.isGM) {
+          chatMessageData.whisper.push(user.id);
+        }
+      }
+    }
+    if (game.settings.get('core', 'rollMode') === 'selfroll') {
+      chatMessageData.whisper = [game.userId];
     }
 
     if (insert) {
@@ -671,7 +680,7 @@ export class UtilsChatMessage {
     itemCardItemData.targets = [];
     for (const targetUuid of targetUuids) {
       const token = tokenMap.get(targetUuid);
-      const actor = (token.data.actorId ? game.actors.get(token.data.actorId) : token.getActor()) as MyActor;
+      const actor = token.getActor() as MyActor;
       const target: ItemCardItem['targets'][0] = {
         uuid: targetUuid,
         calc$: {
