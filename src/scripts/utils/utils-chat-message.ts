@@ -398,14 +398,17 @@ export class UtilsChatMessage {
     const queriedItem = await UtilsDocument.itemFromUuid(item.uuid);
     itemCardData.calc$.level = queriedItem.data.data.level;
 
-    const rollData = actor == null ? {} : actor.getRollData();
+    const rollData: {[key: string]: any} = actor == null ? {} : actor.getRollData();
+    if (item.data.data.prof?.hasProficiency) {
+      rollData.prof = item.data.data.prof.term;
+    }
     // attack
     if (['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
       const bonus = ['@mod'];
 
-      // Proficienty bonus
-      if (item.data.data.proficient) {
-        bonus.push('@prof')
+      // Add proficiency bonus if an explicit proficiency flag is present or for non-item features
+      if ( !["weapon", "consumable"].includes(item.data.data.type) || item.data.proficient ) {
+        bonus.push("@prof");
       }
 
       // Item bonus
