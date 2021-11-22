@@ -108,6 +108,7 @@ export interface ItemCardItem {
     properties?: string[];
     canChangeTargets: boolean;
     activeEffectsData: ActiveEffectData[];
+    requiresSpellSlot: boolean;
     check?: {
       ability: keyof MyActor['data']['data']['abilities'];
       dc: number;
@@ -376,6 +377,7 @@ export class UtilsChatMessage {
         properties: item.getChatData().properties,
         level: item.data.data.level,
         canChangeTargets: true,
+        requiresSpellSlot: false,
         targetDefinition: {
           // @ts-expect-error
           hasAoe: CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type),
@@ -572,8 +574,8 @@ export class UtilsChatMessage {
 
     // Consume actor resources
     if (actor) {
-      const requireSpellSlot = isSpell && itemCardData.calc$.level > 0 && UtilsChatMessage.spellUpcastModes.includes(item.data.data.preparation.mode);
-      if (requireSpellSlot) {
+      itemCardData.calc$.requiresSpellSlot = isSpell && itemCardData.calc$.level > 0 && UtilsChatMessage.spellUpcastModes.includes(item.data.data.preparation.mode);
+      if (itemCardData.calc$.requiresSpellSlot) {
         let spellPropertyName = item.data.data.preparation.mode === "pact" ? "pact" : `spell${itemCardData.calc$.level}`;
         itemCardData.consumeResources.push({
           calc$: {

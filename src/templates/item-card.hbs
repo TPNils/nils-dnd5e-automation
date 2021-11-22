@@ -21,7 +21,7 @@
         </div>
       {{/unless}}
 
-      {{#if (and (nacExpr item.calc$.type '===' 'spell') (nacExpr item.calc$.level '>' 0) )}}
+      {{#if item.calc$.requiresSpellSlot}}
         {{#nacSpellLevels actorUuid=@root.data.actor.uuid minLevel=item.calc$.level}}
           <select class="form-fields" {{#unless item.calc$.canChangeLevel}}disabled{{/unless}} data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-upcastlevel">
             {{#each this}}
