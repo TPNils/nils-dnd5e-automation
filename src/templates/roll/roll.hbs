@@ -19,7 +19,7 @@
         {{#if overrideFormula}}{{overrideFormula}}{{else}}{{roll.formula}}{{/if}}
       </div>
       {{> modules/nils-automated-compendium/templates/roll/tooltip.hbs terms=roll.terms}}
-      <h4 class="dice-total">{{roll.total}}</h4>
+      <h4 class="dice-total {{#if (nacIsMaxRoll roll)}} success{{/if}}{{#if (nacIsMinRoll roll)}} failure{{/if}}">{{roll.total}}</h4>
     {{/if}}
   </div>
 </div>

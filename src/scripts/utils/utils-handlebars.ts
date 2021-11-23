@@ -251,6 +251,64 @@ export class UtilsHandlebars {
     return new Roll(parts.join(' ')).roll({async: false}).total;
   }
 
+  public static isMaxRoll(roll: ReturnType<Roll['toJSON']>, options: Options): any {
+    let max = true;
+    let hasDie = false;
+
+    for (const term of roll.terms as Array<RollTerm & DiceTerm.TermData & {class: string}>) {
+      if (term.class === 'Die') {
+        hasDie = true;
+        for (const result of term.results) {
+          if (result.active && result.result !== term.faces) {
+            max = false;
+            break;
+          }
+        }
+      }
+    }
+
+    const matches = hasDie && max;
+    
+    if (!UtilsHandlebars.isBlockHelper(options)) {
+      return matches;
+    }
+
+    if (matches) {
+      return options.fn(this);
+    } else {
+      return options.inverse(this);
+    }
+  }
+
+  public static isMinRoll(roll: ReturnType<Roll['toJSON']>, options: Options): any {
+    let min = true;
+    let hasDie = false;
+
+    for (const term of roll.terms as Array<RollTerm & DiceTerm.TermData & {class: string}>) {
+      if (term.class === 'Die') {
+        hasDie = true;
+        for (const result of term.results) {
+          if (result.active && result.result !== 1) {
+            min = false;
+            break;
+          }
+        }
+      }
+    }
+
+    const matches = hasDie && min;
+    
+    if (!UtilsHandlebars.isBlockHelper(options)) {
+      return matches;
+    }
+
+    if (matches) {
+      return options.fn(this);
+    } else {
+      return options.inverse(this);
+    }
+  }
+
   public static capitalize(value: string): string {
     if (typeof value !== 'string') {
       return value;
@@ -269,6 +327,8 @@ export class UtilsHandlebars {
       Handlebars.registerHelper(`${staticValues.code}Math`, UtilsHandlebars.math);
       Handlebars.registerHelper(`${staticValues.code}Capitalize`, UtilsHandlebars.capitalize);
       Handlebars.registerHelper(`${staticValues.code}SpellLevels`, UtilsHandlebars.spellLevels);
+      Handlebars.registerHelper(`${staticValues.code}IsMinRoll`, UtilsHandlebars.isMinRoll);
+      Handlebars.registerHelper(`${staticValues.code}IsMaxRoll`, UtilsHandlebars.isMaxRoll);
     });
   }
 
