@@ -709,52 +709,6 @@ export class UtilsChatMessage {
     return itemCardData;
   }
 
-  public static async setTargets(itemCardItemData: ItemCardItem, targetUuids: string[]): Promise<ItemCardItem> {
-    // TODO Move to calc self
-    const tokenMap = new Map<string, TokenDocument>();
-    for (const token of UtilsDocument.tokenFromUuid(targetUuids, {sync: true, deduplciate: true})) {
-      tokenMap.set(token.uuid, token);
-    }
-    
-    itemCardItemData.targets = [];
-    for (const targetUuid of targetUuids) {
-      const token = tokenMap.get(targetUuid);
-      const actor = token.getActor() as MyActor;
-      const target: ItemCardItem['targets'][0] = {
-        uuid: targetUuid,
-        calc$: {
-          actorUuid: actor.uuid,
-          ac: actor.data.data.attributes.ac.value,
-          img: token.data.img,
-          name: token.data.name,
-          immunities: [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))],
-          resistances: [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))],
-          vulnerabilities: [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))],
-          hpSnapshot: {
-            maxHp: actor.data.data.attributes.hp.max,
-            hp: actor.data.data.attributes.hp.value,
-            temp: actor.data.data.attributes.hp.temp
-          },
-          result: {
-            appliedActiveEffects: false
-          }
-        }
-      };
-      if (itemCardItemData.calc$.check) {
-        // Don't prefil the roll, generate that at the moment the roll is made
-        target.check = {
-          mode: 'normal',
-          phase: 'mode-select',
-          userBonus: "",
-          calc$: {}
-        };
-      }
-      itemCardItemData.targets.push(target);
-    }
-    itemCardItemData.targets = itemCardItemData.targets.sort((a, b) => (a.calc$.name || '').localeCompare(b.calc$.name || ''));
-
-    return itemCardItemData;
-  }
   //#endregion
 
   //#region routing
@@ -1780,7 +1734,6 @@ class DmlTriggerUser implements IDmlTrigger<User> {
               }
             }
             
-            messageData.items[itemIndex] = await UtilsChatMessage.setTargets(messageData.items[itemIndex], targetsUuids)
             await InternalFunctions.saveItemCardData(chatMessage.id, messageData);
             // Only retarget 1 item
             return;
@@ -1846,6 +1799,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
         itemCard.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
       }
       this.setTargets(context);
+      this.calcTargets(context);
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
       this.calcCanChangeSpellLevel(itemCards);
@@ -1957,6 +1911,50 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
                 item.targets = targets;
               }
               break;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  private calcTargets(context: IDmlContext<ChatMessage>): void {
+    for (const {newRow, oldRow} of context.rows) {
+      const data = InternalFunctions.getItemCardData(newRow);
+      if (!data) {
+        continue;
+      }
+      const oldData = oldRow == null ? null : InternalFunctions.getItemCardData(oldRow);
+      
+      for (const [item, oldItem] of this.forNewAndOld(data.items, oldData?.items)) {
+        for (const [target, oldTarget] of this.forNewAndOld(item.targets, oldItem?.targets)) {
+          if (target.calc$ == null || target.uuid !== oldTarget?.uuid) {
+            const token = UtilsDocument.tokenFromUuid(target.uuid, {sync: true});
+            const actor = token.getActor() as MyActor;
+            target.calc$ = {
+              actorUuid: actor.uuid,
+              ac: actor.data.data.attributes.ac.value,
+              img: token.data.img,
+              name: token.data.name,
+              immunities: [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))],
+              resistances: [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))],
+              vulnerabilities: [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))],
+              hpSnapshot: {
+                maxHp: actor.data.data.attributes.hp.max,
+                hp: actor.data.data.attributes.hp.value,
+                temp: actor.data.data.attributes.hp.temp
+              },
+              result: {
+                appliedActiveEffects: false
+              }
+            }
+            if (item.calc$.check) {
+              target.check = {
+                mode: 'normal',
+                phase: 'mode-select',
+                userBonus: "",
+                calc$: {}
+              };
             }
           }
         }
@@ -2382,8 +2380,11 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     return itemCards;
   }
 
-  private forNewAndOld<T extends {[key: string]: any}>(newObj: T[], oldObj: T[] | null): Array<[T, T | null]> {
+  private forNewAndOld<T extends {[key: string]: any}>(newObj: T[] | null, oldObj: T[] | null): Array<[T, T | null]> {
     const response: Array<[T, T]> = [];
+    if (newObj == null) {
+      newObj = [];
+    }
     for (let i = 0; i < newObj.length; i++) {
       response.push([newObj[i], oldObj?.[i]]);
     }
@@ -2503,15 +2504,16 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
     
     const templateDetails = UtilsTemplate.getTemplateDetails(template);
     const scene = template.parent;
-    const newTargets: string[] = [];
-    // @ts-ignore
-    for (const token of scene.getEmbeddedCollection('Token') as Iterable<TokenDocument>) {
+    const newTargets: typeof item['targets'] = [];
+    for (const token of scene.getEmbeddedCollection('Token').values() as Iterable<TokenDocument>) {
       if (UtilsTemplate.isTokenInside(templateDetails, token, true)) {
-        newTargets.push(token.uuid);
+        newTargets.push({uuid: token.uuid});
       }
     }
 
-    return UtilsChatMessage.setTargets(item, newTargets);
+    item.targets = newTargets;
+
+    return item;
   }
 
 }

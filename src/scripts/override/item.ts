@@ -33,7 +33,7 @@ async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode
     actor: this.actor as MyActor
   });
 
-  itemData = await UtilsChatMessage.setTargets(itemData, Array.from(game.user.targets).map(token => token.document.uuid));
+  itemData.targets = Array.from(game.user.targets).map(token => {return {uuid: token.document.uuid}});
 
   const itemCardData: Parameters<typeof UtilsChatMessage['createCard']>[0] = {
     items: [itemData]

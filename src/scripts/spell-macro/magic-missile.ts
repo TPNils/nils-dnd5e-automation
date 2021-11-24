@@ -107,7 +107,7 @@ export class MagicMissile implements IMacro<MagicMissileData> {
       actor: actor,
       item: item,
     });
-    UtilsChatMessage.setTargets(itemCardData, data.targets.tokenUuids);
+    itemCardData.targets = data.targets.tokenUuids.map(uuid => {return {uuid: uuid}});
     UtilsChatMessage.createCard({
       actor: actor,
       token: context.tokenUuid == null ? null : await UtilsDocument.tokenFromUuid(context.tokenUuid),
