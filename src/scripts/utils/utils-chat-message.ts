@@ -320,6 +320,22 @@ export class UtilsChatMessage {
           pactLevel: data.actor.data.data?.spells?.pact?.level ?? 0,
         }
       }
+
+      if (!data.token) {
+        if (data.actor.token) {
+          card.token = {
+            uuid: data.actor.token.uuid
+          }
+        } else {
+          const tokenDocuments = data.actor.getActiveTokens(true, true);
+          // TODO this is not ideal but the original token is lost. Maybe see if other modules like tokenhud give it to the item.displayCard() as a parameter
+          if (tokenDocuments.length === 1) {
+            card.token = {
+              uuid: tokenDocuments[0].uuid
+            }
+          }
+        }
+      }
     }
     if (data.token) {
       card.token = {
