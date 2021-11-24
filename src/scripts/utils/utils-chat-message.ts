@@ -446,10 +446,11 @@ export class UtilsChatMessage {
         userBonus: "",
         calc$: {
           rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
+          critTreshold: 20
         }
       };
 
-      let critTreshold = item.data.data.critical?.threshold ?? 20;
+      let critTreshold = item.data.data.critical?.threshold ?? itemCardData.attack.calc$.critTreshold;
       const actorDnd5eFlags = actor?.data?.flags?.dnd5e;
       if (item.type === 'weapon' && actorDnd5eFlags?.weaponCriticalThreshold != null) {
         critTreshold = Math.min(critTreshold, actor.data.flags.dnd5e.weaponCriticalThreshold);
