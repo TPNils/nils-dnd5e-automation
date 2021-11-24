@@ -33,7 +33,8 @@ export interface ItemCardItem {
       label?: string;
       rollBonus?: string;
       evaluatedRoll?: RollJson;
-      critTreshold?: number;
+      critTreshold: number;
+      isCrit?: boolean;
     }
   },
   damages?: {
