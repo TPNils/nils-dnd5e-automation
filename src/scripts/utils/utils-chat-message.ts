@@ -1107,6 +1107,17 @@ export class UtilsChatMessage {
     attack.calc$.evaluatedRoll = roll.toJSON();
     attack.phase = 'result';
 
+    const baseRollResult = (attack.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
+    attack.calc$.isCrit = baseRollResult.result >= attack.calc$.critTreshold;
+
+    if (attack.calc$.isCrit) {
+      for (const dmg of messageData.items?.[itemIndex].damages ?? []) {
+        if (dmg.phase === 'mode-select') {
+          dmg.mode = 'critical';
+        }
+      }
+    }
+
     return messageData;
   }
 
