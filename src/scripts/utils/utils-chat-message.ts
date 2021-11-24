@@ -1,5 +1,6 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import { ActiveEffectData, ItemData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
+import { TARGETS } from "pixi.js";
 import { IDmlContext, DmlTrigger, IDmlTrigger } from "../dml-trigger/dml-trigger";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
@@ -9,7 +10,7 @@ import { DamageType, MyActor, MyActorData, MyItem, MyItemData } from "../types/f
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
 import { UtilsDocument } from "./utils-document";
 import { UtilsRoll } from "./utils-roll";
-import { UtilsTemplate } from "./utils-template";
+import { TemplateDetails, UtilsTemplate } from "./utils-template";
 
 export interface ItemCardActor {
   uuid: string;
@@ -118,6 +119,7 @@ export interface ItemCardItem {
       skill?: string;
       addSaveBonus?: boolean;
     };
+    rangeDefinition: MyItemData['data']['range'];
     targetDefinition: {
       hasAoe: boolean,
       createdTemplateUuid?: string;
@@ -396,6 +398,7 @@ export class UtilsChatMessage {
         level: item.data.data.level,
         canChangeTargets: true,
         requiresSpellSlot: false,
+        rangeDefinition: item.data.data.range,
         targetDefinition: {
           // @ts-expect-error
           hasAoe: CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type),
@@ -707,6 +710,7 @@ export class UtilsChatMessage {
   }
 
   public static async setTargets(itemCardItemData: ItemCardItem, targetUuids: string[]): Promise<ItemCardItem> {
+    // TODO Move to calc self
     const tokenMap = new Map<string, TokenDocument>();
     for (const token of UtilsDocument.tokenFromUuid(targetUuids, {sync: true, deduplciate: true})) {
       tokenMap.set(token.uuid, token);
@@ -1841,6 +1845,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       for (const itemCard of itemCards) {
         itemCard.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
       }
+      this.setTargets(context);
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
       this.calcCanChangeSpellLevel(itemCards);
@@ -1864,6 +1869,94 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   
       if (deleteTemplateUuids.size > 0) {
         UtilsDocument.bulkDelete(((await UtilsDocument.templateFromUuid(deleteTemplateUuids)).map(doc => {return {document: doc}})))
+      }
+    }
+  }
+
+  private setTargets(context: IDmlContext<ChatMessage>): void {
+    for (const {newRow, oldRow} of context.rows) {
+      const data = InternalFunctions.getItemCardData(newRow);
+      const oldData = oldRow == null ? null : InternalFunctions.getItemCardData(oldRow);
+      
+      for (const [item, oldItem] of this.forNewAndOld(data.items, oldData?.items)) {
+        if (item.uuid !== oldItem?.uuid) {
+          // new/changed item => auto set targets
+          let shapeType: null | 'self' | 'circle' = null;
+          switch (item.calc$.targetDefinition.type) {
+            case 'self': {
+              shapeType = 'self';
+              break;
+            }
+            case 'sphere':
+            case 'radius':
+            case 'cylinder': {
+              shapeType = 'circle';
+              break;
+            }
+            
+            case 'ally':
+            case 'enemy':
+            case 'object':
+            case 'creature': {
+              // Consider measured distance units as a cirlce
+              if  (['ft', 'mi', 'm', 'km'].includes(item.calc$.targetDefinition.units)) {
+                shapeType = 'circle';
+              }
+              break;
+            }
+          }
+
+          switch (shapeType) {
+            case 'self': {
+              if (data.token?.uuid) {
+                item.targets = [{uuid: data.token.uuid}];
+              }
+              break;
+            }
+            case 'circle': {
+              if (item.calc$.rangeDefinition.units === 'self' && data.token?.uuid) {
+                const selfToken = UtilsDocument.tokenFromUuid(data.token.uuid, {sync: true});
+                const scene = selfToken.parent;
+                const templateDetails: TemplateDetails = {
+                  x: selfToken.data.x,
+                  y: selfToken.data.y,
+                  shape: new PIXI.Circle(0, 0, UtilsTemplate.feetToPx(UtilsTemplate.getFeet(item.calc$.targetDefinition))),
+                };
+                const targets: typeof item['targets'] = [];
+                let sceneTokens = Array.from(scene.getEmbeddedCollection(TokenDocument.documentName).values() as IterableIterator<TokenDocument>);
+                let filterDispositions: Array<TokenDocument['data']['disposition']> = [-1, 0, 1]
+                if (item.calc$.targetDefinition.type === 'ally') {
+                  if (selfToken.data.disposition === 1) {
+                    filterDispositions = [0, 1];
+                  } else if (selfToken.data.disposition === 0) {
+                    // Neurtal tokens also help friendlies but not enemies.
+                    // Neurtal *should* not distinguish between ally/enemy,
+                    // but in reality they are tokens who feel neurtal to the player party and are probably afraid of enemies
+                    filterDispositions = [0, 1];
+                  } else if (selfToken.data.disposition === -1) {
+                    filterDispositions = [selfToken.data.disposition];
+                  }
+                } else if (item.calc$.targetDefinition.type === 'enemy') {
+                  if (selfToken.data.disposition === 1) {
+                    filterDispositions = [-1];
+                  } else if (selfToken.data.disposition === -1) {
+                    filterDispositions = [1];
+                  } else {
+                    // no filter for neurtals
+                  }
+                }
+                sceneTokens = sceneTokens.filter(token => filterDispositions.includes(token.data.disposition));
+                for (const sceneToken of sceneTokens) {
+                  if (UtilsTemplate.isTokenInside(templateDetails, sceneToken, true)) {
+                    targets.push({uuid: sceneToken.uuid, name: sceneToken.name} as any);
+                  }
+                }
+                item.targets = targets;
+              }
+              break;
+            }
+          }
+        }
       }
     }
   }
@@ -2284,6 +2377,14 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       }
     }
     return itemCards;
+  }
+
+  private forNewAndOld<T extends {[key: string]: any}>(newObj: T[], oldObj: T[] | null): Array<[T, T | null]> {
+    const response: Array<[T, T]> = [];
+    for (let i = 0; i < newObj.length; i++) {
+      response.push([newObj[i], oldObj?.[i]]);
+    }
+    return response;
   }
   
 }

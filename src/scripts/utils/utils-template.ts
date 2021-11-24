@@ -38,9 +38,8 @@ export class UtilsTemplate {
 
   public static getTemplateDetails(document: MeasuredTemplateDocument): TemplateDetails {
     let {direction, distance, angle, width} = document.data;
-    const dimensions = game.canvas.dimensions || {size: 1, distance: 1};
-    distance *= dimensions.size  / dimensions.distance;
-    width *= dimensions.size  / dimensions.distance;
+    distance = UtilsTemplate.feetToPx(distance);
+    width = UtilsTemplate.feetToPx(width);
     direction = Math.toRadians(direction);
 
     let shape: MeasuredTemplate['shape'];
@@ -100,6 +99,11 @@ export class UtilsTemplate {
         return value;
       }
     }
+  }
+
+  public static feetToPx(value: number): number {
+    const dimensions = game.canvas.dimensions || {size: 1, distance: 1};
+    return value * dimensions.size  / dimensions.distance;
   }
 
 }
