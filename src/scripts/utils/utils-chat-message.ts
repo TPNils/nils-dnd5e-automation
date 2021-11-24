@@ -1876,6 +1876,9 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   private setTargets(context: IDmlContext<ChatMessage>): void {
     for (const {newRow, oldRow} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
+      if (!data) {
+        continue;
+      }
       const oldData = oldRow == null ? null : InternalFunctions.getItemCardData(oldRow);
       
       for (const [item, oldItem] of this.forNewAndOld(data.items, oldData?.items)) {
