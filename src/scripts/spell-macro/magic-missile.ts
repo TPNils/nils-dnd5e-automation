@@ -1,7 +1,7 @@
 import { IMacro } from "../macro";
 import { MacroContext } from "../macro-context";
 import { staticValues } from "../static-values";
-import { MyItem } from "../types/fixed-types";
+import { MyActor, MyItem } from "../types/fixed-types";
 import { UtilsChatMessage } from "../utils/utils-chat-message";
 import { UtilsDocument } from "../utils/utils-document";
 import { TargetRequest, TargetResponse, UtilsInput } from "../utils/utils-input";
@@ -97,14 +97,19 @@ export class MagicMissile implements IMacro<MagicMissileData> {
     // TODO item data
     const damageResults = await Promise.all(data.targets.tokenUuids.map(() => new Roll(baseDamageFormula).roll({async: true})));
     
-    const actor = context.actorUuid == null ? null : (await UtilsDocument.actorFromUuid(context.actorUuid));
+    let actor: MyActor;
+    if (context.tokenUuid) {
+      actor = (await UtilsDocument.tokenFromUuid(context.tokenUuid)).getActor();
+    } else if (context.actorUuid) {
+      actor = await UtilsDocument.actorFromUuid(context.actorUuid);
+    }
     const itemCardData = await UtilsChatMessage.createDefaultItemData({
       actor: actor,
       item: item,
     });
     UtilsChatMessage.setTargets(itemCardData, data.targets.tokenUuids);
     UtilsChatMessage.createCard({
-      actor: context.actorUuid == null ? null : await UtilsDocument.actorFromUuid(context.actorUuid),
+      actor: actor,
       token: context.tokenUuid == null ? null : await UtilsDocument.tokenFromUuid(context.tokenUuid),
       items: [itemCardData],
     });
