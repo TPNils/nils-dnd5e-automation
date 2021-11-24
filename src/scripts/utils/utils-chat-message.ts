@@ -32,7 +32,8 @@ export interface ItemCardItem {
     calc$: {
       label?: string;
       rollBonus?: string;
-      evaluatedRoll?: RollJson
+      evaluatedRoll?: RollJson;
+      critTreshold?: number;
     }
   },
   damages?: {
@@ -447,6 +448,17 @@ export class UtilsChatMessage {
           rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
         }
       };
+
+      let critTreshold = item.data.data.critical?.threshold ?? 20;
+      const actorDnd5eFlags = actor?.data?.flags?.dnd5e;
+      if (item.type === 'weapon' && actorDnd5eFlags?.weaponCriticalThreshold != null) {
+        critTreshold = Math.min(critTreshold, actor.data.flags.dnd5e.weaponCriticalThreshold);
+      }
+      if (item.type === 'spell' && actorDnd5eFlags?.spellCriticalThreshold != null) {
+        critTreshold = Math.min(critTreshold, actor.data.flags.dnd5e.spellCriticalThreshold);
+      }
+      itemCardData.attack.calc$.critTreshold = critTreshold;
+
     }
 
     // damage

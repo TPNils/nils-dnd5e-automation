@@ -251,7 +251,20 @@ export class UtilsHandlebars {
     return new Roll(parts.join(' ')).roll({async: false}).total;
   }
 
-  public static isMaxRoll(roll: ReturnType<Roll['toJSON']>, options: Options): any {
+  public static isMaxRoll(...args: [ReturnType<Roll['toJSON']>, Options]): any
+  public static isMaxRoll(...args: [ReturnType<Roll['toJSON']>, boolean, Options]): any
+  public static isMaxRoll(...args: [ReturnType<Roll['toJSON']>, boolean, number, Options]): any
+  public static isMaxRoll(...args: any[]): any {
+    let roll: ReturnType<Roll['toJSON']> = args[0];
+    let options: Options = args[args.length - 1];
+    let highlightTotalOnFirstTerm = false;
+    let overrideMaxRoll: number;
+    if (args.length >= 3) {
+      highlightTotalOnFirstTerm = Boolean(args[1]);
+    }
+    if (args.length >= 4) {
+      overrideMaxRoll = Number(args[2]);
+    }
     let max = true;
     let hasDie = false;
 
@@ -259,10 +272,13 @@ export class UtilsHandlebars {
       if (term.class === 'Die') {
         hasDie = true;
         for (const result of term.results) {
-          if (result.active && result.result !== term.faces) {
+          if (result.active && result.result < (overrideMaxRoll ?? term.faces)) {
             max = false;
             break;
           }
+        }
+        if (highlightTotalOnFirstTerm) {
+          break;
         }
       }
     }
@@ -280,7 +296,20 @@ export class UtilsHandlebars {
     }
   }
 
-  public static isMinRoll(roll: ReturnType<Roll['toJSON']>, options: Options): any {
+  public static isMinRoll(...args: [ReturnType<Roll['toJSON']>, Options]): any
+  public static isMinRoll(...args: [ReturnType<Roll['toJSON']>, boolean, Options]): any
+  public static isMinRoll(...args: [ReturnType<Roll['toJSON']>, boolean, number, Options]): any
+  public static isMinRoll(...args: any[]): any {
+    let roll: ReturnType<Roll['toJSON']> = args[0];
+    let options: Options = args[args.length - 1];
+    let highlightTotalOnFirstTerm = false;
+    let minRoll = 1;
+    if (args.length === 3) {
+      highlightTotalOnFirstTerm = Boolean(args[1]);
+    }
+    if (args.length === 4) {
+      minRoll = Number(args[2]);
+    }
     let min = true;
     let hasDie = false;
 
@@ -288,10 +317,13 @@ export class UtilsHandlebars {
       if (term.class === 'Die') {
         hasDie = true;
         for (const result of term.results) {
-          if (result.active && result.result !== 1) {
+          if (result.active && result.result > minRoll) {
             min = false;
             break;
           }
+        }
+        if (highlightTotalOnFirstTerm) {
+          break;
         }
       }
     }

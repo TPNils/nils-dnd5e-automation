@@ -172,6 +172,10 @@ export type MyItemData = {
       target?: string;
       amount?: number;
     }
+    critical?: {
+      threshold?: number;
+      damage?: string;
+    }
     damage?: {
       [key: string]: any;
       parts?: [string, DamageType][]; // array of ['damage formula', 'damage type']
@@ -228,6 +232,7 @@ export type MyItem = Item & BaseDocument<MyItemData> & {
   getChatData: () => any;
   roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
   displayCard({}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
+  getCriticalThreshold(): number | null;
   protected prepareFinalAttributes: () => void;
   pack?: string;
   hasAreaTarget: boolean;

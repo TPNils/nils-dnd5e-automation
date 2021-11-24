@@ -47,7 +47,11 @@
               <div class="{{@root.staticValues.moduleName}}-roll-wrapper">
                 {{#if (eq item.attack.phase "result")}}
                   <div>
-                    {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=item.attack.calc$.evaluatedRoll}}
+                    {{> modules/nils-automated-compendium/templates/roll/roll.hbs 
+                      roll=item.attack.calc$.evaluatedRoll
+                      highlightTotalOnFirstTerm=true
+                      overrideMaxRoll=item.attack.calc$.critTreshold
+                    }}
                   </div>
                 {{else}}
                   <div class="{{@root.staticValues.moduleName}}-bonus-container">
