@@ -3,7 +3,7 @@ import { MacroContext } from "../macro-context";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { UtilsChatMessage } from "../utils/utils-chat-message";
-import { UtilsDocument } from "../utils/utils-document";
+import { UtilsDocument } from "../lib/db/utils-document";
 import { TargetRequest, TargetResponse, UtilsInput } from "../utils/utils-input";
 import { TemplateDetails, UtilsTemplate } from "../utils/utils-template";
 

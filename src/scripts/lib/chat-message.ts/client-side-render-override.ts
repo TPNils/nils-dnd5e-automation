@@ -1,4 +1,4 @@
-import { staticValues } from '../static-values';
+import { staticValues } from '../../static-values';
 
 async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...args: any[]): Promise<JQuery> {
   // Add client side rendering of the template, specific for the user.
@@ -68,8 +68,14 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
   return wrapped(args);
 }
 
+let hasRegisteredHooks = false;
 export function registerHooks(): void {
+  if (hasRegisteredHooks) {
+    return;
+  }
   Hooks.on('setup', () => {
     libWrapper.register(staticValues.moduleName, 'ChatMessage.prototype.getHTML', getHTML, 'WRAPPER');
   });
+
+  hasRegisteredHooks = true;
 }

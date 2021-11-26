@@ -1,7 +1,7 @@
 import { FolderDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/folderData";
 import { staticValues } from "./static-values";
 import { MyItem } from "./types/fixed-types";
-import { UtilsDocument } from "./utils/utils-document";
+import { UtilsDocument } from "./lib/db/utils-document";
 
 interface CompendiumItemDml {
   compendiumUuid: string;

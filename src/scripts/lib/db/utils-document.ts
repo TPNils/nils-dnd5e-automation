@@ -1,4 +1,4 @@
-import { MyActor, MyActorData, MyItem } from "../types/fixed-types";
+import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 
 type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
 

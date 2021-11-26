@@ -11,7 +11,7 @@ import { MacroContext, macroContextFromArgs } from "./macro-context";
 import { provider } from "./provider/provider";
 import { MagicMissile } from "./spell-macro/magic-missile";
 import { staticValues } from "./static-values";
-import { UtilsDocument } from "./utils/utils-document";
+import { UtilsDocument } from "./lib/db/utils-document";
 
 type MacroCollection = {[key: string]: IMacroConstructor};
 type MacroArguments = [PropertiesToSource<ChatSpeakerDataProperties>, Actor, Token, Actor];

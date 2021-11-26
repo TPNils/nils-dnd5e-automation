@@ -1,4 +1,4 @@
-import { staticValues } from "../static-values";
+import { staticValues } from "../../static-values";
 
 export type WrappedDie = Die & {
   [`_nils-automated-compendium-original-reroll`]: Die['reroll'];
@@ -94,7 +94,4 @@ export class ReEvaluatableDie {
     }
   }
 
-}
-
-export function registerHooks(): void {
 }

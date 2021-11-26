@@ -2,7 +2,7 @@ import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { MyActor, MyActorData, SpellData } from "../types/fixed-types";
 import { ItemCardItem } from "./utils-chat-message";
-import { UtilsDocument } from "./utils-document";
+import { UtilsDocument } from "../lib/db/utils-document";
 
 interface InlineHelperOption {
   blockParams: any;

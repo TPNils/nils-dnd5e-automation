@@ -1,15 +1,15 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import { ActiveEffectData, ItemData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 import { TARGETS } from "pixi.js";
-import { IDmlContext, DmlTrigger, IDmlTrigger } from "../dml-trigger/dml-trigger";
+import { IDmlContext, DmlTrigger, IDmlTrigger } from "../lib/db/dml-trigger";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyActorData, MyItem, MyItemData } from "../types/fixed-types";
-import { UtilsDiceSoNice } from "./utils-dice-so-nice";
-import { UtilsDocument } from "./utils-document";
-import { UtilsRoll } from "./utils-roll";
+import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
+import { UtilsDocument } from "../lib/db/utils-document";
+import { UtilsRoll } from "../lib/roll/utils-roll";
 import { TemplateDetails, UtilsTemplate } from "./utils-template";
 
 export interface ItemCardActor {

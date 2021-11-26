@@ -1,4 +1,4 @@
-import { staticValues } from "../static-values";
+import { staticValues } from "../../static-values";
 
 export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
   readonly type: {new(...args: any[]): T, documentName: string};
