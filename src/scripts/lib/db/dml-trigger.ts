@@ -250,7 +250,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     if (this.documentName === User.documentName) {
       this.registeredFoundryHooks.push({
         hook: `targetToken`,
-        id: Hooks.on(`targetToken`, this.onFoundryTargetToken.bind.bind(this)),
+        id: Hooks.on(`targetToken`, this.onFoundryTargetToken.bind(this)),
       })
     }
 
@@ -405,16 +405,42 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   //#endregion
 
   //#region Special usecases
-  private async onFoundryTargetToken(user: T & {constructor: new (...args: any[]) => T}, token: TokenDocument, arg3: boolean): Promise<void> {
+  private lastOnFoundryTargetToken: {user: User, token: TokenDocument, targeted: boolean};
+  private async onFoundryTargetToken(user: User, token: TokenDocument, targeted: boolean): Promise<void> {
+    if (this.lastOnFoundryTargetToken) {
+      // There is a bug in foundry when you clear the targets and delete the target aswel, the hooks triggers twice
+      if (this.lastOnFoundryTargetToken.user === user && this.lastOnFoundryTargetToken.token === token && this.lastOnFoundryTargetToken.targeted === targeted) {
+        return;
+      }
+    }
+    this.lastOnFoundryTargetToken = {
+      user: user,
+      token: token,
+      targeted: targeted
+    }
+
+    // I am unsure if targetToken allows 'before' functionality (editing the record), to be save, only tigger after
     // Don't allow updates directly on the original document
-    let documentSnapshot = new user.constructor(deepClone(user.data), {parent: user.parent, pack: user.pack});
-    let context: IDmlContext<T> = {
-      rows: [{newRow: documentSnapshot}],
+    const documentSnapshot = new User(deepClone(user.data), {parent: user.parent, pack: user.pack});
+    const simulatedOldRow: User = new User(deepClone(user.data), {parent: user.parent, pack: user.pack});
+
+    // Prevent the hook from going off again
+    simulatedOldRow.targets.add = Set.prototype.add;
+    simulatedOldRow.targets.delete = Set.prototype.delete;
+
+    if (targeted) {
+      // new target added => remove it from the old
+      simulatedOldRow.targets.delete(token.object as Token);
+    } else {
+      // target removed => add it to the old
+      simulatedOldRow.targets.add(token.object as Token);
+    }
+    const context: IDmlContext<T> = {
+      rows: [{newRow: documentSnapshot as any, oldRow: simulatedOldRow as any}],
       options: {},
       userId: user.id
     };
 
-    // I am unsure if targetToken allows 'before' functionality (editing the record), to be save, only tigger after
     for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
       await callback(context);
     }
@@ -422,4 +448,3 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   //#endregion
 
 }
- 
