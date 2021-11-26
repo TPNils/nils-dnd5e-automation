@@ -1703,17 +1703,17 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
-  public upsert(context: IDmlContext<ChatMessage>): Promise<void> | void {
+  public async upsert(context: IDmlContext<ChatMessage>): Promise<void> {
     const itemCards = this.filterItemCardsOnly(context);
     if (itemCards.length > 0) {
-      this.setTargets(context);
-      this.calcTargets(context);
+      await this.setTargets(context);
+      await this.calcTargets(context);
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
       this.calcCanChangeSpellLevel(itemCards);
-      this.calcDamageRoll(context);
-      this.calcConsumeResources(context);
-      this.calculateTargetResult(itemCards)
+      await this.calcDamageRoll(context);
+      await this.calcConsumeResources(context);
+      await this.calculateTargetResult(itemCards)
     }
   }
 
@@ -1736,7 +1736,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
-  private setTargets(context: IDmlContext<ChatMessage>): void {
+  private async setTargets(context: IDmlContext<ChatMessage>): Promise<void> {
     for (const {newRow, oldRow} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
       if (!data) {
@@ -1781,7 +1781,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
             }
             case 'circle': {
               if (item.calc$.rangeDefinition.units === 'self' && data.token?.uuid) {
-                const selfToken = UtilsDocument.tokenFromUuid(data.token.uuid, {sync: true});
+                // TODO no queries in a loop
+                const selfToken = await UtilsDocument.tokenFromUuid(data.token.uuid);
                 const scene = selfToken.parent;
                 const templateDetails: TemplateDetails = {
                   x: selfToken.data.x,
@@ -1827,7 +1828,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
   
-  private calcTargets(context: IDmlContext<ChatMessage>): void {
+  private async calcTargets(context: IDmlContext<ChatMessage>): Promise<void> {
     for (const {newRow, oldRow} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
       if (!data) {
@@ -1838,7 +1839,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       for (const [item, oldItem] of this.forNewAndOld(data.items, oldData?.items)) {
         for (const [target, oldTarget] of this.forNewAndOld(item.targets, oldItem?.targets)) {
           if (target.calc$ == null || target.uuid !== oldTarget?.uuid) {
-            const token = UtilsDocument.tokenFromUuid(target.uuid, {sync: true});
+            // TODO no queries in a loop
+            const token = await UtilsDocument.tokenFromUuid(target.uuid);
             const actor = token.getActor() as MyActor;
             target.calc$ = {
               actorUuid: actor.uuid,
@@ -1871,10 +1873,10 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
-  private calculateTargetResult(chatMessages: ChatMessage[]): void {
+  private async calculateTargetResult(chatMessages: ChatMessage[]): Promise<void> {
     for (const chatMessage of chatMessages) {
       const messageData = InternalFunctions.getItemCardData(chatMessage);
-      let update = InternalFunctions.calculateTargetResult(messageData);
+      let update = await InternalFunctions.calculateTargetResult(messageData);
       if (update) {
         InternalFunctions.setItemCardData(chatMessage, update);
       }
@@ -1955,7 +1957,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
   
-  private calcConsumeResources(context: IDmlContext<ChatMessage>): void {
+  private async calcConsumeResources(context: IDmlContext<ChatMessage>): Promise<void> {
     for (const {newRow, oldRow} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
       if (oldRow) {
@@ -1977,7 +1979,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
             for (const consumedResource of item.consumeResources) {
               if (!consumedResource.calc$.applied && consumedResource.calc$.uuid === data.actor?.uuid && consumedResource.calc$.path === `data.spells.${oldSpellPropertyName}.value`) {
                 consumedResource.calc$.path = `data.spells.${newSpellPropertyName}.value`;
-                consumedResource.calc$.original = UtilsDocument.actorFromUuid(consumedResource.calc$.uuid, {sync: true}).data.data.spells[newSpellPropertyName].value;
+                // TODO no queries in a loop
+                consumedResource.calc$.original = (await UtilsDocument.actorFromUuid(consumedResource.calc$.uuid)).data.data.spells[newSpellPropertyName].value;
               }
             }
           }
@@ -1997,7 +2000,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
-  private calcDamageRoll(context: IDmlContext<ChatMessage>): void {
+  private async calcDamageRoll(context: IDmlContext<ChatMessage>): Promise<void> {
     for (const {newRow} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
       
@@ -2007,10 +2010,10 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
             const normalRollEvaluated = !!dmg.calc$.normalRoll?.evaluated;
             const criticalRollEvaluated = !!dmg.calc$.criticalRoll?.evaluated;
             let normalRollFormula: string;
-            let normalRollPromise: Roll;
+            let normalRollPromise: Promise<Roll>;
             if (normalRollEvaluated) {
               normalRollFormula = dmg.calc$.normalRoll.formula;
-              normalRollPromise = Roll.fromJSON(JSON.stringify(dmg.calc$.normalRoll));
+              normalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.calc$.normalRoll)));
             } else {
               const dmgParts: MyItemData['data']['damage']['parts'] = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.calc$.baseRoll)));
               const upcastLevel = Math.max(item.calc$?.level, item.selectedlevel === 'pact' ? (data.actor?.calc$?.pactLevel ?? 0) : item.selectedlevel);
@@ -2029,20 +2032,19 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
               
               const normalRoll = UtilsRoll.simplifyRoll(UtilsRoll.damagePartsToRoll(dmgParts));
               normalRollFormula = normalRoll.formula;
-              normalRollPromise = normalRoll.roll({async: false});
+              normalRollPromise = normalRoll.roll({async: true});
             }
         
-            let criticalRollPromise: Roll | false;
+            let criticalRollPromise: Promise<Roll | false>;
             if (criticalRollEvaluated) {
-              criticalRollPromise = Roll.fromJSON(JSON.stringify(dmg.calc$.criticalRoll));
+              criticalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.calc$.criticalRoll)));
             } else if (dmg.mode === 'critical') {
-              criticalRollPromise = UtilsRoll.getCriticalBonusRoll(new Roll(normalRollFormula)).roll({async: false});
+              criticalRollPromise = UtilsRoll.getCriticalBonusRoll(new Roll(normalRollFormula)).roll({async: true});
             } else {
-              criticalRollPromise = false;
+              criticalRollPromise = Promise.resolve(false);
             }
         
-            // const [normalResolved, critBonusResolved] = await Promise.all([normalRollPromise, criticalRollPromise]);
-            const [normalResolved, critBonusResolved] = [normalRollPromise, criticalRollPromise];
+            const [normalResolved, critBonusResolved] = await Promise.all([normalRollPromise, criticalRollPromise]);
             const newRolls: Roll[] = [];
             if (!normalRollEvaluated) {
               newRolls.push(normalResolved);
@@ -2513,7 +2515,7 @@ class InternalFunctions {
     return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
   }
 
-  public static calculateTargetResult(messageData: ItemCard): ItemCard {
+  public static async calculateTargetResult(messageData: ItemCard): Promise<ItemCard> {
     const items = messageData.items.filter(item => item.targets?.length);
 
     // Prepare data
@@ -2607,7 +2609,7 @@ class InternalFunctions {
       aggregate.dmg.calcHp -= dmg;
     }
     
-    const applyHeal = (aggregate: ItemCard['calc$']['targetAggregate'][0], amount: number) => {
+    const applyHeal = async (aggregate: ItemCard['calc$']['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {
         aggregate.dmg = {
           avoided: true,
@@ -2622,7 +2624,8 @@ class InternalFunctions {
 
       // Get the current max HP since the max HP may have changed with active effects
       // In the rare usecase where sync actor fetching is not possible, fallback to the snapshot
-      const tokenActor = UtilsDocument.actorFromUuid(aggregate.uuid, {sync: true});
+      // TODO no queries in a loop
+      const tokenActor = await UtilsDocument.actorFromUuid(aggregate.uuid);
       const maxHeal = Math.max(0, tokenActor == null ? aggregate.hpSnapshot.maxHp : tokenActor.data.data.attributes.hp.max - aggregate.hpSnapshot.hp);
       const minHeal = 0;
       const heal = Math.min(maxHeal, Math.max(minHeal, amount));
@@ -2724,7 +2727,7 @@ class InternalFunctions {
               if (target.calc$.result.dmg.type === 'temphp') {
                 aggregate.dmg.calcTemp += target.calc$.result.dmg.calcNumber;
               } else if (InternalFunctions.healingDamageTypes.includes(target.calc$.result.dmg.type)) {
-                applyHeal(aggregate, target.calc$.result.dmg.calcNumber);
+                await applyHeal(aggregate, target.calc$.result.dmg.calcNumber);
               } else {
                 applyDmg(aggregate, target.calc$.result.dmg.calcNumber);
               }
