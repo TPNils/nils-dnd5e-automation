@@ -283,6 +283,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   }
   
   private onFoundryBeforeUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string): void | boolean {
+    this.injectOldValue(document, options);
     const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     let context: IDmlContext<T> = {
@@ -297,6 +298,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       }
     }
   }
+
   private onFoundryBeforeDelete(document: T & {constructor: new (...args: any[]) => T}, options: IDmlContext<T>['options'], userId: string): void | boolean {
     let context: IDmlContext<T> = {
       rows: [{newRow: document, oldRow: document}],
@@ -308,6 +310,17 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       if (response === false) {
         return false;
       }
+    }
+  }
+
+  private injectOldValue(document: T, options: IDmlContext<T>['options']): void {
+    if (!options[staticValues.moduleName]) {
+      options[staticValues.moduleName] = {};
+    }
+    if (!options[staticValues.moduleName].oldData) {
+      options[staticValues.moduleName].oldData = deepClone(document.data);
+      options[staticValues.moduleName].oldParentUuid = document.parent.uuid;
+      options[staticValues.moduleName].oldPack = document.pack;
     }
   }
   //#endregion
@@ -353,8 +366,9 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     let documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
-    let context = {
-      rows: [{newRow: documentSnapshot}],
+    const oldDocument = await this.extractOldValue(document.constructor, options);
+    let context: IDmlContext<T> = {
+      rows: [{newRow: documentSnapshot, oldRow: oldDocument}],
       options: options,
       userId: userId
     };
@@ -366,7 +380,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     if (game.userId === userId) {
       documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
       context = {
-        rows: [{newRow: documentSnapshot}],
+        rows: [{newRow: documentSnapshot, oldRow: oldDocument}],
         options: options,
         userId: userId
       };
@@ -401,6 +415,17 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
     // deletes do not support registerDml 
     // What are you going to do, update a record that has been deleted (:
+  }
+  
+  private async extractOldValue(document: new (...args: any[]) => T, options: IDmlContext<T>['options']): Promise<T | null> {
+    if (options[staticValues.moduleName]?.oldData) {
+      return new document(deepClone(options[staticValues.moduleName]?.oldData), {
+        parent: await fromUuid(options[staticValues.moduleName]?.oldParentUuid),
+        pack: options[staticValues.moduleName]?.oldPack
+      });
+    }
+
+    return null;
   }
   //#endregion
 
