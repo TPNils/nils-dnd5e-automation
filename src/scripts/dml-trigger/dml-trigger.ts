@@ -327,8 +327,8 @@ class WrapAfterCreate<T extends foundry.abstract.Document<any, any> & {construct
         userId: userId
       };
 
-      const callbackIds = Array.from(this.dmlCallbacks.keys()).sort();
-      for (const callbackId of callbackIds) {
+      const dmlCallbackIds = Array.from(this.dmlCallbacks.keys()).sort();
+      for (const callbackId of dmlCallbackIds) {
         await this.dmlCallbacks.get(callbackId)(context);
       }
 
@@ -342,6 +342,7 @@ class WrapAfterCreate<T extends foundry.abstract.Document<any, any> & {construct
       }
     }
   }
+
 }
 
 class WrapAfterUpdate<T extends foundry.abstract.Document<any, any> & {constructor: new (...args: any[]) => T}> extends WrapAfter<T> {
@@ -370,8 +371,8 @@ class WrapAfterUpdate<T extends foundry.abstract.Document<any, any> & {construct
         userId: userId
       };
 
-      const callbackIds = Array.from(this.dmlCallbacks.keys()).sort();
-      for (const callbackId of callbackIds) {
+      const dmlCallbackIds = Array.from(this.dmlCallbacks.keys()).sort();
+      for (const callbackId of dmlCallbackIds) {
         await this.dmlCallbacks.get(callbackId)(context);
       }
 
@@ -385,10 +386,32 @@ class WrapAfterUpdate<T extends foundry.abstract.Document<any, any> & {construct
       }
     }
   }
+
 }
 
-class WrapAfterDelete<T extends foundry.abstract.Document<any, any> & {constructor: new (...args: any[]) => T}> extends WrapAfterCreate<T> {
-  // Identical to create
+class WrapAfterDelete<T extends foundry.abstract.Document<any, any> & {constructor: new (...args: any[]) => T}> extends WrapAfter<T> {
+  
+  protected async execute(document: T, options: IDmlContext<T>['options'], userId: string): Promise<void> {
+    // Don't allow updates directly on the original document
+    let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
+    let context: IDmlContext<T> = {
+      rows: [{newRow: documentSnapshot}],
+      options: options,
+      userId: userId
+    };
+
+    // Keep the order of when they were added
+    const callbackIds = Array.from(this.callbacks.keys()).sort();
+    for (const callbackId of callbackIds) {
+      await this.callbacks.get(callbackId)(context);
+    }
+  }
+
+  public registerDml(arg: any): IUnregisterTrigger {
+    // What are you going to do, update a record that has been deleted (:
+    throw new Error('registerDml is not supported for deletes')
+  }
+
 }
 
 function wrapTargetToken<T extends foundry.abstract.Document<any, any> & {constructor: new (...args: any[]) => T}>(callback: (context: IDmlContext<T>) => void | Promise<void>): (user: T, token: TokenDocument, arg3: boolean) => void {
