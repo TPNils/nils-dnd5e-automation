@@ -82,230 +82,238 @@ export interface IUnregisterTrigger {
   unregister(): void;
 }
 
-class UnregisterTriggerGroup implements IUnregisterTrigger {
-  constructor(private readonly hooks: ReadonlyArray<{hook: string, id: number} | IUnregisterTrigger>){}
-
-  public unregister(): void {
-    for (const hook of this.hooks) {
-      if (UnregisterTriggerGroup.isIUnregisterTrigger(hook)) {
-        hook.unregister();
-      } else {
-        Hooks.off(hook.hook, hook.id);
-      }
-    }
-  }
-
-  private static isIUnregisterTrigger(hook: any): hook is IUnregisterTrigger {
-    return typeof hook.unregister === 'function';
-  }
-}
-
 export class DmlTrigger {
-  private static afterWrappersByHook = new Map<string, WrapAfter<any>>();
+  private static wrappersByHook = new Map<string, Wrapper<any>>();
 
   public static registerTrigger<T extends foundry.abstract.Document<any, any>>(trigger: IDmlTrigger<T>): IUnregisterTrigger {
-    const hooks: Array<{hook: string, id: number} | IUnregisterTrigger> = [];
-  
-    // before
-    if (typeof trigger.beforeCreate === 'function') {
-      hooks.push({
-        hook: `preCreate${trigger.type.documentName}`,
-        id: Hooks.on(`preCreate${trigger.type.documentName}`, wrapBeforeCreate(trigger.beforeCreate.bind(trigger))),
-      });
-    }
-    if (typeof trigger.beforeUpdate === 'function') {
-      hooks.push({
-        hook: `preUpdate${trigger.type.documentName}`,
-        id: Hooks.on(`preUpdate${trigger.type.documentName}`, wrapBeforeUpdate(trigger.beforeUpdate.bind(trigger))),
-      });
-    }
-    if (typeof trigger.beforeUpsert === 'function') {
-      hooks.push({
-        hook: `preCreate${trigger.type.documentName}`,
-        id: Hooks.on(`preCreate${trigger.type.documentName}`, wrapBeforeCreate(trigger.beforeUpsert.bind(trigger))),
-      });
-      hooks.push({
-        hook: `preUpdate${trigger.type.documentName}`,
-        id: Hooks.on(`preUpdate${trigger.type.documentName}`, wrapBeforeUpdate(trigger.beforeUpsert.bind(trigger))),
-      });
-    }
-    if (typeof trigger.beforeDelete === 'function') {
-      hooks.push({
-        hook: `preDelete${trigger.type.documentName}`,
-        id: Hooks.on(`preDelete${trigger.type.documentName}`, wrapBeforeDelete(trigger.beforeDelete.bind(trigger))),
-      });
+    if (!this.wrappersByHook.has(trigger.type.documentName)) {
+      this.wrappersByHook.set(trigger.type.documentName, new Wrapper<T>(trigger.type.documentName));
     }
   
-    // after
-    if (typeof trigger.afterCreate === 'function') {
-      const hook = `create${trigger.type.documentName}`;
-      if (!DmlTrigger.afterWrappersByHook.has(hook)) {
-        DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterCreate(hook));
-      }
-      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterCreate.bind(trigger)));
-    }
-    if (typeof trigger.afterUpdate === 'function') {
-      const hook = `update${trigger.type.documentName}`;
-      if (!DmlTrigger.afterWrappersByHook.has(hook)) {
-        DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterUpdate(hook));
-      }
-      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterUpdate.bind(trigger)));
-    }
-    if (typeof trigger.afterUpsert === 'function') {
-      {
-        const hook = `create${trigger.type.documentName}`;
-        if (!DmlTrigger.afterWrappersByHook.has(hook)) {
-          DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterCreate(hook));
-        }
-        hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterUpsert.bind(trigger)));
-      }
-      {
-        const hook = `update${trigger.type.documentName}`;
-        if (!DmlTrigger.afterWrappersByHook.has(hook)) {
-          DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterUpdate(hook));
-        }
-        hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterUpsert.bind(trigger)));
-      }
-    }
-    if (typeof trigger.afterDelete === 'function') {
-      const hook = `delete${trigger.type.documentName}`;
-      if (!DmlTrigger.afterWrappersByHook.has(hook)) {
-        DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterDelete(hook));
-      }
-      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).register(trigger.afterDelete.bind(trigger)));
-    }
-
-    // after but you can update
-    if (typeof trigger.create === 'function') {
-      const hook = `create${trigger.type.documentName}`;
-      if (!DmlTrigger.afterWrappersByHook.has(hook)) {
-        DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterCreate(hook));
-      }
-      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).registerDml(trigger.create.bind(trigger)));
-    }
-    if (typeof trigger.update === 'function') {
-      const hook = `update${trigger.type.documentName}`;
-      if (!DmlTrigger.afterWrappersByHook.has(hook)) {
-        DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterUpdate(hook));
-      }
-      hooks.push(DmlTrigger.afterWrappersByHook.get(hook).registerDml(trigger.update.bind(trigger)));
-    }
-    if (typeof trigger.upsert === 'function') {
-      {
-        const hook = `create${trigger.type.documentName}`;
-        if (!DmlTrigger.afterWrappersByHook.has(hook)) {
-          DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterCreate(hook));
-        }
-        hooks.push(DmlTrigger.afterWrappersByHook.get(hook).registerDml(trigger.upsert.bind(trigger)));
-      }
-      {
-        const hook = `update${trigger.type.documentName}`;
-        if (!DmlTrigger.afterWrappersByHook.has(hook)) {
-          DmlTrigger.afterWrappersByHook.set(hook, new WrapAfterUpdate(hook));
-        }
-        hooks.push(DmlTrigger.afterWrappersByHook.get(hook).registerDml(trigger.upsert.bind(trigger)));
-      }
-    }
-
-    // Special usecases
-    // @ts-ignore
-    if (trigger.type === User) {
-      // I am unsure if targetToken allows 'before' functionality (editing the record), to be save, only tigger after
-      if (typeof trigger.afterUpdate === 'function') {
-        hooks.push({
-          hook: `targetToken`,
-          id: Hooks.on(`targetToken`, wrapTargetToken(trigger.afterUpdate.bind(trigger))),
-        });
-      }
-    }
-  
-    return new UnregisterTriggerGroup(hooks);
+    return this.wrappersByHook.get(trigger.type.documentName).register(trigger);
   }
 }
 
-function wrapBeforeCreate<T extends foundry.abstract.Document<any, any> & {constructor: new (...args: any[]) => T}>(callback: (context: IDmlContext<T>) => boolean | void): (document: T, options: IDmlContext<T>['options'], userId: string) => void {
-  return (document: T, options: IDmlContext<T>['options'], userId: string) => {
-    return callback({
-      rows: [{newRow: document}],
-      options: options,
-      userId: userId
-    });
-  }
-}
-function wrapBeforeUpdate<T extends foundry.abstract.Document<any, any> & {constructor: new (...args: any[]) => T}>(callback: (context: IDmlContext<T>) => boolean | void): (document: T, change: any, options: IDmlContext<T>['options'], userId: string) => void {
-  return (document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string) => {
-    const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
-    const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
-    const response = callback({
-      rows: [{newRow: modifiedDocument, oldRow: document}],
-      options: options,
-      userId: userId
-    });
-    if (response === false) {
-      return false;
-    }
-    
-    const diff: any = diffObject(document.toObject(), modifiedDocument.data, {inner: false});
-    mergeObject(change, diff);
-  }
-}
-const wrapBeforeDelete = wrapBeforeCreate;
-
-
-abstract class WrapAfter<T extends foundry.abstract.Document<any, any>> {
-
-  private nextInternalId = 0;
-  private hookId: number;
-  protected callbacks = new Map<number, (context: IDmlContext<T>) => void | Promise<void>>();
-  protected dmlCallbacks = new Map<number, (context: IDmlContext<T>) => void | Promise<void>>();
-
-  constructor(
-    private hookName: string,
-  ) {}
-
-  protected getNextId(): number {
-    return this.nextInternalId++;
-  }
-
-  public register(callback: (context: IDmlContext<T>) => void | Promise<void>): IUnregisterTrigger {
-    const id = this.getNextId();
+class CallbackGroup<T extends foundry.abstract.Document<any, any>, R> {
+  private nextId = 0;
+  private callbacks = new Map<number, (context: IDmlContext<T>) => R>();
+  private dmlCallbacks = new Map<number, (context: IDmlContext<T>) => R>();
+  
+  public register(callback: (context: IDmlContext<T>) => R): IUnregisterTrigger {
+    const id = this.nextId++;
     this.callbacks.set(id, callback);
-    if (!this.hookId) {
-      this.hookId = Hooks.on(`${this.hookName}`, this.execute.bind(this));
-    }
 
     return this.getIUnregisterTrigger(id);
   }
 
-  public registerDml(callback: (context: IDmlContext<T>) => void | Promise<void>): IUnregisterTrigger {
-    const id = this.getNextId();
+  public registerDml(callback: (context: IDmlContext<T>) => R): IUnregisterTrigger {
+    const id = this.nextId++;
     this.dmlCallbacks.set(id, callback);
-    if (!this.hookId) {
-      this.hookId = Hooks.on(`${this.hookName}`, this.execute.bind(this));
-    }
 
     return this.getIUnregisterTrigger(id);
   }
 
+  public getCallbacks(): Array<(context: IDmlContext<T>) => R> {
+    const callbackIds = Array.from(this.callbacks.keys()).sort();
+    const callbacks = [];
+    for (const callbackId of callbackIds) {
+      callbacks.push(this.callbacks.get(callbackId));
+    }
+    return callbacks;
+  }
+
+  public getDmlCallbacks(): Array<(context: IDmlContext<T>) => R> {
+    const callbackIds = Array.from(this.dmlCallbacks.keys()).sort();
+    const callbacks = [];
+    for (const callbackId of callbackIds) {
+      callbacks.push(this.dmlCallbacks.get(callbackId));
+    }
+    return callbacks;
+  }
+
+  public isEmpty(): boolean {
+    return this.callbacks.size === 0 && this.dmlCallbacks.size === 0;
+  }
+  
   protected getIUnregisterTrigger(id: number): IUnregisterTrigger {
     return {
       unregister: () => {
         this.callbacks.delete(id);
         this.dmlCallbacks.delete(id);
-        if (this.callbacks.size === 0 && this.dmlCallbacks.size === 0) {
-          Hooks.off(`${this.hookName}`, this.hookId);
-          this.hookId = null;
+      }
+    }
+  }
+}
+class Wrapper<T extends foundry.abstract.Document<any, any>> {
+
+  private isInit: boolean = false;
+  private registeredFoundryHooks: Array<{hook: string, id: number}> = [];
+  private beforeCallbackGroups = new Map<string, CallbackGroup<T, void | boolean>>();
+  private afterCallbackGroups = new Map<string, CallbackGroup<T, void | Promise<void>>>();
+
+  constructor(
+    private readonly documentName: string,
+  ) {}
+
+  public register(trigger: IDmlTrigger<T>): IUnregisterTrigger {
+    if (this.documentName !== trigger.type.documentName) {
+      throw new Error(`Incompatible document types. Expected ${this.documentName} but got ${trigger.type.documentName}`)
+    }
+    
+    if (!this.isInit) {
+      this.init();
+    }
+
+    const unregisterTriggers: IUnregisterTrigger[] = [];
+    // before
+    if (typeof trigger.beforeCreate === 'function') {
+      this.beforeCallbackGroups.get('preCreate').register(trigger.beforeCreate.bind(trigger));
+    }
+    if (typeof trigger.beforeUpdate === 'function') {
+      this.beforeCallbackGroups.get('preUpdate').register(trigger.beforeUpdate.bind(trigger));
+    }
+    if (typeof trigger.beforeUpsert === 'function') {
+      this.beforeCallbackGroups.get('preCreate').register(trigger.beforeUpsert.bind(trigger));
+      this.beforeCallbackGroups.get('preUpdate').register(trigger.beforeUpsert.bind(trigger));
+    }
+    if (typeof trigger.beforeDelete === 'function') {
+      this.beforeCallbackGroups.get('preDelete').register(trigger.beforeDelete.bind(trigger));
+    }
+  
+    // after
+    if (typeof trigger.afterCreate === 'function') {
+      this.afterCallbackGroups.get('create').register(trigger.afterCreate.bind(trigger));
+    }
+    if (typeof trigger.afterUpdate === 'function') {
+      this.afterCallbackGroups.get('update').register(trigger.afterUpdate.bind(trigger));
+    }
+    if (typeof trigger.afterUpsert === 'function') {
+      this.afterCallbackGroups.get('create').register(trigger.afterUpsert.bind(trigger));
+      this.afterCallbackGroups.get('update').register(trigger.afterUpsert.bind(trigger));
+    }
+    if (typeof trigger.afterDelete === 'function') {
+      this.afterCallbackGroups.get('delete').register(trigger.afterDelete.bind(trigger));
+    }
+
+    // after but you can update
+    if (typeof trigger.create === 'function') {
+      this.afterCallbackGroups.get('create').registerDml(trigger.create.bind(trigger));
+    }
+    if (typeof trigger.update === 'function') {
+      this.afterCallbackGroups.get('update').registerDml(trigger.update.bind(trigger));
+    }
+    if (typeof trigger.upsert === 'function') {
+      this.afterCallbackGroups.get('create').registerDml(trigger.upsert.bind(trigger));
+      this.afterCallbackGroups.get('update').registerDml(trigger.upsert.bind(trigger));
+    }
+
+    return {
+      unregister: () => {
+        for (const unregisterTrigger of unregisterTriggers) {
+          unregisterTrigger.unregister();
+        }
+        let empty = true;
+        for (const value of [...Array.from(this.beforeCallbackGroups.values()), ...Array.from(this.afterCallbackGroups.values())]) {
+          if (!value.isEmpty()) {
+            empty = false;
+            break;
+          }
+        }
+        if (empty) {
+          this.unInit();
         }
       }
     }
   }
 
-  protected abstract execute(...args: any[]): Promise<void>;
-}
+  private init(): void {
+    this.beforeCallbackGroups = new Map();
+    this.afterCallbackGroups = new Map();
+    this.registeredFoundryHooks = ([
+      ['preCreate', this.onFoundryBeforeCreate],
+      ['preUpdate', this.onFoundryBeforeUpdate],
+      ['preDelete', this.onFoundryBeforeDelete],
+      ['create', this.onFoundryAfterCreate],
+      ['update', this.onFoundryAfterUpdate],
+      ['delete', this.onFoundryAfterDelete],
+    ] as Array<[string, (...args: any[]) => any]>).map(([prefix, callback]) => {
+      const hookName = `${prefix}${this.documentName}`;
+      const hookId = Hooks.on(hookName, callback.bind(this));
+      (prefix.startsWith('pre') ? this.beforeCallbackGroups : this.afterCallbackGroups).set(prefix, new CallbackGroup<T, any>());
+      return {
+        hook: hookName,
+        id: hookId
+      }
+    });
 
-class WrapAfterCreate<T extends foundry.abstract.Document<any, any> & {constructor: new (...args: any[]) => T}> extends WrapAfter<T> {
+    // Special usecases
+    if (this.documentName === User.documentName) {
+      this.registeredFoundryHooks.push({
+        hook: `targetToken`,
+        id: Hooks.on(`targetToken`, this.onFoundryTargetToken.bind.bind(this)),
+      })
+    }
 
-  protected async execute(document: T, options: IDmlContext<T>['options'], userId: string): Promise<void> {
+    this.isInit = true;
+  }
+
+  private unInit(): void {
+    this.beforeCallbackGroups = new Map();
+    this.afterCallbackGroups = new Map();
+    for (const hook of this.registeredFoundryHooks) {
+      Hooks.off(hook.hook, hook.id);
+    }
+    this.registeredFoundryHooks = [];
+    this.isInit = false;
+  }
+
+  //#region Before
+  private onFoundryBeforeCreate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string): void | boolean {
+    let context: IDmlContext<T> = {
+      rows: [{newRow: document}],
+      options: options,
+      userId: userId
+    };
+    for (const callback of this.beforeCallbackGroups.get('preCreate').getCallbacks()) {
+      const response = callback(context);
+      if (response === false) {
+        return false;
+      }
+    }
+  }
+  
+  private onFoundryBeforeUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string): void | boolean {
+    const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
+    const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
+    let context: IDmlContext<T> = {
+      rows: [{newRow: modifiedDocument, oldRow: document}],
+      options: options,
+      userId: userId,
+    };
+    for (const callback of this.beforeCallbackGroups.get('preUpdate').getCallbacks()) {
+      const response = callback(context);
+      if (response === false) {
+        return false;
+      }
+    }
+  }
+  private onFoundryBeforeDelete(document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string): void | boolean {
+    let context: IDmlContext<T> = {
+      rows: [{newRow: document, oldRow: document}],
+      options: options,
+      userId: userId
+    };
+    for (const callback of this.beforeCallbackGroups.get('preDelete').getCallbacks()) {
+      const response = callback(context);
+      if (response === false) {
+        return false;
+      }
+    }
+  }
+  //#endregion
+
+  //#region After
+  private async onFoundryAfterCreate(document: T & {constructor: new (...args: any[]) => T}, options: IDmlContext<T>['options'], userId: string): Promise<void> {
     // Don't allow updates directly on the original document
     let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
     let context: IDmlContext<T> = {
@@ -314,10 +322,8 @@ class WrapAfterCreate<T extends foundry.abstract.Document<any, any> & {construct
       userId: userId
     };
 
-    // Keep the order of when they were added
-    const callbackIds = Array.from(this.callbacks.keys()).sort();
-    for (const callbackId of callbackIds) {
-      await this.callbacks.get(callbackId)(context);
+    for (const callback of this.afterCallbackGroups.get('create').getCallbacks()) {
+      await callback(context);
     }
 
     if (game.userId === userId) {
@@ -328,9 +334,8 @@ class WrapAfterCreate<T extends foundry.abstract.Document<any, any> & {construct
         userId: userId
       };
 
-      const dmlCallbackIds = Array.from(this.dmlCallbacks.keys()).sort();
-      for (const callbackId of dmlCallbackIds) {
-        await this.dmlCallbacks.get(callbackId)(context);
+      for (const callback of this.afterCallbackGroups.get('create').getDmlCallbacks()) {
+        await callback(context);
       }
 
       const diff = UtilsCompare.findDiff(document.data, documentSnapshot.data);
@@ -343,12 +348,8 @@ class WrapAfterCreate<T extends foundry.abstract.Document<any, any> & {construct
       }
     }
   }
-
-}
-
-class WrapAfterUpdate<T extends foundry.abstract.Document<any, any> & {constructor: new (...args: any[]) => T}> extends WrapAfter<T> {
-
-  protected async execute(document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string): Promise<void> {
+  
+  private async onFoundryAfterUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string): Promise<void> {
     const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     let documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
@@ -358,10 +359,8 @@ class WrapAfterUpdate<T extends foundry.abstract.Document<any, any> & {construct
       userId: userId
     };
 
-    // Keep the order of when they were added
-    const callbackIds = Array.from(this.callbacks.keys()).sort();
-    for (const callbackId of callbackIds) {
-      await this.callbacks.get(callbackId)(context);
+    for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
+      await callback(context);
     }
 
     if (game.userId === userId) {
@@ -372,9 +371,8 @@ class WrapAfterUpdate<T extends foundry.abstract.Document<any, any> & {construct
         userId: userId
       };
 
-      const dmlCallbackIds = Array.from(this.dmlCallbacks.keys()).sort();
-      for (const callbackId of dmlCallbackIds) {
-        await this.dmlCallbacks.get(callbackId)(context);
+      for (const callback of this.afterCallbackGroups.get('update').getDmlCallbacks()) {
+        await callback(context);
       }
 
       const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
@@ -388,11 +386,7 @@ class WrapAfterUpdate<T extends foundry.abstract.Document<any, any> & {construct
     }
   }
 
-}
-
-class WrapAfterDelete<T extends foundry.abstract.Document<any, any> & {constructor: new (...args: any[]) => T}> extends WrapAfter<T> {
-  
-  protected async execute(document: T, options: IDmlContext<T>['options'], userId: string): Promise<void> {
+  private async onFoundryAfterDelete(document: T & {constructor: new (...args: any[]) => T}, options: IDmlContext<T>['options'], userId: string): Promise<void> {
     // Don't allow updates directly on the original document
     let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
     let context: IDmlContext<T> = {
@@ -401,26 +395,31 @@ class WrapAfterDelete<T extends foundry.abstract.Document<any, any> & {construct
       userId: userId
     };
 
-    // Keep the order of when they were added
-    const callbackIds = Array.from(this.callbacks.keys()).sort();
-    for (const callbackId of callbackIds) {
-      await this.callbacks.get(callbackId)(context);
+    for (const callback of this.afterCallbackGroups.get('delete').getCallbacks()) {
+      await callback(context);
     }
-  }
 
-  public registerDml(arg: any): IUnregisterTrigger {
+    // deletes do not support registerDml 
     // What are you going to do, update a record that has been deleted (:
-    throw new Error('registerDml is not supported for deletes')
   }
+  //#endregion
 
-}
-
-function wrapTargetToken<T extends foundry.abstract.Document<any, any> & {constructor: new (...args: any[]) => T}>(callback: (context: IDmlContext<T>) => void | Promise<void>): (user: T, token: TokenDocument, arg3: boolean) => void {
-  return (user: T, token: TokenDocument, arg3: boolean) => {
-    return callback({
-      rows: [{newRow: user}],
+  //#region Special usecases
+  private async onFoundryTargetToken(user: T & {constructor: new (...args: any[]) => T}, token: TokenDocument, arg3: boolean): Promise<void> {
+    // Don't allow updates directly on the original document
+    let documentSnapshot = new user.constructor(deepClone(user.data), {parent: user.parent, pack: user.pack});
+    let context: IDmlContext<T> = {
+      rows: [{newRow: documentSnapshot}],
       options: {},
       userId: user.id
-    });
+    };
+
+    // I am unsure if targetToken allows 'before' functionality (editing the record), to be save, only tigger after
+    for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
+      await callback(context);
+    }
   }
+  //#endregion
+
 }
+ 
