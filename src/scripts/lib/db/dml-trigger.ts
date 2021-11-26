@@ -1,4 +1,5 @@
 import { staticValues } from "../../static-values";
+import { UtilsCompare } from "../utils/utils-compare";
 
 export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
   readonly type: {new(...args: any[]): T, documentName: string};
@@ -332,7 +333,7 @@ class WrapAfterCreate<T extends foundry.abstract.Document<any, any> & {construct
         await this.dmlCallbacks.get(callbackId)(context);
       }
 
-      const diff = findDiff(document.data, documentSnapshot.data);
+      const diff = UtilsCompare.findDiff(document.data, documentSnapshot.data);
       if (diff.changed) {
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
           console.error('Infinite update loop. Stopping any further updates.', {diff: diff});
@@ -376,7 +377,7 @@ class WrapAfterUpdate<T extends foundry.abstract.Document<any, any> & {construct
         await this.dmlCallbacks.get(callbackId)(context);
       }
 
-      const diff = findDiff(modifiedDocument.data, documentSnapshot.data);
+      const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
       if (diff.changed) {
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
           console.error('Infinite update loop. Stopping any further updates.', {diff: diff});
@@ -421,52 +422,5 @@ function wrapTargetToken<T extends foundry.abstract.Document<any, any> & {constr
       options: {},
       userId: user.id
     });
-  }
-}
-
-function findDiff(original: any, override: any): {changed: boolean, diff?: any} {
-  if (original === override) {
-    return {changed: false};
-  }
-  const originalType = typeof original;
-  const overrideType = typeof override;
-
-  if (originalType !== overrideType) {
-    return {changed: true, diff: override};
-  }
-
-  if (Array.isArray(original) !== Array.isArray(override)) {
-    return {changed: true, diff: override};
-  }
-
-  if (original === null && override !== null) {
-    // null is an object, undefined is it's own type
-    return {changed: true, diff: override};
-  }
-
-  if (originalType === 'object') {
-    const keys = new Set([...Object.keys(original), ...Object.keys(override)]);
-    const diff: any = Array.isArray(original) ? [] : {};
-    for (const key of keys) {
-      const itemResult = findDiff(original[key], override[key]);
-      if (itemResult.changed) {
-        diff[key] = itemResult.diff;
-      }
-    }
-    if (Object.keys(diff).length > 0) {
-      if (Array.isArray(override)) {
-        // Foundry can't handle partial array dml updates
-        return {changed: true, diff: override};
-      }
-      return {changed: true, diff: diff};
-    } else {
-      return {changed: false};
-    }
-  } else {
-    if (original === override) {
-      return {changed: false};
-    } else {
-      return {changed: true, diff: override};
-    }
   }
 }
