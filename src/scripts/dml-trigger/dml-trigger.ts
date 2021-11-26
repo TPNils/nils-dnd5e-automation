@@ -422,13 +422,9 @@ function findDiff(original: any, override: any): {changed: boolean, diff?: any} 
   }
 
   if (originalType === 'object') {
-    const originalKeys = Object.keys(original);
-    const overrideKeys = Object.keys(override);
+    const keys = new Set([...Object.keys(original), ...Object.keys(override)]);
     const diff: any = Array.isArray(original) ? [] : {};
-    for (const key of overrideKeys) {
-      if (!originalKeys.includes(key) && override[key] !== undefined) {
-        diff[key] = override[key];
-      }
+    for (const key of keys) {
       const itemResult = findDiff(original[key], override[key]);
       if (itemResult.changed) {
         diff[key] = itemResult.diff;
