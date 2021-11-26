@@ -1693,13 +1693,19 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     this.onBonusChange(context);
     // TODO recalc whole item on level change to support custom scaling level scaling formulas
   }
-
-  public beforeUpsert(context: IDmlContext<ChatMessage>): boolean | void {
+  
+  public beforeUpsert(context: IDmlContext<ChatMessage>): void {
     const itemCards = this.filterItemCardsOnly(context);
     if (itemCards.length > 0) {
       for (const itemCard of itemCards) {
         itemCard.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
       }
+    }
+  }
+
+  public upsert(context: IDmlContext<ChatMessage>): Promise<void> | void {
+    const itemCards = this.filterItemCardsOnly(context);
+    if (itemCards.length > 0) {
       this.setTargets(context);
       this.calcTargets(context);
       this.calcItemCardDamageFormulas(itemCards);
