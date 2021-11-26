@@ -268,7 +268,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   }
 
   //#region Before
-  private onFoundryBeforeCreate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string): void | boolean {
+  private onFoundryBeforeCreate(document: T & {constructor: new (...args: any[]) => T}, data: any, options: IDmlContext<T>['options'], userId: string): void | boolean {
     let context: IDmlContext<T> = {
       rows: [{newRow: document}],
       options: options,
@@ -297,7 +297,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       }
     }
   }
-  private onFoundryBeforeDelete(document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string): void | boolean {
+  private onFoundryBeforeDelete(document: T & {constructor: new (...args: any[]) => T}, options: IDmlContext<T>['options'], userId: string): void | boolean {
     let context: IDmlContext<T> = {
       rows: [{newRow: document, oldRow: document}],
       options: options,
