@@ -48,6 +48,10 @@ export class UtilsHandlebars {
       }
       const documentMatch = UtilsHandlebars.documentPermission.exec(filter);
       if (documentMatch) {
+        if (documentMatch[5].length === 0) {
+          // No uuid/id = don't need permissions
+          return true;
+        }
         switch (documentMatch[1].toLocaleLowerCase()) {
           // Don't support token owner filter. They are too short lived and are based on actor anyway
           case 'actor': {
