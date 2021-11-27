@@ -1829,46 +1829,57 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
   
   private async calcTargets(context: IDmlContext<ChatMessage>): Promise<void> {
+    const calcTargets: Array<{item: ItemCardItem, target: ItemCardItem['targets'][number]}> = [];
     for (const {newRow, oldRow} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
       if (!data) {
         continue;
       }
-      const oldData = oldRow == null ? null : InternalFunctions.getItemCardData(oldRow);
+      const oldData = InternalFunctions.getItemCardData(oldRow);
       
       for (const [item, oldItem] of this.forNewAndOld(data.items, oldData?.items)) {
         for (const [target, oldTarget] of this.forNewAndOld(item.targets, oldItem?.targets)) {
-          if (target.calc$ == null || target.uuid !== oldTarget?.uuid) {
-            // TODO no queries in a loop
-            const token = await UtilsDocument.tokenFromUuid(target.uuid);
-            const actor = token.getActor() as MyActor;
-            target.calc$ = {
-              actorUuid: actor.uuid,
-              ac: actor.data.data.attributes.ac.value,
-              img: token.data.img,
-              name: token.data.name,
-              immunities: [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))],
-              resistances: [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))],
-              vulnerabilities: [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))],
-              hpSnapshot: {
-                maxHp: actor.data.data.attributes.hp.max,
-                hp: actor.data.data.attributes.hp.value,
-                temp: actor.data.data.attributes.hp.temp
-              },
-              result: {
-                appliedActiveEffects: false
-              }
-            }
-            if (item.calc$.check) {
-              target.check = {
-                mode: 'normal',
-                phase: 'mode-select',
-                userBonus: "",
-                calc$: {}
-              };
-            }
+          if (target.uuid !== oldTarget?.uuid || target.calc$ == null || (item.calc$.check && item.calc$.check)) {
+            calcTargets.push({item: item, target: target});
           }
         }
+      }
+    }
+
+    const targetsByUuid = new Map<string, TokenDocument>();
+    for (const target of await UtilsDocument.tokenFromUuid(calcTargets.map(t => t.target.uuid))) {
+      targetsByUuid.set(target.uuid, target);
+    }
+
+    for (const calcTarget of calcTargets) {
+      const token = targetsByUuid.get(calcTarget.target.uuid);
+      const actor = token.getActor() as MyActor;
+      calcTarget.target.calc$ = {
+        actorUuid: actor.uuid,
+        ac: actor.data.data.attributes.ac.value,
+        img: token.data.img,
+        name: token.data.name,
+        immunities: [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))],
+        resistances: [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))],
+        vulnerabilities: [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))],
+        hpSnapshot: {
+          maxHp: actor.data.data.attributes.hp.max,
+          hp: actor.data.data.attributes.hp.value,
+          temp: actor.data.data.attributes.hp.temp
+        },
+        result: {
+          appliedActiveEffects: false
+        }
+      }
+      if (calcTarget.item.calc$.check) {
+        calcTarget.target.check = {
+          mode: 'normal',
+          phase: 'mode-select',
+          userBonus: "",
+          calc$: {}
+        };
+      } else {
+        delete calcTarget.target.check;
       }
     }
   }
@@ -1958,6 +1969,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
   
   private async calcConsumeResources(context: IDmlContext<ChatMessage>): Promise<void> {
+    const fetchOriginalValues: ItemCardItem['consumeResources'] = [];
     for (const {newRow, oldRow} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
       if (oldRow) {
@@ -1979,13 +1991,22 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
             for (const consumedResource of item.consumeResources) {
               if (!consumedResource.calc$.applied && consumedResource.calc$.uuid === data.actor?.uuid && consumedResource.calc$.path === `data.spells.${oldSpellPropertyName}.value`) {
                 consumedResource.calc$.path = `data.spells.${newSpellPropertyName}.value`;
-                // TODO no queries in a loop
-                consumedResource.calc$.original = (await UtilsDocument.actorFromUuid(consumedResource.calc$.uuid)).data.data.spells[newSpellPropertyName].value;
+                fetchOriginalValues.push(consumedResource);
               }
             }
           }
         }
       }
+      
+      const actorsByUuid = new Map<string, MyActor>();
+      for (const actor of await UtilsDocument.actorFromUuid(fetchOriginalValues.map(v => v.calc$.uuid), {deduplciate: true})) {
+        actorsByUuid.set(actor.uuid, actor);
+      }
+      
+      for (const consumedResource of fetchOriginalValues) {
+        consumedResource.calc$.original = getProperty(actorsByUuid.get(consumedResource.calc$.uuid).data, consumedResource.calc$.path);
+      }
+      
 
       for (const item of data.items) {
         item.calc$.allConsumeResourcesApplied = true;
@@ -2583,6 +2604,11 @@ class InternalFunctions {
       }
     }
 
+    const actorsByUuid = new Map<string, MyActor>();
+    for (const actor of await UtilsDocument.actorFromUuid(aggregates.keys())) {
+      actorsByUuid.set(actor.uuid, actor);
+    }
+
     const applyDmg = (aggregate: ItemCard['calc$']['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {
         aggregate.dmg = {
@@ -2609,7 +2635,7 @@ class InternalFunctions {
       aggregate.dmg.calcHp -= dmg;
     }
     
-    const applyHeal = async (aggregate: ItemCard['calc$']['targetAggregate'][0], amount: number) => {
+    const applyHeal = (aggregate: ItemCard['calc$']['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {
         aggregate.dmg = {
           avoided: true,
@@ -2624,8 +2650,7 @@ class InternalFunctions {
 
       // Get the current max HP since the max HP may have changed with active effects
       // In the rare usecase where sync actor fetching is not possible, fallback to the snapshot
-      // TODO no queries in a loop
-      const tokenActor = await UtilsDocument.actorFromUuid(aggregate.uuid);
+      const tokenActor = actorsByUuid.get(aggregate.uuid);
       const maxHeal = Math.max(0, tokenActor == null ? aggregate.hpSnapshot.maxHp : tokenActor.data.data.attributes.hp.max - aggregate.hpSnapshot.hp);
       const minHeal = 0;
       const heal = Math.min(maxHeal, Math.max(minHeal, amount));
@@ -2727,7 +2752,7 @@ class InternalFunctions {
               if (target.calc$.result.dmg.type === 'temphp') {
                 aggregate.dmg.calcTemp += target.calc$.result.dmg.calcNumber;
               } else if (InternalFunctions.healingDamageTypes.includes(target.calc$.result.dmg.type)) {
-                await applyHeal(aggregate, target.calc$.result.dmg.calcNumber);
+                applyHeal(aggregate, target.calc$.result.dmg.calcNumber);
               } else {
                 applyDmg(aggregate, target.calc$.result.dmg.calcNumber);
               }
