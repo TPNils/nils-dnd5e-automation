@@ -141,6 +141,7 @@ export interface ItemCard {
     allDmgApplied?: boolean;
     targetAggregate?: {
       uuid: string;
+      actorUuid: string;
       img?: string;
       name?: string;
       hpSnapshot: {
@@ -149,7 +150,7 @@ export interface ItemCard {
         temp?: number;
       },
       dmg?: {
-        avoided: boolean;
+        avoided?: boolean;
         applied: boolean,
         appliedDmg: number,
         rawDmg: number;
@@ -172,8 +173,10 @@ interface KeyEvent {
 }
 type InteractionResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
 interface ActionParam {clickEvent: ClickEvent, userId: string, keyEvent?: KeyEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCard, inputValue?: boolean | number | string};
-type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, message?: boolean, gm?: boolean, onlyRunLocal?: boolean};
+type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, tokenUuid?: string, message?: boolean, gm?: boolean, onlyRunLocal?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCard>;
+
+
 
 export class UtilsChatMessage {
 
@@ -220,27 +223,27 @@ export class UtilsChatMessage {
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)$/,
-      permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2]}},
+      permissionCheck: ({regexResult}) => {return {tokenUuid: regexResult[2]}},
       execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemCheck(clickEvent, Number(regexResult[1]), regexResult[2], messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-bonus$/,
-      permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2]}},
+      permissionCheck: ({regexResult}) => {return {tokenUuid: regexResult[2]}},
       execute: ({keyEvent, regexResult, inputValue, messageData}) => UtilsChatMessage.processItemCheckBonus(keyEvent, Number(regexResult[1]), regexResult[2], inputValue as string, messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-mode-(minus|plus)$/,
-      permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2]}},
+      permissionCheck: ({regexResult}) => {return {tokenUuid: regexResult[2]}},
       execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemCheckMode(clickEvent, Number(regexResult[1]), regexResult[2], regexResult[3] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^item-([0-9]+)-template$/,
-      permissionCheck: ({regexResult}) => {return {actorUuid: regexResult[2], onlyRunLocal: true, message: true}},
+      permissionCheck: ({}) => {return {onlyRunLocal: true, message: true}},
       execute: ({regexResult, messageData, messageId}) => UtilsChatMessage.processItemTemplate(Number(regexResult[1]), messageData, messageId),
     },
     {
       regex: /^apply-consume-resource-((?:[0-9]+)|\*)-((?:[0-9]+)|\*)$/,
-      permissionCheck: ({regexResult}) => {return {message: true}},
+      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, messageData}) => {
         let itemIndex: '*' | number = regexResult[1] === '*' ? '*' : Number.parseInt(regexResult[1]);
         let consumeResourceIndex: '*' | number = regexResult[2] === '*' ? '*' : Number.parseInt(regexResult[2]);
@@ -249,7 +252,7 @@ export class UtilsChatMessage {
     },
     {
       regex: /^undo-consume-resource-((?:[0-9]+)|\*)-((?:[0-9]+)|\*)$/,
-      permissionCheck: ({regexResult}) => {return {message: true}},
+      permissionCheck: ({messageData}) => {return {message: true, actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, messageData}) => {
         let itemIndex: '*' | number = regexResult[1] === '*' ? '*' : Number.parseInt(regexResult[1]);
         let consumeResourceIndex: '*' | number = regexResult[2] === '*' ? '*' : Number.parseInt(regexResult[2]);
@@ -258,12 +261,12 @@ export class UtilsChatMessage {
     },
     {
       regex: /^apply-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
-      permissionCheck: ({regexResult}) => {return {gm: true}},
+      permissionCheck: ({}) => {return {gm: true}},
       execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.applyDamage([regexResult[1]], messageData, messageId),
     },
     {
       regex: /^undo-damage-((?:[a-zA-Z0-9\.]+)|\*)$/,
-      permissionCheck: ({regexResult}) => {return {gm: true}},
+      permissionCheck: ({}) => {return {gm: true}},
       execute: ({regexResult, messageId, messageData}) => UtilsChatMessage.undoDamage(regexResult[1], messageData, messageId),
     },
   ];
@@ -958,8 +961,18 @@ export class UtilsChatMessage {
             continue;
           }
         }
+        let actorUuids: string[] = [];
         if (permissionCheck.actorUuid) {
-          const actor = await UtilsDocument.actorFromUuid(permissionCheck.actorUuid);
+          actorUuids.push(permissionCheck.actorUuid);
+        }
+        if (permissionCheck.tokenUuid) {
+          const actorUuid = ((await UtilsDocument.tokenFromUuid(permissionCheck.tokenUuid))?.getActor() as MyActor)?.uuid;
+          if (actorUuid) {
+            actorUuids.push(actorUuid);
+          }
+        }
+        for (const actorUuid of actorUuids) {
+          const actor = await UtilsDocument.actorFromUuid(actorUuid);
           if (actor && !actor.testUserPermission(user, 'OWNER')) {
             response.missingPermissions = true;
             continue;
@@ -2575,11 +2588,12 @@ class InternalFunctions {
         }
         aggregates.set(oldAggregate.uuid, {
           uuid: oldAggregate.uuid,
+          actorUuid: oldAggregate.actorUuid,
           name: oldAggregate.name,
           img: oldAggregate.img,
           hpSnapshot: oldAggregate.hpSnapshot,
           dmg: {
-            avoided: true,
+            avoided: null,
             applied: false,
             appliedDmg: oldAggregate.dmg?.appliedDmg || 0,
             rawDmg: 0,
@@ -2596,11 +2610,12 @@ class InternalFunctions {
         if (!aggregates.has(target.uuid)) {
           aggregates.set(target.uuid, {
             uuid: target.uuid,
+            actorUuid: target.calc$?.actorUuid,
             name: target.calc$.name,
             img: target.calc$.img,
             hpSnapshot: target.calc$.hpSnapshot,
             dmg: {
-              avoided: true,
+              avoided: null,
               applied: false,
               appliedDmg: 0,
               rawDmg: 0,
@@ -2618,7 +2633,7 @@ class InternalFunctions {
     const applyDmg = (aggregate: ItemCard['calc$']['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {
         aggregate.dmg = {
-          avoided: true,
+          avoided: null,
           applied: false,
           appliedDmg: 0,
           rawDmg: 0,
@@ -2644,7 +2659,7 @@ class InternalFunctions {
     const applyHeal = (aggregate: ItemCard['calc$']['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {
         aggregate.dmg = {
-          avoided: true,
+          avoided: null,
           applied: false,
           appliedDmg: 0,
           rawDmg: 0,
@@ -2736,6 +2751,7 @@ class InternalFunctions {
               if (!aggregates.get(target.uuid)) {
                 aggregates.set(target.uuid, {
                   uuid: target.uuid,
+                  actorUuid: target.calc$?.actorUuid,
                   hpSnapshot: target.calc$.hpSnapshot,
                   name: target.calc$.name,
                   img: target.calc$.img,
@@ -2744,7 +2760,7 @@ class InternalFunctions {
               const aggregate = aggregates.get(target.uuid);
               if (aggregate.dmg == null) {
                 aggregate.dmg = {
-                  avoided: true,
+                  avoided: null,
                   applied: false,
                   appliedDmg: 0,
                   rawDmg: 0,
@@ -2770,9 +2786,12 @@ class InternalFunctions {
 
     for (const item of items) {
       for (const target of item.targets ?? []) {
-        if ((item.attack && target.calc$.result.hit) || (item.calc$.check && !target.calc$.result.checkPass)) {
-          if (aggregates.get(target.uuid).dmg) {
-            aggregates.get(target.uuid).dmg.avoided = false;
+        if (aggregates.get(target.uuid).dmg) {
+          if ((item.attack && target.calc$.result.hit == null) || (item.calc$.check && target.calc$.result.checkPass == null)) {
+              aggregates.get(target.uuid).dmg.avoided = null;
+          } else {
+            const hit = (item.attack && target.calc$.result.hit) || (item.calc$.check && !target.calc$.result.checkPass);
+            aggregates.get(target.uuid).dmg.avoided = !hit;
           }
         }
       }
