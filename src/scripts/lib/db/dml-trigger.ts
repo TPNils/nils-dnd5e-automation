@@ -1,4 +1,5 @@
 import { staticValues } from "../../static-values";
+import { buffer } from "../decoration/buffer";
 import { UtilsCompare } from "../utils/utils-compare";
 
 export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
@@ -65,6 +66,10 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
    * This hook fires for all connected clients after the deletion has been processed.
    */
   afterDelete?(context: IAfterDmlContext<T>): void | Promise<void>;
+}
+
+type Writeable<T extends { [x: string]: any }, K extends string> = {
+  [P in K]: T[P];
 }
 
 interface DmlOptions {
@@ -169,6 +174,9 @@ class CallbackGroup<T extends foundry.abstract.Document<any, any>, R> {
     }
   }
 }
+
+type OnFoundryTargetToken = (user: User, token: TokenDocument, targeted: boolean) => Promise<void>;
+
 class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   private isInit: boolean = false;
@@ -493,45 +501,52 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   //#endregion
 
   //#region Special usecases
-  private lastOnFoundryTargetToken: {user: User, token: TokenDocument, targeted: boolean};
-  private async onFoundryTargetToken(user: User, token: TokenDocument, targeted: boolean): Promise<void> {
-    if (this.lastOnFoundryTargetToken) {
-      // There is a bug in foundry when you clear the targets and delete the target aswel, the hooks triggers twice
-      if (this.lastOnFoundryTargetToken.user === user && this.lastOnFoundryTargetToken.token === token && this.lastOnFoundryTargetToken.targeted === targeted) {
-        return;
+
+  // There is a bug in foundry when you clear the targets and delete the target aswel, the hooks triggers twice with the same data
+  // Also, every 1 target changes fires an event. If you target multiple targets at once, it fires multiple events
+  // Buffer solved both issues
+  @buffer({bufferTime: 5}) 
+  private async onFoundryTargetToken(events: Array<Parameters<OnFoundryTargetToken>>): ReturnType<OnFoundryTargetToken> {
+    const eventsByUserId = new Map<string, Array<Parameters<OnFoundryTargetToken>>>();
+    for (const event of events) {
+      if (!eventsByUserId.has(event[0].id)) {
+        eventsByUserId.set(event[0].id, []);
       }
-    }
-    this.lastOnFoundryTargetToken = {
-      user: user,
-      token: token,
-      targeted: targeted
+      eventsByUserId.get(event[0].id).push(event);
     }
 
-    // I am unsure if targetToken allows 'before' functionality (editing the record), to be save, only tigger after
-    // Don't allow updates directly on the original document
-    const documentSnapshot = new User(deepClone(user.data), {parent: user.parent, pack: user.pack});
-    const simulatedOldRow: User = new User(deepClone(user.data), {parent: user.parent, pack: user.pack});
+    const rows: Array<IDmlContext<T>['rows'][0]> = [];
+    for (const [userId, events] of eventsByUserId.entries()) {
+      const user = game.users.get(userId);
 
-    // Prevent the hook from going off again
-    simulatedOldRow.targets.add = Set.prototype.add;
-    simulatedOldRow.targets.delete = Set.prototype.delete;
+      // Don't allow updates directly on the original document
+      const documentSnapshot = new User(deepClone(user.data), {parent: user.parent, pack: user.pack});
+      const simulatedOldRow: User = new User(deepClone(user.data), {parent: user.parent, pack: user.pack});
+      
+      // Prevent the hook from going off again
+      simulatedOldRow.targets.add = Set.prototype.add;
+      simulatedOldRow.targets.delete = Set.prototype.delete;
+      
+      for (const event of events) {
+        if (event[2]) {
+          // new target added => remove it from the old
+          simulatedOldRow.targets.delete(event[1].object as Token);
+        } else {
+          // target removed => add it to the old
+          simulatedOldRow.targets.add(event[1].object as Token);
+        }
+      }
 
-    if (targeted) {
-      // new target added => remove it from the old
-      simulatedOldRow.targets.delete(token.object as Token);
-    } else {
-      // target removed => add it to the old
-      simulatedOldRow.targets.add(token.object as Token);
-    }
-    const context: IDmlContext<T> = {
-      rows: [{
+      rows.push({
         newRow: documentSnapshot as any,
         oldRow: simulatedOldRow as any,
-        changedByUserId: user.id,
-        options: {},
-      }],
-    };
+        changedByUserId: documentSnapshot.id,
+        options: {}
+      })
+    }
+    const context: AfterDmlContext<T> = new AfterDmlContext<T>(rows);
 
+    // Before functionality is not supported by foundry (returning false to deny the change)
     for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
       await callback(context);
     }
