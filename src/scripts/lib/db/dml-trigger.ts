@@ -1,5 +1,5 @@
 import { staticValues } from "../../static-values";
-import { buffer } from "../decoration/buffer";
+import { buffer } from "../decorator/buffer";
 import { UtilsCompare } from "../utils/utils-compare";
 
 export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
