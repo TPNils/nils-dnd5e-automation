@@ -1603,8 +1603,8 @@ class DmlTriggerUser implements IDmlTrigger<User> {
         // Assume targets did not changes when non are selected at this time
         if (currentTargetUuids.size !== 0) {
           const itemTargetUuids = new Set<string>();
-          if (messageData.items[itemIndex].targets) {
-            for (const target of messageData.items[itemIndex].targets) {
+          if (item.targets) {
+            for (const target of item.targets) {
               itemTargetUuids.add(target.uuid);
             }
           }
@@ -1622,8 +1622,8 @@ class DmlTriggerUser implements IDmlTrigger<User> {
 
           if (targetsChanged) {
             const targetsUuids: string[] = [];
-            if (messageData.items[itemIndex].targets) {
-              for (const target of messageData.items[itemIndex].targets) {
+            if (item.targets) {
+              for (const target of item.targets) {
                 // The same target could have been originally targeted twice, keep that amount
                 if (currentTargetUuids.has(target.uuid)) {
                   targetsUuids.push(target.uuid);
@@ -1635,6 +1635,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
                 targetsUuids.push(currentTargetUuid);
               }
             }
+            item.targets = targetsUuids.map(uuid => { return {uuid: uuid} });
             
             await InternalFunctions.saveItemCardData(chatMessage.id, messageData);
             // Only retarget 1 item
