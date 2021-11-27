@@ -102,70 +102,6 @@
             }}
           {{/if}}
         {{/each}}
-        
-        {{#if (and item.calc$.check item.targets.length)}}
-          <table>
-            <thead>
-              <th style="width: 30px;">{{! img}}</th>
-              <th>{{localize "Name"}}</th>
-              <th class="{{@root.staticValues.moduleName}}-item-check">
-                {{#if item.calc$.check.skill}}
-                  {{localize (nacConcat "DND5E.Skill" (nacCapitalize item.calc$.check.skill))}}
-                {{else}}
-                  {{localize (nacConcat "DND5E.Ability" (nacCapitalize item.calc$.check.ability))}}
-                {{/if}}
-
-                {{localize "DND5E.AbbreviationDC"}}:
-
-                {{#nacPerm (nacConcat "ActorOwnerUuid:" @root.data.actor.uuid)}}
-                  {{item.calc$.check.dc}}
-                {{else}}
-                  {{localize "DND5E.SaveDC" dc="?" ability=""}}
-                {{/nacPerm}}
-              </th>
-            </thead>
-            <tbody>
-              {{#each item.targets as |target targetIndex|}}
-                <tr class="{{@root.staticValues.moduleName}}-item-{{itemIndex}}-check-target-{{targetIndex}}">
-                  <td>{{#if target.calc$.img}}<img src="{{target.calc$.img}}" height="20px" width="20px">{{/if}}</td>
-                  <td>{{target.calc$.name}}</td>
-                  <td>
-                    <div class="{{@root.staticValues.moduleName}}-roll-wrapper" {{#nacPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}title="{{target.check.calc$.evaluatedRoll.formula}}"{{/nacPerm}}>
-                      {{#if (eq target.check.phase "result")}}
-                        <div class="{{@root.staticValues.moduleName}}-check-{{#if target.result.checkPass}}pass{{else}}fail{{/if}}">
-                          {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=target.check.calc$.evaluatedRoll compact=true}}
-                        </div>
-                      {{else}}
-                        <div class="{{@root.staticValues.moduleName}}-bonus-container">
-                          <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}disabled{{/nacMisPerm}}>
-                            {{#if (eq target.check.mode 'normal')}}
-                              {{#if item.calc$.check.label}}
-                                {{item.calc$.check.label}}
-                              {{else if item.calc$.check.addSaveBonus}}
-                                {{localize "DND5E.SavingThrow"}}
-                              {{else}}
-                                {{localize "DND5E.Ability"}}
-                              {{/if}}
-                            {{else}}
-                              {{ localize (nacConcat "DND5E." (nacCapitalize target.check.mode)) }}
-                            {{/if}}
-                          </button>
-                          
-                          {{#if (and (eq target.check.phase "bonus-input") (nacPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)) )}}
-                            <input class="{{@root.staticValues.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{target.check.userBonus}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-bonus" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
-                          {{/if}}
-                        </div>
-                      {{/if}}
-                      {{#nacPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}
-                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq target.check.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
-                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq target.check.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
-                      {{/nacPerm}}
-                  </td>
-                </tr>
-              {{/each}}
-            </tbody>
-          </table>
-        {{/if}}
       </div>
       
       {{#if item.calc$.targetDefinition.hasAoe}}
@@ -213,48 +149,131 @@
           </tbody>
         </table>
       {{/if}}
+
+      {{#if (and item.calc$.check item.targets.length)}}
+        <table>
+          <thead>
+            <th style="width: 30px;">{{! img}}</th>
+            <th>{{localize "Name"}}</th>
+            <th class="{{@root.staticValues.moduleName}}-item-check">
+              {{#if item.calc$.check.skill}}
+                {{localize (nacConcat "DND5E.Skill" (nacCapitalize item.calc$.check.skill))}}
+              {{else}}
+                {{localize (nacConcat "DND5E.Ability" (nacCapitalize item.calc$.check.ability))}}
+              {{/if}}
+
+              {{localize "DND5E.AbbreviationDC"}}:
+
+              {{#nacPerm (nacConcat "ActorOwnerUuid:" @root.data.actor.uuid)}}
+                {{item.calc$.check.dc}}
+              {{else}}
+                {{localize "DND5E.SaveDC" dc="?" ability=""}}
+              {{/nacPerm}}
+            </th>
+          </thead>
+          <tbody>
+            {{#each item.targets as |target targetIndex|}}
+              <tr class="{{@root.staticValues.moduleName}}-item-{{itemIndex}}-check-target-{{targetIndex}}">
+                <td>{{#if target.calc$.img}}<img src="{{target.calc$.img}}" height="20px" width="20px">{{/if}}</td>
+                <td>{{target.calc$.name}}</td>
+                <td>
+                  <div class="{{@root.staticValues.moduleName}}-roll-wrapper" {{#nacPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}title="{{target.check.calc$.evaluatedRoll.formula}}"{{/nacPerm}}>
+                    {{#if (eq target.check.phase "result")}}
+                      <div class="{{@root.staticValues.moduleName}}-check-{{#if target.result.checkPass}}pass{{else}}fail{{/if}}">
+                        {{> modules/nils-automated-compendium/templates/roll/roll.hbs roll=target.check.calc$.evaluatedRoll compact=true}}
+                      </div>
+                    {{else}}
+                      <div class="{{@root.staticValues.moduleName}}-bonus-container">
+                        <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}disabled{{/nacMisPerm}}>
+                          {{#if (eq target.check.mode 'normal')}}
+                            {{#if item.calc$.check.label}}
+                              {{item.calc$.check.label}}
+                            {{else if item.calc$.check.addSaveBonus}}
+                              {{localize "DND5E.SavingThrow"}}
+                            {{else}}
+                              {{localize "DND5E.Ability"}}
+                            {{/if}}
+                          {{else}}
+                            {{ localize (nacConcat "DND5E." (nacCapitalize target.check.mode)) }}
+                          {{/if}}
+                        </button>
+                        
+                        {{#if (and (eq target.check.phase "bonus-input") (nacPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)) )}}
+                          <input class="{{@root.staticValues.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{target.check.userBonus}}" data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-bonus" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
+                        {{/if}}
+                      </div>
+                    {{/if}}
+                    {{#nacPerm (nacConcat "ActorOwnerUuid:" target.calc$.actorUuid)}}
+                      <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-minus" class="{{@root.staticValues.moduleName}}-mode-minus" {{#if (eq target.check.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+                      <button data-{{@root.staticValues.moduleName}}-action="item-{{itemIndex}}-check-{{target.uuid}}-mode-plus" class="{{@root.staticValues.moduleName}}-mode-plus" {{#if (eq target.check.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+                    {{/nacPerm}}
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      {{/if}}
     </div>
   {{/each}}
 
   {{#if data.calc$.targetAggregate.length}}
-  {{#nacPerm "gm"}}
-    <section class="{{@root.staticValues.moduleName}}-gm-secret">
-      <table class="{{@root.staticValues.moduleName}}-targets">
-        <thead>
-          <tr>
-            <th style="width: 30px;"></th>
-            <th>{{localize "Name"}}</th>
-            <th style="width: 30px; text-align: center;">{{ localize "DND5E.HP" }}</th>
-            <th style="width: 50px;" {{#if @root.data.calc$.allDmgApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
-              {{#nacExpr data.calc$.targetAggregate.length '>' 1}}
-                <div style="display: flex;" title="All">
-                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-*" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
-                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-*" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
-                </div>
-              {{/nacExpr}}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {{#each data.calc$.targetAggregate as |target|}}
-            <tr {{#if target.dmg.applied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
-              <td>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
-              <td> {{#if target.dmg.avoided}}<i style="color: green" class="fas fa-check"></i>{{else}}<i style="color: #d03333" class="fas fa-times-circle"></i>{{/if}} {{target.name}}</td>
-              <td style="text-align: center; white-space: nowrap;">
+    <table class="{{@root.staticValues.moduleName}}-targets">
+      <thead>
+        <tr>
+          <th style="width: 30px;"></th>
+          <th style="width: 1.25em;">{{! hit/mis }}</th>
+          <th>{{! "flex grow" }}</th>
+          <th style="width: 30px; text-align: center;">{{ localize "DND5E.HP" }}</th>
+          {{#nacPerm "gm"}}
+          <th style="width: 50px;" {{#if @root.data.calc$.allDmgApplied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
+            {{#nacExpr data.calc$.targetAggregate.length '>' 1}}
+              <div style="display: flex;" title="All">
+                <button data-{{@root.staticValues.moduleName}}-action="apply-damage-*" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
+                <button data-{{@root.staticValues.moduleName}}-action="undo-damage-*" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+              </div>
+            {{/nacExpr}}
+          </th>
+          {{/nacPerm}}
+        </tr>
+      </thead>
+      <tbody>
+        {{#each data.calc$.targetAggregate as |target|}}
+          <tr {{#if target.dmg.applied}}class="{{@root.staticValues.moduleName}}-applied"{{/if}}>
+            <td {{#nacPerm (nacConcat "ActorObserverUuid:" target.actorUuid)}}title="{{target.name}}"{{/nacPerm}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
+            <td style="text-align: center;">
+              {{#nacPerm (nacConcat "ActorObserverUuid:" target.actorUuid)}}
+                {{#nacExpr target.dmg.avoided '==' null}}
+                  <i style="color: black; opacity: .5;" class="fas fa-question"></i>
+                {{else}}
+                  {{#if target.dmg.avoided}}
+                    <i style="color: green; opacity:.7;" class="fas fa-tint-slash"></i>
+                  {{else}}
+                    <i style="color: #d03333;" class="fas fa-tint"></i>
+                  {{/if}}
+                {{/nacExpr}}
+              {{/nacPerm}}
+            </td>
+            <td>{{! "flex grow" }}</td>
+            
+            <td style="text-align: center; white-space: nowrap;">
+              {{#nacPerm (nacConcat "ActorObserverUuid:" target.actorUuid)}}
                 <span title="{{ localize "DND5E.HP" }}">{{target.hpSnapshot.hp}}</span>{{#if target.hpSnapshot.temp}}<span title="{{ localize "DND5E.Temp" }}">[{{target.hpSnapshot.temp}}]</span>{{/if}}{{#nacExpr target.dmg.calcDmg '>' 0}}-{{target.dmg.calcDmg}}{{else}}+{{nacMath '-' target.dmg.calcDmg}}{{/nacExpr}}=<b><u>{{target.dmg.calcHp}}{{#if (or target.dmg.calcTemp target.hpSnapshot.temp)}}[{{target.dmg.calcTemp}}]{{/if}}</u></b>
-              </td>
-              <td class="{{@root.staticValues.moduleName}}-target-actions">
-                <div style="display: flex;">
-                  <button data-{{@root.staticValues.moduleName}}-action="apply-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
-                  <button data-{{@root.staticValues.moduleName}}-action="undo-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
-                </div>
-              </td>
-            </tr>
-          {{/each}}
-        </tbody>
-      </table>
-    </section>
-  {{/nacPerm}}
+              {{else}}
+                ?
+              {{/nacPerm}}
+            </td>
+            {{#nacPerm "gm"}}
+            <td class="{{@root.staticValues.moduleName}}-target-actions">
+              <div style="display: flex;">
+                <button data-{{@root.staticValues.moduleName}}-action="apply-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-apply"><i class="fas fa-check"></i></button>
+                <button data-{{@root.staticValues.moduleName}}-action="undo-damage-{{target.uuid}}" class="{{@root.staticValues.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+              </div>
+            </td>
+            {{/nacPerm}}
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
   {{/if}}
     
 </div>
