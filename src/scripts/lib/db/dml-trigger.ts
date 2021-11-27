@@ -319,7 +319,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }
     if (!options[staticValues.moduleName].oldData) {
       options[staticValues.moduleName].oldData = deepClone(document.data);
-      options[staticValues.moduleName].oldParentUuid = document.parent.uuid;
+      options[staticValues.moduleName].oldParentUuid = document.parent?.uuid;
       options[staticValues.moduleName].oldPack = document.pack;
     }
   }
@@ -419,8 +419,9 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   
   private async extractOldValue(document: new (...args: any[]) => T, options: IDmlContext<T>['options']): Promise<T | null> {
     if (options[staticValues.moduleName]?.oldData) {
+      const oldParentUuid = options[staticValues.moduleName]?.oldParentUuid;
       return new document(deepClone(options[staticValues.moduleName]?.oldData), {
-        parent: await fromUuid(options[staticValues.moduleName]?.oldParentUuid),
+        parent: oldParentUuid == null ? null : await fromUuid(oldParentUuid),
         pack: options[staticValues.moduleName]?.oldPack
       });
     }
