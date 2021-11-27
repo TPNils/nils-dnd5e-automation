@@ -3,8 +3,6 @@ import { UtilsCompare } from "../utils/utils-compare";
 
 export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
   readonly type: {new(...args: any[]): T, documentName: string};
-  
-  // TODO async before triggers, Hooks does not support async hooks
 
   /**
    * A hook event that fires for every Document type before execution of a creation workflow.
