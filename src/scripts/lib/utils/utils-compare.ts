@@ -47,4 +47,37 @@ export class UtilsCompare {
     }
   }
 
+  public static deepEquals(original: any, compareTo: any): boolean {
+    if (original === compareTo) {
+      return true;
+    }
+    const originalType = typeof original;
+    const compareToType = typeof compareTo;
+  
+    if (originalType !== compareToType) {
+      return false;
+    }
+  
+    if (Array.isArray(original) !== Array.isArray(compareTo)) {
+      return false;
+    }
+  
+    if (original === null && compareTo !== null) {
+      // null is an object, undefined is it's own type
+      return false;
+    }
+  
+    if (originalType === 'object') {
+      const keys = new Set([...Object.keys(original), ...Object.keys(compareTo)]);
+      for (const key of keys) {
+        if (!UtilsCompare.findDiff(original[key], compareTo[key])) {
+          return false;
+        }
+      }
+      return true;
+    } else {
+      return original === compareTo;
+    }
+  }
+
 }
