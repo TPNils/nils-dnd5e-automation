@@ -1653,31 +1653,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     return ChatMessage;
   }
 
-  // public async afterUpsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
-  //   if (context.userId !== game.userId) {
-  //     // Only one user needs to do this operation
-  //     // TODO should happen before when async is possible
-  //     return;
-  //   }
-  //   const chatMessages = this.filterItemCardsOnly(context);
-  //   if (chatMessages.length > 0) {
-  //     this.applyActiveEffects(chatMessages);
-  //   }
-  //     let clonedMessageData = deepClone(data);
-  //     let changed = false;
-  //     {
-  //       const response = await this.applyConsumeResources(clonedMessageData);
-  //       if (response) {
-  //         clonedMessageData = response;
-  //         changed = true;
-  //       }
-  //     }
-
-  //     if (changed) {
-  //       await InternalFunctions.saveItemCardData(newRow.id, clonedMessageData);
-  //     }
-  //   }
-  // }
   public async afterUpsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
     this.applyActiveEffects(context);
     
@@ -1720,16 +1695,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   public beforeUpdate(context: IDmlContext<ChatMessage>): void {
     this.onBonusChange(context);
     // TODO recalc whole item on level change to support custom scaling level scaling formulas
-  }
-  
-  public beforeUpsert(context: IDmlContext<ChatMessage>): void {
-    for (const {newRow} of context.rows) {
-      const data = InternalFunctions.getItemCardData(newRow);
-      if (!data) {
-        continue;
-      }
-      newRow.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
-    }
   }
 
   public async upsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {

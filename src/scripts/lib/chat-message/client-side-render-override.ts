@@ -1,4 +1,5 @@
 import { staticValues } from '../../static-values';
+import { DmlTrigger, IDmlContext, IDmlTrigger } from '../db/dml-trigger';
 
 async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...args: any[]): Promise<JQuery> {
   // Add client side rendering of the template, specific for the user.
@@ -68,6 +69,23 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
   return wrapped(args);
 }
 
+class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
+  get type() {
+    return ChatMessage;
+  }
+
+  public beforeUpsert(context: IDmlContext<ChatMessage>): void {
+    for (const {newRow} of context.rows) {
+      if (newRow == null) {
+        continue;
+      }
+      if (typeof newRow.getFlag(staticValues.moduleName, 'clientTemplate') === 'string') {
+        newRow.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
+      }
+    }
+  }
+}
+
 let hasRegisteredHooks = false;
 export function registerHooks(): void {
   if (hasRegisteredHooks) {
@@ -76,6 +94,7 @@ export function registerHooks(): void {
   Hooks.on('setup', () => {
     libWrapper.register(staticValues.moduleName, 'ChatMessage.prototype.getHTML', getHTML, 'WRAPPER');
   });
+  DmlTrigger.registerTrigger(new ChatMessageTrigger());
 
   hasRegisteredHooks = true;
 }
