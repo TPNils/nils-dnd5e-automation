@@ -1878,7 +1878,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       
       for (const [item, oldItem] of this.forNewAndOld(data.items, oldData?.items)) {
         for (const [target, oldTarget] of this.forNewAndOld(item.targets, oldItem?.targets)) {
-          if (target.uuid !== oldTarget?.uuid || target.calc$ == null || (item.calc$.check && item.calc$.check)) {
+          if (target.uuid !== oldTarget?.uuid || target.calc$ == null || (item.calc$.check && !target.check)) {
             calcTargets.push({item: item, target: target});
           }
         }
