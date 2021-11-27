@@ -1589,7 +1589,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
     // There needs to be some way of cutting off the ability to retarget when they are not relevant anymore
     // TODO this should probably be improved
     const chatMessage = InternalFunctions.getLatestMessage();
-    if (!chatMessage || chatMessage.data.user !== context.userId) {
+    if (!chatMessage || chatMessage.data.user !== game.userId) {
       return;
     }
 
@@ -1653,18 +1653,45 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     return ChatMessage;
   }
 
+  // public async afterUpsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
+  //   if (context.userId !== game.userId) {
+  //     // Only one user needs to do this operation
+  //     // TODO should happen before when async is possible
+  //     return;
+  //   }
+  //   const chatMessages = this.filterItemCardsOnly(context);
+  //   if (chatMessages.length > 0) {
+  //     this.applyActiveEffects(chatMessages);
+  //   }
+  //     let clonedMessageData = deepClone(data);
+  //     let changed = false;
+  //     {
+  //       const response = await this.applyConsumeResources(clonedMessageData);
+  //       if (response) {
+  //         clonedMessageData = response;
+  //         changed = true;
+  //       }
+  //     }
+
+  //     if (changed) {
+  //       await InternalFunctions.saveItemCardData(newRow.id, clonedMessageData);
+  //     }
+  //   }
+  // }
   public async afterUpsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
-    if (context.userId !== game.userId) {
-      // Only one user needs to do this operation
-      // TODO should happen before when async is possible
-      return;
-    }
-    const chatMessages = this.filterItemCardsOnly(context);
-    if (chatMessages.length > 0) {
-      this.applyActiveEffects(chatMessages);
-    }
-    for (const chatMessage of chatMessages) {
-      let clonedMessageData = deepClone(InternalFunctions.getItemCardData(chatMessage));
+    this.applyActiveEffects(context);
+    
+    for (const {newRow, changedByUserId} of context.rows) {
+      if (changedByUserId !== game.userId) {
+        // Only one user needs to do this operation
+        // TODO should happen before when async is possible
+        continue;
+      }
+      const data = InternalFunctions.getItemCardData(newRow);
+      if (!data) {
+        continue;
+      }
+      let clonedMessageData = deepClone(data);
       let changed = false;
       {
         const response = await this.applyConsumeResources(clonedMessageData);
@@ -1675,7 +1702,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       }
 
       if (changed) {
-        await InternalFunctions.saveItemCardData(chatMessage.id, clonedMessageData);
+        await InternalFunctions.saveItemCardData(newRow.id, clonedMessageData);
       }
     }
   }
@@ -1696,16 +1723,24 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
   
   public beforeUpsert(context: IDmlContext<ChatMessage>): void {
-    const itemCards = this.filterItemCardsOnly(context);
-    if (itemCards.length > 0) {
-      for (const itemCard of itemCards) {
-        itemCard.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
+    for (const {newRow} of context.rows) {
+      const data = InternalFunctions.getItemCardData(newRow);
+      if (!data) {
+        continue;
       }
+      newRow.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
     }
   }
 
   public async upsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
-    const itemCards = this.filterItemCardsOnly(context);
+    const itemCards: ChatMessage[] = []
+    
+    for (const {newRow} of context.rows) {
+      const data = InternalFunctions.getItemCardData(newRow);
+      if (data) {
+        itemCards.push(newRow);
+      }
+    }
     if (itemCards.length > 0) {
       await this.setTargets(context);
       await this.calcTargets(context);
@@ -1719,14 +1754,17 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
 
   public async afterDelete(context: IDmlContext<ChatMessage>): Promise<void> {
-    const chatMessages = this.filterItemCardsOnly(context);
-    if (context.userId === game.userId) {
+    for (const {newRow, changedByUserId} of context.rows) {
+      if (changedByUserId !== game.userId) {
+        continue;
+      }
+      const data = InternalFunctions.getItemCardData(newRow);
+      if (!data) {
+        continue;
+      }
       const deleteTemplateUuids = new Set<string>();
-      for (const chatMessage of chatMessages) {
-        const data: ItemCard = InternalFunctions.getItemCardData(chatMessage);
-        for (const item of data.items) {
-          deleteTemplateUuids.add(item?.calc$?.targetDefinition?.createdTemplateUuid);
-        }
+      for (const item of data.items) {
+        deleteTemplateUuids.add(item?.calc$?.targetDefinition?.createdTemplateUuid);
       }
       deleteTemplateUuids.delete(null);
       deleteTemplateUuids.delete(undefined);
@@ -1738,9 +1776,9 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
 
   private async setTargets(context: IAfterDmlContext<ChatMessage>): Promise<void> {
-    const calcTargets: Array<{type: 'circle/self' | 'self/self', data: ItemCard, item: ItemCardItem, messageUuid: string}> = [];
+    const calcTargets: Array<{type: 'circle/self' | 'self/self', data: ItemCard, item: ItemCardItem, messageUuid: string, userId: string}> = [];
 
-    for (const {newRow, oldRow} of context.rows) {
+    for (const {newRow, oldRow, changedByUserId} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
       if (!data) {
         continue;
@@ -1782,6 +1820,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
                   type: 'self/self',
                   data: data,
                   item: item,
+                  userId: changedByUserId,
                   messageUuid: newRow.uuid,
                 });
               }
@@ -1793,6 +1832,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
                   type: 'circle/self',
                   data: data,
                   item: item,
+                  userId: changedByUserId,
                   messageUuid: newRow.uuid,
                 });
               }
@@ -1857,7 +1897,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       context.endOfContext(async () => {
         // Need to delay since setting targets will update the record which is currently being updated
         // Basically, wait for your turn
-        await UtilsDocument.setTargets({tokenUuids: calcTargets[0].item.targets.map(t => t.uuid), user: game.users.get(context.userId)});
+        await UtilsDocument.setTargets({tokenUuids: calcTargets[0].item.targets.map(t => t.uuid), user: game.users.get(calcTargets[0].userId)});
       });
     }
   }
@@ -2129,11 +2169,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
   
   private onBonusChange(context: IDmlContext<ChatMessage>): void {
-    if (context.userId !== game.userId) {
-      return;
-    }
-    for (const {newRow, oldRow} of context.rows) {
-      if (!oldRow) {
+    for (const {newRow, oldRow, changedByUserId} of context.rows) {
+      if (!oldRow || changedByUserId !== game.userId) {
         continue;
       }
       const data: ItemCard = InternalFunctions.getItemCardData(newRow);
@@ -2172,7 +2209,15 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     MemoryStorageService.setFocusedElementSelector(null);
   }
 
-  private async applyActiveEffects(chatMessages: ChatMessage[]): Promise<void> {
+  private async applyActiveEffects(context: IDmlContext<ChatMessage>): Promise<void> {
+    const chatMessages: ChatMessage[] = [];
+    for (const {newRow} of context.rows) {
+      const data = InternalFunctions.getItemCardData(newRow);
+      if (data) {
+        chatMessages.push(newRow);
+      }
+    }
+
     const chatMessageDatas: ItemCard[] = [];
     const chatMessageDatasByUuid = new Map<string, ItemCard>();
     for (const chatMessage of chatMessages) {
@@ -2406,16 +2451,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
 
     return messageData;
   }
-  
-  private filterItemCardsOnly(context: IDmlContext<ChatMessage>): ChatMessage[] {
-    const itemCards: ChatMessage[] = [];
-    for (const {newRow} of context.rows) {
-      if (newRow.getFlag(staticValues.moduleName, 'clientTemplate') === `modules/${staticValues.moduleName}/templates/item-card.hbs`) {
-        itemCards.push(newRow);
-      }
-    }
-    return itemCards;
-  }
 
   private forNewAndOld<T extends {[key: string]: any}>(newObj: T[] | null, oldObj: T[] | null): Array<[T, T | null]> {
     const response: Array<[T, T]> = [];
@@ -2437,10 +2472,10 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
   }
   
   public async afterCreate(context: IDmlContext<MeasuredTemplateDocument>): Promise<void> {
-    if (game.userId !== context.userId) {
-      return;
-    }
-    for (const {newRow: template} of context.rows) {
+    for (const {newRow: template, changedByUserId} of context.rows) {
+      if (game.userId !== changedByUserId) {
+        continue;
+      }
       const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
       if (!messageId || !game.messages.has(messageId)) {
         continue;
@@ -2476,11 +2511,11 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
   }
 
   public async afterUpdate(context: IDmlContext<MeasuredTemplateDocument>): Promise<void> {
-    if (game.userId !== context.userId) {
-      return;
-    }
 
-    for (const {newRow: template} of context.rows) {
+    for (const {newRow: template, changedByUserId} of context.rows) {
+      if (game.userId !== changedByUserId) {
+        continue;
+      }
       const messageId = template.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
       if (!messageId || !game.messages.has(messageId)) {
         continue;
