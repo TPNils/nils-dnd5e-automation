@@ -370,6 +370,8 @@ export class UtilsChatMessage {
     }
     if (game.settings.get('core', 'rollMode') === 'blindroll') {
       for (const user of game.users.values()) {
+        chatMessageData.whisper = [];
+        chatMessageData.blind = true;
         if (user.isGM) {
           chatMessageData.whisper.push(user.id);
         }
