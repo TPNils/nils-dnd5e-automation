@@ -38,33 +38,33 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
    * 
    * The hook provides the commited document instance can be modified, which will trigger another update.
    */
-   create?(context: IDmlContext<T>): void | Promise<void>;
+   create?(context: IAfterDmlContext<T>): void | Promise<void>;
    /**
     * A hook event that fires for every Document type after execution of an update workflow.
     * This hook only fires for the client who is initiating the update request.
     * 
    * The hook provides the commited document instance can be modified, which will trigger another update.
     */
-   update?(context: IDmlContext<T>): void | Promise<void>;
-   upsert?(context: IDmlContext<T>): void | Promise<void>;
+   update?(context: IAfterDmlContext<T>): void | Promise<void>;
+   upsert?(context: IAfterDmlContext<T>): void | Promise<void>;
 
 
   /**
    * A hook event that fires for every embedded Document type after conclusion of a creation workflow.
    * This hook fires for all connected clients after the creation has been processed.
    */
-  afterCreate?(context: IDmlContext<T>): void | Promise<void>;
+  afterCreate?(context: IAfterDmlContext<T>): void | Promise<void>;
   /**
    * A hook event that fires for every Document type after conclusion of an update workflow.
    * This hook fires for all connected clients after the update has been processed.
    */
-  afterUpdate?(context: IDmlContext<T>): void | Promise<void>;
-  afterUpsert?(context: IDmlContext<T>): void | Promise<void>;
+  afterUpdate?(context: IAfterDmlContext<T>): void | Promise<void>;
+  afterUpsert?(context: IAfterDmlContext<T>): void | Promise<void>;
   /**
    * A hook event that fires for every Document type after conclusion of an deletion workflow.
    * This hook fires for all connected clients after the deletion has been processed.
    */
-  afterDelete?(context: IDmlContext<T>): void | Promise<void>;
+  afterDelete?(context: IAfterDmlContext<T>): void | Promise<void>;
 }
 
 export interface IDmlContext<T extends foundry.abstract.Document<any, any>> {
@@ -74,6 +74,36 @@ export interface IDmlContext<T extends foundry.abstract.Document<any, any>> {
   }>;
   readonly options: {[key: string]: any};
   readonly userId: string;
+}
+
+export interface IAfterDmlContext<T extends foundry.abstract.Document<any, any>> extends IDmlContext<T> {
+  readonly rows: ReadonlyArray<{
+    newRow: T,
+    oldRow?: T
+  }>;
+  readonly options: {[key: string]: any};
+  readonly userId: string;
+
+  endOfContext(...execs: Array<() => void | Promise<void>>): void
+}
+
+class AfterDmlContext<T extends foundry.abstract.Document<any, any>> implements IAfterDmlContext<T> {
+  public endOfContextExecutes: Array<() => void | Promise<void>> = [];
+
+  constructor(
+    public readonly rows: ReadonlyArray<{
+      newRow: T,
+      oldRow?: T
+    }>,
+    public readonly options: {[key: string]: any},
+    public readonly userId: string,
+  ) {}
+
+  public endOfContext(...execs: Array<() => void | Promise<void>>): void {
+    for (const exec of execs) {
+      this.endOfContextExecutes.push(exec);
+    }
+  }
 }
 
 export interface IUnregisterTrigger {
@@ -267,7 +297,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   //#region Before
   private onFoundryBeforeCreate(document: T & {constructor: new (...args: any[]) => T}, data: any, options: IDmlContext<T>['options'], userId: string): void | boolean {
-    let context: IDmlContext<T> = {
+    const context: IDmlContext<T> = {
       rows: [{newRow: document}],
       options: options,
       userId: userId
@@ -284,7 +314,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     this.injectOldValue(document, options);
     const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
-    let context: IDmlContext<T> = {
+    const context: IDmlContext<T> = {
       rows: [{newRow: modifiedDocument, oldRow: document}],
       options: options,
       userId: userId,
@@ -298,7 +328,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   }
 
   private onFoundryBeforeDelete(document: T & {constructor: new (...args: any[]) => T}, options: IDmlContext<T>['options'], userId: string): void | boolean {
-    let context: IDmlContext<T> = {
+    const context: IDmlContext<T> = {
       rows: [{newRow: document, oldRow: document}],
       options: options,
       userId: userId
@@ -327,11 +357,11 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   private async onFoundryAfterCreate(document: T & {constructor: new (...args: any[]) => T}, options: IDmlContext<T>['options'], userId: string): Promise<void> {
     // Don't allow updates directly on the original document
     let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
-    let context: IDmlContext<T> = {
-      rows: [{newRow: documentSnapshot}],
-      options: options,
-      userId: userId
-    };
+    let context = new AfterDmlContext<T>(
+      [{newRow: documentSnapshot}],
+      options,
+      userId
+    );
 
     for (const callback of this.afterCallbackGroups.get('create').getCallbacks()) {
       await callback(context);
@@ -339,11 +369,13 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
     if (game.userId === userId) {
       let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
-      let context: IDmlContext<T> = {
-        rows: [{newRow: documentSnapshot}],
-        options: options,
-        userId: userId
-      };
+      const execs = context.endOfContextExecutes;
+      context = new AfterDmlContext<T>(
+        [{newRow: documentSnapshot}],
+        options,
+        userId
+      );
+      context.endOfContext(...execs);
 
       for (const callback of this.afterCallbackGroups.get('create').getDmlCallbacks()) {
         await callback(context);
@@ -358,6 +390,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         }
       }
     }
+
+    for (const exec of context.endOfContextExecutes) {
+      await exec();
+    }
   }
   
   private async onFoundryAfterUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: IDmlContext<T>['options'], userId: string): Promise<void> {
@@ -365,11 +401,11 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     let documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
     const oldDocument = await this.extractOldValue(document.constructor, options);
-    let context: IDmlContext<T> = {
-      rows: [{newRow: documentSnapshot, oldRow: oldDocument}],
-      options: options,
-      userId: userId
-    };
+    let context = new AfterDmlContext<T>(
+      [{newRow: documentSnapshot, oldRow: oldDocument}],
+      options,
+      userId
+    );
 
     for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
       await callback(context);
@@ -377,11 +413,13 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
     if (game.userId === userId) {
       documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
-      context = {
-        rows: [{newRow: documentSnapshot, oldRow: oldDocument}],
-        options: options,
-        userId: userId
-      };
+      const execs = context.endOfContextExecutes;
+      context = new AfterDmlContext<T>(
+        [{newRow: documentSnapshot, oldRow: oldDocument}],
+        options,
+        userId
+      );
+      context.endOfContext(...execs);
 
       for (const callback of this.afterCallbackGroups.get('update').getDmlCallbacks()) {
         await callback(context);
@@ -396,16 +434,20 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         }
       }
     }
+    
+    for (const exec of context.endOfContextExecutes) {
+      await exec();
+    }
   }
 
   private async onFoundryAfterDelete(document: T & {constructor: new (...args: any[]) => T}, options: IDmlContext<T>['options'], userId: string): Promise<void> {
     // Don't allow updates directly on the original document
     let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
-    let context: IDmlContext<T> = {
-      rows: [{newRow: documentSnapshot}],
-      options: options,
-      userId: userId
-    };
+    const context = new AfterDmlContext<T>(
+      [{newRow: documentSnapshot}],
+      options,
+      userId
+    );
 
     for (const callback of this.afterCallbackGroups.get('delete').getCallbacks()) {
       await callback(context);
@@ -413,6 +455,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
     // deletes do not support registerDml 
     // What are you going to do, update a record that has been deleted (:
+    
+    for (const exec of context.endOfContextExecutes) {
+      await exec();
+    }
   }
   
   private async extractOldValue(document: new (...args: any[]) => T, options: IDmlContext<T>['options']): Promise<T | null> {
