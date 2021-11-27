@@ -1731,7 +1731,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       deleteTemplateUuids.delete(undefined);
   
       if (deleteTemplateUuids.size > 0) {
-        UtilsDocument.bulkDelete(((await UtilsDocument.templateFromUuid(deleteTemplateUuids)).map(doc => {return {document: doc}})))
+        UtilsDocument.bulkDelete(Array.from(((await UtilsDocument.templateFromUuid(deleteTemplateUuids)).values())).map(doc => {return {document: doc}}))
       }
     }
   }
@@ -1846,10 +1846,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       }
     }
 
-    const targetsByUuid = new Map<string, TokenDocument>();
-    for (const target of await UtilsDocument.tokenFromUuid(calcTargets.map(t => t.target.uuid))) {
-      targetsByUuid.set(target.uuid, target);
-    }
+    const targetsByUuid = await UtilsDocument.tokenFromUuid(calcTargets.map(t => t.target.uuid));
 
     for (const calcTarget of calcTargets) {
       const token = targetsByUuid.get(calcTarget.target.uuid);
@@ -1998,10 +1995,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
         }
       }
       
-      const actorsByUuid = new Map<string, MyActor>();
-      for (const actor of await UtilsDocument.actorFromUuid(fetchOriginalValues.map(v => v.calc$.uuid), {deduplciate: true})) {
-        actorsByUuid.set(actor.uuid, actor);
-      }
+      const actorsByUuid = await UtilsDocument.actorFromUuid(fetchOriginalValues.map(v => v.calc$.uuid));
       
       for (const consumedResource of fetchOriginalValues) {
         consumedResource.calc$.original = getProperty(actorsByUuid.get(consumedResource.calc$.uuid).data, consumedResource.calc$.path);
@@ -2191,10 +2185,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       return;
     }
 
-    const actorsByTokenUuid = new Map<string, MyActor>();
-    for (const token of (await UtilsDocument.tokenFromUuid(effectsByTargetUuid.keys()))) {
-      actorsByTokenUuid.set(token.uuid, token.getActor());
-    }
+    const actorsByTokenUuid = await UtilsDocument.actorFromUuid(effectsByTargetUuid.keys())
 
     const getOriginKey = (origin: any): string => {
       return `${origin.messageUuid}.${origin.itemIndex}.${origin.activeEffectsIndex}`;
@@ -2449,7 +2440,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         Array.from(game.user.targets)[0].setTarget(false, {releaseOthers: true})
       }
       if (item.targets) {
-        const targetCanvasIds = (await UtilsDocument.tokenFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
+        const targetCanvasIds = Array.from((await UtilsDocument.tokenFromUuid(item.targets.map(t => t.uuid))).values()).map(t => t.object.id)
         game.user.updateTokenTargets(targetCanvasIds);
         game.user.broadcastActivity({targets: targetCanvasIds});
       }
@@ -2491,7 +2482,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         Array.from(game.user.targets)[0].setTarget(false, {releaseOthers: true})
       }
       if (item.targets) {
-        const targetCanvasIds = (await UtilsDocument.tokenFromUuid(item.targets.map(t => t.uuid))).map(t => t.object.id)
+        const targetCanvasIds = Array.from((await UtilsDocument.tokenFromUuid(item.targets.map(t => t.uuid))).values()).map(t => t.object.id)
         game.user.updateTokenTargets(targetCanvasIds);
         game.user.broadcastActivity({targets: targetCanvasIds});
       }
@@ -2604,10 +2595,7 @@ class InternalFunctions {
       }
     }
 
-    const actorsByUuid = new Map<string, MyActor>();
-    for (const actor of await UtilsDocument.actorFromUuid(aggregates.keys())) {
-      actorsByUuid.set(actor.uuid, actor);
-    }
+    const actorsByUuid = await UtilsDocument.actorFromUuid(aggregates.keys());
 
     const applyDmg = (aggregate: ItemCard['calc$']['targetAggregate'][0], amount: number) => {
       if (aggregate.dmg == null) {

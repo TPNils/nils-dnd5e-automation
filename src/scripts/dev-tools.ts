@@ -115,11 +115,7 @@ export class DevTools {
     }
     console.debug(syncWorldItems, compendiumFolderIds);
 
-    const compendiumItems = await UtilsDocument.itemFromUuid(syncWorldItems.map(item => item.getFlag(staticValues.moduleName, 'source-uuid')).filter(uuid => typeof uuid === 'string'));
-    const compendiumItemsByUuid = new Map<string, MyItem>();
-    for (const item of compendiumItems) {
-      compendiumItemsByUuid.set(item.uuid, item);
-    }
+    const compendiumItemsByUuid = await UtilsDocument.itemFromUuid(syncWorldItems.map(item => item.getFlag(staticValues.moduleName, 'source-uuid')).filter(uuid => typeof uuid === 'string'));
 
     const compendiumDmls = new Map<string, CompendiumItemDml>();
     for (const syncWorldItem of syncWorldItems) {
