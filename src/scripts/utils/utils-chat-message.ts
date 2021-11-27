@@ -1737,6 +1737,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
 
   private async setTargets(context: IDmlContext<ChatMessage>): Promise<void> {
+    const calcTargets: Array<{type: 'circle/self', data: ItemCard, item: ItemCardItem}> = [];
+
     for (const {newRow, oldRow} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
       if (!data) {
@@ -1781,48 +1783,61 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
             }
             case 'circle': {
               if (item.calc$.rangeDefinition.units === 'self' && data.token?.uuid) {
-                // TODO no queries in a loop
-                const selfToken = await UtilsDocument.tokenFromUuid(data.token.uuid);
-                const scene = selfToken.parent;
-                const templateDetails: TemplateDetails = {
-                  x: selfToken.data.x,
-                  y: selfToken.data.y,
-                  shape: new PIXI.Circle(0, 0, UtilsTemplate.feetToPx(UtilsTemplate.getFeet(item.calc$.targetDefinition))),
-                };
-                const targets: typeof item['targets'] = [];
-                let sceneTokens = Array.from(scene.getEmbeddedCollection(TokenDocument.documentName).values() as IterableIterator<TokenDocument>);
-                let filterDispositions: Array<TokenDocument['data']['disposition']> = [-1, 0, 1]
-                if (item.calc$.targetDefinition.type === 'ally') {
-                  if (selfToken.data.disposition === 1) {
-                    filterDispositions = [0, 1];
-                  } else if (selfToken.data.disposition === 0) {
-                    // Neurtal tokens also help friendlies but not enemies.
-                    // Neurtal *should* not distinguish between ally/enemy,
-                    // but in reality they are tokens who feel neurtal to the player party and are probably afraid of enemies
-                    filterDispositions = [0, 1];
-                  } else if (selfToken.data.disposition === -1) {
-                    filterDispositions = [selfToken.data.disposition];
-                  }
-                } else if (item.calc$.targetDefinition.type === 'enemy') {
-                  if (selfToken.data.disposition === 1) {
-                    filterDispositions = [-1];
-                  } else if (selfToken.data.disposition === -1) {
-                    filterDispositions = [1];
-                  } else {
-                    // no filter for neurtals
-                  }
-                }
-                sceneTokens = sceneTokens.filter(token => filterDispositions.includes(token.data.disposition));
-                for (const sceneToken of sceneTokens) {
-                  if (UtilsTemplate.isTokenInside(templateDetails, sceneToken, true)) {
-                    targets.push({uuid: sceneToken.uuid, name: sceneToken.name} as any);
-                  }
-                }
-                item.targets = targets;
+                calcTargets.push({
+                  type: 'circle/self',
+                  data: data,
+                  item: item
+                });
               }
               break;
             }
           }
+        }
+      }
+    }
+
+    const tokensByUuid = await UtilsDocument.tokenFromUuid(calcTargets.filter(t => t.type === 'circle/self').map(t => t.data.token.uuid));
+
+    for (const calc of calcTargets) {
+      switch (calc.type) {
+        case 'circle/self': {
+          const selfToken = tokensByUuid.get(calc.data.token.uuid);
+          const scene = selfToken.parent;
+          const templateDetails: TemplateDetails = {
+            x: selfToken.data.x,
+            y: selfToken.data.y,
+            shape: new PIXI.Circle(0, 0, UtilsTemplate.feetToPx(UtilsTemplate.getFeet(calc.item.calc$.targetDefinition))),
+          };
+          const targets: typeof calc.item['targets'] = [];
+          let sceneTokens = Array.from(scene.getEmbeddedCollection(TokenDocument.documentName).values() as IterableIterator<TokenDocument>);
+          let filterDispositions: Array<TokenDocument['data']['disposition']> = [-1, 0, 1]
+          if (calc.item.calc$.targetDefinition.type === 'ally') {
+            if (selfToken.data.disposition === 1) {
+              filterDispositions = [0, 1];
+            } else if (selfToken.data.disposition === 0) {
+              // Neurtal tokens also help friendlies but not enemies.
+              // Neurtal *should* not distinguish between ally/enemy,
+              // but in reality they are tokens who feel neurtal to the player party and are probably afraid of enemies
+              filterDispositions = [0, 1];
+            } else if (selfToken.data.disposition === -1) {
+              filterDispositions = [selfToken.data.disposition];
+            }
+          } else if (calc.item.calc$.targetDefinition.type === 'enemy') {
+            if (selfToken.data.disposition === 1) {
+              filterDispositions = [-1];
+            } else if (selfToken.data.disposition === -1) {
+              filterDispositions = [1];
+            } else {
+              // no filter for neurtals
+            }
+          }
+          sceneTokens = sceneTokens.filter(token => filterDispositions.includes(token.data.disposition));
+          for (const sceneToken of sceneTokens) {
+            if (UtilsTemplate.isTokenInside(templateDetails, sceneToken, true)) {
+              targets.push({uuid: sceneToken.uuid, name: sceneToken.name} as any);
+            }
+          }
+          calc.item.targets = targets;
         }
       }
     }
