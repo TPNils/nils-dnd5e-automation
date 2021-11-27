@@ -1,7 +1,7 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import { ActiveEffectData, ItemData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 import { TARGETS } from "pixi.js";
-import { IDmlContext, DmlTrigger, IDmlTrigger } from "../lib/db/dml-trigger";
+import { IDmlContext, DmlTrigger, IDmlTrigger, IAfterDmlContext } from "../lib/db/dml-trigger";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
 import { MemoryStorageService } from "../service/memory-storage-service";
@@ -1652,7 +1652,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     return ChatMessage;
   }
 
-  public async afterUpsert(context: IDmlContext<ChatMessage>): Promise<void> {
+  public async afterUpsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
     if (context.userId !== game.userId) {
       // Only one user needs to do this operation
       // TODO should happen before when async is possible
@@ -1679,7 +1679,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
-  public afterUpdate(context: IDmlContext<ChatMessage>): void {
+  public afterUpdate(context: IAfterDmlContext<ChatMessage>): void {
     const log = document.querySelector("#chat-log");
     const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
     if (isAtBottom) {
@@ -1703,7 +1703,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
-  public async upsert(context: IDmlContext<ChatMessage>): Promise<void> {
+  public async upsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
     const itemCards = this.filterItemCardsOnly(context);
     if (itemCards.length > 0) {
       await this.setTargets(context);
@@ -1736,8 +1736,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
-  private async setTargets(context: IDmlContext<ChatMessage>): Promise<void> {
-    const calcTargets: Array<{type: 'circle/self', data: ItemCard, item: ItemCardItem}> = [];
+  private async setTargets(context: IAfterDmlContext<ChatMessage>): Promise<void> {
+    const calcTargets: Array<{type: 'circle/self' | 'self/self', data: ItemCard, item: ItemCardItem, messageUuid: string}> = [];
 
     for (const {newRow, oldRow} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
@@ -1777,7 +1777,12 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
           switch (shapeType) {
             case 'self': {
               if (data.token?.uuid) {
-                item.targets = [{uuid: data.token.uuid}];
+                calcTargets.push({
+                  type: 'self/self',
+                  data: data,
+                  item: item,
+                  messageUuid: newRow.uuid,
+                });
               }
               break;
             }
@@ -1786,7 +1791,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
                 calcTargets.push({
                   type: 'circle/self',
                   data: data,
-                  item: item
+                  item: item,
+                  messageUuid: newRow.uuid,
                 });
               }
               break;
@@ -1800,6 +1806,10 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
 
     for (const calc of calcTargets) {
       switch (calc.type) {
+        case 'self/self': {
+          calc.item.targets = [{uuid: calc.data.token.uuid}];
+          break;
+        }
         case 'circle/self': {
           const selfToken = tokensByUuid.get(calc.data.token.uuid);
           const scene = selfToken.parent;
@@ -1840,6 +1850,14 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
           calc.item.targets = targets;
         }
       }
+    }
+
+    if (calcTargets.length === 1 && InternalFunctions.getLatestMessage().uuid === calcTargets[0].messageUuid) {
+      context.endOfContext(async () => {
+        // Need to delay since setting targets will update the record which is currently being updated
+        // Basically, wait for your turn
+        await UtilsDocument.setTargets({tokenUuids: calcTargets[0].item.targets.map(t => t.uuid), user: game.users.get(context.userId)});
+      });
     }
   }
   
@@ -2450,15 +2468,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
 
       item = await this.setTargetsFromTemplate(item);
       messageData.items[itemIndex] = item;
-      // Game seems buggy when unetting targets, this however does work
-      if (game.user.targets.size > 0) {
-        Array.from(game.user.targets)[0].setTarget(false, {releaseOthers: true})
-      }
-      if (item.targets) {
-        const targetCanvasIds = Array.from((await UtilsDocument.tokenFromUuid(item.targets.map(t => t.uuid))).values()).map(t => t.object.id)
-        game.user.updateTokenTargets(targetCanvasIds);
-        game.user.broadcastActivity({targets: targetCanvasIds});
-      }
+      UtilsDocument.setTargets({tokenUuids: item.targets.map(t => t.uuid)});
 
       await InternalFunctions.saveItemCardData(messageId, messageData);
     }
@@ -2492,15 +2502,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
 
       item = await this.setTargetsFromTemplate(item);
       messageData.items[itemIndex] = item;
-      // Game seems buggy when unetting targets, this however does work
-      if (game.user.targets.size > 0) {
-        Array.from(game.user.targets)[0].setTarget(false, {releaseOthers: true})
-      }
-      if (item.targets) {
-        const targetCanvasIds = Array.from((await UtilsDocument.tokenFromUuid(item.targets.map(t => t.uuid))).values()).map(t => t.object.id)
-        game.user.updateTokenTargets(targetCanvasIds);
-        game.user.broadcastActivity({targets: targetCanvasIds});
-      }
+      UtilsDocument.setTargets({tokenUuids: item.targets.map(t => t.uuid)});
 
       await InternalFunctions.saveItemCardData(messageId, messageData);
     }

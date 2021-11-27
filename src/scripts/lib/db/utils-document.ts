@@ -294,6 +294,19 @@ export class UtilsDocument {
     }
     return UtilsDocument.bulkUpdate(documents);
   }
+
+  public static async setTargets(params: {tokenUuids: string[], user?: User}): Promise<void> {
+    const user = params.user ?? game.user;
+    // Game seems buggy when unetting targets, this however does work
+    if (user.targets.size > 0) {
+      Array.from(user.targets)[0].setTarget(false, {releaseOthers: true});
+    }
+    if (params.tokenUuids?.length > 0) {
+      const targetCanvasIds = Array.from((await UtilsDocument.tokenFromUuid(params.tokenUuids)).values()).map(t => t.object.id)
+      user.updateTokenTargets(targetCanvasIds);
+      user.broadcastActivity({targets: targetCanvasIds});
+    }
+  }
   
   private static groupDocumentsForDml(inputDocuments: Array<{document: FoundryDocument, data?: any}>): Map<string, Map<string, BulkEntry>> {
     const documentsByUuid = new Map<string, {document: FoundryDocument, data?: any}>();
