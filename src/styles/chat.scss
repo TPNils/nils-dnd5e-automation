@@ -8,13 +8,13 @@
   /* default foundry css */
   .dice-total.compact .roll {
     position: relative;
-    width: 24px;
-    line-height: 24px;
+    width: var(--font-size-24, 24px);
+    line-height: var(--font-size-24, 24px);
     float: left;
     margin-right: 1px;
-    font-size: 16px;
+    font-size: var(--font-size-16, 16px);
 
-    color: #000;
+    color: var(--color-text-dark-primary, #000);
     font-weight: bold;
     text-align: center;
 
@@ -27,10 +27,10 @@
       display: block;
       position: absolute;
       background-image: url("/icons/svg/d20-grey.svg");
-      background-size: 24px 24px;
+      background-size: var(--font-size-24, 24px) var(--font-size-24, 24px);
       filter: brightness(0) invert(.9); // white background image
-      width: 24px;
-      height: 24px;
+      width: var(--font-size-24, 24px);
+      height: var(--font-size-24, 24px);
     }
     &.d4::before {
       background-image: url("/icons/svg/d4-grey.svg");
@@ -70,7 +70,7 @@
     
   }
   .roll.exploded:before {
-    font-size: 8px;
+    font-size: var(--font-size-8, 8px);
     font-family: "Font Awesome 5 Free";
     content: "\f666";
     position: absolute;
@@ -89,13 +89,14 @@
 
 .#{$module-name}-item-card {
   font-style: normal;
-  font-size: 12px;
+  font-size: var(--font-size-12, 12px);
 
   button {
+    font-size: var(--font-size-14, 14px);
     background: rgb(190, 189, 178);
     border: 2px groove #eeede0;
-    height: 26px;
-    line-height: 20px;
+    height: calc(2em - 2px);
+    line-height: calc(2em - 8px);
   }
 
   .dice-roll .dice-flavor {
@@ -175,23 +176,22 @@
       border: 1px solid #b5b3a4;
       position: absolute;
       line-height: 0px;
-      width: 20px;
-      height: 20px;
       font-size: 10px;
+      height: 2em;
+      width: 2em;
+      top: 3px;
+      //top: 50%;
+      //transform: translate(0, -50%);
     }
 
     .#{$module-name}-mode-minus {
       color: red;
-      top: 3px;
       left: 2px;
-      //transform: translate(25%, 0);
     }
 
     .#{$module-name}-mode-plus {
       color: #4F8A10;
-      top: 3px;
       right: 2px;
-      //transform: translate(-25%, 0);
     }
 
     .#{$module-name}-mode-plus[disabled],
@@ -208,9 +208,9 @@
   .#{$module-name}-apply,
   .#{$module-name}-undo {
     font-size: 10px;
-    height: 20px;
-    width: 20px;
-    line-height: 10px;
+    height: 2em;
+    width: 2em;
+    line-height: 1em;
   }
 
   .#{$module-name}-bonus-container {
