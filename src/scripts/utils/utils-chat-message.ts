@@ -1674,31 +1674,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
 
   public async afterUpsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
     this.applyActiveEffects(context);
-    
-    for (const {newRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId) {
-        // Only one user needs to do this operation
-        // TODO should happen before when async is possible
-        continue;
-      }
-      const data = InternalFunctions.getItemCardData(newRow);
-      if (!data) {
-        continue;
-      }
-      let clonedMessageData = deepClone(data);
-      let changed = false;
-      {
-        const response = await this.applyConsumeResources(clonedMessageData);
-        if (response) {
-          clonedMessageData = response;
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        await InternalFunctions.saveItemCardData(newRow.id, clonedMessageData);
-      }
-    }
   }
 
   public afterUpdate(context: IAfterDmlContext<ChatMessage>): void {
@@ -1717,7 +1692,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
 
   public async upsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
-    const itemCards: ChatMessage[] = []
+    const itemCards: ChatMessage[] = [];
     
     for (const {newRow} of context.rows) {
       const data = InternalFunctions.getItemCardData(newRow);
@@ -1728,6 +1703,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     if (itemCards.length > 0) {
       await this.setTargets(context);
       await this.calcTargets(context);
+      await this.applyConsumeResources(context);
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
       this.calcCanChangeSpellLevel(itemCards);
@@ -2338,59 +2314,69 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     ChatMessage.updateDocuments(chatMessages.map(message => message.data));
   }
 
-  private async applyConsumeResources(messageData: ItemCard): Promise<ItemCard> {
-    // TODO try to do dmls across all functions in a central place
+  private async applyConsumeResources(context: IDmlContext<ChatMessage>): Promise<void> {
     const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
     const consumeResourcesToToggle: ItemCard['items'][0]['consumeResources'] = [];
     const bulkUpdate: Parameters<typeof UtilsDocument['bulkUpdate']>[0] = [];
     {
       const promisesByUuid = new Map<string, Promise<{uuid: string, document: foundry.abstract.Document<any, any>}>>();
-      for (const item of messageData.items) {
-        for (const consumeResource of item.consumeResources) {
-          let shouldApply = false;
-          if (consumeResource.consumeResourcesAction === 'undo') {
-            shouldApply = false;
-          } else if (consumeResource.consumeResourcesAction === 'manual-apply') {
-            shouldApply = true;
-          } else {
-            switch (consumeResource.calc$.autoconsumeAfter) {
-              case 'init': {
-                shouldApply = true;
-                break;
-              }
-              case 'attack': {
-                shouldApply = item.attack?.calc$?.evaluatedRoll?.evaluated === true;
-                break;
-              }
-              case 'template-placed': {
-                shouldApply = item?.calc$.targetDefinition?.createdTemplateUuid != null;
-                break;
-              }
-              case 'damage': {
-                for (const damage of (item.damages ?? [])) {
-                  if (damage?.calc$.normalRoll?.evaluated === true || damage?.calc$.criticalRoll?.evaluated === true) {
-                    shouldApply = true;
-                    break;
-                  }
+      for (const {newRow, changedByUserId} of context.rows) {
+        const messageData = InternalFunctions.getItemCardData(newRow);
+        if (changedByUserId !== game.userId) {
+          // Only one user needs to do this operation
+          // TODO should happen before when async is possible
+          continue;
+        }
+        if (messageData == null) {
+          continue;
+        }
+        for (const item of messageData.items) {
+          for (const consumeResource of item.consumeResources) {
+            let shouldApply = false;
+            if (consumeResource.consumeResourcesAction === 'undo') {
+              shouldApply = false;
+            } else if (consumeResource.consumeResourcesAction === 'manual-apply') {
+              shouldApply = true;
+            } else {
+              switch (consumeResource.calc$.autoconsumeAfter) {
+                case 'init': {
+                  shouldApply = true;
+                  break;
                 }
-                break;
-              }
-              case 'check': {
-                for (const target of (item.targets ?? [])) {
-                  if (target?.check.calc$?.evaluatedRoll?.evaluated === true) {
-                    shouldApply = true;
-                    break;
-                  }
+                case 'attack': {
+                  shouldApply = item.attack?.calc$?.evaluatedRoll?.evaluated === true;
+                  break;
                 }
-                break;
+                case 'template-placed': {
+                  shouldApply = item?.calc$.targetDefinition?.createdTemplateUuid != null;
+                  break;
+                }
+                case 'damage': {
+                  for (const damage of (item.damages ?? [])) {
+                    if (damage?.calc$.normalRoll?.evaluated === true || damage?.calc$.criticalRoll?.evaluated === true) {
+                      shouldApply = true;
+                      break;
+                    }
+                  }
+                  break;
+                }
+                case 'check': {
+                  for (const target of (item.targets ?? [])) {
+                    if (target?.check.calc$?.evaluatedRoll?.evaluated === true) {
+                      shouldApply = true;
+                      break;
+                    }
+                  }
+                  break;
+                }
               }
             }
-          }
-          
-          if (shouldApply !== consumeResource.calc$.applied) {
-            consumeResourcesToToggle.push(consumeResource);
-            if (!promisesByUuid.has(consumeResource.calc$.uuid)) {
-              promisesByUuid.set(consumeResource.calc$.uuid, fromUuid(consumeResource.calc$.uuid).then(doc => {return {uuid: consumeResource.calc$.uuid, document: doc}}));
+            
+            if (shouldApply !== consumeResource.calc$.applied) {
+              consumeResourcesToToggle.push(consumeResource);
+              if (!promisesByUuid.has(consumeResource.calc$.uuid)) {
+                promisesByUuid.set(consumeResource.calc$.uuid, fromUuid(consumeResource.calc$.uuid).then(doc => {return {uuid: consumeResource.calc$.uuid, document: doc}}));
+              }
             }
           }
         }
@@ -2403,7 +2389,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
 
     if (consumeResourcesToToggle.length === 0) {
-      return null;
+      return;
     }
 
     const updatesByUuid = new Map<string, any>();
@@ -2432,8 +2418,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
 
     await UtilsDocument.bulkUpdate(bulkUpdate);
-
-    return messageData;
   }
 
   private forNewAndOld<T extends {[key: string]: any}>(newObj: T[] | null, oldObj: T[] | null): Array<[T, T | null]> {
@@ -2876,6 +2860,22 @@ class InternalFunctions {
       }
     }
     return true;
+  }
+  
+  public static getMessagesBefore(chatMessageId: string): ChatMessage[] {
+    const chatMessages: ChatMessage[] = [];
+    for (let messageIndex = game.messages.contents.length - 1; messageIndex >= 0; messageIndex--) {
+      const chatMessage = game.messages.contents[messageIndex];
+      if (chatMessage.id === chatMessageId) {
+        return chatMessages;
+      }
+      const data = InternalFunctions.getItemCardData(chatMessage);
+      if (!data) {
+        continue;
+      }
+      chatMessages.push(chatMessage);
+    }
+    return chatMessages;
   }
   
   public static getLatestMessage(): ChatMessage | null {
