@@ -1,6 +1,5 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
-import { ActiveEffectData, ItemData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
-import { TARGETS } from "pixi.js";
+import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 import { IDmlContext, DmlTrigger, IDmlTrigger, IAfterDmlContext } from "../lib/db/dml-trigger";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { provider } from "../provider/provider";
