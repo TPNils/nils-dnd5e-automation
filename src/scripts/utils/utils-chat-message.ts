@@ -12,6 +12,10 @@ import { UtilsDocument } from "../lib/db/utils-document";
 import { UtilsRoll } from "../lib/roll/utils-roll";
 import { TemplateDetails, UtilsTemplate } from "./utils-template";
 
+// TODO When HP is applied from a card, update all 'future' card HP snapshots of the applied tokens
+// TODO I really need modular item cards.
+//      It should be split into parts (attack+dmg & save & template & ...) so other items like 'bardic inspiration' or 'sneak attack' can add to the card
+
 export interface ItemCardActor {
   uuid: string;
   calc$?: {
@@ -426,6 +430,7 @@ export class UtilsChatMessage {
     const queriedItem = await UtilsDocument.itemFromUuid(item.uuid);
     itemCardData.calc$.level = queriedItem.data.data.level;
 
+    // TODO issue with @mod? maybe issue from an ohter module
     const rollData: {[key: string]: any} = actor == null ? {} : item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
       rollData.prof = item.data.data.prof.term;
