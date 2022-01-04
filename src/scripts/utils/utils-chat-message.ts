@@ -1673,7 +1673,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   }
 
   public async afterUpsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
-    this.applyActiveEffects(context);
+    await this.applyActiveEffects(context);
+    await this.recalcFutureHpSnapshots(context);
   }
 
   public afterUpdate(context: IAfterDmlContext<ChatMessage>): void {
@@ -2314,6 +2315,94 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     ChatMessage.updateDocuments(chatMessages.map(message => message.data));
   }
 
+  private async recalcFutureHpSnapshots(context: IDmlContext<ChatMessage>): Promise<void> {
+    let latestAppliedHp: ChatMessage;
+    const recalcTargetUuid = new Set<string>();
+    for (const {newRow, oldRow, changedByUserId} of context.rows) {
+      if (changedByUserId !== game.userId) {
+        continue;
+      }
+
+      const itemData = InternalFunctions.getItemCardData(newRow);
+      if (!itemData) {
+        continue;
+      }
+      const oldItemData = InternalFunctions.getItemCardData(oldRow);
+
+      const newAppliedUuids = new Set<string>();
+      for (const target of itemData.items.map(item => item.targets ?? []).deepFlatten()) {
+        if (target.applyDmg) {
+          newAppliedUuids.add(target.uuid);
+        }
+      }
+      const oldAppliedUuids = new Set<string>();
+      for (const target of (oldItemData?.items ?? []).map(item => item.targets ?? []).deepFlatten()) {
+        if (target.applyDmg) {
+          oldAppliedUuids.add(target.uuid);
+        }
+      }
+      console.log({newAppliedUuids, oldAppliedUuids})
+      const allUuids = new Set<string>([...Array.from(newAppliedUuids), ...Array.from(oldAppliedUuids)]);
+      for (const uuid of allUuids) {
+        if (newAppliedUuids.has(uuid) !== oldAppliedUuids.has(uuid)) {
+          recalcTargetUuid.add(uuid);
+          if (latestAppliedHp == null || newRow.data.timestamp < latestAppliedHp.data.timestamp) {
+            latestAppliedHp = newRow;
+          }
+        }
+      }
+    }
+
+    console.log('latestAppliedHp', latestAppliedHp, recalcTargetUuid);
+
+    if (!latestAppliedHp) {
+      return;
+    }
+
+    const futureChatMessages: ChatMessage[] = [];
+    for (let messageIndex = game.messages.contents.length - 1; messageIndex >= 0; messageIndex--) {
+      const chatMessage = game.messages.contents[messageIndex];
+      if (chatMessage.id === latestAppliedHp.id) {
+        break;
+      }
+      const data = InternalFunctions.getItemCardData(chatMessage);
+      if (!data) {
+        continue;
+      }
+      let hasFinalHp = false;
+      for (const item of data.items) {
+        for (const target of item.targets ?? []) {
+          if (target.applyDmg) {
+            hasFinalHp = true;
+          }
+        }
+      }
+      if (hasFinalHp) {
+        continue;
+      }
+      futureChatMessages.push(chatMessage);
+    }
+    console.log('futureChatMessages', futureChatMessages);
+
+    const tokensByUuid = await UtilsDocument.tokenFromUuid(recalcTargetUuid);
+    for (const chatMessage of futureChatMessages) {
+      const data = InternalFunctions.getItemCardData(chatMessage);
+      for (const item of data.items) {
+        for (const target of item.targets ?? []) {
+          const actor: MyActor = tokensByUuid.get(target.uuid).getActor();
+          target.calc$.hpSnapshot = {
+            hp: actor.data.data.attributes.hp.value,
+            maxHp: actor.data.data.attributes.hp.max,
+            temp: actor.data.data.attributes.hp.temp,
+          }
+        }
+      }
+      InternalFunctions.setItemCardData(chatMessage, data);
+    }
+
+    await UtilsDocument.bulkUpdate(futureChatMessages.map(c => {return {document: c, data: c.data}}));
+  }
+
   private async applyConsumeResources(context: IDmlContext<ChatMessage>): Promise<void> {
     const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
     const consumeResourcesToToggle: ItemCard['items'][0]['consumeResources'] = [];
@@ -2860,22 +2949,6 @@ class InternalFunctions {
       }
     }
     return true;
-  }
-  
-  public static getMessagesBefore(chatMessageId: string): ChatMessage[] {
-    const chatMessages: ChatMessage[] = [];
-    for (let messageIndex = game.messages.contents.length - 1; messageIndex >= 0; messageIndex--) {
-      const chatMessage = game.messages.contents[messageIndex];
-      if (chatMessage.id === chatMessageId) {
-        return chatMessages;
-      }
-      const data = InternalFunctions.getItemCardData(chatMessage);
-      if (!data) {
-        continue;
-      }
-      chatMessages.push(chatMessage);
-    }
-    return chatMessages;
   }
   
   public static getLatestMessage(): ChatMessage | null {
