@@ -11,7 +11,6 @@ import { UtilsDocument } from "../lib/db/utils-document";
 import { UtilsRoll } from "../lib/roll/utils-roll";
 import { TemplateDetails, UtilsTemplate } from "./utils-template";
 
-// TODO When HP is applied from a card, update all 'future' card HP snapshots of the applied tokens
 // TODO I really need modular item cards.
 //      It should be split into parts (attack+dmg & save & template & ...) so other items like 'bardic inspiration' or 'sneak attack' can add to the card
 
