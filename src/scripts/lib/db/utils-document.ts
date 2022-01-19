@@ -27,7 +27,7 @@ export class UtilsDocument {
   public static actorFromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, MyActor>
   public static actorFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): MyActor | Map<string, MyActor> | Promise<MyActor> | Promise<Map<string, MyActor>> {
     let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
-    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
       for (let document of response.values()) {
         if (document.documentName === (TokenDocument as any).documentName) {
           document = (document as TokenDocument).getActor();
@@ -47,7 +47,7 @@ export class UtilsDocument {
   public static tokenFromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, TokenDocument>
   public static tokenFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): TokenDocument | Map<string, TokenDocument> | Promise<TokenDocument> | Promise<Map<string, TokenDocument>> {
     let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
-    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
       for (let document of response.values()) {
         if (document.documentName !== (TokenDocument as any).documentName) {
           throw new Error(`UUID '${document.uuid}' is not an ${(TokenDocument as any).documentName}. In stead found: ${document.documentName}`)
@@ -63,7 +63,7 @@ export class UtilsDocument {
   public static activeEffectFromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, ActiveEffect>
   public static activeEffectFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): ActiveEffect | Map<string, ActiveEffect> | Promise<ActiveEffect> | Promise<Map<string, ActiveEffect>> {
     let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
-    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
       for (let document of response.values()) {
         if (document.documentName !== (ActiveEffect as any).documentName) {
           throw new Error(`UUID '${document.uuid}' is not an ${(ActiveEffect as any).documentName}. In stead found: ${document.documentName}`)
@@ -79,7 +79,7 @@ export class UtilsDocument {
   public static itemFromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, MyItem>
   public static itemFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): MyItem | Map<string, MyItem> | Promise<MyItem> | Promise<Map<string, MyItem>> {
     let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
-    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
       for (let document of response.values()) {
         if (document.documentName !== (Item as any).documentName) {
           throw new Error(`UUID '${document.uuid}' is not an ${(Item as any).documentName}. In stead found: ${document.documentName}`)
@@ -95,7 +95,7 @@ export class UtilsDocument {
   public static sceneFromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, Scene>
   public static sceneFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): Scene | Map<string, Scene> | Promise<Scene> | Promise<Map<string, Scene>> {
     let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
-    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
       for (let document of response.values()) {
         if (document.documentName !== (Scene as any).documentName) {
           throw new Error(`UUID '${document.uuid}' is not an ${(Scene as any).documentName}. In stead found: ${document.documentName}`)
@@ -111,7 +111,7 @@ export class UtilsDocument {
   public static templateFromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, MeasuredTemplateDocument>
   public static templateFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): MeasuredTemplateDocument | Map<string, MeasuredTemplateDocument> | Promise<MeasuredTemplateDocument> | Promise<Map<string, MeasuredTemplateDocument>> {
     let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
-    return new MaybePromise(UtilsDocument.fromUuid(uuids, options as any)).then(response => {
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
       for (let document of response.values()) {
         if (document.documentName !== (MeasuredTemplateDocument as any).documentName) {
           throw new Error(`UUID '${document.uuid}' is not an ${(MeasuredTemplateDocument as any).documentName}. In stead found: ${document.documentName}`)
@@ -120,10 +120,22 @@ export class UtilsDocument {
       return typeof inputUuid === 'string' ? response.get(inputUuid) : response;
     }).getValue() as any;
   }
+  
+  
+  public static fromUuid(inputUuid: string): Promise<foundry.abstract.Document<any, any>>
+  public static fromUuid(inputUuid: Iterable<string>, options?: {sync?: false}): Promise<Map<string, foundry.abstract.Document<any, any>>>
+  public static fromUuid(inputUuid: string, options: {sync: true}): foundry.abstract.Document<any, any>
+  public static fromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, foundry.abstract.Document<any, any>>
+  public static fromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): foundry.abstract.Document<any, any> | Map<string, foundry.abstract.Document<any, any>> | Promise<foundry.abstract.Document<any, any>> | Promise<Map<string, foundry.abstract.Document<any, any>>> {
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
+      return typeof inputUuid === 'string' ? response.get(inputUuid) : response;
+    }).getValue() as any;
+  }
 
-  private static fromUuid(uuids: Iterable<string>): Promise<Map<string, FoundryDocument>>
-  private static fromUuid(uuids: Iterable<string>, options: {sync: true}): Map<string, FoundryDocument>
-  private static fromUuid(uuids: Iterable<string>, options: {sync?: boolean} = {}): Promise<Map<string, FoundryDocument>> | Map<string, FoundryDocument> {
+  private static fromUuidInternal(uuids: Iterable<string>): Promise<Map<string, FoundryDocument>>
+  private static fromUuidInternal(uuids: Iterable<string>, options: {sync: true}): Map<string, FoundryDocument>
+  private static fromUuidInternal(uuids: Iterable<string>, options: {sync?: boolean} = {}): Promise<Map<string, FoundryDocument>> | Map<string, FoundryDocument> {
     // Fixes map keyset iterators, maybe you can only iterate them onces? not sure why it breaks without converting
     uuids = Array.from(new Set<string>(uuids));
     const getIdsPerPack = new Map<string, string[]>();
