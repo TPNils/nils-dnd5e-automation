@@ -189,39 +189,9 @@ export class UtilsChatMessage {
       execute: ({messageId}) => UtilsChatMessage.toggleCollapse(messageId),
     },
     {
-      regex: /^item-([0-9]+)-damage-([0-9]+)$/,
-      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({clickEvent, regexResult, messageData, messageId}) => UtilsChatMessage.processItemDamage(clickEvent, Number(regexResult[1]), Number(regexResult[2]), messageData, messageId),
-    },
-    {
-      regex: /^item-([0-9]+)-damage-([0-9]+)-mode-(minus|plus)$/,
-      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({clickEvent, regexResult, messageData, messageId}) => UtilsChatMessage.processItemDamageMode(clickEvent, Number(regexResult[1]), Number(regexResult[2]), regexResult[3] as ('plus' | 'minus'), messageData, messageId),
-    },
-    {
-      regex: /^item-([0-9]+)-damage-([0-9]+)-bonus$/,
-      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({keyEvent, regexResult, inputValue, messageData, messageId}) => UtilsChatMessage.processItemDamageBonus(keyEvent, Number(regexResult[1]), Number(regexResult[2]), inputValue as string, messageData, messageId),
-    },
-    {
-      regex: /^item-([0-9]+)-attack$/,
-      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemAttack(clickEvent, Number(regexResult[1]), messageData),
-    },
-    {
-      regex: /^item-([0-9]+)-attack-bonus$/,
-      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({keyEvent, regexResult, inputValue, messageData}) => UtilsChatMessage.processItemAttackBonus(keyEvent, Number(regexResult[1]), inputValue as string, messageData),
-    },
-    {
       regex: /^item-([0-9]+)-upcastlevel$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, inputValue, messageData}) => UtilsChatMessage.upcastlevelChange(Number(regexResult[1]), inputValue as string, messageData),
-    },
-    {
-      regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
-      permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({clickEvent, regexResult, messageData}) => UtilsChatMessage.processItemAttackMode(clickEvent, Number(regexResult[1]), regexResult[2] as ('plus' | 'minus'), messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)$/,
@@ -432,160 +402,6 @@ export class UtilsChatMessage {
     const rollData: {[key: string]: any} = actor == null ? {} : item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
       rollData.prof = item.data.data.prof.term;
-    }
-    // attack
-    if (['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
-      const bonus = ['@mod'];
-
-      // Add proficiency bonus if an explicit proficiency flag is present or for non-item features
-      if ( !["weapon", "consumable"].includes(item.data.data.type) || item.data.proficient ) {
-        bonus.push("@prof");
-      }
-
-      // Item bonus
-      if (item.data.data.attackBonus) {
-        bonus.push(String(item.data.data.attackBonus));
-      }
-
-      // Actor bonus
-      const actorBonus = actor?.data.data.bonuses?.[item.data.data.actionType]?.attack;
-      if (actorBonus) {
-        bonus.push(actorBonus);
-      }
-
-      // One-time bonus provided by consumed ammunition
-      if ( (item.data.data.consume?.type === 'ammo') && !!actor?.items ) {
-        const ammoItemData = actor.items.get(item.data.data.consume.target)?.data;
-
-        if (ammoItemData) {
-          const ammoItemQuantity = ammoItemData.data.quantity;
-          const ammoCanBeConsumed = ammoItemQuantity && (ammoItemQuantity - (item.data.data.consume.amount ?? 0) >= 0);
-          const ammoItemAttackBonus = ammoItemData.data.attackBonus;
-          const ammoIsTypeConsumable = ammoItemData.type === "consumable" && ammoItemData.data.consumableType === "ammo";
-          if ( ammoCanBeConsumed && ammoItemAttackBonus && ammoIsTypeConsumable ) {
-            bonus.push(`${ammoItemAttackBonus}[ammo]`);
-          }
-        }
-      }
-
-      itemCardData.attack = {
-        mode: 'normal',
-        phase: 'mode-select',
-        userBonus: "",
-        calc$: {
-          rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
-          critTreshold: 20
-        }
-      };
-
-      let critTreshold = item.data.data.critical?.threshold ?? itemCardData.attack.calc$.critTreshold;
-      const actorDnd5eFlags = actor?.data?.flags?.dnd5e;
-      if (item.type === 'weapon' && actorDnd5eFlags?.weaponCriticalThreshold != null) {
-        critTreshold = Math.min(critTreshold, actor.data.flags.dnd5e.weaponCriticalThreshold);
-      }
-      if (item.type === 'spell' && actorDnd5eFlags?.spellCriticalThreshold != null) {
-        critTreshold = Math.min(critTreshold, actor.data.flags.dnd5e.spellCriticalThreshold);
-      }
-      itemCardData.attack.calc$.critTreshold = critTreshold;
-
-    }
-
-    // damage
-    {
-      const inputDamages: Array<Omit<ItemCardItem['damages'][0], 'damageTypes' | 'displayFormula'>> = [];
-      // Main damage
-      const damageParts = item.data.data.damage?.parts;
-      let mainDamage: typeof inputDamages[0];
-      if (damageParts && damageParts.length > 0) {
-        mainDamage = {
-          mode: 'normal',
-          phase: 'mode-select',
-          userBonus: "",
-          calc$: {
-            label: 'DND5E.Damage',
-            baseRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON(),
-          }
-        }
-        // Consider it healing if all damage types are healing
-        const isHealing = damageParts.filter(roll => InternalFunctions.healingDamageTypes.includes(roll[1])).length === damageParts.length;
-        if (isHealing) {
-          mainDamage.calc$.label = 'DND5E.Healing';
-        }
-        inputDamages.push(mainDamage);
-      }
-
-      // Versatile damage
-      if (mainDamage && item.data.data.damage?.versatile) {
-        const versatileDamage = deepClone(mainDamage);
-        versatileDamage.calc$.label = 'DND5E.Versatile';
-        versatileDamage.calc$.baseRoll = new Roll(item.data.data.damage.versatile, rollData).toJSON();
-        inputDamages.push(versatileDamage);
-      }
-  
-      // Spell scaling
-      const scaling = item.data.data.scaling;
-      if (scaling?.mode === 'level' && scaling.formula) {
-        const scalingRollJson: RollJson = new Roll(scaling.formula, rollData).toJSON();
-        if (inputDamages.length === 0) {
-          // when only dealing damage by upcasting? not sure if that ever happens
-          inputDamages.push({
-            mode: 'normal',
-            phase: 'mode-select',
-            userBonus: "",
-            calc$: {
-              label: 'DND5E.Damage',
-              baseRoll: new Roll('0').toJSON(),
-            }
-          });
-        }
-        for (const damage of inputDamages) {
-          damage.calc$.upcastRoll = scalingRollJson;
-        }
-      } else if (scaling?.mode === 'cantrip' && actor) {
-        let actorLevel = 0;
-        if (actor.type === "character") {
-          actorLevel = actor.data.data.details.level;
-        } else if (item.data.data.preparation.mode === "innate") {
-          actorLevel = Math.ceil(actor.data.data.details.cr);
-        } else {
-          actorLevel = actor.data.data.details.spellLevel;
-        }
-        const applyScalingXTimes = Math.floor((actorLevel + 1) / 6);
-
-        if (applyScalingXTimes > 0) {
-          if (inputDamages.length === 0) {
-            // when only dealing damage by upcasting? not sure if that ever happens
-            inputDamages.push({
-              mode: 'normal',
-              phase: 'mode-select',
-              userBonus: "",
-              calc$: {
-                label: 'DND5E.Damage',
-                baseRoll: new Roll('0').toJSON(),
-              }
-            });
-          }
-  
-          for (const damage of inputDamages) {
-            // DND5e spell compendium has cantrip formula empty => default to the base damage formula
-            const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? damage.calc$.baseRoll.formula : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
-            // Override normal roll since cantrip scaling is static, not dynamic like level scaling
-            damage.calc$.baseRoll = UtilsRoll.mergeRolls(Roll.fromJSON(JSON.stringify(damage.calc$.baseRoll)), scalingRoll).toJSON();
-          }
-        }
-      }
-      
-      // Add damage bonus formula
-      if (inputDamages.length > 0) {
-        const actorBonus = actor.data.data.bonuses?.[item.data.data.actionType];
-        if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
-          for (const damage of inputDamages) {
-            damage.calc$.actorBonusRoll = new Roll(actorBonus.damage, rollData).toJSON();
-          }
-        }
-      }
-      
-      itemCardData.damages = inputDamages;
     }
 
     // Saving throw
@@ -1002,153 +818,6 @@ export class UtilsChatMessage {
   }
   //#endregion
 
-  //#region attack
-  private static async processItemAttack(event: ClickEvent, itemIndex: number, messageData: ItemCard): Promise<void | ItemCard> {
-    const attack = messageData.items?.[itemIndex]?.attack;
-    if (!attack || attack.phase === 'result') {
-      return;
-    }
-
-    const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
-    if (event.shiftKey) {
-      attack.phase = orderedPhases[orderedPhases.length - 1];
-    } else {
-      attack.phase = orderedPhases[orderedPhases.indexOf(attack.phase) + 1];
-    }
-
-    if (orderedPhases.indexOf(attack.phase) === orderedPhases.length - 1) {
-      const response = await UtilsChatMessage.processItemAttackRoll(itemIndex, messageData);
-      if (response) {
-        return response;
-      }
-    }
-
-    return messageData;
-  }
-  
-  private static async processItemAttackBonus(keyEvent: KeyEvent | null, itemIndex: number, attackBonus: string, messageData: ItemCard): Promise<void | ItemCard> {
-    const attack = messageData.items?.[itemIndex]?.attack;
-    if (!attack || attack.calc$.evaluatedRoll?.evaluated || attack.phase === 'result') {
-      return;
-    }
-
-    const oldPhase = attack.phase;
-    const oldBonus = attack.userBonus;
-    if (attackBonus) {
-      attack.userBonus = attackBonus;
-    } else {
-      attack.userBonus = "";
-    }
-
-    if (attack.userBonus && !Roll.validate(attack.userBonus) && keyEvent) {
-      // Only show error on key press
-      throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-    }
-
-    if (keyEvent?.key === 'Enter') {
-      const response = await UtilsChatMessage.processItemAttackRoll(itemIndex, messageData);
-      if (response) {
-        return response;
-      }
-    } else if (keyEvent?.key === 'Escape') {
-      attack.phase = 'mode-select';
-    }
-
-    if (attack.userBonus !== oldBonus || attack.phase !== oldPhase) {
-      return messageData;
-    }
-  }
-
-  private static async processItemAttackRoll(itemIndex: number, messageData: ItemCard): Promise<void | ItemCard> {
-    const attack = messageData.items?.[itemIndex]?.attack;
-    if (!attack || attack.calc$.evaluatedRoll) {
-      return;
-    }
-    
-    const actor: MyActor = messageData.token?.uuid == null ? null : (await UtilsDocument.tokenFromUuid(messageData.token?.uuid)).getActor();
-    let baseRoll = new Die();
-    baseRoll.faces = 20;
-    baseRoll.number = 1;
-    switch (attack.mode) {
-      case 'advantage': {
-        baseRoll.number = 2;
-        baseRoll.modifiers.push('kh');
-        break;
-      }
-      case 'disadvantage': {
-        baseRoll.number = 2;
-        baseRoll.modifiers.push('kl');
-        break;
-      }
-    }
-    if (actor && actor.getFlag("dnd5e", "halflingLucky")) {
-      // reroll a base roll 1 once
-      // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
-      // second 2 = reroll when the roll result is equal to 1 (=1)
-      baseRoll.modifiers.push('r1=1');
-    }
-    const parts: string[] = [baseRoll.formula];
-    if (attack.calc$.rollBonus) {
-      parts.push(attack.calc$.rollBonus);
-    }
-    
-    if (attack.userBonus && Roll.validate(attack.userBonus)) {
-      parts.push(attack.userBonus);
-    }
-
-    const roll = await UtilsRoll.simplifyRoll(new Roll(parts.join(' + '))).roll({async: true});
-    UtilsDiceSoNice.showRoll({roll: roll});
-    attack.calc$.evaluatedRoll = roll.toJSON();
-    attack.phase = 'result';
-
-    const baseRollResult = (attack.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
-    attack.calc$.isCrit = baseRollResult.result >= attack.calc$.critTreshold;
-
-    if (attack.calc$.isCrit) {
-      for (const dmg of messageData.items?.[itemIndex].damages ?? []) {
-        if (dmg.phase === 'mode-select') {
-          dmg.mode = 'critical';
-        }
-      }
-    }
-
-    return messageData;
-  }
-
-  private static async processItemAttackMode(event: ClickEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCard): Promise<void | ItemCard> {
-    const attack = messageData.items[itemIndex].attack;
-    let modifier = modName === 'plus' ? 1 : -1;
-    if (event.shiftKey && modifier > 0) {
-      modifier++;
-    } else if (event.shiftKey && modifier < 0) {
-      modifier--;
-    }
-    
-    const order: Array<typeof attack.mode> = ['disadvantage', 'normal', 'advantage'];
-    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(attack.mode) + modifier));
-    if (attack.mode === order[newIndex]) {
-      return;
-    }
-    attack.mode = order[newIndex];
-
-    if (event.shiftKey) {
-      const response = await UtilsChatMessage.processItemAttackRoll(itemIndex, messageData);
-      if (response) {
-        messageData = response;
-      }
-    }
-    
-    if (!attack.calc$.evaluatedRoll) {
-      return messageData;
-    }
-
-    const originalRoll = Roll.fromJSON(JSON.stringify(attack.calc$.evaluatedRoll));
-    attack.calc$.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, attack.mode)).toJSON();
-
-    return messageData;
-  }
-  //#endregion
-
   //#region check
   private static async processItemCheck(event: ClickEvent, itemIndex: number, targetUuid: string, messageData: ItemCard): Promise<void | ItemCard> {
     const itemCheck = messageData.items?.[itemIndex]?.calc$?.check;
@@ -1314,69 +983,6 @@ export class UtilsChatMessage {
   //#endregion
 
   //#region damage
-  private static async processItemDamage(event: ClickEvent, itemIndex: number, damageIndex: number, messageData: ItemCard, messageId: string): Promise<void | ItemCard> {
-    const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
-    if (!dmg || dmg.phase === 'result') {
-      return;
-    }
-
-    const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
-    if (event.shiftKey) {
-      dmg.phase = orderedPhases[orderedPhases.length - 1];
-    } else {
-      dmg.phase = orderedPhases[orderedPhases.indexOf(dmg.phase) + 1];
-    }
-
-    return messageData;
-  }
-
-  private static async processItemDamageMode(event: ClickEvent, itemIndex: number, damageIndex: number, modName: 'plus' | 'minus', messageData: ItemCard, messageId: string): Promise<void | ItemCard> {
-    const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
-    let modifier = modName === 'plus' ? 1 : -1;
-    
-    const order: Array<ItemCardItem['damages'][0]['mode']> = ['normal', 'critical'];
-    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(dmg.mode) + modifier));
-    if (dmg.mode === order[newIndex]) {
-      return;
-    }
-    dmg.mode = order[newIndex];
-
-    if (event.shiftKey || (dmg.calc$?.normalRoll?.evaluated && (dmg.mode === 'critical' && !dmg.calc$?.criticalRoll?.evaluated))) {
-      dmg.phase = 'result';
-    }
-    return messageData;
-  }
-  
-  private static async processItemDamageBonus(keyEvent: KeyEvent | null, itemIndex: number, damageIndex: number, damageBonus: string, messageData: ItemCard, messageId: string): Promise<void | ItemCard> {
-    const dmg = messageData.items?.[itemIndex]?.damages?.[damageIndex];
-    if (!dmg || dmg.calc$?.normalRoll?.evaluated || dmg.phase === 'result') {
-      return;
-    }
-
-    const oldPhase = dmg.phase;
-    const oldBonus = dmg.userBonus;
-    if (damageBonus) {
-      dmg.userBonus = damageBonus;
-    } else {
-      dmg.userBonus = "";
-    }
-
-    if (dmg.userBonus && !Roll.validate(dmg.userBonus) && keyEvent) {
-      // Only show error on key press
-      throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-    }
-
-    if (keyEvent?.key === 'Enter') {
-      dmg.phase = 'result';
-    } else if (keyEvent?.key === 'Escape') {
-      dmg.phase = 'mode-select';
-    }
-
-    if (dmg.userBonus !== oldBonus || dmg.phase !== oldPhase) {
-      return messageData;
-    }
-  }
-  
   private static async applyDamage(tokenUuid: (string | '*')[], messageData: ItemCard, messageId: string): Promise<void | ItemCard> {
     if (!messageData.calc$?.targetAggregate) {
       return;
@@ -1704,10 +1310,8 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       await this.setTargets(context);
       await this.calcTargets(context);
       await this.applyConsumeResources(context);
-      this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
       this.calcCanChangeSpellLevel(itemCards);
-      await this.calcDamageRoll(context);
       await this.calcConsumeResources(context);
       await this.calculateTargetResult(itemCards)
     }
@@ -1925,38 +1529,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
   
-  private calcItemCardDamageFormulas(chatMessages: ChatMessage[]): void {
-    for (const chatMessage of chatMessages) {
-      const data: ItemCard = InternalFunctions.getItemCardData(chatMessage);
-      for (const item of data.items) {
-        if (!item.damages) {
-          continue;
-        }
-
-        item.damages = item.damages.map(damage => {
-          // Diplay formula
-          let displayFormula = damage.mode === 'critical' ? damage?.calc$.criticalRoll?.formula : damage?.calc$.normalRoll?.formula;
-          const damageTypes: DamageType[] = [];
-          if (displayFormula) {
-            for (const damageType of UtilsRoll.getValidDamageTypes()) {
-              if (displayFormula.match(`\\[${damageType}\\]`)) {
-                damageTypes.push(damageType);
-                displayFormula = displayFormula.replace(new RegExp(`\\[${damageType}\\]`, 'g'), '');
-              }
-            }
-          }
-    
-          return {
-            ...damage,
-            displayFormula: displayFormula,
-            displayDamageTypes: damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined
-          };
-        });
-      }
-      InternalFunctions.setItemCardData(chatMessage, data);
-    }
-  }
-  
   private calcItemCardCanChangeTargets(chatMessages: ChatMessage[]): void {
     for (const chatMessage of chatMessages) {
       const data: ItemCard = InternalFunctions.getItemCardData(chatMessage);
@@ -2048,85 +1620,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       InternalFunctions.setItemCardData(newRow, data);
     }
   }
-
-  private async calcDamageRoll(context: IDmlContext<ChatMessage>): Promise<void> {
-    for (const {newRow} of context.rows) {
-      const data = InternalFunctions.getItemCardData(newRow);
-      
-      for (const item of data.items) {
-        for (const dmg of item.damages ?? []) {
-          if (dmg.phase === 'result') {
-            const normalRollEvaluated = !!dmg.calc$.normalRoll?.evaluated;
-            const criticalRollEvaluated = !!dmg.calc$.criticalRoll?.evaluated;
-            let normalRollFormula: string;
-            let normalRollPromise: Promise<Roll>;
-            if (normalRollEvaluated) {
-              normalRollFormula = dmg.calc$.normalRoll.formula;
-              normalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.calc$.normalRoll)));
-            } else {
-              const dmgParts: MyItemData['data']['damage']['parts'] = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.calc$.baseRoll)));
-              const upcastLevel = Math.max(item.calc$?.level, item.selectedlevel === 'pact' ? (data.actor?.calc$?.pactLevel ?? 0) : item.selectedlevel);
-              if (upcastLevel > item.calc$.level) {
-                if (dmg.calc$?.upcastRoll) {
-                  const upcastRoll = Roll.fromJSON(JSON.stringify(dmg.calc$?.upcastRoll)).alter(upcastLevel - item.calc$?.level, 0, {multiplyNumeric: true})
-                  dmgParts.push(...UtilsRoll.rollToDamageParts(upcastRoll));
-                }
-              }
-              if (dmg.calc$.actorBonusRoll) {
-                dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.calc$.actorBonusRoll))))
-              }
-              if (dmg.userBonus) {
-                dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.userBonus))))
-              }
-              
-              const normalRoll = UtilsRoll.simplifyRoll(UtilsRoll.damagePartsToRoll(dmgParts));
-              normalRollFormula = normalRoll.formula;
-              normalRollPromise = normalRoll.roll({async: true});
-            }
-        
-            let criticalRollPromise: Promise<Roll | false>;
-            if (criticalRollEvaluated) {
-              criticalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.calc$.criticalRoll)));
-            } else if (dmg.mode === 'critical') {
-              criticalRollPromise = UtilsRoll.getCriticalBonusRoll(new Roll(normalRollFormula)).roll({async: true});
-            } else {
-              criticalRollPromise = Promise.resolve(false);
-            }
-        
-            const [normalResolved, critBonusResolved] = await Promise.all([normalRollPromise, criticalRollPromise]);
-            const newRolls: Roll[] = [];
-            if (!normalRollEvaluated) {
-              newRolls.push(normalResolved);
-              dmg.calc$.normalRoll = normalResolved.toJSON();
-            }
-            if (!criticalRollEvaluated && critBonusResolved instanceof Roll) {
-              newRolls.push(critBonusResolved);
-              dmg.calc$.criticalRoll = UtilsRoll.mergeRolls(normalResolved, critBonusResolved).toJSON();
-            }
-        
-            if (newRolls.length > 0) {
-              // Don't await for the roll animation to finish
-              UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...newRolls)});
-            }
-            
-            // Auto apply healing since it very rarely gets modified
-            const damageTypes = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(dmg.calc$.criticalRoll?.evaluated ? dmg.calc$.criticalRoll : dmg.calc$.normalRoll)));
-            let isHealing = true;
-            for (const type of damageTypes.keys()) {
-              if (!InternalFunctions.healingDamageTypes.includes(type)) {
-                isHealing = false;
-                break;
-              }
-            }
-        
-            if (isHealing && item.targets) {
-              // TODO auto apply healing, but it needs to be sync?
-            }
-          }
-        }
-      }
-    }
-  }
   
   private onBonusChange(context: IDmlContext<ChatMessage>): void {
     for (const {newRow, oldRow, changedByUserId} of context.rows) {
@@ -2144,15 +1637,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
           return;
         }
 
-        for (let dmgIndex = 0; dmgIndex < item.damages?.length; dmgIndex++) {
-          const dmg = item.damages[dmgIndex];
-          const oldDmg = oldItem?.damages?.[dmgIndex];
-          
-          if (dmg?.phase === 'bonus-input' && oldDmg?.phase !== 'bonus-input') {
-            MemoryStorageService.setFocusedElementSelector(`.${staticValues.moduleName}-item-${itemIndex}-damage-${dmgIndex} input.${staticValues.moduleName}-bonus`);
-            return;
-          }
-        }
         for (let targetIndex = 0; targetIndex < item.targets?.length; targetIndex++) {
           const target = item.targets[targetIndex];
           const oldTarget = oldItem?.targets?.[targetIndex];

@@ -1,0 +1,36 @@
+<div class="{{@root.moduleName}}-attack">
+  <div class="{{@root.moduleName}}-flavor">
+    {{#if @root.data.calc$.evaluatedRoll}}
+      {{ localize (nacConcat "DND5E." (nacCapitalize @root.data.mode)) }}
+    {{/if}}
+  </div>
+  <div class="{{@root.moduleName}}-roll-wrapper">
+    {{#if (eq @root.data.phase "result")}}
+      <div>
+        {{> modules/nils-automated-compendium/templates/roll/roll.hbs 
+          roll=@root.data.calc$.evaluatedRoll
+          highlightTotalOnFirstTerm=true
+          overrideMaxRoll=@root.data.calc$.critTreshold
+        }}
+      </div>
+    {{else}}
+      <div class="{{@root.moduleName}}-bonus-container">
+        <button data-{{@root.moduleName}}-action="item-{{itemIndex}}-attack" class="{{@root.moduleName}}-item-attack" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" @root.data.actor.uuid)}}disabled{{/nacMisPerm}}>
+          {{#if (eq @root.data.mode 'normal')}}
+            {{#if @root.data.calc$.label}}{{@root.data.calc$.label}}{{else}}{{localize "DND5E.Attack"}}{{/if}}
+          {{else}}
+            {{ localize (nacConcat "DND5E." (nacCapitalize @root.data.mode)) }}
+          {{/if}}
+        </button>
+        
+        {{#if (and (eq @root.data.phase "bonus-input") (nacPerm (nacConcat "ActorOwnerUuid:" @root.data.actor.uuid)) )}}
+          <input class="{{@root.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{@root.data.userBonus}}" data-{{@root.moduleName}}-action="item-{{itemIndex}}-attack-bonus" {{#nacMisPerm (nacConcat "ActorOwnerUuid:" @root.data.actor.uuid)}}disabled{{/nacMisPerm}}/>
+        {{/if}}
+      </div>
+    {{/if}}
+    {{#nacPerm (nacConcat "ActorOwnerUuid:" @root.data.actor.uuid)}}
+      <button data-{{@root.moduleName}}-action="item-{{itemIndex}}-attack-mode-minus" class="{{@root.moduleName}}-mode-minus" {{#if (eq @root.data.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+      <button data-{{@root.moduleName}}-action="item-{{itemIndex}}-attack-mode-plus" class="{{@root.moduleName}}-mode-plus" {{#if (eq @root.data.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+    {{/nacPerm}}
+  </div>
+</div>
