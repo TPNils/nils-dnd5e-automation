@@ -323,6 +323,47 @@ export class UtilsRoll {
     return Roll.fromTerms(baseTerms.map(t => RollTerm.fromJSON(JSON.stringify(t.toJSON()))));
   }
 
+  public static rollUnrolledTerms(terms: RollTerm[], options?: Partial<RollTerm.EvaluationOptions> & {async: false}): {results: RollTerm[], newRolls?: RollTerm[]}
+  public static rollUnrolledTerms(terms: RollTerm[], options?: Partial<RollTerm.EvaluationOptions> & {async: true}): Promise<{results: RollTerm[], newRolls?: RollTerm[]}>
+  public static rollUnrolledTerms(terms: RollTerm[], options?: Partial<RollTerm.EvaluationOptions>): {results: RollTerm[], newRolls?: RollTerm[]} | Promise<{results: RollTerm[], newRolls?: RollTerm[]}> {
+    const termResults$: Array<RollTerm | Promise<RollTerm>> = [];
+    const newRolledTerms$: Array<RollTerm | Promise<RollTerm>> = [];
+
+    // TODO allow dice terms to increase their nr of dice (for simplifying crits)
+    for (let i = 0; i < terms.length; i++) {
+      if (!(terms[i] as any)._evaluated) {
+        // TODO evaluate the terms using the Roll class
+        //  If an other module sends the rolls to an external service, you don't want it to send each individual term
+        //  or cause a bug and it wont be send at all
+        //  These modules will most likely hook into the Roll class
+        const result = terms[i].evaluate(options);
+        newRolledTerms$.push(result);
+        termResults$.push(result);
+      } else {
+        termResults$.push(terms[i]);
+      }
+    }
+
+    if (options.async === false) {
+      if (newRolledTerms$.length > 0) {
+        return {results: termResults$ as RollTerm[], newRolls: newRolledTerms$ as RollTerm[]};
+      } else {
+        return {results: termResults$ as RollTerm[]};
+      }
+    }
+
+    return Promise.all([
+      Promise.all(termResults$),
+      Promise.all(newRolledTerms$),
+    ]).then(([termResults, newRolledTerms]) => {
+      if (newRolledTerms.length > 0) {
+        return {results: termResults, newRolls: newRolledTerms};
+      } else {
+        return {results: termResults};
+      }
+    });
+  }
+
   public static simplifyRoll(roll: Roll): Roll {
     let terms: (RollTerm & {operator?: string})[] = [];
     for (const term of roll.terms as (RollTerm & {operator?: string})[]) {
