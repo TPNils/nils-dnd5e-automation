@@ -20,15 +20,23 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
    * 
    * Hooked functions may modify that data
    * 
-   * @returns Explicitly return false to prevent update of this Document
+   * @returns Explicitly return false to prevent the update of this Document
    */
   beforeUpdate?(context: IDmlContext<T>): boolean | void;
+  /**
+   * A hook event that fires for every Document type before execution of an insert or update workflow.
+   * This hook only fires for the client who is initiating the insert or update request.
+   * 
+   * Hooked functions may modify that data
+   * 
+   * @returns Explicitly return false to prevent the insert or update of this Document
+   */
   beforeUpsert?(context: IDmlContext<T>): boolean | void;
   /**
    * A hook event that fires for every Document type before execution of a deletion workflow.
    * This hook only fires for the client who is initiating the delete request.
    * 
-   * @returns Explicitly return false to prevent deletion of this Document
+   * @returns Explicitly return false to prevent the deletion of this Document
    */
   beforeDelete?(context: IDmlContext<T>): boolean | void;
   
@@ -47,6 +55,12 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
    * The hook provides the commited document instance can be modified, which will trigger another update.
     */
    update?(context: IAfterDmlContext<T>): void | Promise<void>;
+   /**
+    * A hook event that fires for every Document type after execution of an insert or update workflow.
+    * This hook only fires for the client who is initiating the insert or update request.
+    * 
+    * The hook provides the commited document instance can be modified, which will trigger another update.
+    */
    upsert?(context: IAfterDmlContext<T>): void | Promise<void>;
 
 
@@ -60,6 +74,10 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
    * This hook fires for all connected clients after the update has been processed.
    */
   afterUpdate?(context: IAfterDmlContext<T>): void | Promise<void>;
+  /**
+   * A hook event that fires for every Document type after conclusion of an insert or update workflow.
+   * This hook fires for all connected clients after the insert or update has been processed.
+   */
   afterUpsert?(context: IAfterDmlContext<T>): void | Promise<void>;
   /**
    * A hook event that fires for every Document type after conclusion of an deletion workflow.
