@@ -194,9 +194,9 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
       this.data.addedDamages$ = {};
     }
     if (addedDamage == null) {
-      delete this.data[part.getId()]
+      delete this.data.addedDamages$[part.getId()]
     } else {
-      this.data[part.getId()] = addedDamage;
+      this.data.addedDamages$[part.getId()] = addedDamage;
     }
   }
 
