@@ -1,14 +1,21 @@
-import { IAfterDmlContext, IDmlContext, IDmlTrigger } from "../lib/db/dml-trigger";
+import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger } from "../lib/db/dml-trigger";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { UtilsRoll } from "../lib/roll/utils-roll";
+import { UtilsCompare } from "../lib/utils/utils-compare";
+import { UtilsObject } from "../lib/utils/utils-object";
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
-import { DamageType, MyActor, MyItem, MyItemData } from "../types/fixed-types";
+import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { ItemCardHelpers } from "./item-card-helpers";
-import { ModularCard } from "./modular-card";
+import { ModularCard, PartDmlContext } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 
-type RollJson = ReturnType<Roll['toJSON']>
+type TermJson = ReturnType<RollTerm['toJSON']> & {
+  class: string;
+  options: any;
+  evaluated: boolean;
+};
+type RollJson = TermJson[];
 
 export interface AddedDamage {
   normalRoll: RollJson;
@@ -18,7 +25,7 @@ export interface AddedDamage {
 interface DamageCardData {
   phase: 'mode-select' | 'bonus-input' | 'result';
   mode: 'normal' | 'critical';
-  userBonus: string;
+  userBonus?: RollJson;
   addedDamages$?: {
     [key: string]: AddedDamage
   },
@@ -35,6 +42,8 @@ interface DamageCardData {
     displayFormula?: string;
   }
 }
+
+let hasRegisteredHooks = false;
 
 export class DamageCardPart extends ModularCardPart<DamageCardData> {
 
@@ -53,10 +62,9 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
       mainDamage = {
         mode: 'normal',
         phase: 'mode-select',
-        userBonus: "",
         calc$: {
           label: 'DND5E.Damage',
-          baseRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).toJSON(),
+          baseRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).terms.map(t => t.toJSON() as TermJson),
         }
       }
       // Consider it healing if all damage types are healing
@@ -71,23 +79,23 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
     if (mainDamage && item.data.data.damage?.versatile) {
       const versatileDamage = deepClone(mainDamage);
       versatileDamage.calc$.label = 'DND5E.Versatile';
-      versatileDamage.calc$.baseRoll = new Roll(item.data.data.damage.versatile, rollData).toJSON();
+      versatileDamage.calc$.baseRoll = new Roll(item.data.data.damage.versatile, rollData).terms.map(t => t.toJSON() as TermJson);
       inputDamages.push(versatileDamage);
     }
 
     // Spell scaling
     const scaling = item.data.data.scaling;
     if (scaling?.mode === 'level' && scaling.formula) {
-      const scalingRollJson: RollJson = new Roll(scaling.formula, rollData).toJSON();
+      // TODO level scaling should be migrated to a its own card
+      const scalingRollJson: RollJson = new Roll(scaling.formula, rollData).terms.map(t => t.toJSON() as TermJson);
       if (inputDamages.length === 0) {
         // when only dealing damage by upcasting? not sure if that ever happens
         inputDamages.push({
           mode: 'normal',
           phase: 'mode-select',
-          userBonus: "",
           calc$: {
             label: 'DND5E.Damage',
-            baseRoll: new Roll('0').toJSON(),
+            baseRoll: new Roll('0').terms.map(t => t.toJSON() as TermJson),
           }
         });
       }
@@ -111,19 +119,18 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
           inputDamages.push({
             mode: 'normal',
             phase: 'mode-select',
-            userBonus: "",
             calc$: {
               label: 'DND5E.Damage',
-              baseRoll: new Roll('0').toJSON(),
+              baseRoll: new Roll('0').terms.map(t => t.toJSON() as TermJson),
             }
           });
         }
 
         for (const damage of inputDamages) {
           // DND5e spell compendium has cantrip formula empty => default to the base damage formula
-          const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? damage.calc$.baseRoll.formula : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
+          const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? Roll.getFormula(damage.calc$.baseRoll.map(RollTerm.fromData)) : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
           // Override normal roll since cantrip scaling is static, not dynamic like level scaling
-          damage.calc$.baseRoll = UtilsRoll.mergeRolls(Roll.fromJSON(JSON.stringify(damage.calc$.baseRoll)), scalingRoll).toJSON();
+          damage.calc$.baseRoll = UtilsRoll.mergeRolls(Roll.fromJSON(JSON.stringify(damage.calc$.baseRoll)), scalingRoll).terms.map(t => t.toJSON() as TermJson);
         }
       }
     }
@@ -133,7 +140,7 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
       const actorBonus = actor.data.data.bonuses?.[item.data.data.actionType];
       if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
         for (const damage of inputDamages) {
-          damage.calc$.actorBonusRoll = new Roll(actorBonus.damage, rollData).toJSON();
+          damage.calc$.actorBonusRoll = new Roll(actorBonus.damage, rollData).terms.map(t => t.toJSON() as TermJson);
         }
       }
     }
@@ -145,6 +152,16 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
     }
     
     return inputDamages;
+  }
+
+  public static registerHooks(): void {
+    if (hasRegisteredHooks) {
+      return;
+    }
+
+    DmlTrigger.registerTrigger(new DmlTriggerChatMessage());
+  
+    hasRegisteredHooks = true;
   }
 
   public getType(): string {
@@ -179,25 +196,14 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
       {
         regex: /^item-damage-bonus$/,
         permissionCheck: permissionCheck,
-        execute: ({keyEvent, inputValue}) => this.processItemDamageBonus(keyEvent, inputValue as string),
+        execute: ({keyEvent, inputValue}) => this.processDamageBonus(keyEvent, inputValue as string),
       },
       {
         regex: /^item-damage-mode-(minus|plus)$/,
         permissionCheck: permissionCheck,
-        execute: ({clickEvent, regexResult}) => this.processItemDamageMode(clickEvent, regexResult[2] as ('plus' | 'minus')),
+        execute: ({clickEvent, regexResult}) => this.processDamageMode(clickEvent, regexResult[2] as ('plus' | 'minus')),
       },
     ]
-  }
-
-  public setPartDamage(part: ModularCardPart, addedDamage: AddedDamage | null): void {
-    if (!this.data.addedDamages$) {
-      this.data.addedDamages$ = {};
-    }
-    if (addedDamage == null) {
-      delete this.data.addedDamages$[part.getId()]
-    } else {
-      this.data.addedDamages$[part.getId()] = addedDamage;
-    }
   }
 
   private async processNextPhase(event: ClickEvent | null): Promise<void> {
@@ -214,7 +220,7 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
     }
   }
 
-  private async processItemDamageMode(event: ClickEvent, modName: 'plus' | 'minus'): Promise<void> {
+  private async processDamageMode(event: ClickEvent, modName: 'plus' | 'minus'): Promise<void> {
     let modifier = modName === 'plus' ? 1 : -1;
     
     const order: Array<DamageCardData['mode']> = ['normal', 'critical'];
@@ -224,34 +230,45 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
     }
     this.data.mode = order[newIndex];
 
-    if (event.shiftKey || (this.data.calc$?.normalRoll?.evaluated && (this.data.mode === 'critical' && !this.data.calc$?.criticalRoll?.evaluated))) {
+    if (event.shiftKey) {
       this.data.phase = 'result';
     }
   }
   
-  private async processItemDamageBonus(keyEvent: KeyEvent | null, damageBonus: string): Promise<void> {
-    if (this.data.calc$?.normalRoll?.evaluated || this.data.phase === 'result') {
+  private async processDamageBonus(keyEvent: KeyEvent | null, damageBonus: string): Promise<void> {
+    if (keyEvent?.key === 'Escape') {
+      this.data.phase = 'mode-select';
       return;
     }
 
-    if (damageBonus) {
-      this.data.userBonus = damageBonus;
+    const canOverride = this.data.userBonus == null || this.data.userBonus.every(t => !t.evaluated);
+    if (canOverride) {
+      if (damageBonus) {
+        if (!Roll.validate(damageBonus) && keyEvent) {
+          // Only show error on key press
+          throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+        }
+        this.data.userBonus = new Roll(damageBonus).terms.map(t => t.toJSON() as TermJson);
+      } else {
+        delete this.data.userBonus;
+      }
     } else {
-      this.data.userBonus = "";
-    }
-
-    if (this.data.userBonus && !Roll.validate(this.data.userBonus) && keyEvent) {
-      // Only show error on key press
-      throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+      if (damageBonus) {
+        if (!Roll.validate(damageBonus) && keyEvent) {
+          // Only show error on key press
+          throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+        }
+        if (this.data.userBonus == null) {
+          this.data.userBonus = [];
+        }
+        this.data.userBonus.push(...new Roll(damageBonus).terms.map(t => t.toJSON() as TermJson));
+      }
     }
 
     if (keyEvent?.key === 'Enter') {
       this.data.phase = 'result';
-    } else if (keyEvent?.key === 'Escape') {
-      this.data.phase = 'mode-select';
-    }
+    } 
   }
-
 }
 
 class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
@@ -260,19 +277,35 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     return ChatMessage;
   }
 
+  public beforeUpdate(context: IDmlContext<ChatMessage>): void {
+    const partContext = ModularCard.toPartDmlContext(context);
+    this.rolledTermsAreFinal(partContext)
+  }
+
   public afterUpdate(context: IDmlContext<ChatMessage>): void {
-    this.onBonusChange(context);
+    const partContext = ModularCard.toPartDmlContext(context);
+    this.onBonusChange(partContext);
   }
 
   public async upsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
     // TODO recalc whole item on level change to support custom scaling level scaling formulas
-    this.calcItemCardDamageFormulas(context);
-    await this.calcDamageRoll(context);
+    const partContext = ModularCard.toPartDmlContext(context);
+    this.calcDamageFormulas(partContext);
+    await this.calcDamageRoll(partContext);
   }
   
-  private calcItemCardDamageFormulas(context: IDmlContext<ChatMessage>): void {
-    for (const data of this.getDamageParts(context)) {
-      let displayFormula = data.mode === 'critical' ? data.calc$.criticalRoll?.formula : data?.calc$.normalRoll?.formula;
+  private calcDamageFormulas(context: PartDmlContext): void {
+    for (const {newPart} of context.parts) {
+      if (newPart.type !== DamageCardPart.name) {
+        continue;
+      }
+      const data: DamageCardData = newPart.data;
+      let displayFormula: string;
+      const displayRoll: RollJson = data.mode === 'critical' ? data.calc$.criticalRoll : data?.calc$.normalRoll;
+      if (displayRoll) {
+        displayFormula = Roll.getFormula(displayRoll.map(RollTerm.fromData));
+      }
+
       const damageTypes: DamageType[] = [];
       if (displayFormula) {
         for (const damageType of UtilsRoll.getValidDamageTypes()) {
@@ -288,65 +321,104 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
-  private async calcDamageRoll(context: IDmlContext<ChatMessage>): Promise<void> {
-    for (const dmg of this.getDamageParts(context)) {
+  private async calcDamageRoll(context: PartDmlContext): Promise<void> {
+    for (const {newPart} of context.parts) {
+      if (newPart.type !== DamageCardPart.name) {
+        continue
+      }
+      const dmg: DamageCardData = newPart.data;
       if (dmg.phase === 'result') {
-        const normalRollEvaluated = !!dmg.calc$.normalRoll?.evaluated;
-        const criticalRollEvaluated = !!dmg.calc$.criticalRoll?.evaluated;
-        let normalRollFormula: string;
-        let normalRollPromise: Promise<Roll>;
-        if (normalRollEvaluated) {
-          normalRollFormula = dmg.calc$.normalRoll.formula;
-          normalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.calc$.normalRoll)));
-        } else {
-          const dmgParts: MyItemData['data']['damage']['parts'] = UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.calc$.baseRoll)));
-          // TODO upcasting (should be a different card)
-          /*const upcastLevel = Math.max(item.calc$?.level, item.selectedlevel === 'pact' ? (data.actor?.calc$?.pactLevel ?? 0) : item.selectedlevel);
-          if (upcastLevel > item.calc$.level) {
-            if (dmg.calc$?.upcastRoll) {
-              const upcastRoll = Roll.fromJSON(JSON.stringify(dmg.calc$?.upcastRoll)).alter(upcastLevel - item.calc$?.level, 0, {multiplyNumeric: true})
-              dmgParts.push(...UtilsRoll.rollToDamageParts(upcastRoll));
+        const newNormalTerms: RollTerm[] = [];
+        //#region Normal roll
+        {
+          const termsToEvaluate: Array<{
+            rollProperty: string[];
+            index: number;
+            term: TermJson;
+          }> = [];
+          for (const rollProperty of this.getRollProperties(dmg)) {
+            const rollJson: RollJson = UtilsObject.getProperty(dmg, rollProperty);
+            for (let i = 0; i < rollJson.length; i++) {
+              if (!rollJson[i].evaluated) {
+                termsToEvaluate.push({
+                  rollProperty: rollProperty,
+                  index: i,
+                  term: rollJson[i],
+                });
+              }
             }
-          }*/
-          if (dmg.calc$.actorBonusRoll) {
-            dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.calc$.actorBonusRoll))))
           }
-          if (dmg.userBonus) {
-            dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.userBonus))))
+
+          const unevaluatedTerms: RollTerm[] = [];
+          for (const rollToEvaluate of termsToEvaluate) {
+            unevaluatedTerms.push(RollTerm.fromData(rollToEvaluate.term));
           }
-          
-          const normalRoll = UtilsRoll.simplifyRoll(UtilsRoll.damagePartsToRoll(dmgParts));
-          normalRollFormula = normalRoll.formula;
-          normalRollPromise = normalRoll.roll({async: true});
+
+          if (unevaluatedTerms.length > 0) {
+            const result = await UtilsRoll.rollUnrolledTerms(unevaluatedTerms, {async: true});
+
+            for (let i = 0; i < result.results.length; i++) {
+              UtilsObject.getProperty(dmg, termsToEvaluate[i].rollProperty)[termsToEvaluate[i].index] = result.results[i].toJSON();
+            }
+
+            if (result.newRolls) {
+              // Don't await for the roll animation to finish
+              newNormalTerms.push(...result.newRolls)
+            }
+            
+            const normalRollTerms: RollJson = [];
+            for (const rollProperty of this.getRollProperties(dmg)) {
+              normalRollTerms.push(...(UtilsObject.getProperty(dmg, rollProperty) as RollJson));
+            }
+            dmg.calc$.normalRoll = normalRollTerms;
+          }
         }
+        //#endregion
+
+        //#region Crit roll
+        // TODO I would prefer a method which can recalc the crit roll from 0 and retain the already rolled dice
+        const newCriticalTerms: RollTerm[] = [];
+        {
+          const unevaluatedTerms: RollTerm[] = [];
+          if (newNormalTerms.length > 0) {
+            unevaluatedTerms.push(...UtilsRoll.getCriticalBonusRoll(Roll.fromTerms(newNormalTerms)).terms);
+          }
+          if (dmg.addedDamages$) {
+            for (const key in dmg.addedDamages$) {
+              const additionalDamage = dmg.addedDamages$[key];
+              for (const termJson of additionalDamage.additionalCriticalRoll || []) {
+                if (!termJson.evaluated) {
+                  unevaluatedTerms.push(RollTerm.fromData(termJson));
+                }
+              }
+            }
+          }
+
+          if (unevaluatedTerms.length > 0) {
+            if (dmg.calc$.criticalRoll == null) {
+              dmg.calc$.criticalRoll = [];
+            }
+            const result = await UtilsRoll.rollUnrolledTerms(unevaluatedTerms, {async: true});
+            
+            for (const term of result.results) {
+              dmg.calc$.criticalRoll.push(term.toJSON() as TermJson);
+            }
+
+            if (result.newRolls) {
+              // Don't await for the roll animation to finish
+              newCriticalTerms.push(...result.newRolls);
+            }
+          }
+        }
+        //#endregion
     
-        let criticalRollPromise: Promise<Roll | false>;
-        if (criticalRollEvaluated) {
-          criticalRollPromise = Promise.resolve(Roll.fromJSON(JSON.stringify(dmg.calc$.criticalRoll)));
-        } else if (dmg.mode === 'critical') {
-          criticalRollPromise = UtilsRoll.getCriticalBonusRoll(new Roll(normalRollFormula)).roll({async: true});
-        } else {
-          criticalRollPromise = Promise.resolve(false);
-        }
-    
-        const [normalResolved, critBonusResolved] = await Promise.all([normalRollPromise, criticalRollPromise]);
-        const newRolls: Roll[] = [];
-        if (!normalRollEvaluated) {
-          newRolls.push(normalResolved);
-          dmg.calc$.normalRoll = normalResolved.toJSON();
-        }
-        if (!criticalRollEvaluated && critBonusResolved instanceof Roll) {
-          newRolls.push(critBonusResolved);
-          dmg.calc$.criticalRoll = UtilsRoll.mergeRolls(normalResolved, critBonusResolved).toJSON();
-        }
-    
-        if (newRolls.length > 0) {
+        if (newNormalTerms.length > 0 || newCriticalTerms.length > 0) {
           // Don't await for the roll animation to finish
-          UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...newRolls)});
+          UtilsDiceSoNice.showRoll({roll: Roll.fromTerms([...newNormalTerms, ...newCriticalTerms])});
         }
         
         // Auto apply healing since it very rarely gets modified
-        const damageTypes = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(dmg.calc$.criticalRoll?.evaluated ? dmg.calc$.criticalRoll : dmg.calc$.normalRoll)));
+        /*const damageTypes = UtilsRoll.rollToDamageResults(Roll.fromJSON(JSON.stringify(dmg.calc$.criticalRoll?.evaluated ? dmg.calc$.criticalRoll : dmg.calc$.normalRoll)));
         let isHealing = true;
         for (const type of damageTypes.keys()) {
           if (!ItemCardHelpers.healingDamageTypes.includes(type)) {
@@ -355,56 +427,85 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
           }
         }
     
-        //if (isHealing && item.targets) {
-          // TODO auto apply healing, but it needs to be sync?
-        //}
+        if (isHealing && item.targets) {
+           TODO auto apply healing, but it needs to be sync?
+        }*/
       }
     }
   }
   
-  private onBonusChange(context: IDmlContext<ChatMessage>): void {
-    for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId) {
+  /**
+   * When a roll term was already rolled and then changed, revert it back to the way it was.
+   */
+  private rolledTermsAreFinal(context: PartDmlContext): void {
+    for (const {newPart, oldPart, messageId} of context.parts) {
+      if (!newPart || !oldPart) {
         continue;
       }
-      const parts = ModularCard.getCardPartDatas(newRow);
-      if (!Array.isArray(parts)) {
-        continue;
+      if (newPart.type !== DamageCardPart.name) {
+        continue
       }
-      const oldParts = ModularCard.getCardPartDatas(oldRow);
-      
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        if (part.type !== DamageCardPart.name) {
-          continue;
-        }
-        const oldPart = oldParts?.[i];
+      const newData: DamageCardData = newPart.data;
+      const oldData: DamageCardData = oldPart.data;
 
-        if ((part.data as DamageCardData).phase === 'bonus-input' && (oldPart?.data as DamageCardData)?.phase !== 'bonus-input') {
-          MemoryStorageService.setFocusedElementSelector(`[data-message-id="${newRow.id}"] [data-${staticValues.moduleName}-card-part="${part.id}"] input.${staticValues.moduleName}-bonus`);
-          return;
+      for (const property of this.getRollProperties(oldData)) {
+        const newTerms: RollJson = UtilsObject.getProperty(newData, property);
+        const oldTerms: RollJson = UtilsObject.getProperty(oldData, property);
+        
+        for (let i = 0; i < oldTerms.length; i++) {
+          const oldTerm = RollTerm.fromData(oldTerms[i]);
+          if (oldTerm.total == null) {
+            continue;
+          }
+
+          // TODO allow dice terms to increase their nr of dice (for simplifying crits)
+          if (!UtilsCompare.deepEquals(oldTerms[i], newTerms[i])) {
+            console.error(`Not allowed to edit already rolled terms.`, {
+              context: {
+                entity: 'Message',
+                entityId: messageId,
+                module: staticValues.moduleName,
+                moduleSubSystem: ['DamageCardPart', oldPart.id, property, i],
+              },
+              oldValue: oldTerms[i],
+              newValue: newTerms[i],
+            })
+            newTerms[i] = deepClone(oldTerms[i]);
+          }
         }
       }
     }
   }
-
-  private getDamageParts(context: IDmlContext<ChatMessage>): DamageCardData[] {
-    const parts: DamageCardData[] = [];
-
-    for (const {newRow} of context.rows) {
-      const parts = ModularCard.getCardPartDatas(newRow);
-      if (!Array.isArray(parts)) {
+  
+  private onBonusChange(context: PartDmlContext): void {
+    for (const {newPart, oldPart, changedByUserId, messageId} of context.parts) {
+      if (changedByUserId !== game.userId) {
         continue;
       }
-      
-      for (const part of parts) {
-        if (part.type === DamageCardPart.name) {
-          parts.push(part.data);
-        }
+      if ((newPart.data as DamageCardData).phase === 'bonus-input' && (oldPart?.data as DamageCardData)?.phase !== 'bonus-input') {
+        MemoryStorageService.setFocusedElementSelector(`[data-message-id="${messageId}"] [data-${staticValues.moduleName}-card-part="${newPart.id}"] input.${staticValues.moduleName}-bonus`);
+        return;
       }
     }
+  }
 
-    return parts;
+  private getRollProperties(data: DamageCardData): string[][] {
+    const rollProperties: string[][] = [
+      ['calc$', 'baseRoll'],
+      ,
+    ];
+    if (data.calc$.actorBonusRoll) {
+      rollProperties.push(['userBonus']);
+    }
+    if (data.userBonus) {
+      rollProperties.push(['userBonus']);
+    }
+    if (data.addedDamages$) {
+      for (const key in data.addedDamages$) {
+        rollProperties.push(['addedDamages$', key]);
+      }
+    }
+    return rollProperties;
   }
   
 }
