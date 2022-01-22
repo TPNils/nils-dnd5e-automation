@@ -92,6 +92,10 @@ export abstract class ModularCardPart<D = any> {
     private readonly id: string,
     protected readonly data: D,
   ) {}
+
+  /**
+   * @returns An id which is unique <b>within the modular card</b>
+   */
   public getId(): string {
     return this.id;
   }
