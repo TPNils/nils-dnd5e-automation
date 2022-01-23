@@ -1,5 +1,6 @@
+import { ITrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
-import { ModularCard } from "./modular-card";
+import { ModularCardTriggerData } from "./modular-card";
 
 export interface ClickEvent {
   readonly altKey: boolean;
@@ -83,7 +84,7 @@ export interface ICallbackAction<T> {
   execute: ActionPermissionExecute<T>;
 }
 
-export interface ModularCardPart<D = any> {
+export interface ModularCardPart<D = any> extends ITrigger<ModularCardTriggerData> {
   getType(): string;
   getHtml(context: {partId: string, data: D}): string | Promise<string>;
   getCallbackActions(): ICallbackAction<D>[];

@@ -1,20 +1,102 @@
-import { IDmlContext, IDmlTrigger } from "../lib/db/dml-trigger";
+import { DmlTrigger, IDmlContext, IDmlTrigger, ITrigger, IUnregisterTrigger } from "../lib/db/dml-trigger";
+import { TransformTrigger } from "../lib/db/transform-trigger";
+import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { ModularCardPart } from "./modular-card-part";
 
 export interface ModularCardPartData {
-  type: string;
   id: string;
+  type: string;
   data: any;
 }
 
+export interface ModularCardTriggerData extends ModularCardPartData {
+  messageId: string;
+}
+
+class ChatMessageTransformer extends TransformTrigger<ChatMessage, ModularCardTriggerData> implements IDmlTrigger<ChatMessage> {
+
+  constructor() {
+    super(ChatMessageTransformer.transformFunc);
+  }
+
+  get type(): typeof ChatMessage {
+    return ChatMessage;
+  }
+
+  private static transformFunc(from: ChatMessage): {uniqueKey: string, data: ModularCardTriggerData} | Array<{uniqueKey: string, data: ModularCardTriggerData}> {
+    const parts = ModularCard.getCardPartDatas(from);
+    if (!Array.isArray(parts)) {
+      return [];
+    }
+    
+    return parts.map(p => {
+      return {
+        uniqueKey: `${from.uuid}.${p.id}`,
+        data: {
+          ...p,
+          messageId: from.id
+        }
+      }
+    });
+  }
+  
+}
+
+class TriggerMessagePart implements ITrigger<ModularCardPartData> {
+
+  public beforeUpdate(context: IDmlContext<ModularCardPartData>): boolean {
+    if (this.finalFields(context) === false) {
+      return false;
+    }
+    return true;
+  }
+
+  public beforeDelete(context: IDmlContext<ModularCardPartData>): boolean | void {
+    /*
+    TODO Does this even matter?
+     CardParts in this foundry module should be build in a way to support this.
+     But can I expect other modules who might want to integratie to also 
+    for (const {oldRow} of context.rows) {
+      console.error(`Can't delete message parts.`)
+      return false;
+    }
+    */
+  }
+  
+  private finalFields(context: IDmlContext<ModularCardPartData>): boolean {
+    for (const {newRow, oldRow} of context.rows) {
+      if (newRow.type !== oldRow?.type) {
+        console.error(`Can't change the type of part and retain the same id.`)
+        return false;
+      }
+    }
+
+    return true;
+  }
+  
+}
+
+const chatMessageTransformer = new ChatMessageTransformer();
+
 export class ModularCard {
 
-  private static registeredPartsByType = new Map<string, ModularCardPart>();
+  private static registeredPartsByType = new Map<string, {part: ModularCardPart, unregisterTrigger: IUnregisterTrigger}>();
   private static typeToModule = new Map<string, string>();
   public static registerModularCardPart(moduleName: string, part: ModularCardPart): void {
-    ModularCard.registeredPartsByType.set(part.getType(), part);
+    if (ModularCard.registeredPartsByType.has(part.getType())) {
+      console.info(`ModularCardPart type "${part.getType()}" from module ${ModularCard.typeToModule.get(part.getType())} gets overwritten by module ${moduleName}`);
+      ModularCard.registeredPartsByType.get(part.getType()).unregisterTrigger.unregister();
+    }
+    const unregisterTrigger = chatMessageTransformer.register(part);
+    ModularCard.registeredPartsByType.set(part.getType(), {part: part, unregisterTrigger: unregisterTrigger});
     ModularCard.typeToModule.set(part.getType(), moduleName);
+  }
+  
+  @RunOnce()
+  public static registerHooks(): void {
+    DmlTrigger.registerTrigger(chatMessageTransformer);
+    chatMessageTransformer.register(new TriggerMessagePart())
   }
 
   public static getCardPartDatas(message: ChatMessage): Array<ModularCardPartData> | null {
@@ -31,49 +113,6 @@ export class ModularCard {
     return message.setFlag(staticValues.moduleName, 'modularCardData', data);
   }
 
-  public static toPartDmlContext(context: IDmlContext<ChatMessage>): PartDmlContext {
-    const partContext: Array<PartDmlContext['parts'][0]> = [];
-    for (const {newRow, oldRow, changedByUserId, options} of context.rows) {
-      const newPartsMap = new Map<string, PartDmlContext['parts'][0]['newPart']>()
-      const oldPartsMap = new Map<string, PartDmlContext['parts'][0]['oldPart']>()
-      const newParts = ModularCard.getCardPartDatas(newRow);
-      const oldParts = ModularCard.getCardPartDatas(oldRow);
-  
-      if (Array.isArray(newParts)) {
-        for (const part of newParts) {
-          newPartsMap.set(part.id, part);
-        }
-      }
-      if (Array.isArray(oldParts)) {
-        for (const part of oldParts) {
-          oldPartsMap.set(part.id, part);
-        }
-      }
-  
-      for (const [id, part] of newPartsMap.entries()) {
-        partContext.push({
-          newPart: part,
-          oldPart: oldPartsMap.get(id),
-          changedByUserId: changedByUserId,
-          options: options,
-          messageId: newRow.id,
-        })
-      }
-      
-      for (const [id, part] of oldPartsMap.entries()) {
-        if (!newPartsMap.has(id)) {
-          partContext.push({
-            oldPart: part,
-            changedByUserId: changedByUserId,
-            options: options,
-            messageId: newRow.id,
-          })
-        }
-      }
-    }
-    return {parts: partContext};
-  }
-
   public static async getHtml(parts: ModularCardPartData[]): Promise<string> {
     const htmlParts$: Array<{html: string, id: string} | Promise<{html: string, id: string}>> = [];
     for (const partData of parts) {
@@ -84,7 +123,7 @@ export class ModularCard {
       }
 
       // TODO error handeling during render
-      const htmlPart = ModularCard.registeredPartsByType.get(partData.type).getHtml({partId: partData.id, data: partData});
+      const htmlPart = ModularCard.registeredPartsByType.get(partData.type).part.getHtml({partId: partData.id, data: partData});
       if (htmlPart instanceof Promise) {
         htmlParts$.push(htmlPart.then(html => {return {html: html, id: partData.id}}));
       } else {
@@ -108,53 +147,4 @@ export class ModularCard {
     return htmlParts.join('');
   }
 
-}
-
-export interface PartDmlContext {
-  readonly parts: ReadonlyArray<{
-    readonly newPart?: {readonly id: string; readonly type: string, data: any};
-    readonly oldPart?: {readonly id: string; readonly type: string, data: any};
-    readonly messageId: string;
-    readonly changedByUserId: string;
-    readonly options: any;
-  }>;
-}
-
-class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
-
-  get type(): typeof ChatMessage {
-    return ChatMessage;
-  }
-
-  public beforeUpdate(context: IDmlContext<ChatMessage>): boolean {
-    const partContext = ModularCard.toPartDmlContext(context);
-    if (this.finalFields(partContext) === false) {
-      return false;
-    }
-    return true;
-  }
-  
-  private finalFields(context: PartDmlContext): boolean {
-    for (const {newPart, oldPart} of context.parts) {
-      /*
-       TODO Does this even matter?
-        CardParts in this foundry module should be build in a way to support this.
-        But can I expect other modules who might want to integratie to also 
-      if (!newPart && oldPart) {
-        console.error(`Can't delete message parts.`)
-        return false;
-      }
-      */
-      if (!newPart || !oldPart) {
-        continue;
-      }
-      if (newPart.type !== oldPart?.type) {
-        console.error(`Can't change the type of part and retain the same id.`)
-        return false;
-      }
-    }
-
-    return true;
-  }
-  
 }

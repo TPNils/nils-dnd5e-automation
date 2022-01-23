@@ -1,4 +1,4 @@
-import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger } from "../lib/db/dml-trigger";
+import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { UtilsRoll } from "../lib/roll/utils-roll";
@@ -8,7 +8,7 @@ import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { ItemCardHelpers } from "./item-card-helpers";
-import { ModularCard, PartDmlContext } from "./modular-card";
+import { ModularCard, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 
 type TermJson = ReturnType<RollTerm['toJSON']> & {
@@ -156,13 +156,13 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   @RunOnce()
   public static registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, new DamageCardPart());
-    DmlTrigger.registerTrigger(new DmlTriggerChatMessage());
   }
 
   public getType(): string {
     return DamageCardPart.name;
   }
 
+  //#region Front end
   public getHtml({data}): string | Promise<string> {
     return renderTemplate(
       // TODO make the template
@@ -263,37 +263,29 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       data.phase = 'result';
     } 
   }
-}
+  //#endregion
 
-class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
-
-  get type(): typeof ChatMessage {
-    return ChatMessage;
+  //#region Backend
+  public beforeUpdate(context: IDmlContext<ModularCardTriggerData>): void {
+    this.rolledTermsAreFinal(context)
   }
 
-  public beforeUpdate(context: IDmlContext<ChatMessage>): void {
-    const partContext = ModularCard.toPartDmlContext(context);
-    this.rolledTermsAreFinal(partContext)
+  public afterUpdate(context: IDmlContext<ModularCardTriggerData>): void {
+    this.onBonusChange(context);
   }
 
-  public afterUpdate(context: IDmlContext<ChatMessage>): void {
-    const partContext = ModularCard.toPartDmlContext(context);
-    this.onBonusChange(partContext);
-  }
-
-  public async upsert(context: IAfterDmlContext<ChatMessage>): Promise<void> {
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
     // TODO recalc whole item on level change to support custom scaling level scaling formulas
-    const partContext = ModularCard.toPartDmlContext(context);
-    this.calcDamageFormulas(partContext);
-    await this.calcDamageRoll(partContext);
+    this.calcDamageFormulas(context);
+    await this.calcDamageRoll(context);
   }
   
-  private calcDamageFormulas(context: PartDmlContext): void {
-    for (const {newPart} of context.parts) {
-      if (newPart.type !== DamageCardPart.name) {
+  private calcDamageFormulas(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow} of context.rows) {
+      if (newRow.type !== DamageCardPart.name) {
         continue;
       }
-      const data: DamageCardData = newPart.data;
+      const data: DamageCardData = newRow.data;
       let displayFormula: string;
       const displayRoll: RollJson = data.mode === 'critical' ? data.calc$.criticalRoll : data?.calc$.normalRoll;
       if (displayRoll) {
@@ -315,12 +307,12 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
 
-  private async calcDamageRoll(context: PartDmlContext): Promise<void> {
-    for (const {newPart} of context.parts) {
-      if (newPart.type !== DamageCardPart.name) {
+  private async calcDamageRoll(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+    for (const {newRow} of context.rows) {
+      if (newRow.type !== DamageCardPart.name) {
         continue
       }
-      const dmg: DamageCardData = newPart.data;
+      const dmg: DamageCardData = newRow.data;
       if (dmg.phase === 'result') {
         const newNormalTerms: RollTerm[] = [];
         //#region Normal roll
@@ -431,16 +423,16 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   /**
    * When a roll term was already rolled and then changed, revert it back to the way it was.
    */
-  private rolledTermsAreFinal(context: PartDmlContext): void {
-    for (const {newPart, oldPart, messageId} of context.parts) {
-      if (!newPart || !oldPart) {
+  private rolledTermsAreFinal(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow, oldRow} of context.rows) {
+      if (!newRow || !oldRow) {
         continue;
       }
-      if (newPart.type !== DamageCardPart.name) {
+      if (newRow.type !== DamageCardPart.name) {
         continue
       }
-      const newData: DamageCardData = newPart.data;
-      const oldData: DamageCardData = oldPart.data;
+      const newData: DamageCardData = newRow.data;
+      const oldData: DamageCardData = oldRow.data;
 
       for (const property of this.getRollProperties(oldData)) {
         const newTerms: RollJson = UtilsObject.getProperty(newData, property);
@@ -457,9 +449,9 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
             console.error(`Not allowed to edit already rolled terms.`, {
               context: {
                 entity: 'Message',
-                entityId: messageId,
+                entityId: newRow.messageId,
                 module: staticValues.moduleName,
-                moduleSubSystem: ['DamageCardPart', oldPart.id, property, i],
+                moduleSubSystem: ['DamageCardPart', oldRow.id, property, i],
               },
               oldValue: oldTerms[i],
               newValue: newTerms[i],
@@ -471,13 +463,13 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
   }
   
-  private onBonusChange(context: PartDmlContext): void {
-    for (const {newPart, oldPart, changedByUserId, messageId} of context.parts) {
+  private onBonusChange(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow, oldRow, changedByUserId} of context.rows) {
       if (changedByUserId !== game.userId) {
         continue;
       }
-      if ((newPart.data as DamageCardData).phase === 'bonus-input' && (oldPart?.data as DamageCardData)?.phase !== 'bonus-input') {
-        MemoryStorageService.setFocusedElementSelector(`[data-message-id="${messageId}"] [data-${staticValues.moduleName}-card-part="${newPart.id}"] input.${staticValues.moduleName}-bonus`);
+      if ((newRow.data as DamageCardData).phase === 'bonus-input' && (oldRow?.data as DamageCardData)?.phase !== 'bonus-input') {
+        MemoryStorageService.setFocusedElementSelector(`[data-message-id="${newRow.messageId}"] [data-${staticValues.moduleName}-card-part="${newRow.id}"] input.${staticValues.moduleName}-bonus`);
         return;
       }
     }
@@ -501,5 +493,5 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
     }
     return rollProperties;
   }
-  
+  //#endregion
 }
