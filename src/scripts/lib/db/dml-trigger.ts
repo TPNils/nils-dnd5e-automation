@@ -86,15 +86,11 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
   afterDelete?(context: IAfterDmlContext<T>): void | Promise<void>;
 }
 
-type Writeable<T extends { [x: string]: any }, K extends string> = {
-  [P in K]: T[P];
-}
-
 interface DmlOptions {
   [key: string]: any;
 }
 
-export interface IDmlContext<T extends foundry.abstract.Document<any, any>> {
+export interface IDmlContext<T> {
   readonly rows: ReadonlyArray<{
     /**
      * Has a value during insert and update
@@ -109,11 +105,11 @@ export interface IDmlContext<T extends foundry.abstract.Document<any, any>> {
   }>;
 }
 
-export interface IAfterDmlContext<T extends foundry.abstract.Document<any, any>> extends IDmlContext<T> {
+export interface IAfterDmlContext<T> extends IDmlContext<T> {
   endOfContext(...execs: Array<() => void | Promise<void>>): void
 }
 
-class AfterDmlContext<T extends foundry.abstract.Document<any, any>> implements IAfterDmlContext<T> {
+class AfterDmlContext<T> implements IAfterDmlContext<T> {
   public endOfContextExecutes: Array<() => void | Promise<void>> = [];
 
   constructor(
