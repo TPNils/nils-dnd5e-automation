@@ -70,7 +70,7 @@ export class UtilsCompare {
     if (originalType === 'object') {
       const keys = new Set([...Object.keys(original), ...Object.keys(compareTo)]);
       for (const key of keys) {
-        if (!UtilsCompare.findDiff(original[key], compareTo[key])) {
+        if (!UtilsCompare.deepEquals(original[key], compareTo[key])) {
           return false;
         }
       }
