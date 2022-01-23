@@ -2,8 +2,8 @@ import { staticValues } from "../../static-values";
 import { buffer } from "../decorator/buffer";
 import { UtilsCompare } from "../utils/utils-compare";
 
-export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
-  readonly type: {new(...args: any[]): T, documentName: string};
+
+export interface ITrigger<T> {
 
   /**
    * A hook event that fires for every Document type before execution of a creation workflow.
@@ -86,23 +86,29 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> {
   afterDelete?(context: IAfterDmlContext<T>): void | Promise<void>;
 }
 
+export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> extends ITrigger<T> {
+  readonly type: {new(...args: any[]): T, documentName: string};
+}
+
 interface DmlOptions {
   [key: string]: any;
 }
 
-export interface IDmlContext<T> {
-  readonly rows: ReadonlyArray<{
+export interface IDmlContextRow<T> {
     /**
      * Has a value during insert and update
      */
-    readonly newRow?: T;
-    /**
-     * Has a value during update and delete
-     */
-    readonly oldRow?: T;
-    readonly changedByUserId: string;
-    readonly options: DmlOptions;
-  }>;
+     newRow?: T;
+     /**
+      * Has a value during update and delete
+      */
+     oldRow?: T;
+     changedByUserId: string;
+     options: DmlOptions;
+}
+
+export interface IDmlContext<T> {
+  readonly rows: ReadonlyArray<Readonly<IDmlContextRow<T>>>;
 }
 
 export interface IAfterDmlContext<T> extends IDmlContext<T> {
