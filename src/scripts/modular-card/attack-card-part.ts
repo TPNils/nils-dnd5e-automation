@@ -1,4 +1,5 @@
 import { UtilsDocument } from "../lib/db/utils-document";
+import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
@@ -21,8 +22,6 @@ interface AttackCardData {
     isCrit?: boolean;
   }
 }
-
-let hasRegisteredHooks = false;
 
 export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
@@ -91,14 +90,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     return [attack];
   }
 
+  @RunOnce()
   public static registerHooks(): void {
-    if (hasRegisteredHooks) {
-      return;
-    }
-
     ModularCard.registerModularCardPart(staticValues.moduleName, new AttackCardPart());
-  
-    hasRegisteredHooks = true;
   }
 
   public getType(): string {

@@ -1,4 +1,5 @@
 import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger } from "../lib/db/dml-trigger";
+import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { UtilsRoll } from "../lib/roll/utils-roll";
 import { UtilsCompare } from "../lib/utils/utils-compare";
@@ -42,8 +43,6 @@ interface DamageCardData {
     displayFormula?: string;
   }
 }
-
-let hasRegisteredHooks = false;
 
 export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
@@ -154,15 +153,10 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     return inputDamages;
   }
 
+  @RunOnce()
   public static registerHooks(): void {
-    if (hasRegisteredHooks) {
-      return;
-    }
-
     ModularCard.registerModularCardPart(staticValues.moduleName, new DamageCardPart());
     DmlTrigger.registerTrigger(new DmlTriggerChatMessage());
-  
-    hasRegisteredHooks = true;
   }
 
   public getType(): string {
