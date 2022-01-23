@@ -2,6 +2,7 @@
  * Based on https://gitlab.com/tposney/midi-qol/-/blob/master/gulpfile.js
  */
 
+const glob = require("glob");
 const gulp = require('gulp');
 const fs = require('fs-extra');
 const path = require('path');
@@ -63,6 +64,62 @@ function getManifest() {
 	}
 
 	return json;
+}
+
+function buildManifest() {
+	const manifest = getManifest();
+
+	/** @type {Promise<string[]>[]} */
+	const filePromises = [];
+	filePromises.push(new Promise((resolve, reject) => {
+		glob('dist/**/*.css', (err, matches) => {
+			if (err) {
+				reject(err);
+				return;
+			}
+			resolve(matches);
+		})
+	}));
+	filePromises.push(new Promise((resolve, reject) => {
+		glob('dist/**/*.hbs', (err, matches) => {
+			if (err) {
+				reject(err);
+				return;
+			}
+			resolve(matches);
+		})
+	}));
+	
+	return Promise.all(filePromises).then(fileNameCollection => {
+		/** @type {Set<string>} */
+		const cssFiles = new Set();
+		/** @type {Set<string>} */
+		const hbsFiles = new Set();
+		for (const fileNames of fileNameCollection) {
+			for (let fileName of fileNames) {
+				fileName = fileName.replace(/^(dist|src)\//, '');
+				if (fileName.toLowerCase().endsWith('.css')) {
+					cssFiles.add(fileName);
+				} else if (fileName.toLowerCase().endsWith('.hbs')) {
+					hbsFiles.add(fileName);
+				}
+			}
+		}
+
+		if (manifest.file.flags == null) {
+			manifest.file.flags = {};
+		}
+		if (Array.isArray(manifest.file.styles)) {
+			cssFiles.add(...manifest.file.styles)
+		}
+		if (Array.isArray(manifest.file.flags.hbsFiles)) {
+			hbsFiles.add(...manifest.file.flags.hbsFiles)
+		}
+		manifest.file.styles = Array.from(cssFiles).sort();
+		manifest.file.flags.hbsFiles = Array.from(hbsFiles).sort();
+
+		fs.writeFileSync(path.join('dist', manifest.name), JSON.stringify(manifest.file, null, 2));
+	})
 }
 
 /**
@@ -211,6 +268,7 @@ function buildWatch() {
 	gulp.watch('src/**/*.ts', { ignoreInitial: false }, buildTS);
 	gulp.watch('src/**/*.less', { ignoreInitial: false }, buildLess);
 	gulp.watch('src/**/*.scss', { ignoreInitial: false }, buildSASS);
+	gulp.watch(['dist/**/*.css', 'dist/**/*.hbs'], { ignoreInitial: false }, buildManifest);
 	gulp.watch(
 		[...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
 		{ ignoreInitial: false },
@@ -544,7 +602,7 @@ function startFoundry() {
 	exec(cmd);
 }
 
-exports.build = gulp.series(clean, execBuild);
+exports.build = gulp.series(clean, execBuild, buildManifest);
 exports.updateSrcPacks = gulp.parallel(createCopyFiles([{from: ['dist','packs'], to: ['src','packs']}]));
 exports.watch = buildWatch;
 exports.clean = clean;
