@@ -3,6 +3,7 @@ import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
+import { ModularCard } from "./modular-card";
 import { ActionParam, ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
@@ -20,6 +21,8 @@ interface AttackCardData {
     isCrit?: boolean;
   }
 }
+
+let hasRegisteredHooks = false;
 
 export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
@@ -86,6 +89,16 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     attack.calc$.critTreshold = critTreshold;
 
     return [attack];
+  }
+
+  public static registerHooks(): void {
+    if (hasRegisteredHooks) {
+      return;
+    }
+
+    ModularCard.registerModularCardPart(staticValues.moduleName, new AttackCardPart());
+  
+    hasRegisteredHooks = true;
   }
 
   public getType(): string {

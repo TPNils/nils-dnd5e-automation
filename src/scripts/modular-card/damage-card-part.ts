@@ -159,6 +159,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       return;
     }
 
+    ModularCard.registerModularCardPart(staticValues.moduleName, new DamageCardPart());
     DmlTrigger.registerTrigger(new DmlTriggerChatMessage());
   
     hasRegisteredHooks = true;
