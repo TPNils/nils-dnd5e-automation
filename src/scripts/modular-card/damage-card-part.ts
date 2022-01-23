@@ -45,7 +45,7 @@ interface DamageCardData {
 
 let hasRegisteredHooks = false;
 
-export class DamageCardPart extends ModularCardPart<DamageCardData> {
+export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   public static create({item, actor}: {item: MyItem, actor?: MyActor}): DamageCardData[] {
     // TODO what about other interactions like spell scaling (modifier with html) and hunters mark (automatic, but only to a specific target)
@@ -168,21 +168,21 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
     return DamageCardPart.name;
   }
 
-  public getHtml(): string | Promise<string> {
+  public getHtml({data}): string | Promise<string> {
     return renderTemplate(
       // TODO make the template
       `modules/${staticValues.moduleName}/templates/modular-card/damage-part.hbs`, {
-        data: this.data,
+        data: data,
         moduleName: staticValues.moduleName
       }
     );
   }
 
-  public getCallbackActions(): ICallbackAction[] {
-    const permissionCheck = createPermissionCheck(() => {
+  public getCallbackActions(): ICallbackAction<DamageCardData>[] {
+    const permissionCheck = createPermissionCheck<DamageCardData>(({data}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (this.data.calc$.actorUuid) {
-        documents.push({uuid: this.data.calc$.actorUuid, permission: 'OWNER'});
+      if (data.calc$.actorUuid) {
+        documents.push({uuid: data.calc$.actorUuid, permission: 'OWNER'});
       }
       return {documents: documents};
     })
@@ -191,66 +191,65 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
       {
         regex: /^item-damage$/,
         permissionCheck: permissionCheck,
-        execute: ({clickEvent}) => this.processNextPhase(clickEvent),
+        execute: ({data, clickEvent}) => DamageCardPart.processNextPhase(data, clickEvent),
       },
       {
         regex: /^item-damage-bonus$/,
         permissionCheck: permissionCheck,
-        execute: ({keyEvent, inputValue}) => this.processDamageBonus(keyEvent, inputValue as string),
+        execute: ({data, keyEvent, inputValue}) => DamageCardPart.processDamageBonus(data, keyEvent, inputValue as string),
       },
       {
         regex: /^item-damage-mode-(minus|plus)$/,
         permissionCheck: permissionCheck,
-        execute: ({clickEvent, regexResult}) => this.processDamageMode(clickEvent, regexResult[2] as ('plus' | 'minus')),
+        execute: ({data, clickEvent, regexResult}) => DamageCardPart.processDamageMode(data, clickEvent, regexResult[2] as ('plus' | 'minus')),
       },
     ]
   }
 
-  private async processNextPhase(event: ClickEvent | null): Promise<void> {
-    const dmg = this.data;
-    if (this.data.phase === 'result') {
+  private static async processNextPhase(data: DamageCardData,event: ClickEvent | null): Promise<void> {
+    if (data.phase === 'result') {
       return;
     }
 
     const orderedPhases: DamageCardData['phase'][] = ['mode-select', 'bonus-input', 'result'];
     if (event?.shiftKey) {
-      dmg.phase = orderedPhases[orderedPhases.length - 1];
+      data.phase = orderedPhases[orderedPhases.length - 1];
     } else {
-      dmg.phase = orderedPhases[orderedPhases.indexOf(dmg.phase) + 1];
+      data.phase = orderedPhases[orderedPhases.indexOf(data.phase) + 1];
     }
   }
 
-  private async processDamageMode(event: ClickEvent, modName: 'plus' | 'minus'): Promise<void> {
+  private static async processDamageMode(data: DamageCardData, event: ClickEvent, modName: 'plus' | 'minus'): Promise<void> {
     let modifier = modName === 'plus' ? 1 : -1;
     
     const order: Array<DamageCardData['mode']> = ['normal', 'critical'];
-    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(this.data.mode) + modifier));
-    if (this.data.mode === order[newIndex]) {
+    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(data.mode) + modifier));
+    if (data.mode === order[newIndex]) {
       return;
     }
-    this.data.mode = order[newIndex];
+    data.mode = order[newIndex];
 
     if (event.shiftKey) {
-      this.data.phase = 'result';
+      data.phase = 'result';
     }
   }
   
-  private async processDamageBonus(keyEvent: KeyEvent | null, damageBonus: string): Promise<void> {
+  private static async processDamageBonus(data: DamageCardData, keyEvent: KeyEvent | null, damageBonus: string): Promise<void> {
     if (keyEvent?.key === 'Escape') {
-      this.data.phase = 'mode-select';
+      data.phase = 'mode-select';
       return;
     }
 
-    const canOverride = this.data.userBonus == null || this.data.userBonus.every(t => !t.evaluated);
+    const canOverride = data.userBonus == null || data.userBonus.every(t => !t.evaluated);
     if (canOverride) {
       if (damageBonus) {
         if (!Roll.validate(damageBonus) && keyEvent) {
           // Only show error on key press
           throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
         }
-        this.data.userBonus = new Roll(damageBonus).terms.map(t => t.toJSON() as TermJson);
+        data.userBonus = new Roll(damageBonus).terms.map(t => t.toJSON() as TermJson);
       } else {
-        delete this.data.userBonus;
+        delete data.userBonus;
       }
     } else {
       if (damageBonus) {
@@ -258,15 +257,15 @@ export class DamageCardPart extends ModularCardPart<DamageCardData> {
           // Only show error on key press
           throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
         }
-        if (this.data.userBonus == null) {
-          this.data.userBonus = [];
+        if (data.userBonus == null) {
+          data.userBonus = [];
         }
-        this.data.userBonus.push(...new Roll(damageBonus).terms.map(t => t.toJSON() as TermJson));
+        data.userBonus.push(...new Roll(damageBonus).terms.map(t => t.toJSON() as TermJson));
       }
     }
 
     if (keyEvent?.key === 'Enter') {
-      this.data.phase = 'result';
+      data.phase = 'result';
     } 
   }
 }

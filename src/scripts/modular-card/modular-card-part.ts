@@ -11,7 +11,9 @@ export interface KeyEvent {
   readonly key: 'Enter' | 'Escape';
 }
 
-interface ActionParamBase {
+interface ActionParamBase<T> {
+  partId: string;
+  data: T;
   regexResult: RegExpExecArray;
   messageId: string;
   cardParts: ModularCardPart<any>[];
@@ -28,11 +30,11 @@ interface ActionParamKey {
   inputValue: boolean | number | string
 }
 
-export type ActionParam = ActionParamBase & Partial<ActionParamClick> & Partial<ActionParamKey>;
+export type ActionParam<T> = ActionParamBase<T> & Partial<ActionParamClick> & Partial<ActionParamKey>;
 
 type PromiseOrSync<T> = T | Promise<T>;
-type ActionPermissionCheck = ({}: ActionParam) => PromiseOrSync<'can-run-local' | 'can-run-as-gm' | 'prevent-action'>;
-type ActionPermissionExecute = ({}: ActionParam) => PromiseOrSync<void>;
+type ActionPermissionCheck<T> = ({}: ActionParam<T>) => PromiseOrSync<'can-run-local' | 'can-run-as-gm' | 'prevent-action'>;
+type ActionPermissionExecute<T> = ({}: ActionParam<T>) => PromiseOrSync<void>;
 
 export interface CreatePermissionCheckArgs {
   documents?: Array<{
@@ -47,10 +49,10 @@ export interface CreatePermissionCheckArgs {
   mustBeGm?: boolean;
 }
 
-export function createPermissionCheck(args: CreatePermissionCheckArgs | (() => PromiseOrSync<CreatePermissionCheckArgs>)): ActionPermissionCheck {
-  return async ({userId}) => {
-    const {mustBeGm, documents} = typeof args === 'function' ? await args() : args;
-    const user = game.users.get(userId);
+export function createPermissionCheck<T>(args: CreatePermissionCheckArgs | (({}: ActionParam<T>) => PromiseOrSync<CreatePermissionCheckArgs>)): ActionPermissionCheck<T> {
+  return async (action) => {
+    const {mustBeGm, documents} = typeof args === 'function' ? await args(action) : args;
+    const user = game.users.get(action.userId);
     let successAction: 'can-run-local' | 'can-run-as-gm' = 'can-run-local';
     if (user.isGM) {
       // GM can do anything
@@ -75,33 +77,14 @@ export function createPermissionCheck(args: CreatePermissionCheckArgs | (() => P
   }
 }
 
-export interface ICallbackAction {
+export interface ICallbackAction<T> {
   regex: RegExp;
-  permissionCheck?: ActionPermissionCheck;
-  execute: ActionPermissionExecute;
+  permissionCheck?: ActionPermissionCheck<T>;
+  execute: ActionPermissionExecute<T>;
 }
 
-export interface IModularCardPartProvider<D, T extends ModularCardPart<D>> {
+export interface ModularCardPart<D = any> {
   getType(): string;
-  serialize(part: T): {id: string, data: D};
-  deserialize({}: {id: string, data: D}): T;
-}
-
-export abstract class ModularCardPart<D = any> {
-  constructor(
-    private readonly id: string,
-    protected readonly data: D,
-  ) {}
-
-  /**
-   * @returns An id which is unique <b>within the modular card</b>
-   */
-  public getId(): string {
-    return this.id;
-  }
-  public abstract getType(): string;
-  public abstract getHtml(): string | Promise<string>;
-  public abstract getCallbackActions(): ICallbackAction[];
-  public afterCardInit(modularCard: ModularCard): void | Promise<void> {
-  }
+  getHtml(context: {partId: string, data: D}): string | Promise<string>;
+  getCallbackActions(): ICallbackAction<D>[];
 }

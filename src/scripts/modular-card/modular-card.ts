@@ -2,33 +2,33 @@ import { IDmlContext, IDmlTrigger } from "../lib/db/dml-trigger";
 import { staticValues } from "../static-values";
 import { ModularCardPart } from "./modular-card-part";
 
+export interface ModularCardPartData {
+  type: string;
+  id: string;
+  data: any;
+}
+
 export class ModularCard {
 
-  private readonly partsById = new Map<string, ModularCardPart>();
-  private readonly orderedPartIds: string[] = [];
-
-  constructor(
-    parts: ReadonlyArray<ModularCardPart>,
-  ) {
-    for (const part of parts) {
-      if (this.partsById.has(part.getId())) {
-        throw new Error(`duplicate id detected: ${part.getId()}`)
-      } else {
-        this.orderedPartIds.push(part.getId());
-        this.partsById.set(part.getId(), part);
-      }
-    }
-
-    for (const part of this.partsById.values()) {
-      part.afterCardInit(this);
-    }
+  private static registeredPartsByType = new Map<string, ModularCardPart>();
+  private static typeToModule = new Map<string, string>();
+  public static registerModularCardPart(moduleName: string, part: ModularCardPart): void {
+    ModularCard.registeredPartsByType.set(part.getType(), part);
+    ModularCard.typeToModule.set(part.getType(), moduleName);
   }
 
-  public static getCardPartDatas(message: ChatMessage): Array<{id: string, data: any, type: string}> | null {
+  public static getCardPartDatas(message: ChatMessage): Array<ModularCardPartData> | null {
     if (message == null) {
       return null;
     }
     return (message.getFlag(staticValues.moduleName, 'modularCardData') as any);
+  }
+
+  public static setCardPartDatas(message: ChatMessage, data: Array<ModularCardPartData>): Promise<ChatMessage> {
+    if (message == null) {
+      return Promise.resolve(message);
+    }
+    return message.setFlag(staticValues.moduleName, 'modularCardData', data);
   }
 
   public static toPartDmlContext(context: IDmlContext<ChatMessage>): PartDmlContext {
@@ -74,16 +74,21 @@ export class ModularCard {
     return {parts: partContext};
   }
 
-  public async getHtml(): Promise<string> {
-    // TODO error handeling
-
+  public static async getHtml(parts: ModularCardPartData[]): Promise<string> {
     const htmlParts$: Array<{html: string, id: string} | Promise<{html: string, id: string}>> = [];
-    for (const partId of this.orderedPartIds) {
-      const htmlPart = this.getPartFromId(partId).getHtml();
+    for (const partData of parts) {
+      if (!ModularCard.registeredPartsByType.has(partData.type)) {
+        console.error(`Could not render ModularCardPart ${partData.type} of module ${ModularCard.typeToModule.get(partData.type)}`);
+        // Don't throw(?), what if a module extention got disabled
+        continue;
+      }
+
+      // TODO error handeling during render
+      const htmlPart = ModularCard.registeredPartsByType.get(partData.type).getHtml({partId: partData.id, data: partData});
       if (htmlPart instanceof Promise) {
-        htmlParts$.push(htmlPart.then(html => {return {html: html, id: partId}}));
+        htmlParts$.push(htmlPart.then(html => {return {html: html, id: partData.id}}));
       } else {
-        htmlParts$.push({html: htmlPart, id: partId});
+        htmlParts$.push({html: htmlPart, id: partData.id});
       }
     }
 
@@ -101,35 +106,6 @@ export class ModularCard {
       htmlParts.push(`</div>`);
     }
     return htmlParts.join('');
-  }
-
-  public getPartFromId<T>(id: string): ModularCardPart<T> | null {
-    return this.partsById.get(id);
-  }
-
-  public getPartFromType<T>(type: string): ModularCardPart<T> | null {
-    const parts = this.getPartsByType().get(type);
-    if (parts != null && parts.length > 0) {
-      return parts[0];
-    }
-    return null;
-  }
-
-  public getPartsFromType<T>(type: string): ModularCardPart<T>[] {
-    return this.getPartsByType().get(type) ?? [];
-  }
-
-  private partsByType: Map<string, ModularCardPart[]>;
-  private getPartsByType(): Map<string, ModularCardPart[]> {
-    if (!this.partsByType) {
-      for (const part of this.partsById.values()) {
-        if (!this.partsByType.has(part.getType())) {
-          this.partsByType.set(part.getType(), []);
-        }
-        this.partsByType.get(part.getType()).push(part);
-      }
-    }
-    return this.partsByType;
   }
 
 }

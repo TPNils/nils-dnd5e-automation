@@ -21,7 +21,7 @@ interface AttackCardData {
   }
 }
 
-export class AttackCardPart extends ModularCardPart<AttackCardData> {
+export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
   public static create({item, actor}: {item: MyItem, actor?: MyActor}): AttackCardData[] {
     if (!['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
@@ -92,20 +92,20 @@ export class AttackCardPart extends ModularCardPart<AttackCardData> {
     return `AttackCardPart`
   }
 
-  public getHtml(): string | Promise<string> {
+  public getHtml({data}): string | Promise<string> {
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/attack-part.hbs`, {
-        data: this.data,
+        data: data,
         moduleName: staticValues.moduleName
       }
     );
   }
 
-  public getCallbackActions(): ICallbackAction[] {
-    const permissionCheck = createPermissionCheck(() => {
+  public getCallbackActions(): ICallbackAction<AttackCardData>[] {
+    const permissionCheck = createPermissionCheck<AttackCardData>(({data}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (this.data.calc$.actorUuid) {
-        documents.push({uuid: this.data.calc$.actorUuid, permission: 'OWNER'});
+      if (data.calc$.actorUuid) {
+        documents.push({uuid: data.calc$.actorUuid, permission: 'OWNER'});
       }
       return {documents: documents};
     })
@@ -114,71 +114,71 @@ export class AttackCardPart extends ModularCardPart<AttackCardData> {
       {
         regex: /^item-attack$/,
         permissionCheck: permissionCheck,
-        execute: ({clickEvent}) => this.processItemAttack(clickEvent),
+        execute: ({data, clickEvent}) => AttackCardPart.processItemAttack(data, clickEvent),
       },
       {
         regex: /^item-attack-bonus$/,
         permissionCheck: permissionCheck,
-        execute: ({keyEvent, inputValue}) => this.processItemAttackBonus(keyEvent, inputValue as string),
+        execute: ({data, keyEvent, inputValue}) => AttackCardPart.processItemAttackBonus(data, keyEvent, inputValue as string),
       },
       {
         regex: /^item-attack-mode-(minus|plus)$/,
         permissionCheck: permissionCheck,
-        execute: ({clickEvent, regexResult}) => this.processItemAttackMode(clickEvent, regexResult[2] as ('plus' | 'minus')),
+        execute: ({data, clickEvent, regexResult}) => AttackCardPart.processItemAttackMode(data, clickEvent, regexResult[2] as ('plus' | 'minus')),
       },
     ]
   }
 
-  private async processItemAttack(clickEvent: ClickEvent | null): Promise<void> {
-    if (this.data.phase === 'result') {
+  private static async processItemAttack(data: AttackCardData, clickEvent: ClickEvent | null): Promise<void> {
+    if (data.phase === 'result') {
       return;
     }
 
     const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
     if (clickEvent.shiftKey) {
-      this.data.phase = orderedPhases[orderedPhases.length - 1];
+      data.phase = orderedPhases[orderedPhases.length - 1];
     } else {
-      this.data.phase = orderedPhases[orderedPhases.indexOf(this.data.phase) + 1];
+      data.phase = orderedPhases[orderedPhases.indexOf(data.phase) + 1];
     }
 
-    if (orderedPhases.indexOf(this.data.phase) === orderedPhases.length - 1) {
-      await this.processItemAttackRoll();
+    if (orderedPhases.indexOf(data.phase) === orderedPhases.length - 1) {
+      await AttackCardPart.processItemAttackRoll(data);
     }
   }
   
-  private async processItemAttackBonus(keyEvent: KeyEvent | null, attackBonus: string): Promise<void> {
-    if (this.data.calc$.evaluatedRoll?.evaluated || this.data.phase === 'result') {
+  private static async processItemAttackBonus(data: AttackCardData, keyEvent: KeyEvent | null, attackBonus: string): Promise<void> {
+    if (data.calc$.evaluatedRoll?.evaluated || data.phase === 'result') {
       return;
     }
 
     if (attackBonus) {
-      this.data.userBonus = attackBonus;
+      data.userBonus = attackBonus;
     } else {
-      this.data.userBonus = "";
+      data.userBonus = "";
     }
 
-    if (this.data.userBonus && !Roll.validate(this.data.userBonus) && keyEvent) {
+    if (data.userBonus && !Roll.validate(data.userBonus) && keyEvent) {
       // Only show error on key press
       throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
     }
 
     if (keyEvent?.key === 'Enter') {
-      await this.processItemAttackRoll();
+      await AttackCardPart.processItemAttackRoll(data);
     } else if (keyEvent?.key === 'Escape') {
-      this.data.phase = 'mode-select';
+      data.phase = 'mode-select';
     }
   }
 
-  private async processItemAttackRoll(): Promise<void> {
-    if (this.data.calc$.evaluatedRoll) {
+  private static async processItemAttackRoll(data: AttackCardData): Promise<void> {
+    if (data.calc$.evaluatedRoll) {
       return;
     }
     
-    const actor: MyActor = this.data.calc$?.actorUuid == null ? null : (await UtilsDocument.tokenFromUuid(this.data.calc$.actorUuid)).getActor();
+    const actor: MyActor = data.calc$?.actorUuid == null ? null : (await UtilsDocument.tokenFromUuid(data.calc$.actorUuid)).getActor();
     let baseRoll = new Die();
     baseRoll.faces = 20;
     baseRoll.number = 1;
-    switch (this.data.mode) {
+    switch (data.mode) {
       case 'advantage': {
         baseRoll.number = 2;
         baseRoll.modifiers.push('kh');
@@ -197,23 +197,23 @@ export class AttackCardPart extends ModularCardPart<AttackCardData> {
       baseRoll.modifiers.push('r1=1');
     }
     const parts: string[] = [baseRoll.formula];
-    if (this.data.calc$.rollBonus) {
-      parts.push(this.data.calc$.rollBonus);
+    if (data.calc$.rollBonus) {
+      parts.push(data.calc$.rollBonus);
     }
     
-    if (this.data.userBonus && Roll.validate(this.data.userBonus)) {
-      parts.push(this.data.userBonus);
+    if (data.userBonus && Roll.validate(data.userBonus)) {
+      parts.push(data.userBonus);
     }
 
     const roll = await UtilsRoll.simplifyRoll(new Roll(parts.join(' + '))).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: roll});
-    this.data.calc$.evaluatedRoll = roll.toJSON();
-    this.data.phase = 'result';
+    data.calc$.evaluatedRoll = roll.toJSON();
+    data.phase = 'result';
 
-    const baseRollResult = (this.data.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
-    this.data.calc$.isCrit = baseRollResult.result >= this.data.calc$.critTreshold;
+    const baseRollResult = (data.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
+    data.calc$.isCrit = baseRollResult.result >= data.calc$.critTreshold;
 
-    if (this.data.calc$.isCrit) {
+    if (data.calc$.isCrit) {
       // TODO modify damage cards to become crits
       // for (const dmg of this.data.items?.[itemIndex].damages ?? []) {
       //   if (dmg.phase === 'mode-select') {
@@ -223,7 +223,7 @@ export class AttackCardPart extends ModularCardPart<AttackCardData> {
     }
   }
 
-  private async processItemAttackMode(event: ClickEvent | null, modName: 'plus' | 'minus'): Promise<void> {
+  private static async processItemAttackMode(data: AttackCardData,event: ClickEvent | null, modName: 'plus' | 'minus'): Promise<void> {
     let modifier = modName === 'plus' ? 1 : -1;
     if (event.shiftKey && modifier > 0) {
       modifier++;
@@ -232,22 +232,22 @@ export class AttackCardPart extends ModularCardPart<AttackCardData> {
     }
     
     const order: Array<AttackCardData['mode']> = ['disadvantage', 'normal', 'advantage'];
-    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(this.data.mode) + modifier));
-    if (this.data.mode === order[newIndex]) {
+    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(data.mode) + modifier));
+    if (data.mode === order[newIndex]) {
       return;
     }
-    this.data.mode = order[newIndex];
+    data.mode = order[newIndex];
 
     if (event.shiftKey) {
-      await this.processItemAttackRoll();
+      await AttackCardPart.processItemAttackRoll(data);
     }
     
-    if (!this.data.calc$.evaluatedRoll) {
+    if (!data.calc$.evaluatedRoll) {
       return;
     }
 
-    const originalRoll = Roll.fromJSON(JSON.stringify(this.data.calc$.evaluatedRoll));
-    this.data.calc$.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, this.data.mode)).toJSON();
+    const originalRoll = Roll.fromJSON(JSON.stringify(data.calc$.evaluatedRoll));
+    data.calc$.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, data.mode)).toJSON();
   }
 
 }
