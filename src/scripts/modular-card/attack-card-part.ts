@@ -5,7 +5,7 @@ import { UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { ModularCard } from "./modular-card";
-import { ActionParam, ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
+import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
 
@@ -142,7 +142,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
 
     const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
-    if (clickEvent.shiftKey) {
+    if (clickEvent?.shiftKey) {
       data.phase = orderedPhases[orderedPhases.length - 1];
     } else {
       data.phase = orderedPhases[orderedPhases.indexOf(data.phase) + 1];
@@ -230,11 +230,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
   }
 
-  private static async processItemAttackMode(data: AttackCardData,event: ClickEvent | null, modName: 'plus' | 'minus'): Promise<void> {
+  private static async processItemAttackMode(data: AttackCardData, event: ClickEvent | null, modName: 'plus' | 'minus'): Promise<void> {
     let modifier = modName === 'plus' ? 1 : -1;
-    if (event.shiftKey && modifier > 0) {
+    if (event?.shiftKey && modifier > 0) {
       modifier++;
-    } else if (event.shiftKey && modifier < 0) {
+    } else if (event?.shiftKey && modifier < 0) {
       modifier--;
     }
     
@@ -245,7 +245,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
     data.mode = order[newIndex];
 
-    if (event.shiftKey) {
+    if (event?.shiftKey) {
       await AttackCardPart.processItemAttackRoll(data);
     }
     
