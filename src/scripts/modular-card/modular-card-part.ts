@@ -1,6 +1,6 @@
 import { ITrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
-import { ModularCardTriggerData } from "./modular-card";
+import { ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 
 export interface ClickEvent {
   readonly altKey: boolean;
@@ -17,7 +17,7 @@ interface ActionParamBase<T> {
   data: T;
   regexResult: RegExpExecArray;
   messageId: string;
-  cardParts: ModularCardPart<any>[];
+  allCardParts: ModularCardPartData[];
   userId: string;
 }
 

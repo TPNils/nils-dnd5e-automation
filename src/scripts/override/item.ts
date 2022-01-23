@@ -1,3 +1,4 @@
+import { ModularCard } from "../modular-card/modular-card";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
@@ -28,27 +29,18 @@ async function roll(this: MyItem, {rollMode, createMessage=true}: {configureDial
 }
 
 async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage> {
-  let itemData = await UtilsChatMessage.createDefaultItemData({
+  let itemData = await ModularCard.getDefaultItemParts({
     item: this as any,
-    actor: this.actor as MyActor
+    actor: this.actor as MyActor,
+    token: ((this.actor as any).token) == null ? undefined : (this.actor as any).token,
   });
 
-  itemData.targets = Array.from(game.user.targets).map(token => {return {uuid: token.document.uuid}});
-
-  const itemCardData: Parameters<typeof UtilsChatMessage['createCard']>[0] = {
-    items: [itemData]
-  };
-
-  if (this.actor) {
-    itemCardData.actor = this.actor as MyActor;
-    if ((this.actor as any).token) {
-      itemCardData.token = (this.actor as any).token;
-    }
-  }
+  // TODO auto set targets
+  // itemData.targets = Array.from(game.user.targets).map(token => {return {uuid: token.document.uuid}});
 
   // TODO spell scaling, both dmg and targets
 
-  return await UtilsChatMessage.createCard(itemCardData, createMessage);
+  return await ModularCard.createCard(itemData);
 }
 
 export function registerHooks(): void {
