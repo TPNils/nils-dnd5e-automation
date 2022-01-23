@@ -196,7 +196,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       {
         regex: /^item-damage-mode-(minus|plus)$/,
         permissionCheck: permissionCheck,
-        execute: ({data, clickEvent, regexResult}) => DamageCardPart.processDamageMode(data, clickEvent, regexResult[2] as ('plus' | 'minus')),
+        execute: ({data, clickEvent, regexResult}) => DamageCardPart.processDamageMode(data, clickEvent, regexResult[1] as ('plus' | 'minus')),
       },
     ]
   }

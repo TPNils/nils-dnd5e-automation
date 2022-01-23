@@ -131,7 +131,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       {
         regex: /^item-attack-mode-(minus|plus)$/,
         permissionCheck: permissionCheck,
-        execute: ({data, clickEvent, regexResult}) => AttackCardPart.processItemAttackMode(data, clickEvent, regexResult[2] as ('plus' | 'minus')),
+        execute: ({data, clickEvent, regexResult}) => AttackCardPart.processItemAttackMode(data, clickEvent, regexResult[1] as ('plus' | 'minus')),
       },
     ]
   }
@@ -231,6 +231,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   private static async processItemAttackMode(data: AttackCardData, event: ClickEvent | null, modName: 'plus' | 'minus'): Promise<void> {
+    console.log('processItemAttackMode', {data, event, modName})
     let modifier = modName === 'plus' ? 1 : -1;
     if (event?.shiftKey && modifier > 0) {
       modifier++;
