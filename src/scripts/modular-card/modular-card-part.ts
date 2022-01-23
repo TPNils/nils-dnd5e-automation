@@ -84,8 +84,13 @@ export interface ICallbackAction<T> {
   execute: ActionPermissionExecute<T>;
 }
 
+export interface HtmlContext<T> {
+  partId: string;
+  data: T;
+}
+
 export interface ModularCardPart<D = any> extends ITrigger<ModularCardTriggerData> {
   getType(): string;
-  getHtml(context: {partId: string, data: D}): string | Promise<string>;
+  getHtml(context: HtmlContext<D>): string | Promise<string>;
   getCallbackActions(): ICallbackAction<D>[];
 }

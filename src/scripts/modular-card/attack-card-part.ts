@@ -5,7 +5,7 @@ import { UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { ModularCard } from "./modular-card";
-import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
+import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
 
@@ -99,7 +99,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     return `AttackCardPart`
   }
 
-  public getHtml({data}): string | Promise<string> {
+  public getHtml({data}: HtmlContext<AttackCardData>): string | Promise<string> {
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/attack-part.hbs`, {
         data: data,

@@ -9,7 +9,7 @@ import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardTriggerData } from "./modular-card";
-import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
+import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 
 type TermJson = ReturnType<RollTerm['toJSON']> & {
   class: string;
@@ -163,7 +163,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   //#region Front end
-  public getHtml({data}): string | Promise<string> {
+  public getHtml({data}: HtmlContext<DamageCardData>): string | Promise<string> {
     return renderTemplate(
       // TODO make the template
       `modules/${staticValues.moduleName}/templates/modular-card/damage-part.hbs`, {
