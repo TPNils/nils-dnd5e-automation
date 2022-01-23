@@ -314,6 +314,7 @@ export class ModularCard {
       enrichOptions.secrets = true;
     }
     const htmlParts: string[] = [];
+    htmlParts.push(`<div class="${staticValues.moduleName}-item-card">`);
     for (const part of await Promise.all(htmlParts$)) {
       if (typeof part.html !== 'string' || part.html === '') {
         continue;
@@ -322,6 +323,7 @@ export class ModularCard {
       htmlParts.push(TextEditor.enrichHTML(part.html, enrichOptions as any))
       htmlParts.push(`</div>`);
     }
+    htmlParts.push(`</div>`);
     return htmlParts.join('');
   }
   
