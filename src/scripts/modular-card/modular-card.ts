@@ -301,7 +301,7 @@ export class ModularCard {
       }
 
       // TODO error handeling during render
-      const htmlPart = ModularCard.registeredPartsByType.get(partData.type).part.getHtml({partId: partData.id, data: partData});
+      const htmlPart = ModularCard.registeredPartsByType.get(partData.type).part.getHtml({partId: partData.id, data: partData.data});
       if (htmlPart instanceof Promise) {
         htmlParts$.push(htmlPart.then(html => {return {html: html, id: partData.id}}));
       } else {
