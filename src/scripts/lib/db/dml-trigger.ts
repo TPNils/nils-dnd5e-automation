@@ -96,7 +96,13 @@ interface DmlOptions {
 
 export interface IDmlContext<T extends foundry.abstract.Document<any, any>> {
   readonly rows: ReadonlyArray<{
-    readonly newRow: T;
+    /**
+     * Has a value during insert and update
+     */
+    readonly newRow?: T;
+    /**
+     * Has a value during update and delete
+     */
     readonly oldRow?: T;
     readonly changedByUserId: string;
     readonly options: DmlOptions;
@@ -112,7 +118,7 @@ class AfterDmlContext<T extends foundry.abstract.Document<any, any>> implements 
 
   constructor(
     public readonly rows: ReadonlyArray<{
-      readonly newRow: T;
+      readonly newRow?: T;
       readonly oldRow?: T;
       readonly changedByUserId: string;
       readonly options: {[key: string]: any},
@@ -358,7 +364,6 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   private onFoundryBeforeDelete(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): void | boolean {
     const context: IDmlContext<T> = {
       rows: [{
-        newRow: document,
         oldRow: document,
         changedByUserId: userId,
         options: options
@@ -486,7 +491,6 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
     const context = new AfterDmlContext<T>(
       [{
-        newRow: documentSnapshot,
         oldRow: documentSnapshot,
         changedByUserId: userId,
         options: options
