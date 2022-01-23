@@ -176,9 +176,9 @@ export class TransformTrigger<FROM, TO> implements ITrigger<FROM> {
     }
     const baseContextClone = {...context, rows: null};
     return {
-      create: {...deepClone(context), rows: createRows},
-      update: {...deepClone(context), rows: updateRows},
-      delete: {...deepClone(context), rows: deleteRows},
+      create: {...deepClone(baseContextClone), rows: createRows},
+      update: {...deepClone(baseContextClone), rows: updateRows},
+      delete: {...deepClone(baseContextClone), rows: deleteRows},
     }
   }
   
