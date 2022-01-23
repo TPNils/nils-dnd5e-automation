@@ -29,7 +29,7 @@ export class UtilsHandlebars {
     return args.join('');
   }
 
-  private static documentPermission = /(actor)(exact)?(owner|observer|limited|none)(uuid|id):(.*)/i;
+  private static documentPermission = /(actor)?(exact)?(owner|observer|limited|none)(uuid|id):(.*)/i;
   private static hasPermissionCheck(secretFilters: string[]): boolean {
     // no filters = always visible
     if (secretFilters.length === 0) {
@@ -52,26 +52,25 @@ export class UtilsHandlebars {
           // No uuid/id = don't need permissions
           return true;
         }
-        switch (documentMatch[1].toLocaleLowerCase()) {
-          // Don't support token owner filter. They are too short lived and are based on actor anyway
-          case 'actor': {
-            let actor: MyActor;
-            if (documentMatch[4].toLocaleLowerCase() === 'uuid') {
-              actor = UtilsDocument.actorFromUuid(documentMatch[5], {sync: true});
-            } else {
-              game.actors.get(documentMatch[5]);
+        let document: foundry.abstract.Document<any, any>;
+        if (documentMatch[4].toLocaleLowerCase() === 'uuid') {
+          document = UtilsDocument.fromUuid(documentMatch[5], {sync: true});
+        } else {
+          switch (documentMatch[1].toLocaleLowerCase()) {
+            // Don't support token owner filter. They are too short lived and are based on actor anyway
+            case 'actor': {
+              document = game.actors.get(documentMatch[5]);
+              break;
             }
-            // always show missing/invalid/deleted/null actors for gms
-            if (actor == null && game.user.isGM) {
-              return true;
-            } else {
-              const exactMatch = documentMatch[2] != null;
-              if (actor.testUserPermission(game.user, CONST.ENTITY_PERMISSIONS[documentMatch[3].toLocaleLowerCase().toUpperCase()], exactMatch)) {
-                return true;
-              }
-            }
-            break;
           }
+        }
+        if (document == null) {
+          // always show missing/invalid/deleted/null actors for gms
+          return game.user.isGM;
+        }
+
+        if (document.testUserPermission(game.user, CONST.ENTITY_PERMISSIONS[documentMatch[3].toLocaleLowerCase().toUpperCase()], {exact: documentMatch[2] != null})) {
+          return true;
         }
       }
     }
