@@ -164,10 +164,19 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   //#region Front end
   public getHtml({data}: HtmlContext<DamageCardData>): string | Promise<string> {
+    const renderData = {
+      ...data,
+      $calc: {
+        ...data.calc$,
+        // TODO edit the roll template
+        normalRoll: data.calc$.normalRoll == null ? null : Roll.fromTerms(data.calc$.normalRoll.map(RollTerm.fromData)).toJSON(),
+        criticalRoll: data.calc$.criticalRoll == null ? null : Roll.fromTerms(data.calc$.criticalRoll.map(RollTerm.fromData)).toJSON(),
+      }
+    }
+
     return renderTemplate(
-      // TODO make the template
       `modules/${staticValues.moduleName}/templates/modular-card/damage-part.hbs`, {
-        data: data,
+        data: renderData,
         moduleName: staticValues.moduleName
       }
     );
