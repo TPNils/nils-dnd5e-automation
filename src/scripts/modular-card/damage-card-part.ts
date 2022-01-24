@@ -166,7 +166,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   public getHtml({data}: HtmlContext<DamageCardData>): string | Promise<string> {
     const renderData = {
       ...data,
-      $calc: {
+      calc$: {
         ...data.calc$,
         // TODO edit the roll template
         normalRoll: data.calc$.normalRoll == null ? null : Roll.fromTerms(data.calc$.normalRoll.map(RollTerm.fromData)).toJSON(),
