@@ -13,11 +13,11 @@ import { ActionParam, ClickEvent, ICallbackAction, KeyEvent, ModularCardPart } f
 export interface ModularCardPartData {
   readonly id: string;
   readonly type: string;
-  data: any;
+  readonly data: any;
 }
 
 export interface ModularCardTriggerData extends ModularCardPartData {
-  messageId: string;
+  readonly messageId: string;
 }
 
 class ChatMessageTransformer extends TransformTrigger<ChatMessage, ModularCardTriggerData> implements IDmlTrigger<ChatMessage> {
