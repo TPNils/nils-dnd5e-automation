@@ -38,21 +38,21 @@ export class TransformTrigger<FROM, TO> implements ITrigger<FROM> {
           return false;
         }
       }
-      if (context.update.rows.length > 0) {
-        for (const trigger of this.triggers.values()) {
-          if (trigger.beforeUpdate && trigger.beforeUpdate(context.update) === false) {
-            return false;
-          }
-          if (trigger.beforeUpsert && trigger.beforeUpsert(context.update) === false) {
-            return false;
-          }
+    }
+    if (context.update.rows.length > 0) {
+      for (const trigger of this.triggers.values()) {
+        if (trigger.beforeUpdate && trigger.beforeUpdate(context.update) === false) {
+          return false;
+        }
+        if (trigger.beforeUpsert && trigger.beforeUpsert(context.update) === false) {
+          return false;
         }
       }
-      if (context.delete.rows.length > 0) {
-        for (const trigger of this.triggers.values()) {
-          if (trigger.beforeDelete && trigger.beforeDelete(context.delete) === false) {
-            return false;
-          }
+    }
+    if (context.delete.rows.length > 0) {
+      for (const trigger of this.triggers.values()) {
+        if (trigger.beforeDelete && trigger.beforeDelete(context.delete) === false) {
+          return false;
         }
       }
     }
@@ -70,14 +70,14 @@ export class TransformTrigger<FROM, TO> implements ITrigger<FROM> {
           await trigger.upsert(context.create);
         }
       }
-      if (context.update.rows.length > 0) {
-        for (const trigger of this.triggers.values()) {
-          if (trigger.update) {
-            await trigger.update(context.update);
-          }
-          if (trigger.upsert) {
-            await trigger.upsert(context.update);
-          }
+    }
+    if (context.update.rows.length > 0) {
+      for (const trigger of this.triggers.values()) {
+        if (trigger.update) {
+          await trigger.update(context.update);
+        }
+        if (trigger.upsert) {
+          await trigger.upsert(context.update);
         }
       }
     }
@@ -96,21 +96,21 @@ export class TransformTrigger<FROM, TO> implements ITrigger<FROM> {
           await trigger.afterUpsert(context.create);
         }
       }
-      if (context.update.rows.length > 0) {
-        for (const trigger of this.triggers.values()) {
-          if (trigger.afterUpdate) {
-            await trigger.afterUpdate(context.update);
-          }
-          if (trigger.afterUpsert) {
-            await trigger.afterUpsert(context.update);
-          }
+    }
+    if (context.update.rows.length > 0) {
+      for (const trigger of this.triggers.values()) {
+        if (trigger.afterUpdate) {
+          await trigger.afterUpdate(context.update);
+        }
+        if (trigger.afterUpsert) {
+          await trigger.afterUpsert(context.update);
         }
       }
-      if (context.delete.rows.length > 0) {
-        for (const trigger of this.triggers.values()) {
-          if (trigger.afterDelete) {
-            await trigger.afterDelete(context.delete);
-          }
+    }
+    if (context.delete.rows.length > 0) {
+      for (const trigger of this.triggers.values()) {
+        if (trigger.afterDelete) {
+          await trigger.afterDelete(context.delete);
         }
       }
     }
