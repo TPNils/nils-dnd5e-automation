@@ -181,7 +181,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       return;
     }
     
-    const actor: MyActor = data.calc$?.actorUuid == null ? null : (await UtilsDocument.tokenFromUuid(data.calc$.actorUuid)).getActor();
+    const actor: MyActor = data.calc$?.actorUuid == null ? null : (await UtilsDocument.actorFromUuid(data.calc$.actorUuid));
     let baseRoll = new Die();
     baseRoll.faces = 20;
     baseRoll.number = 1;
