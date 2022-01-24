@@ -143,7 +143,7 @@ export class TransformTrigger<FROM, TO> implements ITrigger<FROM> {
           newPartsMap.set(part.uniqueKey, part.data);
         }
         for (const part of oldParts) {
-          newPartsMap.set(part.uniqueKey, part.data);
+          oldPartsMap.set(part.uniqueKey, part.data);
         }
       }
 
