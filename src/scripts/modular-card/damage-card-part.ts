@@ -487,7 +487,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   private getRollProperties(data: DamageCardData): string[][] {
     const rollProperties: string[][] = [
       ['calc$', 'baseRoll'],
-      ,
     ];
     if (data.calc$.actorBonusRoll) {
       rollProperties.push(['userBonus']);
