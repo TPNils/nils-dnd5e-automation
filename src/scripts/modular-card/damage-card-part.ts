@@ -31,6 +31,7 @@ interface DamageCardData {
     [key: string]: AddedDamage
   },
   calc$: {
+    rollsShouldEvaluate: boolean;
     actorUuid?: string;
     label: string;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
@@ -62,6 +63,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         mode: 'normal',
         phase: 'mode-select',
         calc$: {
+          rollsShouldEvaluate: false,
           label: 'DND5E.Damage',
           baseRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).terms.map(t => t.toJSON() as TermJson),
         }
@@ -93,6 +95,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           mode: 'normal',
           phase: 'mode-select',
           calc$: {
+            rollsShouldEvaluate: false,
             label: 'DND5E.Damage',
             baseRoll: new Roll('0').terms.map(t => t.toJSON() as TermJson),
           }
@@ -119,6 +122,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
             mode: 'normal',
             phase: 'mode-select',
             calc$: {
+              rollsShouldEvaluate: false,
               label: 'DND5E.Damage',
               baseRoll: new Roll('0').terms.map(t => t.toJSON() as TermJson),
             }
@@ -275,6 +279,10 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   //#endregion
 
   //#region Backend
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData>): void {
+    this.calcShouldRoll(context);
+  }
+
   public beforeUpdate(context: IDmlContext<ModularCardTriggerData>): void {
     this.rolledTermsAreFinal(context)
   }
@@ -287,6 +295,18 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     // TODO recalc whole item on level change to support custom scaling level scaling formulas
     this.calcDamageFormulas(context);
     await this.calcDamageRoll(context);
+  }
+  
+  private calcShouldRoll(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow} of context.rows) {
+      if (newRow.type !== DamageCardPart.name) {
+        continue;
+      }
+      const data: DamageCardData = newRow.data;
+      if (data.phase === 'result') {
+        data.calc$.rollsShouldEvaluate = true;
+      }
+    }
   }
   
   private calcDamageFormulas(context: IDmlContext<ModularCardTriggerData>): void {
@@ -322,7 +342,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         continue
       }
       const dmg: DamageCardData = newRow.data;
-      if (dmg.phase === 'result') {
+      if (dmg.calc$.rollsShouldEvaluate) {
         const newNormalTerms: RollTerm[] = [];
         //#region Normal roll
         {

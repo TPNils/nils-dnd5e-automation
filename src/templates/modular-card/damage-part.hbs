@@ -5,17 +5,16 @@
     {{/if}}
   </div>
   <div class="{{@root.moduleName}}-roll-wrapper">
-    
-    {{#if (eq @root.data.phase "result")}}
+    {{#if @root.data.calc$.rollsShouldEvaluate}}
       <div>
         {{#if (and @root.data.calc$.normalRoll.evaluated (eq @root.data.mode 'normal'))}}
           {{> modules/nils-automated-compendium/templates/roll/roll.hbs 
-            overrideFormula=@root.data.displayFormula
+            overrideFormula=@root.data.calc$.displayFormula
             roll=@root.data.calc$.normalRoll
           }}
         {{else if (and @root.data.calc$.criticalRoll.evaluated (eq @root.data.mode 'critical'))}}
           {{> modules/nils-automated-compendium/templates/roll/roll.hbs
-            overrideFormula=@root.data.displayFormula
+            overrideFormula=@root.data.calc$.displayFormula
             roll=@root.data.calc$.criticalRoll
           }}
         {{/if}}
