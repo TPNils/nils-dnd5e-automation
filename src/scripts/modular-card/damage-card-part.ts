@@ -410,8 +410,18 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         //#endregion
     
         if (newNormalTerms.length > 0 || newCriticalTerms.length > 0) {
+          const termCollections: RollTerm[] = [];
+          if (newNormalTerms.length > 0) {
+            termCollections.push(...newCriticalTerms);
+          }
+          if (newCriticalTerms.length > 0) {
+            if (termCollections.length > 0) {
+              termCollections.push(new OperatorTerm({operator: '+'}).evaluate({async: false}));
+            }
+            termCollections.push(...newCriticalTerms);
+          }
           // Don't await for the roll animation to finish
-          UtilsDiceSoNice.showRoll({roll: Roll.fromTerms([...newNormalTerms, ...newCriticalTerms])});
+          UtilsDiceSoNice.showRoll({roll: Roll.fromTerms(termCollections)});
         }
         
         // Auto apply healing since it very rarely gets modified
