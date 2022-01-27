@@ -109,7 +109,6 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
   // - Extra CPU power required by the client
   // - Templates won't be shown properly once the module is uninstalled => would be an issue anyway, this might even be cleaner
   const clientTemplateData = ModularCard.getCardPartDatas(this);
-  console.log(this, clientTemplateData)
   if (clientTemplateData) {
     try {
       this.data.update({content: await ModularCard.getHtml(clientTemplateData)});
