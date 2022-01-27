@@ -372,6 +372,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
         //#region Crit roll
         // TODO I would prefer a method which can recalc the crit roll from 0 and retain the already rolled dice
+        // TODO This should also integrate with the DnD system latest version for crit calculation
         const newCriticalTerms: RollTerm[] = [];
         {
           const unevaluatedTerms: RollTerm[] = [];
@@ -396,6 +397,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
             const result = await UtilsRoll.rollUnrolledTerms(unevaluatedTerms, {async: true});
             
             for (const term of result.results) {
+              // TODO merge normal en critical bonus
               dmg.calc$.criticalRoll.push(term.toJSON() as TermJson);
             }
 
