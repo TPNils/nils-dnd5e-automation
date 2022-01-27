@@ -361,6 +361,23 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         return false;
       }
     }
+
+    // Apply the changes made to the document
+    const totalDiff = UtilsCompare.findDiff(document.data, modifiedDocument.data);
+    const id = change._id
+    for (const key in change) {
+      if (Object.prototype.hasOwnProperty.call(change, key)) {
+        delete change[key];
+      }
+    }
+    change._id = id;
+    if (totalDiff.changed) {
+      for (const key in totalDiff.diff) {
+        if (Object.prototype.hasOwnProperty.call(totalDiff.diff, key)) {
+          change[key] = totalDiff.diff[key];
+        }
+      }
+    }
   }
 
   private onFoundryBeforeDelete(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): void | boolean {
