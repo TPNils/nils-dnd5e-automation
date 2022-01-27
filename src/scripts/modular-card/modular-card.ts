@@ -281,14 +281,36 @@ export class ModularCard {
     if (message == null) {
       return null;
     }
-    return (message.getFlag(staticValues.moduleName, 'modularCardData') as any);
+
+    let cards: Array<ModularCardPartData> | {[key: string]: ModularCardPartData} = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
+    if (typeof cards === 'object' && !Array.isArray(cards)) {
+      let cardsArray: Array<ModularCardPartData> = [];
+
+      const keys = Object.keys(cards).map(Number).sort();
+      for (const key of keys) {
+        cardsArray.push(cards[key]);
+      }
+
+      cards = cardsArray;
+    }
+    return cards;
   }
 
   public static setCardPartDatas(message: ChatMessage, data: Array<ModularCardPartData>): Promise<ChatMessage> {
     if (message == null) {
       return Promise.resolve(message);
     }
-    return message.setFlag(staticValues.moduleName, 'modularCardData', data);
+
+    // Foundry change detection is not perfect.
+    // If a single part of an array has been changed the whole array needs to be updated, this is not a problem with objects.
+    // Ideally all arrays would be converted to object, but thats more complex and this solution will be fine for now.
+    const cardsObj = {};
+    if (data) {
+      for (let i = 0; i < data.length; i++) {
+        cardsObj[i] = data[i];
+      }
+    }
+    return message.setFlag(staticValues.moduleName, 'modularCardData', cardsObj);
   }
 
   public static async getHtml(parts: ModularCardPartData[]): Promise<string> {
