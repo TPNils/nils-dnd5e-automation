@@ -971,7 +971,7 @@ export class UtilsChatMessage {
       roll = new Roll(roll.formula + ' + ' + target.check.userBonus);
     }
     roll = await UtilsRoll.setRollMode(roll, target.check.mode);
-    roll = await UtilsRoll.simplifyRoll(roll).roll({async: true});
+    roll = await UtilsRoll.simplifyTerms(roll).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: roll});
 
     target.check.calc$ = target.check.calc$ ?? {};

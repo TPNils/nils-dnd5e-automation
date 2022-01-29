@@ -1,3 +1,4 @@
+import { data } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
 import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
@@ -168,15 +169,23 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   //#region Front end
   public getHtml({data}: HtmlContext<DamageCardData>): string | Promise<string> {
+    const normalTerms = data.calc$.normalRoll == null ? null : data.calc$.normalRoll.map(RollTerm.fromData);
+    const critBonusTerms = data.calc$.criticalRoll == null ? null : data.calc$.criticalRoll.map(RollTerm.fromData);
     const renderData = {
       ...data,
       calc$: {
         ...data.calc$,
         // TODO edit the roll template
-        normalRoll: data.calc$.normalRoll == null ? null : Roll.fromTerms(data.calc$.normalRoll.map(RollTerm.fromData)).toJSON(),
-        criticalRoll: data.calc$.criticalRoll == null ? null : Roll.fromTerms(data.calc$.criticalRoll.map(RollTerm.fromData)).toJSON(),
+        normalRoll: normalTerms == null ? null : Roll.fromTerms(normalTerms).toJSON(),
+        criticalRoll: normalTerms == null || critBonusTerms == null ? null : Roll.fromTerms(UtilsRoll.mergeCritRoll(normalTerms, critBonusTerms)).toJSON(),
       }
     }
+
+    console.log({
+      normalTerms,
+      critBonusTerms,
+      criticalRoll: renderData.calc$.criticalRoll,
+    });
 
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/damage-part.hbs`, {
@@ -316,7 +325,14 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
       const data: DamageCardData = newRow.data;
       let displayFormula: string;
-      const displayRoll: RollJson = data.mode === 'critical' ? data.calc$.criticalRoll : data?.calc$.normalRoll;
+      let displayRoll: RollJson;
+      if (data.mode === 'normal') {
+        displayRoll = data?.calc$.normalRoll;
+      } else if (data.mode === 'critical') {
+        const normalTerms = data.calc$.normalRoll == null ? null : data.calc$.normalRoll.map(RollTerm.fromData);
+        const critBonusTerms = data.calc$.criticalRoll == null ? null : data.calc$.criticalRoll.map(RollTerm.fromData);
+        displayRoll = Roll.fromTerms(UtilsRoll.mergeCritRoll(normalTerms, critBonusTerms)).terms.map(t => t.toJSON() as TermJson);
+      }
       if (displayRoll) {
         displayFormula = Roll.getFormula(displayRoll.map(RollTerm.fromData));
       }
@@ -397,7 +413,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         {
           const unevaluatedTerms: RollTerm[] = [];
           if (newNormalTerms.length > 0) {
-            unevaluatedTerms.push(...UtilsRoll.getCriticalBonusRoll(Roll.fromTerms(newNormalTerms)).terms);
+            unevaluatedTerms.push(...UtilsRoll.getCriticalBonusRoll(newNormalTerms));
           }
           if (dmg.addedDamages$) {
             for (const key in dmg.addedDamages$) {
@@ -442,7 +458,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
             termCollections.push(...newCriticalTerms);
           }
           // Don't await for the roll animation to finish
-          UtilsDiceSoNice.showRoll({roll: Roll.fromTerms(termCollections)});
+          UtilsDiceSoNice.showRoll({roll: Roll.fromTerms(UtilsRoll.simplifyTerms(termCollections))});
         }
         
         // Auto apply healing since it very rarely gets modified
@@ -487,7 +503,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           }
 
           // TODO allow dice terms to increase their nr of dice (for simplifying crits)
-          if (!UtilsCompare.deepEquals(oldTerms[i], newTerms[i])) {
+          if (oldTerms[i].evaluated && !UtilsCompare.deepEquals(oldTerms[i], newTerms[i])) {
             console.error(`Not allowed to edit already rolled terms.`, {
               context: {
                 entity: 'Message',

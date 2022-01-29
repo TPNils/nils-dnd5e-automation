@@ -212,7 +212,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       parts.push(data.userBonus);
     }
 
-    const roll = await UtilsRoll.simplifyRoll(new Roll(parts.join(' + '))).roll({async: true});
+    const roll = await UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).roll({async: true});
     UtilsDiceSoNice.showRoll({roll: roll});
     data.calc$.evaluatedRoll = roll.toJSON();
     data.phase = 'result';

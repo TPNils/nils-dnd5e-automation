@@ -229,10 +229,10 @@ export class UtilsRoll {
     return new Roll(parts.join(' + '), data);
   }
 
-  public static getCriticalBonusRoll(normal: Roll): Roll {
+  public static getCriticalBonusRoll(normal: RollTerm[]): RollTerm[] {
     const critTerms: RollTerm[] = [];
     // new Roll(formula) will ensure we create a new instance
-    for (const normalTerm of new Roll(normal.formula).terms) {
+    for (const normalTerm of normal) {
       if (normalTerm instanceof NumericTerm) {
         // Do not add numeric terms to the crit bonus
         // also remove operators related to that numeric term
@@ -242,21 +242,20 @@ export class UtilsRoll {
         continue;
       } 
       
-      critTerms.push(normalTerm);
+      critTerms.push(...new Roll(normalTerm.formula).terms);
     }
 
-    return Roll.fromTerms(critTerms);
+    return critTerms;
   }
 
+  /**
+   * roll1:  1d10 + 1d10 + 1d6
+   * roll2:  1d10 + 1d10 + 1d8
+   * result: 4d10 + 1d6 + 1d8
+   */
   public static mergeRolls(...rolls: Roll[]): Roll {
-    if (rolls.length === 0) {
-      return Roll.fromTerms([]);
-    }
-    if (rolls.length === 1) {
-      return Roll.fromJSON(JSON.stringify(rolls[0].toJSON()));
-    }
     // return null when merge is not supported
-    const getMergeKey = (term: RollTerm): string | null => {
+    const getMergeKey = (context: RollTerm[], term: RollTerm): string | null => {
       let optionsParts: string[] = [];
       if (term.options) {
         for (const key of Object.keys(term.options)) {
@@ -265,20 +264,77 @@ export class UtilsRoll {
           }
         }
       }
+      const index = context.indexOf(term);
+      let operator = '+';
+      if (index > 0 && context[index - 1] instanceof OperatorTerm) {
+        operator = (context[index - 1] as OperatorTerm).operator;
+      }
       optionsParts = optionsParts.sort();
       if (term instanceof DiceTerm) {
-        return `${term.constructor.name}/${term.faces}/${term.modifiers.join('-')}/${optionsParts.join('-')}`;
+        return `${operator}/${term.constructor.name}/${term.faces}/${term.modifiers.join('-')}/${optionsParts.join('-')}`;
       } else if (term.constructor === NumericTerm.prototype.constructor) {
-        return `${term.constructor.name}/${optionsParts.join('-')}`;
+        return `${operator}/${term.constructor.name}/${optionsParts.join('-')}`;
       }
       return null;
     }
-    const baseTerms: RollTerm[] = rolls[0].terms.map(t => RollTerm.fromJSON(JSON.stringify(t.toJSON())));
+
+    return Roll.fromTerms(UtilsRoll.mergeTerms(rolls.map(r => r.terms), getMergeKey));
+  }
+
+  /**
+   * normal: 1d10 + 1d10 + 1d6
+   * crit:   1d10 + 1d10 + 1d8
+   * result: 2d20 + 2d10 + 1d6 + 1d8
+   */
+  public static mergeCritRoll(normalTerms: RollTerm[], critTerms: RollTerm[]): RollTerm[] {
+    // return null when merge is not supported
+    const getMergeKey = (context: RollTerm[], term: RollTerm): string | null => {
+      let optionsParts: string[] = [];
+      if (term.options) {
+        for (const key of Object.keys(term.options)) {
+          if (term.options[key] != null) {
+            optionsParts.push(`${key}:${term.options[key]}`);
+          }
+        }
+      }
+      const index = context.indexOf(term);
+      let operator = '+';
+      if (index > 0 && context[index - 1] instanceof OperatorTerm) {
+        operator = (context[index - 1] as OperatorTerm).operator;
+      }
+      let termTypeNr = 0;
+      for (const contextTerm of context) {
+        if (contextTerm === term) {
+          break;
+        } else if (contextTerm.constructor.name === term.constructor.name) {
+          termTypeNr++;
+        }
+      }
+      optionsParts = optionsParts.sort();
+      if (term instanceof DiceTerm) {
+        return `${termTypeNr}/${operator}/${term.constructor.name}/${term.faces}/${term.modifiers.join('-')}/${optionsParts.join('-')}`;
+      } else if (term.constructor === NumericTerm.prototype.constructor) {
+        return `${termTypeNr}/${operator}/${term.constructor.name}/${optionsParts.join('-')}`;
+      }
+      return null;
+    }
+
+    return UtilsRoll.mergeTerms([normalTerms, critTerms], getMergeKey);
+  }
+
+  private static mergeTerms(termsCollection: Array<RollTerm[]>, getMergeKey: (context: RollTerm[], term: RollTerm) => string | null): RollTerm[] {
+    if (termsCollection.length === 0) {
+      return [];
+    }
+    if (termsCollection.length === 1) {
+      return termsCollection[0].map(term => RollTerm.fromData(deepClone(term.toJSON())));
+    }
+    const baseTerms: RollTerm[] = termsCollection[0].map(t => RollTerm.fromJSON(JSON.stringify(t.toJSON())));
     const additionalTermsByMergeKey = new Map<string, {merged: boolean, terms: RollTerm[]}>()
 
-    for (let i = 1; i < rolls.length; i++) {
-      for (const term of rolls[i].terms) {
-        const mergeKey = getMergeKey(term);
+    for (let i = 1; i < termsCollection.length; i++) {
+      for (const term of termsCollection[i]) {
+        const mergeKey = getMergeKey(termsCollection[i], term);
         if (!additionalTermsByMergeKey.has(mergeKey)) {
           additionalTermsByMergeKey.set(mergeKey, {
             merged: false,
@@ -290,7 +346,7 @@ export class UtilsRoll {
     }
 
     for (const baseTerm of baseTerms) {
-      const mergeKey = getMergeKey(baseTerm);
+      const mergeKey = getMergeKey(baseTerms, baseTerm);
       if (mergeKey != null && additionalTermsByMergeKey.get(mergeKey)?.merged === false) {
         const added = additionalTermsByMergeKey.get(mergeKey);
         added.merged = true;
@@ -320,7 +376,7 @@ export class UtilsRoll {
       baseTerms.pop();
     }
 
-    return Roll.fromTerms(baseTerms.map(t => RollTerm.fromJSON(JSON.stringify(t.toJSON()))));
+    return baseTerms.map(t => RollTerm.fromData(deepClone(t.toJSON())));
   }
 
   public static rollUnrolledTerms(terms: RollTerm[], options?: Partial<RollTerm.EvaluationOptions> & {async: false}): {results: RollTerm[], newRolls?: RollTerm[]}
@@ -364,9 +420,12 @@ export class UtilsRoll {
     });
   }
 
-  public static simplifyRoll(roll: Roll): Roll {
+  public static simplifyTerms(roll: RollTerm[]): RollTerm[]
+  public static simplifyTerms(roll: Roll): Roll
+  public static simplifyTerms(roll: RollTerm[] | Roll): RollTerm[] | Roll {
     let terms: (RollTerm & {operator?: string})[] = [];
-    for (const term of roll.terms as (RollTerm & {operator?: string})[]) {
+    const inputTerms = (roll instanceof Roll ? roll.terms : roll) as (RollTerm & {operator?: string})[]
+    for (const term of inputTerms) {
       if (terms.length > 0) {
         if (term.operator === '+') {
           if (terms[terms.length-1].operator) {
@@ -388,7 +447,10 @@ export class UtilsRoll {
       terms.push(term);
     }
 
-    return Roll.fromTerms(terms)
+    if (roll instanceof Roll) {
+      return Roll.fromTerms(terms);
+    }
+    return terms;
   }
 
 }
