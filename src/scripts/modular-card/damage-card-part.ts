@@ -414,6 +414,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
             if (dmg.calc$.criticalRoll == null) {
               dmg.calc$.criticalRoll = [];
             }
+            // TODO right now this rolls the when only selecting normal damage
             const result = await UtilsRoll.rollUnrolledTerms(unevaluatedTerms, {async: true});
             
             for (const term of result.results) {
