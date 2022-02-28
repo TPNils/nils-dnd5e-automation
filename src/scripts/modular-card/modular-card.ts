@@ -8,6 +8,7 @@ import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { AttackCardPart } from "./attack-card-part";
 import { DamageCardPart } from "./damage-card-part";
+import { DescriptionCardPart } from "./description-card-part";
 import { ActionParam, ClickEvent, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 
 export interface ModularCardPartData {
@@ -111,7 +112,7 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
   const clientTemplateData = ModularCard.getCardPartDatas(this);
   if (clientTemplateData) {
     try {
-      this.data.update({content: await ModularCard.getHtml(clientTemplateData)});
+      this.data.update({content: await ModularCard.getHtml(this.id, clientTemplateData)});
     } catch (e) {
       console.error(e);
 
@@ -192,6 +193,13 @@ export class ModularCard {
     let id = 0;
     const parts: ModularCardPartData[] = [];
 
+    for (const part of DescriptionCardPart.create(data)) {
+      parts.push({
+        id: `${id++}`,
+        type: DescriptionCardPart.name,
+        data: part
+      });
+    }
     for (const part of AttackCardPart.create(data)) {
       parts.push({
         id: `${id++}`,
@@ -312,7 +320,7 @@ export class ModularCard {
     return message.setFlag(staticValues.moduleName, 'modularCardData', cardsObj);
   }
 
-  public static async getHtml(parts: ModularCardPartData[]): Promise<string> {
+  public static async getHtml(messageId: string, parts: ModularCardPartData[]): Promise<string> {
     const htmlParts$: Array<{html: string, id: string} | Promise<{html: string, id: string}>> = [];
     for (const partData of parts) {
       if (!ModularCard.registeredPartsByType.has(partData.type)) {
@@ -322,7 +330,7 @@ export class ModularCard {
       }
 
       // TODO error handeling during render
-      const htmlPart = ModularCard.registeredPartsByType.get(partData.type).part.getHtml({partId: partData.id, data: partData.data});
+      const htmlPart = ModularCard.registeredPartsByType.get(partData.type).part.getHtml({messageId: messageId, partId: partData.id, data: partData.data});
       if (htmlPart instanceof Promise) {
         htmlParts$.push(htmlPart.then(html => {return {html: html, id: partData.id}}));
       } else {
@@ -603,7 +611,7 @@ export class ModularCard {
         response.push({
           action: actionMatch,
           regex: result,
-          permissionCheckResult: await actionMatch.permissionCheck({
+          permissionCheckResult: actionMatch.permissionCheck == null ? 'can-run-local' : await actionMatch.permissionCheck({
             partId: partData.id,
             data: partData.data,
             regexResult: result,

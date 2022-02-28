@@ -85,6 +85,7 @@ export interface ICallbackAction<T> {
 }
 
 export interface HtmlContext<T> {
+  messageId: string;
   partId: string;
   data: T;
 }
