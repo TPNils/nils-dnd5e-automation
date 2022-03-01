@@ -6,7 +6,7 @@ import { staticValues } from "../static-values";
 import { MyActor, MyItem, MyItemData } from "../types/fixed-types";
 import { UtilsTemplate } from "../utils/utils-template";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { HtmlContext, ICallbackAction, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, ModularCardPart } from "./modular-card-part";
 
 interface TemplateCardData {
   calc$: {
@@ -52,10 +52,18 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   }
 
   public getCallbackActions(): ICallbackAction<TemplateCardData>[] {
+    const permissionCheck = createPermissionCheck<TemplateCardData>(({data}) => {
+      const documents: CreatePermissionCheckArgs['documents'] = [];
+      if (data.calc$.actorUuid) {
+        documents.push({uuid: data.calc$.actorUuid, permission: 'OWNER'});
+      }
+      return {documents: documents};
+    })
+
     return [
       {
         regex: /^item-template$/,
-        permissionCheck: () => 'can-run-local',
+        permissionCheck: permissionCheck,
         execute: ({data, messageId, partId}) => TemplateCardPart.processItemTemplate(data, messageId, partId),
       }
     ]
