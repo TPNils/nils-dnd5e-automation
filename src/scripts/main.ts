@@ -9,6 +9,7 @@ import { DamageCardPart } from "./modular-card/damage-card-part";
 import { staticValues } from "./static-values";
 import { DescriptionCardPart } from "./modular-card/description-card-part";
 import { PropertyCardPart } from "./modular-card/property-card-part";
+import { TemplateCardPart } from "./modular-card/template-card-part";
 
 registerGlobalApiHooks();
 registerHtmlHooks();
@@ -20,6 +21,7 @@ AttackCardPart.registerHooks();
 DamageCardPart.registerHooks();
 DescriptionCardPart.registerHooks();
 PropertyCardPart.registerHooks();
+TemplateCardPart.registerHooks();
 
 Hooks.on('init', () => {
   const hbsFiles: string[] = [];

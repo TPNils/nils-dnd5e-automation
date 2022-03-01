@@ -1,31 +1,10 @@
 import { ModularCard } from "../modular-card/modular-card";
-import MyAbilityTemplate from "../pixi/ability-template";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
-import { UtilsChatMessage } from "../utils/utils-chat-message";
 
 // Source: https://gitlab.com/foundrynet/dnd5e/-/blob/e0e7ac62469046b0bf51a2fa933b7be34a476b2e/module/item/entity.js#L415
 async function roll(this: MyItem, {rollMode, createMessage=true}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}) {
-  // Create or return the Chat Message data
-  const message = await this.displayCard({rollMode, createMessage});
-
-  // Initiate measured template creation
-  if (this.hasAreaTarget) {
-    const template = MyAbilityTemplate.fromItem({
-      target: this.data.data.target,
-      flags: {
-        [staticValues.moduleName]: {
-          dmlCallbackMessageId: message.id,
-          dmlCallbackItemIndex: 0,
-        }
-      }
-    });
-    if (template) {
-      template.drawPreview();
-    }
-  }
-
-  return message;
+  return this.displayCard({rollMode, createMessage});;
 }
 
 async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage> {

@@ -11,11 +11,12 @@ import { DamageCardPart } from "./damage-card-part";
 import { DescriptionCardPart } from "./description-card-part";
 import { ActionParam, ClickEvent, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 import { PropertyCardPart } from "./property-card-part";
+import { TemplateCardPart } from "./template-card-part";
 
-export interface ModularCardPartData {
+export interface ModularCardPartData<T = any> {
   readonly id: string;
   readonly type: string;
-  readonly data: any;
+  readonly data: T;
 }
 
 export interface ModularCardTriggerData extends ModularCardPartData {
@@ -212,6 +213,13 @@ export class ModularCard {
       parts.push({
         id: `${id++}`,
         type: DamageCardPart.name,
+        data: part
+      });
+    }
+    for (const part of TemplateCardPart.create(data)) {
+      parts.push({
+        id: `${id++}`,
+        type: TemplateCardPart.name,
         data: part
       });
     }
