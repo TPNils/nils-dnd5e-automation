@@ -10,6 +10,7 @@ import { AttackCardPart } from "./attack-card-part";
 import { DamageCardPart } from "./damage-card-part";
 import { DescriptionCardPart } from "./description-card-part";
 import { ActionParam, ClickEvent, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
+import { PropertyCardPart } from "./property-card-part";
 
 export interface ModularCardPartData {
   readonly id: string;
@@ -211,6 +212,13 @@ export class ModularCard {
       parts.push({
         id: `${id++}`,
         type: DamageCardPart.name,
+        data: part
+      });
+    }
+    for (const part of PropertyCardPart.create(data)) {
+      parts.push({
+        id: `${id++}`,
+        type: PropertyCardPart.name,
         data: part
       });
     }
