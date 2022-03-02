@@ -2076,7 +2076,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
                 dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.calc$.actorBonusRoll))))
               }
               if (dmg.userBonus) {
-                dmgParts.push(...UtilsRoll.rollToDamageParts(Roll.fromJSON(JSON.stringify(dmg.userBonus))))
+                dmgParts.push(...UtilsRoll.rollToDamageParts(new Roll(dmg.userBonus)));
               }
               
               const normalRoll = UtilsRoll.simplifyRoll(UtilsRoll.damagePartsToRoll(dmgParts));
