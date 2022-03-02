@@ -63,7 +63,7 @@ jobs:
       env:
         version: ${{ github.ref_name }}
         url: https://github.com/${{github.repository}}
-        manifest: https://github.com/${{github.repository}}/releases/download/${{github.ref_name}}/module.json
+        manifest: https://github.com/${{github.repository}}/releases/download/latest/module.json
         download: https://github.com/${{github.repository}}/releases/download/${{github.ref_name}}/module.zip
     
     # Create a release for this specific version
