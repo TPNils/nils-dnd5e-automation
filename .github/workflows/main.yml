@@ -15,7 +15,7 @@ jobs:
     - name: Install dependancies
       shell: bash
       id: install-dependancies
-      run: npm i
+      run: npm ci
 
     # Get the name from 'module.json'
     - name: Build
