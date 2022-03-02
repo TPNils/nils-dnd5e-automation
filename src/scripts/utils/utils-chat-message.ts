@@ -1022,23 +1022,12 @@ export class UtilsChatMessage {
       attack.phase = orderedPhases[orderedPhases.indexOf(attack.phase) + 1];
     }
 
-    if (orderedPhases.indexOf(attack.phase) === orderedPhases.length - 1) {
-      const response = await UtilsChatMessage.processItemAttackRoll(itemIndex, messageData);
-      if (response) {
-        return response;
-      }
-    }
-
     return messageData;
   }
   
   private static async processItemAttackBonus(keyEvent: KeyEvent | null, blurEvent: boolean, itemIndex: number, attackBonus: string, messageData: ItemCard): Promise<void | ItemCard> {
     const attack = messageData.items?.[itemIndex]?.attack;
     if (!attack || attack.calc$.evaluatedRoll?.evaluated || attack.phase === 'result') {
-      return;
-    }
-
-    if (!keyEvent && !blurEvent) {
       return;
     }
 
@@ -1056,73 +1045,14 @@ export class UtilsChatMessage {
     }
 
     if (keyEvent?.key === 'Enter') {
-      const response = await UtilsChatMessage.processItemAttackRoll(itemIndex, messageData);
-      if (response) {
-        return response;
-      }
-    } else if (keyEvent?.key === 'Escape' || blurEvent) {
+      attack.phase = 'result';
+    } else if (keyEvent?.key === 'Escape') {
       attack.phase = 'mode-select';
     }
 
     if (attack.userBonus !== oldBonus || attack.phase !== oldPhase) {
       return messageData;
     }
-  }
-
-  private static async processItemAttackRoll(itemIndex: number, messageData: ItemCard): Promise<void | ItemCard> {
-    const attack = messageData.items?.[itemIndex]?.attack;
-    if (!attack || attack.calc$.evaluatedRoll) {
-      return;
-    }
-    
-    const actor: MyActor = messageData.token?.uuid == null ? null : (await UtilsDocument.tokenFromUuid(messageData.token?.uuid)).getActor();
-    let baseRoll = new Die();
-    baseRoll.faces = 20;
-    baseRoll.number = 1;
-    switch (attack.mode) {
-      case 'advantage': {
-        baseRoll.number = 2;
-        baseRoll.modifiers.push('kh');
-        break;
-      }
-      case 'disadvantage': {
-        baseRoll.number = 2;
-        baseRoll.modifiers.push('kl');
-        break;
-      }
-    }
-    if (actor && actor.getFlag("dnd5e", "halflingLucky")) {
-      // reroll a base roll 1 once
-      // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
-      // second 2 = reroll when the roll result is equal to 1 (=1)
-      baseRoll.modifiers.push('r1=1');
-    }
-    const parts: string[] = [baseRoll.formula];
-    if (attack.calc$.rollBonus) {
-      parts.push(attack.calc$.rollBonus);
-    }
-    
-    if (attack.userBonus && Roll.validate(attack.userBonus)) {
-      parts.push(attack.userBonus);
-    }
-
-    const roll = await UtilsRoll.simplifyRoll(new Roll(parts.join(' + '))).roll({async: true});
-    UtilsDiceSoNice.showRoll({roll: roll});
-    attack.calc$.evaluatedRoll = roll.toJSON();
-    attack.phase = 'result';
-
-    const baseRollResult = (attack.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
-    attack.calc$.isCrit = baseRollResult.result >= attack.calc$.critTreshold;
-
-    if (attack.calc$.isCrit) {
-      for (const dmg of messageData.items?.[itemIndex].damages ?? []) {
-        if (dmg.phase === 'mode-select') {
-          dmg.mode = 'critical';
-        }
-      }
-    }
-
-    return messageData;
   }
 
   private static async processItemAttackMode(event: ClickEvent, itemIndex: number, modName: 'plus' | 'minus', messageData: ItemCard): Promise<void | ItemCard> {
@@ -1142,10 +1072,7 @@ export class UtilsChatMessage {
     attack.mode = order[newIndex];
 
     if (event.shiftKey) {
-      const response = await UtilsChatMessage.processItemAttackRoll(itemIndex, messageData);
-      if (response) {
-        messageData = response;
-      }
+      attack.phase = 'result';
     }
     
     if (!attack.calc$.evaluatedRoll) {
@@ -1714,6 +1641,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       await this.setTargets(context);
       await this.calcTargets(context);
       await this.applyConsumeResources(context);
+      await this.processItemAttackRoll(context);
       this.calcItemCardDamageFormulas(itemCards);
       this.calcItemCardCanChangeTargets(itemCards);
       this.calcCanChangeSpellLevel(itemCards);
@@ -1741,6 +1669,64 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
   
       if (deleteTemplateUuids.size > 0) {
         UtilsDocument.bulkDelete(Array.from(((await UtilsDocument.templateFromUuid(deleteTemplateUuids)).values())).map(doc => {return {document: doc}}))
+      }
+    }
+  }
+  
+  private async processItemAttackRoll(context: IDmlContext<ChatMessage>): Promise<void> {
+    for (const {newRow} of context.rows) {
+      const data: ItemCard = InternalFunctions.getItemCardData(newRow);
+      for (const item of data.items) {
+        if (!item.attack || item.attack.calc$.evaluatedRoll || item.attack.phase !== 'result') {
+          continue;
+        }
+
+        const actor: MyActor = data.token?.uuid == null ? null : (await UtilsDocument.tokenFromUuid(data.token?.uuid)).getActor();
+        let baseRoll = new Die();
+        baseRoll.faces = 20;
+        baseRoll.number = 1;
+        switch (item.attack.mode) {
+          case 'advantage': {
+            baseRoll.number = 2;
+            baseRoll.modifiers.push('kh');
+            break;
+          }
+          case 'disadvantage': {
+            baseRoll.number = 2;
+            baseRoll.modifiers.push('kl');
+            break;
+          }
+        }
+        if (actor && actor.getFlag("dnd5e", "halflingLucky")) {
+          // reroll a base roll 1 once
+          // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
+          // second 2 = reroll when the roll result is equal to 1 (=1)
+          baseRoll.modifiers.push('r1=1');
+        }
+        const parts: string[] = [baseRoll.formula];
+        if (item.attack.calc$.rollBonus) {
+          parts.push(item.attack.calc$.rollBonus);
+        }
+        
+        if (item.attack.userBonus && Roll.validate(item.attack.userBonus)) {
+          parts.push(item.attack.userBonus);
+        }
+    
+        const roll = await UtilsRoll.simplifyRoll(new Roll(parts.join(' + '))).roll({async: true});
+        UtilsDiceSoNice.showRoll({roll: roll});
+        item.attack.calc$.evaluatedRoll = roll.toJSON();
+        item.attack.phase = 'result';
+    
+        const baseRollResult = (item.attack.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
+        item.attack.calc$.isCrit = baseRollResult.result >= item.attack.calc$.critTreshold;
+    
+        if (item.attack.calc$.isCrit) {
+          for (const dmg of item.damages ?? []) {
+            if (dmg.phase === 'mode-select') {
+              dmg.mode = 'critical';
+            }
+          }
+        }
       }
     }
   }

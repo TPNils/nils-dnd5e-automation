@@ -45,7 +45,7 @@
                 {{/if}}
               </div>
               <div class="{{@root.staticValues.moduleName}}-roll-wrapper">
-                {{#if (eq item.attack.phase "result")}}
+                {{#if item.attack.calc$.evaluatedRoll.evaluated}}
                   <div>
                     {{> modules/nils-automated-compendium/templates/roll/roll.hbs 
                       roll=item.attack.calc$.evaluatedRoll
