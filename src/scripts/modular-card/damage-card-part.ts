@@ -181,12 +181,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
     }
 
-    console.log({
-      normalTerms,
-      critBonusTerms,
-      criticalRoll: renderData.calc$.criticalRoll,
-    });
-
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/damage-part.hbs`, {
         data: renderData,
