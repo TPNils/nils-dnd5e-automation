@@ -613,7 +613,7 @@ export class ModularCard {
 
     if (!UtilsCompare.deepEquals(originalAllCardParts, allCardParts)) {
       // Don't use await so you can return a response faster to the client
-      ModularCard.setCardPartDatas(message, allCardParts);
+      await ModularCard.setCardPartDatas(message, allCardParts);
     }
 
     return {
