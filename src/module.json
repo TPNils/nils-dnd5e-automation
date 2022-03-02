@@ -12,7 +12,7 @@
   "manifest": "https://github.com/TPNils/nils-automated-compendium/releases/download/v1.3.4-beta/module.json",
   "download": "https://github.com/TPNils/nils-automated-compendium/releases/download/v1.3.4-beta/module.zip",
   "type": "module",
-  "styles": ["styles/chat.css", "styles/global-variables.css"],
+  "styles": [],
   "esmodules": ["scripts/main.js"],
   "bugs": "https://github.com/TPNils/nils-automated-compendium/issues",
   "flags": {"allowBugReporter": true},
