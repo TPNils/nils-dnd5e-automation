@@ -173,8 +173,14 @@ interface ClickEvent {
 interface KeyEvent {
   readonly key: 'Enter' | 'Escape';
 }
+interface InteractionEvents {
+  clickEvent?: ClickEvent;
+  keyEvent?: KeyEvent;
+  changeEvent?: {value: boolean | number | string};
+  blurEvent?: true;
+}
 type InteractionResponse = {success: true;} | {success: false; errorMessage: string, errorType: 'warn' | 'error'}
-interface ActionParam {clickEvent: ClickEvent, userId: string, keyEvent?: KeyEvent, regexResult: RegExpExecArray, messageId: string, messageData: ItemCard, inputValue?: boolean | number | string};
+type ActionParam = {userId: string, regexResult: RegExpExecArray, messageId: string, messageData: ItemCard} & InteractionEvents;
 type ActionPermissionCheck = ({}: ActionParam) => {actorUuid?: string, tokenUuid?: string, message?: boolean, gm?: boolean, onlyRunLocal?: boolean};
 type ActionPermissionExecute = ({}: ActionParam) => Promise<void | ItemCard>;
 
@@ -201,7 +207,7 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-damage-([0-9]+)-bonus$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({keyEvent, regexResult, inputValue, messageData, messageId}) => UtilsChatMessage.processItemDamageBonus(keyEvent, Number(regexResult[1]), Number(regexResult[2]), inputValue as string, messageData, messageId),
+      execute: ({keyEvent, regexResult, changeEvent, messageData, messageId}) => UtilsChatMessage.processItemDamageBonus(keyEvent, Number(regexResult[1]), Number(regexResult[2]), changeEvent?.value as string, messageData, messageId),
     },
     {
       regex: /^item-([0-9]+)-attack$/,
@@ -211,12 +217,12 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-attack-bonus$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({keyEvent, regexResult, inputValue, messageData}) => UtilsChatMessage.processItemAttackBonus(keyEvent, Number(regexResult[1]), inputValue as string, messageData),
+      execute: ({keyEvent, regexResult, changeEvent, messageData, blurEvent}) => UtilsChatMessage.processItemAttackBonus(keyEvent, blurEvent, Number(regexResult[1]), changeEvent?.value as string, messageData),
     },
     {
       regex: /^item-([0-9]+)-upcastlevel$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
-      execute: ({regexResult, inputValue, messageData}) => UtilsChatMessage.upcastlevelChange(Number(regexResult[1]), inputValue as string, messageData),
+      execute: ({regexResult, changeEvent, messageData}) => UtilsChatMessage.upcastlevelChange(Number(regexResult[1]), changeEvent?.value as string, messageData),
     },
     {
       regex: /^item-([0-9]+)-attack-mode-(minus|plus)$/,
@@ -231,7 +237,7 @@ export class UtilsChatMessage {
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-bonus$/,
       permissionCheck: ({regexResult}) => {return {tokenUuid: regexResult[2]}},
-      execute: ({keyEvent, regexResult, inputValue, messageData}) => UtilsChatMessage.processItemCheckBonus(keyEvent, Number(regexResult[1]), regexResult[2], inputValue as string, messageData),
+      execute: ({keyEvent, regexResult, changeEvent, messageData}) => UtilsChatMessage.processItemCheckBonus(keyEvent, Number(regexResult[1]), regexResult[2], changeEvent?.value as string, messageData),
     },
     {
       regex: /^item-([0-9]+)-check-([a-zA-Z0-9\.]+)-mode-(minus|plus)$/,
@@ -741,6 +747,7 @@ export class UtilsChatMessage {
 
   private static async onBlur(event: FocusEvent): Promise<void> {
     if (event.target instanceof HTMLInputElement) {
+      console.log('onBlur')
       // blur does not work very well with checkboxes => listen to click event
       const input = event.target as HTMLInputElement;
       if (input.type === 'checkbox') {
@@ -748,7 +755,8 @@ export class UtilsChatMessage {
       }
       if (event.target instanceof Node) {
         UtilsChatMessage.onInteraction({
-          element: event.target as Node
+          element: event.target as Node,
+          blurEvent: true,
         });
       }
     }
@@ -756,6 +764,7 @@ export class UtilsChatMessage {
 
   private static async onKeyDown(event: KeyboardEvent): Promise<void> {
     if (event.target instanceof HTMLInputElement && ['Enter', 'Escape'].includes(event.key)) {
+      console.log('onKeyDown')
       UtilsChatMessage.onInteraction({
         element: event.target as Node,
         keyEvent: {
@@ -768,12 +777,13 @@ export class UtilsChatMessage {
   private static async onChange(event: Event): Promise<void> {
     if (event.target instanceof Node) {
       UtilsChatMessage.onInteraction({
-        element: event.target as Node
+        element: event.target as Node,
+        changeEvent: {value: (event.target as HTMLInputElement).value},
       });
     }
   }
 
-  private static async onInteraction({clickEvent, element, keyEvent}: {element: Node, clickEvent?: ClickEvent, keyEvent?: KeyEvent}): Promise<void> {
+  private static async onInteraction({clickEvent, element, keyEvent, blurEvent}: {element: Node} & InteractionEvents): Promise<void> {
     clickEvent = {
       altKey: clickEvent?.altKey === true,
       ctrlKey: clickEvent?.ctrlKey === true,
@@ -844,7 +854,8 @@ export class UtilsChatMessage {
       userId: game.userId,
       messageId: messageId,
       action: action,
-      inputValue: inputValue,
+      changeEvent: inputValue ? {value: inputValue} : null,
+      blurEvent: blurEvent,
     }
 
     let response: InteractionResponse;
@@ -877,14 +888,11 @@ export class UtilsChatMessage {
     }
   }
 
-  private static async onInteractionProcessor({clickEvent, keyEvent, userId, messageId, action, inputValue}: {
-    clickEvent: ClickEvent,
-    keyEvent: KeyEvent,
+  private static async onInteractionProcessor({clickEvent, keyEvent, blurEvent, changeEvent, userId, messageId, action}: {
     userId: string,
     messageId: string,
     action: string,
-    inputValue?: ActionParam['inputValue'];
-  }): Promise<InteractionResponse> {
+  } & InteractionEvents): Promise<InteractionResponse> {
     const message = game.messages.get(messageId);
     const messageData = InternalFunctions.getItemCardData(message);
     if (messageData == null) {
@@ -908,7 +916,7 @@ export class UtilsChatMessage {
     let doUpdate = false;
     
     for (const action of actions.actionsToExecute) {
-      const param: ActionParam = {clickEvent: clickEvent, userId: userId, keyEvent: keyEvent, regexResult: action.regex, messageId: messageId, messageData: latestMessageData, inputValue: inputValue};
+      const param: ActionParam = {clickEvent: clickEvent, keyEvent: keyEvent, blurEvent: blurEvent, changeEvent: changeEvent, userId: userId, regexResult: action.regex, messageId: messageId, messageData: latestMessageData};
       try {
         let response = await action.action.execute(param);
         if (response) {
@@ -1026,11 +1034,16 @@ export class UtilsChatMessage {
     return messageData;
   }
   
-  private static async processItemAttackBonus(keyEvent: KeyEvent | null, itemIndex: number, attackBonus: string, messageData: ItemCard): Promise<void | ItemCard> {
+  private static async processItemAttackBonus(keyEvent: KeyEvent | null, blurEvent: boolean, itemIndex: number, attackBonus: string, messageData: ItemCard): Promise<void | ItemCard> {
     const attack = messageData.items?.[itemIndex]?.attack;
     if (!attack || attack.calc$.evaluatedRoll?.evaluated || attack.phase === 'result') {
       return;
     }
+
+    if (!keyEvent && !blurEvent) {
+      return;
+    }
+    console.log('processItemAttackBonus', keyEvent, attackBonus)
 
     const oldPhase = attack.phase;
     const oldBonus = attack.userBonus;
@@ -1050,10 +1063,11 @@ export class UtilsChatMessage {
       if (response) {
         return response;
       }
-    } else if (keyEvent?.key === 'Escape') {
+    } else if (keyEvent?.key === 'Escape' || blurEvent) {
       attack.phase = 'mode-select';
     }
 
+    console.log(attack.userBonus, '!==', oldBonus, ' || ', attack.phase, ' !== ', oldPhase)
     if (attack.userBonus !== oldBonus || attack.phase !== oldPhase) {
       return messageData;
     }
