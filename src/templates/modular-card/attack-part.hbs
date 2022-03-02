@@ -5,7 +5,7 @@
     {{/if}}
   </div>
   <div class="{{@root.moduleName}}-roll-wrapper">
-    {{#if (eq @root.data.phase "result")}}
+    {{#if @root.data.calc$.evaluatedRoll.evaluated }}
       <div>
         {{> modules/nils-automated-compendium/templates/roll/roll.hbs 
           roll=@root.data.calc$.evaluatedRoll

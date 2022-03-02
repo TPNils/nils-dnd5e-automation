@@ -1,10 +1,11 @@
+import { IAfterDmlContext } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
-import { ModularCard } from "./modular-card";
+import { ModularCard, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
@@ -136,7 +137,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     ]
   }
 
-  private static async processItemAttack(data: AttackCardData, clickEvent: ClickEvent | null): Promise<void> {
+  private static processItemAttack(data: AttackCardData, clickEvent: ClickEvent | null): void {
     if (data.phase === 'result') {
       return;
     }
@@ -147,13 +148,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     } else {
       data.phase = orderedPhases[orderedPhases.indexOf(data.phase) + 1];
     }
-
-    if (orderedPhases.indexOf(data.phase) === orderedPhases.length - 1) {
-      await AttackCardPart.processItemAttackRoll(data);
-    }
   }
   
-  private static async processItemAttackBonus(data: AttackCardData, keyEvent: KeyEvent | null, attackBonus: string): Promise<void> {
+  private static processItemAttackBonus(data: AttackCardData, keyEvent: KeyEvent | null, attackBonus: string): void {
     if (data.calc$.evaluatedRoll?.evaluated || data.phase === 'result') {
       return;
     }
@@ -170,68 +167,13 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
 
     if (keyEvent?.key === 'Enter') {
-      await AttackCardPart.processItemAttackRoll(data);
+      data.phase = 'result';
     } else if (keyEvent?.key === 'Escape') {
       data.phase = 'mode-select';
     }
   }
 
-  private static async processItemAttackRoll(data: AttackCardData): Promise<void> {
-    if (data.calc$.evaluatedRoll) {
-      return;
-    }
-    
-    const actor: MyActor = data.calc$?.actorUuid == null ? null : (await UtilsDocument.actorFromUuid(data.calc$.actorUuid));
-    let baseRoll = new Die();
-    baseRoll.faces = 20;
-    baseRoll.number = 1;
-    switch (data.mode) {
-      case 'advantage': {
-        baseRoll.number = 2;
-        baseRoll.modifiers.push('kh');
-        break;
-      }
-      case 'disadvantage': {
-        baseRoll.number = 2;
-        baseRoll.modifiers.push('kl');
-        break;
-      }
-    }
-    if (actor && actor.getFlag("dnd5e", "halflingLucky")) {
-      // reroll a base roll 1 once
-      // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
-      // second 2 = reroll when the roll result is equal to 1 (=1)
-      baseRoll.modifiers.push('r1=1');
-    }
-    const parts: string[] = [baseRoll.formula];
-    if (data.calc$.rollBonus) {
-      parts.push(data.calc$.rollBonus);
-    }
-    
-    if (data.userBonus && Roll.validate(data.userBonus)) {
-      parts.push(data.userBonus);
-    }
-
-    const roll = await UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).roll({async: true});
-    UtilsDiceSoNice.showRoll({roll: roll});
-    data.calc$.evaluatedRoll = roll.toJSON();
-    data.phase = 'result';
-
-    const baseRollResult = (data.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
-    data.calc$.isCrit = baseRollResult.result >= data.calc$.critTreshold;
-
-    if (data.calc$.isCrit) {
-      // TODO modify damage cards to become crits
-      // for (const dmg of this.data.items?.[itemIndex].damages ?? []) {
-      //   if (dmg.phase === 'mode-select') {
-      //     dmg.mode = 'critical';
-      //   }
-      // }
-    }
-  }
-
   private static async processItemAttackMode(data: AttackCardData, event: ClickEvent | null, modName: 'plus' | 'minus'): Promise<void> {
-    console.log('processItemAttackMode', {data, event, modName})
     let modifier = modName === 'plus' ? 1 : -1;
     if (event?.shiftKey && modifier > 0) {
       modifier++;
@@ -247,7 +189,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     data.mode = order[newIndex];
 
     if (event?.shiftKey) {
-      await AttackCardPart.processItemAttackRoll(data);
+      data.phase = 'result';
     }
     
     if (!data.calc$.evaluatedRoll) {
@@ -256,6 +198,73 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
     const originalRoll = Roll.fromJSON(JSON.stringify(data.calc$.evaluatedRoll));
     data.calc$.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, data.mode)).toJSON();
+  }
+
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+    await this.rollAttack(context);
+  }
+
+  private async rollAttack(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+    for (const {newRow} of context.rows) {
+      if (!this.isThisType(newRow)) {
+        continue;
+      }
+      if (newRow.data.calc$.evaluatedRoll?.evaluated || newRow.data.phase !== 'result') {
+        continue;
+      }
+
+      const actor: MyActor = newRow.data.calc$?.actorUuid == null ? null : (await UtilsDocument.actorFromUuid(newRow.data.calc$.actorUuid));
+      let baseRoll = new Die();
+      baseRoll.faces = 20;
+      baseRoll.number = 1;
+      switch (newRow.data.mode) {
+        case 'advantage': {
+          baseRoll.number = 2;
+          baseRoll.modifiers.push('kh');
+          break;
+        }
+        case 'disadvantage': {
+          baseRoll.number = 2;
+          baseRoll.modifiers.push('kl');
+          break;
+        }
+      }
+      if (actor && actor.getFlag("dnd5e", "halflingLucky")) {
+        // reroll a base roll 1 once
+        // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
+        // second 2 = reroll when the roll result is equal to 1 (=1)
+        baseRoll.modifiers.push('r1=1');
+      }
+      const parts: string[] = [baseRoll.formula];
+      if (newRow.data.calc$.rollBonus) {
+        parts.push(newRow.data.calc$.rollBonus);
+      }
+      
+      if (newRow.data.userBonus && Roll.validate(newRow.data.userBonus)) {
+        parts.push(newRow.data.userBonus);
+      }
+  
+      const roll = await UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).roll({async: true});
+      UtilsDiceSoNice.showRoll({roll: roll});
+      newRow.data.calc$.evaluatedRoll = roll.toJSON();
+      newRow.data.phase = 'result';
+  
+      const baseRollResult = (newRow.data.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
+      newRow.data.calc$.isCrit = baseRollResult.result >= newRow.data.calc$.critTreshold;
+  
+      if (newRow.data.calc$.isCrit) {
+        // TODO modify damage cards to become crits
+        // for (const dmg of this.data.items?.[itemIndex].damages ?? []) {
+        //   if (dmg.phase === 'mode-select') {
+        //     dmg.mode = 'critical';
+        //   }
+        // }
+      }
+    }
+  }
+
+  private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData> {
+    return row.type === this.getType() && row.typeHandler instanceof AttackCardPart;
   }
 
 }
