@@ -747,7 +747,6 @@ export class UtilsChatMessage {
 
   private static async onBlur(event: FocusEvent): Promise<void> {
     if (event.target instanceof HTMLInputElement) {
-      console.log('onBlur')
       // blur does not work very well with checkboxes => listen to click event
       const input = event.target as HTMLInputElement;
       if (input.type === 'checkbox') {
@@ -764,7 +763,6 @@ export class UtilsChatMessage {
 
   private static async onKeyDown(event: KeyboardEvent): Promise<void> {
     if (event.target instanceof HTMLInputElement && ['Enter', 'Escape'].includes(event.key)) {
-      console.log('onKeyDown')
       UtilsChatMessage.onInteraction({
         element: event.target as Node,
         keyEvent: {
@@ -1043,7 +1041,6 @@ export class UtilsChatMessage {
     if (!keyEvent && !blurEvent) {
       return;
     }
-    console.log('processItemAttackBonus', keyEvent, attackBonus)
 
     const oldPhase = attack.phase;
     const oldBonus = attack.userBonus;
@@ -1067,7 +1064,6 @@ export class UtilsChatMessage {
       attack.phase = 'mode-select';
     }
 
-    console.log(attack.userBonus, '!==', oldBonus, ' || ', attack.phase, ' !== ', oldPhase)
     if (attack.userBonus !== oldBonus || attack.phase !== oldPhase) {
       return messageData;
     }
