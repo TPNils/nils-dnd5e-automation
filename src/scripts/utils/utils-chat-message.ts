@@ -461,11 +461,11 @@ export class UtilsChatMessage {
 
       // One-time bonus provided by consumed ammunition
       if ( (item.data.data.consume?.type === 'ammo') && !!actor?.items ) {
-        const ammoItemData = actor.items.get(item.data.data.consume.target)?.data;
+        const ammoItemData = actor.items.get(item.data.data.consume?.target)?.data;
 
         if (ammoItemData) {
           const ammoItemQuantity = ammoItemData.data.quantity;
-          const ammoCanBeConsumed = ammoItemQuantity && (ammoItemQuantity - (item.data.data.consume.amount ?? 0) >= 0);
+          const ammoCanBeConsumed = ammoItemQuantity && (ammoItemQuantity - (item.data.data.consume?.amount ?? 0) >= 0);
           const ammoItemAttackBonus = ammoItemData.data.attackBonus;
           const ammoIsTypeConsumable = ammoItemData.type === "consumable" && ammoItemData.data.consumableType === "ammo";
           if ( ammoCanBeConsumed && ammoItemAttackBonus && ammoIsTypeConsumable ) {
@@ -635,9 +635,9 @@ export class UtilsChatMessage {
         });
       }
 
-      switch (item.data.data.consume.type) {
+      switch (item.data.data.consume?.type) {
         case 'attribute': {
-          if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
+          if (item.data.data.consume?.target && item.data.data.consume?.amount > 0) {
             let propertyPath = `data.${item.data.data.consume.target}`;
             itemCardData.consumeResources.push({
               calc$: {
@@ -655,10 +655,10 @@ export class UtilsChatMessage {
     }
 
     // Consume item resources
-    switch (item.data.data.consume.type) {
+    switch (item.data.data.consume?.type) {
       case 'ammo':
       case 'material': {
-        if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
+        if (item.data.data.consume?.target && item.data.data.consume?.amount > 0) {
           const targetItem = item.actor.items.get(item.data.data.consume.target);
           let propertyPath = `data.quantity`;
           itemCardData.consumeResources.push({
@@ -674,7 +674,7 @@ export class UtilsChatMessage {
         break;
       }
       case 'charges': {
-        if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
+        if (item.data.data.consume?.target && item.data.data.consume?.amount > 0) {
           const targetItem = item.actor.items.get(item.data.data.consume.target);
           let propertyPath = `data.uses.value`;
           itemCardData.consumeResources.push({
