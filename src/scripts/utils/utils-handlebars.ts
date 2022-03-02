@@ -263,10 +263,10 @@ export class UtilsHandlebars {
     let options: Options = args[args.length - 1];
     let highlightTotalOnFirstTerm = false;
     let overrideMaxRoll: number;
-    if (args.length >= 3) {
+    if (args.length >= 1 && args[1] != null) {
       highlightTotalOnFirstTerm = Boolean(args[1]);
     }
-    if (args.length >= 4) {
+    if (args.length >= 2 && args[2] != null) {
       overrideMaxRoll = Number(args[2]);
     }
     let max = true;
@@ -289,10 +289,10 @@ export class UtilsHandlebars {
 
     const matches = hasDie && max;
     
+
     if (!UtilsHandlebars.isBlockHelper(options)) {
       return matches;
     }
-
     if (matches) {
       return options.fn(this);
     } else {
@@ -308,10 +308,10 @@ export class UtilsHandlebars {
     let options: Options = args[args.length - 1];
     let highlightTotalOnFirstTerm = false;
     let minRoll = 1;
-    if (args.length === 3) {
+    if (args.length >= 1 && args[1] != null) {
       highlightTotalOnFirstTerm = Boolean(args[1]);
     }
-    if (args.length === 4) {
+    if (args.length >= 2 && args[2] != null) {
       minRoll = Number(args[2]);
     }
     let min = true;
