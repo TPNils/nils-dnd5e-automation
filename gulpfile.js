@@ -2,22 +2,27 @@
  * Based on https://gitlab.com/tposney/midi-qol/-/blob/master/gulpfile.js
  */
 
-const gulp = require('gulp');
-const fs = require('fs-extra');
-const path = require('path');
-const chalk = import('chalk');
-const archiver = require('archiver');
-const stringify = require('json-stringify-pretty-compact');
-const typescript = require('typescript');
+import gulp from 'gulp';
+import fs from 'fs-extra';
+import path from 'path';
+import chalk from 'chalk';
+import archiver from 'archiver';
+import stringify from 'json-stringify-pretty-compact';
+import typescript from 'typescript';
 
-const ts = require('gulp-typescript');
-const less = require('gulp-less');
-const sass = require('gulp-sass')(require('sass'));
-const git = require('gulp-git');
-const sourcemaps = require('gulp-sourcemaps');
+import ts from 'gulp-typescript';
+import less from 'gulp-less';
+import sassCompiler from 'sass';
+import gulpSass from 'gulp-sass';
+import git from 'gulp-git';
+import sourcemaps from 'gulp-sourcemaps';
 
-const exec = require('child_process').exec;
-const argv = require('yargs').argv;
+import child_process from 'child_process';
+import yargs from 'yargs';
+
+const sass = gulpSass(sassCompiler);
+const exec = child_process.exec;
+const argv = yargs.argv;
 
 /**
  * @returns {{
@@ -542,15 +547,16 @@ function startFoundry() {
 	exec(cmd);
 }
 
-exports.build = gulp.series(clean, execBuild);
-exports.updateSrcPacks = gulp.parallel(createCopyFiles([{from: ['dist','packs'], to: ['src','packs']}]));
-exports.watch = buildWatch;
-exports.clean = clean;
-exports.link = linkUserData;
-exports.package = packageBuild;
-exports.updateManifest = updateGithubManifest;
-exports.test = gitPushTag;
-exports.publish = gulp.series(
+
+export const build = gulp.series(clean, execBuild);
+export const updateSrcPacks = gulp.parallel(createCopyFiles([{from: ['dist','packs'], to: ['src','packs']}]));
+export const watch = buildWatch;
+//export {clean};
+export const link = linkUserData;
+export const buildZip = packageBuild;
+export const updateManifest = updateGithubManifest;
+export const test = gitPushTag;
+export const publish = gulp.series(
 	clean,
 	validateCleanRepo,
 	updateGithubManifest,
