@@ -2340,7 +2340,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
           oldAppliedUuids.add(target.uuid);
         }
       }
-      console.log({newAppliedUuids, oldAppliedUuids})
       const allUuids = new Set<string>([...Array.from(newAppliedUuids), ...Array.from(oldAppliedUuids)]);
       for (const uuid of allUuids) {
         if (newAppliedUuids.has(uuid) !== oldAppliedUuids.has(uuid)) {
@@ -2351,8 +2350,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
         }
       }
     }
-
-    console.log('latestAppliedHp', latestAppliedHp, recalcTargetUuid);
 
     if (!latestAppliedHp) {
       return;
@@ -2381,7 +2378,6 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       }
       futureChatMessages.push(chatMessage);
     }
-    console.log('futureChatMessages', futureChatMessages);
 
     const tokensByUuid = await UtilsDocument.tokenFromUuid(recalcTargetUuid);
     for (const chatMessage of futureChatMessages) {
