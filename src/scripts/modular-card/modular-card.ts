@@ -19,8 +19,9 @@ export interface ModularCardPartData<T = any> {
   readonly data: T;
 }
 
-export interface ModularCardTriggerData extends ModularCardPartData {
+export interface ModularCardTriggerData<T = any> extends ModularCardPartData<T> {
   readonly messageId: string;
+  readonly typeHandler: ModularCardPart<T>;
 }
 
 class ChatMessageTransformer extends TransformTrigger<ChatMessage, ModularCardTriggerData> implements IDmlTrigger<ChatMessage> {
@@ -44,7 +45,8 @@ class ChatMessageTransformer extends TransformTrigger<ChatMessage, ModularCardTr
         uniqueKey: `${from.uuid}.${p.id}`,
         data: {
           ...p,
-          messageId: from.id
+          messageId: from.id,
+          typeHandler: ModularCard.getTypeHandler(p.type),
         }
       }
     });
@@ -188,6 +190,10 @@ export class ModularCard {
     const unregisterTrigger = chatMessageTransformer.register(part);
     ModularCard.registeredPartsByType.set(part.getType(), {part: part, unregisterTrigger: unregisterTrigger});
     ModularCard.typeToModule.set(part.getType(), moduleName);
+  }
+
+  public static getTypeHandler<T extends ModularCardPart = ModularCardPart>(type: string): T | null {
+    return ModularCard.registeredPartsByType.get(type).part as T;
   }
 
   public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardPartData[]> {
