@@ -314,17 +314,17 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   
   private calcDamageFormulas(context: IDmlContext<ModularCardTriggerData>): void {
     for (const {newRow} of context.rows) {
-      if (newRow.type !== DamageCardPart.name) {
+      if (!this.isThisType(newRow)) {
         continue;
       }
-      const data: DamageCardData = newRow.data;
       let displayFormula: string;
       let displayRoll: RollJson;
-      if (data.mode === 'normal') {
-        displayRoll = data?.calc$.normalRoll;
-      } else if (data.mode === 'critical') {
-        const normalTerms = data.calc$.normalRoll == null ? null : data.calc$.normalRoll.map(RollTerm.fromData);
-        const critBonusTerms = data.calc$.criticalRoll == null ? null : data.calc$.criticalRoll.map(RollTerm.fromData);
+      if (newRow.data.mode === 'normal') {
+        displayRoll = newRow.data?.calc$.normalRoll;
+      } else if (newRow.data.mode === 'critical') {
+        const normalTerms = newRow.data.calc$.normalRoll == null ? [new NumericTerm({number: 0})] : newRow.data.calc$.normalRoll.map(RollTerm.fromData);
+        const critBonusTerms = newRow.data.calc$.criticalRoll == null ? [new NumericTerm({number: 0})] : newRow.data.calc$.criticalRoll.map(RollTerm.fromData);
+        // TODO crit is null when not rolled so the incorrect formula gets generated
         displayRoll = Roll.fromTerms(UtilsRoll.mergeCritRoll(normalTerms, critBonusTerms)).terms.map(t => t.toJSON() as TermJson);
       }
       if (displayRoll) {
@@ -341,8 +341,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         }
       }
 
-      data.calc$.displayFormula = displayFormula;
-      data.calc$.displayDamageTypes = damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined;
+      newRow.data.calc$.displayFormula = displayFormula;
+      newRow.data.calc$.displayDamageTypes = damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined;
     }
   }
 
@@ -543,6 +543,10 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
     }
     return rollProperties;
+  }
+  
+  private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
+    return row.type === this.getType() && row.typeHandler instanceof DamageCardPart;
   }
   //#endregion
 }
