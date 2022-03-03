@@ -1,16 +1,17 @@
-import { IAfterDmlContext } from "../lib/db/dml-trigger";
+import { IAfterDmlContext, IDmlContext } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
+import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { ModularCard, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
 
-interface AttackCardData {
+export interface AttackCardData {
   phase: RollPhase;
   mode: 'normal' | 'advantage' | 'disadvantage';
   userBonus: string;
@@ -200,11 +201,75 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     data.calc$.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, data.mode)).toJSON();
   }
 
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {
+    this.calcIsCrit(context);
+    this.setDamageAsCrit(context);
+  }
+
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
     await this.rollAttack(context);
   }
 
-  private async rollAttack(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  private calcIsCrit(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow} of context.rows) {
+      if (!this.isThisType(newRow)) {
+        continue;
+      }
+
+      if (!newRow.data.calc$.evaluatedRoll?.evaluated) {
+        newRow.data.calc$.isCrit = false;
+        continue;
+      }
+
+      const baseRollResult = (newRow.data.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
+      newRow.data.calc$.isCrit = baseRollResult.result >= newRow.data.calc$.critTreshold;
+    }
+  }
+
+  private setDamageAsCrit(context: IDmlContext<ModularCardTriggerData>): void {
+    const messagesBecameCrit = new Set<string>();
+    const messagesBecameNormal = new Set<string>();
+    for (const {newRow, oldRow} of context.rows) {
+      if (!this.isThisType(newRow)) {
+        continue;
+      }
+      if (newRow.data.calc$.isCrit !== oldRow?.data?.calc$?.isCrit) {
+        if (newRow.data.calc$.isCrit) {
+          messagesBecameCrit.add(newRow.messageId);
+        } else {
+          messagesBecameNormal.add(newRow.messageId);
+        }
+      }
+    }
+    messagesBecameCrit.delete(null);
+    messagesBecameCrit.delete(undefined);
+    messagesBecameNormal.delete(null);
+    messagesBecameNormal.delete(undefined);
+
+    if (messagesBecameCrit.size === 0 && messagesBecameNormal.size === 0) {
+      return;
+    }
+
+    for (const {newRow} of context.rows) {
+      if (!messagesBecameCrit.has(newRow.messageId) && !messagesBecameNormal.has(newRow.messageId)) {
+        continue;
+      }
+
+      if (!this.isAnyDamageType(newRow)) {
+        continue;
+      }
+
+      if (newRow.data.phase === 'mode-select') {
+        if (messagesBecameCrit.has(newRow.messageId)) {
+          newRow.data.mode = 'critical';
+        } else {
+          newRow.data.mode = 'normal';
+        }
+      }
+    }
+  }
+
+  private async rollAttack(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
     for (const {newRow} of context.rows) {
       if (!this.isThisType(newRow)) {
         continue;
@@ -247,24 +312,15 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       const roll = await UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).roll({async: true});
       UtilsDiceSoNice.showRoll({roll: roll});
       newRow.data.calc$.evaluatedRoll = roll.toJSON();
-      newRow.data.phase = 'result';
-  
-      const baseRollResult = (newRow.data.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
-      newRow.data.calc$.isCrit = baseRollResult.result >= newRow.data.calc$.critTreshold;
-  
-      if (newRow.data.calc$.isCrit) {
-        // TODO modify damage cards to become crits
-        // for (const dmg of this.data.items?.[itemIndex].damages ?? []) {
-        //   if (dmg.phase === 'mode-select') {
-        //     dmg.mode = 'critical';
-        //   }
-        // }
-      }
     }
   }
 
   private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData> {
     return row.type === this.getType() && row.typeHandler instanceof AttackCardPart;
+  }
+
+  private isAnyDamageType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
+    return row.typeHandler instanceof DamageCardPart;
   }
 
 }

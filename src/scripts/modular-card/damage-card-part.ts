@@ -24,7 +24,7 @@ export interface AddedDamage {
   additionalCriticalRoll?: RollJson;
 }
 
-interface DamageCardData {
+export interface DamageCardData {
   phase: 'mode-select' | 'bonus-input' | 'result';
   mode: 'normal' | 'critical';
   userBonus?: RollJson;
