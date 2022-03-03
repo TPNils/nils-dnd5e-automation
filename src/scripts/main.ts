@@ -10,11 +10,13 @@ import { staticValues } from "./static-values";
 import { DescriptionCardPart } from "./modular-card/description-card-part";
 import { PropertyCardPart } from "./modular-card/property-card-part";
 import { TemplateCardPart } from "./modular-card/template-card-part";
+import { MutableDiceTerm } from "./lib/roll/mutable-dice-term";
 
 registerGlobalApiHooks();
 registerHtmlHooks();
 provider.registerHooks();
 registerOverrideHooks()
+MutableDiceTerm.registerHooks();
 UtilsHandlebars.registerHooks();
 ModularCard.registerHooks();
 AttackCardPart.registerHooks();
