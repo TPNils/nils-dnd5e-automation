@@ -3,6 +3,7 @@ import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
+import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
@@ -200,6 +201,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     await this.rollAttack(context);
   }
 
+  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<any>>): void | Promise<void> {
+    this.onBonusChange(context);
+  }
+
   private calcIsCrit(context: IDmlContext<ModularCardTriggerData>): void {
     for (const {newRow} of context.rows) {
       if (!this.isThisType(newRow)) {
@@ -329,6 +334,18 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         if (result.rollToDisplay) {
           UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
         }
+      }
+    }
+  }
+  
+  private onBonusChange(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow, oldRow, changedByUserId} of context.rows) {
+      if (changedByUserId !== game.userId || !this.isThisType(newRow)) {
+        continue;
+      }
+      if (newRow.data.phase === 'bonus-input' && (oldRow?.data as AttackCardData)?.phase !== 'bonus-input') {
+        MemoryStorageService.setFocusedElementSelector(`[data-message-id="${newRow.messageId}"] [data-${staticValues.moduleName}-card-part="${newRow.id}"] input.${staticValues.moduleName}-bonus`);
+        return;
       }
     }
   }
