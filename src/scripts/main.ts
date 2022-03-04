@@ -19,11 +19,11 @@ registerOverrideHooks()
 MutableDiceTerm.registerHooks();
 UtilsHandlebars.registerHooks();
 ModularCard.registerHooks();
-AttackCardPart.registerHooks();
-DamageCardPart.registerHooks();
-DescriptionCardPart.registerHooks();
-PropertyCardPart.registerHooks();
-TemplateCardPart.registerHooks();
+AttackCardPart.instance.registerHooks();
+DamageCardPart.instance.registerHooks();
+DescriptionCardPart.instance.registerHooks();
+PropertyCardPart.instance.registerHooks();
+TemplateCardPart.instance.registerHooks();
 
 Hooks.on('init', () => {
   const hbsFiles: string[] = [];

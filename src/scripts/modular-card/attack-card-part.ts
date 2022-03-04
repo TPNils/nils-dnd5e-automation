@@ -29,7 +29,10 @@ export interface AttackCardData {
 
 export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
-  public static create({item, actor}: {item: MyItem, actor?: MyActor}): AttackCardData[] {
+  public static readonly instance = new AttackCardPart();
+  private constructor(){}
+
+  public generate({item, actor}: {item: MyItem, actor?: MyActor}): AttackCardData[] {
     if (!['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
       return [];
     }
@@ -96,8 +99,8 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   @RunOnce()
-  public static registerHooks(): void {
-    ModularCard.registerModularCardPart(staticValues.moduleName, new AttackCardPart());
+  public registerHooks(): void {
+    ModularCard.registerModularCardPart(staticValues.moduleName, this);
   }
 
   public getType(): string {

@@ -16,8 +16,11 @@ interface DescriptionCardData {
 }
 
 export class DescriptionCardPart implements ModularCardPart<DescriptionCardData> {
+
+  public static readonly instance = new DescriptionCardPart();
+  private constructor(){}
   
-  public static create({item}: {item: MyItem}): DescriptionCardData[] {
+  public generate({item}: {item: MyItem}): DescriptionCardData[] {
     return [{
       calc$: {
         name: item.name,
@@ -29,8 +32,8 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   }
 
   @RunOnce()
-  public static registerHooks(): void {
-    ModularCard.registerModularCardPart(staticValues.moduleName, new DescriptionCardPart());
+  public registerHooks(): void {
+    ModularCard.registerModularCardPart(staticValues.moduleName, this);
   }
 
   public getType(): string {

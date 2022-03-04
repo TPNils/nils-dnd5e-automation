@@ -41,7 +41,10 @@ export interface DamageCardData {
 
 export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
-  public static create({item, actor}: {item: MyItem, actor?: MyActor}): DamageCardData[] {
+  public static readonly instance = new DamageCardPart();
+  private constructor(){}
+
+  public generate({item, actor}: {item: MyItem, actor?: MyActor}): DamageCardData[] {
     // TODO what about other interactions like spell scaling (modifier with html) and hunters mark (automatic, but only to a specific target)
     const rollData: {[key: string]: any} = actor == null ? {} : item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
@@ -149,8 +152,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   @RunOnce()
-  public static registerHooks(): void {
-    ModularCard.registerModularCardPart(staticValues.moduleName, new DamageCardPart());
+  public registerHooks(): void {
+    ModularCard.registerModularCardPart(staticValues.moduleName, this);
   }
 
   public getType(): string {

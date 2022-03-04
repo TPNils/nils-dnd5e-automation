@@ -1,5 +1,6 @@
 import { ITrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
+import { MyActor, MyItem } from "../types/fixed-types";
 import { ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 
 export interface ClickEvent {
@@ -91,6 +92,7 @@ export interface HtmlContext<T> {
 }
 
 export interface ModularCardPart<D = any> extends ITrigger<ModularCardTriggerData> {
+  generate(args: {actor?: MyActor, token?: TokenDocument, item: MyItem}): D[];
   getType(): string;
   getHtml(context: HtmlContext<D>): string | Promise<string>;
   getCallbackActions(): ICallbackAction<D>[];

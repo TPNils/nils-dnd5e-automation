@@ -11,8 +11,11 @@ interface PropertyCardData {
 }
 
 export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
+
+  public static readonly instance = new PropertyCardPart();
+  private constructor(){}
   
-  public static create({item}: {item: MyItem}): PropertyCardData[] {
+  public generate({item}: {item: MyItem}): PropertyCardData[] {
     return [{
       calc$: {
         properties: item.getChatData().properties,
@@ -21,8 +24,8 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
   }
 
   @RunOnce()
-  public static registerHooks(): void {
-    ModularCard.registerModularCardPart(staticValues.moduleName, new PropertyCardPart());
+  public registerHooks(): void {
+    ModularCard.registerModularCardPart(staticValues.moduleName, this);
   }
 
   public getType(): string {

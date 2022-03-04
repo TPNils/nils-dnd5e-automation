@@ -201,35 +201,35 @@ export class ModularCard {
     let id = 0;
     const parts: ModularCardPartData[] = [];
 
-    for (const part of DescriptionCardPart.create(data)) {
+    for (const part of DescriptionCardPart.instance.generate(data)) {
       parts.push({
         id: `${id++}`,
         type: DescriptionCardPart.name,
         data: part
       });
     }
-    for (const part of AttackCardPart.create(data)) {
+    for (const part of AttackCardPart.instance.generate(data)) {
       parts.push({
         id: `${id++}`,
         type: AttackCardPart.name,
         data: part
       });
     }
-    for (const part of DamageCardPart.create(data)) {
+    for (const part of DamageCardPart.instance.generate(data)) {
       parts.push({
         id: `${id++}`,
         type: DamageCardPart.name,
         data: part
       });
     }
-    for (const part of TemplateCardPart.create(data)) {
+    for (const part of TemplateCardPart.instance.generate(data)) {
       parts.push({
         id: `${id++}`,
         type: TemplateCardPart.name,
         data: part
       });
     }
-    for (const part of PropertyCardPart.create(data)) {
+    for (const part of PropertyCardPart.instance.generate(data)) {
       parts.push({
         id: `${id++}`,
         type: PropertyCardPart.name,

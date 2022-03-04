@@ -17,8 +17,11 @@ interface TemplateCardData {
 }
 
 export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
+
+  public static readonly instance = new TemplateCardPart();
+  private constructor(){}
   
-  public static create({item, actor}: {item: MyItem, actor?: MyActor}): TemplateCardData[] {
+  public generate({item, actor}: {item: MyItem, actor?: MyActor}): TemplateCardData[] {
     // @ts-expect-error
     const hasAoe = CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type);
     if (!hasAoe) {
@@ -33,8 +36,8 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   }
 
   @RunOnce()
-  public static registerHooks(): void {
-    ModularCard.registerModularCardPart(staticValues.moduleName, new TemplateCardPart());
+  public registerHooks(): void {
+    ModularCard.registerModularCardPart(staticValues.moduleName, this);
     DmlTrigger.registerTrigger(new DmlTriggerTemplate());
   }
 
