@@ -10,6 +10,7 @@ export interface RollData {
   terms: Array<(PoolTerm.TermData & { class: 'DicePool' }) | DiceTerm.Data>;
   total: number | null;
   evaluated: boolean;
+  options: Roll['options'],
 }
 
 export interface TermData {
@@ -38,6 +39,7 @@ export class UtilsRoll {
   public static toRollData(roll: Roll): RollData {
     return {
       formula: roll.formula,
+      options: roll.options,
       terms: roll.terms.map(t => t.toJSON() as any),
       total: roll.total,
       evaluated: roll.total != null,
