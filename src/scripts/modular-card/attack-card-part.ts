@@ -301,7 +301,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       }
 
       const formula = parts.join(' + ');
-      if (newRow.data.calc$?.roll.formula !== formula) {
+      if (newRow.data.calc$.roll?.formula !== formula) {
         // Rolling the attack happens automatically in rollAttack and retains previous rolled dice
         newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(formula));
       }
