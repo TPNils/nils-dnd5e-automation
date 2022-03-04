@@ -51,6 +51,10 @@ export class MutableDiceTerm extends Die {
       this.roll({minimize, maximize});
     }
     this._evaluateModifiers();
+    for (const deactivated of this.deactivatedResults) {
+      this.results.push({result: deactivated, active: false, discarded: true})
+    }
+    this.deactivatedResults = [];
     
     return this;
   }
