@@ -532,7 +532,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       ['calc$', 'baseRoll'],
     ];
     if (data.calc$.actorBonusRoll) {
-      rollProperties.push(['userBonus']);
+      rollProperties.push(['calc$', 'actorBonusRoll']);
     }
     if (data.userBonus) {
       rollProperties.push(['userBonus']);
