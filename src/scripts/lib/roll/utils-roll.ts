@@ -447,6 +447,15 @@ export class UtilsRoll {
       terms.push(term);
     }
 
+    // Remove suffixed operators
+    for (let i = terms.length - 1; i >= 0; i--) {
+      if (terms[i].operator != null) {
+        terms.splice(i, 1);
+      } else {
+        break;
+      }
+    }
+
     if (roll instanceof Roll) {
       return Roll.fromTerms(terms);
     }
