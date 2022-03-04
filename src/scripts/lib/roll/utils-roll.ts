@@ -54,38 +54,6 @@ export class UtilsRoll {
     }).join(' + '), rollData);
   }
 
-  public static damageFormulaToDamageParts(formula: string): MyItemData['data']['damage']['parts'] {
-    return UtilsRoll.rollToDamageParts(new Roll(formula));
-  }
-
-  public static rollToDamageParts(roll: Roll): MyItemData['data']['damage']['parts'] {
-    const parts: MyItemData['data']['damage']['parts'] = [];
-
-    const terms = roll.terms;
-    let formulaBuilder: string[] = [];
-    let latestDamageType: DamageType = '';
-    const convertToParts = () => {
-      if (formulaBuilder.length > 0 && formulaBuilder[0].trim() === '+') {
-        formulaBuilder = formulaBuilder.splice(1)
-      }
-      if (formulaBuilder.length > 0) {
-        parts.unshift([formulaBuilder.join('').trim(), latestDamageType]);
-        formulaBuilder = [];
-      }
-    }
-    for (let i = terms.length-1; i >= 0; i--) {
-      const flavor = terms[i].options?.flavor?.toLowerCase();
-      if (UtilsRoll.isValidDamageType(flavor)) {
-        convertToParts();
-        latestDamageType = flavor;
-      }
-      formulaBuilder.unshift(terms[i].expression);
-    }
-    convertToParts();
-
-    return parts;
-  }
-
   public static rollToDamageResults(roll: Roll): Map<DamageType, number> {
     const damageFormulaMap = new Map<DamageType, Array<string | number>>();
 
@@ -200,6 +168,10 @@ export class UtilsRoll {
     }
   }
 
+  /**
+   * TODO remove
+   * @deprecated
+   */
   public static async setRollMode(roll: Roll, mode: 'disadvantage' |'normal' | 'advantage', options: {skipDiceSoNice?: boolean} = {}): Promise<Roll> {
     const terms = roll.terms.map(t => RollTerm.fromJSON(JSON.stringify(t.toJSON())))
     const d20Term = terms[0] as (Die & {_evaluated: boolean, _evaluateModifiers: () => void});
@@ -280,6 +252,9 @@ export class UtilsRoll {
     return Roll.fromTerms(terms);
   }
 
+  /**
+   * TODO check if this can use the standard dnd5e module for potentially better integration
+   */
   public static getAbilityRoll(actor: MyActor, {ability, skill, addSaveBonus}: {ability: keyof MyActorData['data']['abilities'], skill?: string, addSaveBonus?: boolean}): Roll {
     const actorAbility = actor.data.data.abilities[ability];
     const actorSkill = actor.data.data.skills[skill];
@@ -337,6 +312,9 @@ export class UtilsRoll {
     return new Roll(parts.join(' + '), data);
   }
 
+  /**
+   * TODO Should use the standard dnd5e module for custom crit rules
+   */
   public static getCriticalBonusRoll(normal: RollTerm[]): RollTerm[] {
     const critTerms: RollTerm[] = [];
     // new Roll(formula) will ensure we create a new instance
@@ -393,6 +371,8 @@ export class UtilsRoll {
    * normal: 1d10 + 1d10 + 1d6
    * crit:   1d10 + 1d10 + 1d8
    * result: 2d20 + 2d10 + 1d6 + 1d8
+   * TODO remove, should be replace with setRollMode
+   * @deprecated
    */
   public static mergeCritRoll(normalTerms: RollTerm[], critTerms: RollTerm[]): RollTerm[] {
     // return null when merge is not supported

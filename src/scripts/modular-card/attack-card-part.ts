@@ -5,7 +5,6 @@ import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
-import { RollJson } from "../utils/utils-chat-message";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { ModularCard, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
