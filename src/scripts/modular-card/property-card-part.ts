@@ -26,7 +26,7 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
   }
 
   public getType(): string {
-    return 'PropertyCardPart';
+    return this.constructor.name;
   }
 
   public getHtml(context: HtmlContext<PropertyCardData>): string | Promise<string> {

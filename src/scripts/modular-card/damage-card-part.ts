@@ -154,7 +154,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   public getType(): string {
-    return DamageCardPart.name;
+    return this.constructor.name;
   }
 
   //#region Front end

@@ -101,7 +101,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   public getType(): string {
-    return `AttackCardPart`
+    return this.constructor.name;
   }
 
   public getHtml({data}: HtmlContext<AttackCardData>): string | Promise<string> {

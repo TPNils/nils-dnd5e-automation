@@ -39,7 +39,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   }
 
   public getType(): string {
-    return 'TemplateCardPart';
+    return this.constructor.name;
   }
 
   public getHtml(context: HtmlContext<TemplateCardData>): string | Promise<string> {

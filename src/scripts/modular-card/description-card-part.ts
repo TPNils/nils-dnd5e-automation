@@ -34,7 +34,7 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   }
 
   public getType(): string {
-    return 'DescriptionCardPart';
+    return this.constructor.name;
   }
 
   public getHtml(context: HtmlContext<DescriptionCardData>): string | Promise<string> {
