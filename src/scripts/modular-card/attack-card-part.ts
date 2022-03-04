@@ -2,9 +2,10 @@ import { IAfterDmlContext, IDmlContext } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
-import { UtilsRoll } from "../lib/roll/utils-roll";
+import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
+import { RollJson } from "../utils/utils-chat-message";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { ModularCard, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
@@ -19,7 +20,7 @@ export interface AttackCardData {
     actorUuid?: string;
     label?: string;
     rollBonus?: string;
-    evaluatedRoll?: ReturnType<Roll['toJSON']>;
+    evaluatedRoll?: RollData;
     critTreshold: number;
     isCrit?: boolean;
   }
@@ -152,10 +153,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
   
   private static processItemAttackBonus(data: AttackCardData, keyEvent: KeyEvent | null, attackBonus: string): void {
-    if (data.calc$.evaluatedRoll?.evaluated || data.phase === 'result') {
-      return;
-    }
-
     if (attackBonus) {
       data.userBonus = attackBonus;
     } else {
@@ -169,7 +166,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
     if (keyEvent?.key === 'Enter') {
       data.phase = 'result';
-    } else if (keyEvent?.key === 'Escape') {
+    } else if (keyEvent?.key === 'Escape' && data.phase === 'bonus-input') {
       data.phase = 'mode-select';
     }
   }
@@ -192,13 +189,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     if (event?.shiftKey) {
       data.phase = 'result';
     }
-    
-    if (!data.calc$.evaluatedRoll) {
-      return;
-    }
-
-    const originalRoll = Roll.fromJSON(JSON.stringify(data.calc$.evaluatedRoll));
-    data.calc$.evaluatedRoll = (await UtilsRoll.setRollMode(originalRoll, data.mode)).toJSON();
   }
 
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {
@@ -207,6 +197,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+    await this.calcAttackRoll(context);
     await this.rollAttack(context);
   }
 
@@ -269,12 +260,16 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
   }
 
-  private async rollAttack(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
-    for (const {newRow} of context.rows) {
+  private async calcAttackRoll(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+    for (const {newRow, oldRow} of context.rows) {
       if (!this.isThisType(newRow)) {
         continue;
       }
-      if (newRow.data.calc$.evaluatedRoll?.evaluated || newRow.data.phase !== 'result') {
+      const changed = (newRow.data.mode !== oldRow?.data?.mode) ||
+        (newRow.data.userBonus !== oldRow?.data?.userBonus) ||
+        (newRow.data.calc$.rollBonus !== oldRow?.data?.calc$.rollBonus);
+      
+      if (!changed) {
         continue;
       }
 
@@ -308,10 +303,38 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       if (newRow.data.userBonus && Roll.validate(newRow.data.userBonus)) {
         parts.push(newRow.data.userBonus);
       }
-  
-      const roll = await UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).roll({async: true});
-      UtilsDiceSoNice.showRoll({roll: roll});
-      newRow.data.calc$.evaluatedRoll = roll.toJSON();
+
+      // Rolling the attack happens automatically in rollAttack and retains previous rolled dice
+      newRow.data.calc$.evaluatedRoll = UtilsRoll.toRollData(new Roll(parts.join(' + ')));
+    }
+  }
+
+  private async rollAttack(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+    for (const {newRow, oldRow} of context.rows) {
+      if (!this.isThisType(newRow)) {
+        continue;
+      }
+      
+      const oldRoll: RollData = oldRow?.data?.calc$?.evaluatedRoll;
+      console.log(newRow, oldRow)
+
+      if ((newRow.data.phase === 'result') !== newRow.data.calc$.evaluatedRoll?.evaluated && !oldRoll?.evaluated) {
+        // Make new roll
+        console.log((newRow.data.phase === 'result'), '!==', newRow.data.calc$.evaluatedRoll?.evaluated)
+        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.evaluatedRoll);
+        newRow.data.calc$.evaluatedRoll = UtilsRoll.toRollData(await newRoll.roll({async: true}));
+        UtilsDiceSoNice.showRoll({roll: newRoll});
+      } else if (newRow.data.calc$.evaluatedRoll.formula !== oldRoll?.formula && oldRoll) {
+        // Roll changed => reroll
+        console.log((newRow.data.calc$.evaluatedRoll.formula), '!==', oldRoll?.formula)
+        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.evaluatedRoll);
+        const result = await UtilsRoll.setRoll(UtilsRoll.fromRollData(oldRoll).terms, newRoll.terms);
+        console.log({oldRoll, newRoll, result})
+        newRow.data.calc$.evaluatedRoll = UtilsRoll.toRollData(Roll.fromTerms(result.result));
+        if (result.rollToDisplay) {
+          UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
+        }
+      }
     }
   }
 

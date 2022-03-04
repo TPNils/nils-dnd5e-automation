@@ -1,8 +1,22 @@
 import { ReEvaluatableDie } from "./re-evaluatable-die";
 import { DamageType, MyActor, MyActorData, MyItemData } from "../../types/fixed-types";
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
+import { MutableDiceTerm } from "./mutable-dice-term";
 
 const validDamageTypes: DamageType[] = ['' /* none */, 'acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder', 'healing', 'temphp'];
+
+export interface RollData {
+  formula: string;
+  terms: Array<(PoolTerm.TermData & { class: 'DicePool' }) | DiceTerm.Data>;
+  total: number | null;
+  evaluated: boolean;
+}
+
+export interface TermData {
+  formula: string;
+  terms: Array<(PoolTerm.TermData & { class: 'DicePool' }) | DiceTerm.Data>;
+  total: number | null;
+}
 
 export class UtilsRoll {
 
@@ -15,6 +29,19 @@ export class UtilsRoll {
 
   public static getValidDamageTypes(): DamageType[] {
     return [...validDamageTypes];
+  }
+
+  public static fromRollData(rollData: RollData): Roll {
+    return Roll.fromData(rollData as any);
+  }
+
+  public static toRollData(roll: Roll): RollData {
+    return {
+      formula: roll.formula,
+      terms: roll.terms.map(t => t.toJSON() as any),
+      total: roll.total,
+      evaluated: roll.total != null,
+    }
   }
 
   public static damagePartsToRoll(parts: MyItemData['data']['damage']['parts'], rollData?: any): Roll {
@@ -90,6 +117,87 @@ export class UtilsRoll {
     }
 
     return damageMap;
+  }
+
+  public static async setRoll(original: RollTerm[], newTerms: RollTerm[]): Promise<{result: RollTerm[], rollToDisplay: Roll | null}> {
+    original = original.map(t => {
+      if (t instanceof Die) {
+        return MutableDiceTerm.fromDie(t);
+      }
+      return t;
+    });
+    newTerms = newTerms.map(t => {
+      if (t instanceof Die) {
+        return MutableDiceTerm.fromDie(t);
+      }
+      return t;
+    });
+
+    const hasAnyOriginalEvaluated = original.find(term => (term as any)._evaluated) != null;
+
+    const originalResultsFromByDieFaces = new Map<number, MutableDiceTerm[]>();
+    for (const term of original) {
+      if (term instanceof MutableDiceTerm) {
+        if (!originalResultsFromByDieFaces.has(term.faces)) {
+          originalResultsFromByDieFaces.set(term.faces, []);
+        }
+        originalResultsFromByDieFaces.get(term.faces).push(term);
+      }
+    }
+
+    for (const term of newTerms) {
+      if (term instanceof MutableDiceTerm) {
+        if (originalResultsFromByDieFaces.has(term.faces)) {
+          const originalTerm = originalResultsFromByDieFaces.get(term.faces).splice(0, 1)[0];
+          term.allResults = originalTerm.allResults;
+        }
+      }
+    }
+
+    for (let term of Array.from(originalResultsFromByDieFaces.values()).deepFlatten()) {
+      if (newTerms.length > 0) {
+        newTerms.push(new OperatorTerm({operator: '+'}));
+      }
+      term = MutableDiceTerm.fromData(term.toJSON()) as MutableDiceTerm;
+      term.number = 0;
+      newTerms.push(term);
+    }
+
+    const pendingTermRolls: Promise<RollTerm>[] = [];
+    if (hasAnyOriginalEvaluated) {
+      for (const term of newTerms) {
+        // @ts-expect-error
+        if (!term._evaluated) {
+          pendingTermRolls.push(term.evaluate({async: true}));
+        }
+      }
+    }
+
+    let termsToDisplay: RollTerm[] = [];
+    for (const term of await Promise.all(pendingTermRolls)) {
+      if (termsToDisplay.length > 0) {
+        termsToDisplay.push(await new OperatorTerm({operator: '+'}).evaluate({async: true}));
+      }
+      if (term instanceof MutableDiceTerm) {
+        if (term.newRollsSinceEvaluate.length > 0) {
+          termsToDisplay.push(new Die({
+            number: term.newRollsSinceEvaluate.length,
+            faces: term.faces,
+            results: term.newRollsSinceEvaluate,
+          }))
+        }
+      } else if (term instanceof DiceTerm) {
+        termsToDisplay.push(term);
+      }
+    }
+
+    termsToDisplay = UtilsRoll.simplifyTerms(termsToDisplay);
+    termsToDisplay = (await UtilsRoll.rollUnrolledTerms(termsToDisplay, {async: true})).results;
+
+    return {
+      result: newTerms,
+      rollToDisplay: termsToDisplay.length > 0 ? Roll.fromTerms(termsToDisplay) : null,
+    }
   }
 
   public static async setRollMode(roll: Roll, mode: 'disadvantage' |'normal' | 'advantage', options: {skipDiceSoNice?: boolean} = {}): Promise<Roll> {
