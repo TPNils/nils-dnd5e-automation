@@ -18,6 +18,7 @@ export interface AttackCardData {
   userBonus: string;
   calc$: {
     actorUuid?: string;
+    hasHalflingLucky: boolean;
     label?: string;
     rollBonus?: string;
     roll?: RollData;
@@ -74,6 +75,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       phase: 'mode-select',
       userBonus: "",
       calc$: {
+        hasHalflingLucky: actor?.getFlag("dnd5e", "halflingLucky") === true,
         actorUuid: actor?.uuid,
         rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
         critTreshold: 20
@@ -265,22 +267,12 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   private async calcAttackRoll(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
-    for (const {newRow, oldRow} of context.rows) {
+    for (const {newRow} of context.rows) {
       if (!this.isThisType(newRow)) {
         continue;
       }
-      const changed = (newRow.data.mode !== oldRow?.data?.mode) ||
-        (newRow.data.userBonus !== oldRow?.data?.userBonus) ||
-        (newRow.data.calc$.rollBonus !== oldRow?.data?.calc$.rollBonus);
-      
-      if (!changed) {
-        continue;
-      }
 
-      const actor: MyActor = newRow.data.calc$?.actorUuid == null ? null : (await UtilsDocument.actorFromUuid(newRow.data.calc$.actorUuid));
-      let baseRoll = new Die();
-      baseRoll.faces = 20;
-      baseRoll.number = 1;
+      let baseRoll = new Die({faces: 20, number: 1});
       switch (newRow.data.mode) {
         case 'advantage': {
           baseRoll.number = 2;
@@ -293,7 +285,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           break;
         }
       }
-      if (actor && actor.getFlag("dnd5e", "halflingLucky")) {
+      if (newRow.data.calc$.hasHalflingLucky) {
         // reroll a base roll 1 once
         // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
         // second 2 = reroll when the roll result is equal to 1 (=1)
@@ -308,20 +300,24 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         parts.push(newRow.data.userBonus);
       }
 
-      // Rolling the attack happens automatically in rollAttack and retains previous rolled dice
-      newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(parts.join(' + ')));
+      const formula = parts.join(' + ');
+      if (newRow.data.calc$?.roll.formula !== formula) {
+        // Rolling the attack happens automatically in rollAttack and retains previous rolled dice
+        newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(formula));
+      }
     }
   }
 
   private async rollAttack(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
     for (const {newRow, oldRow} of context.rows) {
-      if (!this.isThisType(newRow)) {
+      if (!this.isThisType(newRow) || !this.assumeThisType(oldRow)) {
         continue;
       }
       
-      const oldRoll: RollData = oldRow?.data?.calc$?.evaluatedRoll;
+      const oldRoll: RollData = oldRow?.data?.calc$?.roll;
+      const shouldEvaluate = newRow.data.phase === 'result';
 
-      if ((newRow.data.phase === 'result') !== newRow.data.calc$.roll?.evaluated && !oldRoll?.evaluated) {
+      if (shouldEvaluate !== newRow.data.calc$.roll?.evaluated && !oldRoll?.evaluated) {
         // Make new roll
         const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
         newRow.data.calc$.roll = UtilsRoll.toRollData(await newRoll.roll({async: true}));
@@ -356,6 +352,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
   private isAnyDamageType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
     return row.typeHandler instanceof DamageCardPart;
+  }
+
+  private assumeThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
+    return true;
   }
 
 }
