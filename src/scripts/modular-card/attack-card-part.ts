@@ -316,20 +316,16 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       }
       
       const oldRoll: RollData = oldRow?.data?.calc$?.evaluatedRoll;
-      console.log(newRow, oldRow)
 
       if ((newRow.data.phase === 'result') !== newRow.data.calc$.evaluatedRoll?.evaluated && !oldRoll?.evaluated) {
         // Make new roll
-        console.log((newRow.data.phase === 'result'), '!==', newRow.data.calc$.evaluatedRoll?.evaluated)
         const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.evaluatedRoll);
         newRow.data.calc$.evaluatedRoll = UtilsRoll.toRollData(await newRoll.roll({async: true}));
         UtilsDiceSoNice.showRoll({roll: newRoll});
       } else if (newRow.data.calc$.evaluatedRoll.formula !== oldRoll?.formula && oldRoll) {
         // Roll changed => reroll
-        console.log((newRow.data.calc$.evaluatedRoll.formula), '!==', oldRoll?.formula)
         const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.evaluatedRoll);
         const result = await UtilsRoll.setRoll(UtilsRoll.fromRollData(oldRoll).terms, newRoll.terms);
-        console.log({oldRoll, newRoll, result})
         newRow.data.calc$.evaluatedRoll = UtilsRoll.toRollData(Roll.fromTerms(result.result));
         if (result.rollToDisplay) {
           UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
