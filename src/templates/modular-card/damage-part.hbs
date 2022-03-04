@@ -1,23 +1,16 @@
 <div class="{{@root.moduleName}}-damage">
   <div class="{{@root.moduleName}}-flavor">
-    {{#if @root.data.calc$.evaluatedRoll}}
+    {{#if @root.data.calc$.roll.evaluated}}
       {{ localize (nacConcat "DND5E." (nacCapitalize @root.data.mode)) }}
     {{/if}}
   </div>
   <div class="{{@root.moduleName}}-roll-wrapper">
-    {{#if @root.data.calc$.rollsShouldEvaluate}}
+    {{#if @root.data.calc$.roll.evaluated}}
       <div>
-        {{#if (and @root.data.calc$.normalRoll.evaluated (eq @root.data.mode 'normal'))}}
-          {{> modules/nils-automated-compendium/templates/roll/roll.hbs 
-            overrideFormula=@root.data.calc$.displayFormula
-            roll=@root.data.calc$.normalRoll
-          }}
-        {{else if (and @root.data.calc$.criticalRoll.evaluated (eq @root.data.mode 'critical'))}}
-          {{> modules/nils-automated-compendium/templates/roll/roll.hbs
-            overrideFormula=@root.data.calc$.displayFormula
-            roll=@root.data.calc$.criticalRoll
-          }}
-        {{/if}}
+        {{> modules/nils-automated-compendium/templates/roll/roll.hbs 
+          roll=@root.data.calc$.roll
+          overrideFormula=@root.data.calc$.displayFormula
+        }}
       </div>
     {{else}}
       <div class="{{@root.moduleName}}-bonus-container">
