@@ -5,17 +5,28 @@ import { RunOnce } from "../decorator/run-once";
  */
 export class MutableDiceTerm extends Die {
 
-  public static SERIALIZE_ATTRIBUTES: string[] = [...Die.SERIALIZE_ATTRIBUTES, 'allResults'].filter(attr => attr !== 'results');
+  public static SERIALIZE_ATTRIBUTES: string[] = [...Die.SERIALIZE_ATTRIBUTES, 'allResults'];
 
   public allResults: number[] = [];
   public deactivatedResults: number[] = [];
+  public newRollsSinceEvaluate: Die['results'] = [];
 
-  constructor(args: Partial<Omit<Die.TermData, 'results'> & {allResults: MutableDiceTerm['allResults']}>) {
+  constructor(args: Partial<Die.TermData & {allResults: MutableDiceTerm['allResults']}>) {
     super(args);
     this.allResults = args.allResults ?? [];
     if (this.allResults.length > 0) {
       this.evaluate();
     }
+  }
+
+  public static fromDie(die: Die): MutableDiceTerm {
+    if (die instanceof MutableDiceTerm) {
+      return die;
+    }
+    const dieData: any = die.toJSON();
+    dieData.allResults = (dieData.results as Die['results']).map(r => r.result);
+    delete dieData.results;
+    return new MutableDiceTerm(dieData);
   }
 
   public evaluate(options?: Partial<RollTerm.EvaluationOptions & { async: false }>): this;
@@ -34,6 +45,7 @@ export class MutableDiceTerm extends Die {
       throw new Error(`You may not evaluate a DiceTerm with more than 999 requested results`);
     }
     this.results = [];
+    this.newRollsSinceEvaluate = [];
     this.deactivatedResults = deepClone(this.allResults);
     for (let i = this.results.length; i < this.number; i++) {
       this.roll({minimize, maximize});
@@ -48,7 +60,9 @@ export class MutableDiceTerm extends Die {
     if (args.minimize || args.maximize) {
       // Do not add min & max rolls to allRolls
       // This is to ensure a real roll may be returned from the cache
-      return super.roll(args)
+      const result = super.roll(args);
+      this.newRollsSinceEvaluate.push(result);
+      return result;
     }
     if (this.deactivatedResults.length > 0) {
       const result: DiceTerm.Result = {
@@ -60,6 +74,7 @@ export class MutableDiceTerm extends Die {
     }
     const result = super.roll(args);
     this.allResults.push(result.result);
+    this.newRollsSinceEvaluate.push(result);
     return result;
   }
 
