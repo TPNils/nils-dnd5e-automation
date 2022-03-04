@@ -19,6 +19,15 @@ export interface TermData {
   total: number | null;
 }
 
+export interface DamageRollOptions extends Partial<RollTerm.EvaluationOptions> {
+  criticalBonusDice?: number;
+  criticalMultiplier?: number;
+  multiplyNumeric?: boolean;
+  powerfulCritical?: boolean;
+  criticalBonusDamage?: string;
+  critical?: boolean
+}
+
 export class UtilsRoll {
 
   public static isValidDamageType(value: any): value is DamageType {
@@ -168,6 +177,19 @@ export class UtilsRoll {
       result: newTerms,
       rollToDisplay: termsToDisplay.length > 0 ? Roll.fromTerms(termsToDisplay) : null,
     }
+  }
+
+  public static createDamageRoll(roll: string | RollTerm[], options: DamageRollOptions = {}): Roll {
+    const DamageRoll = CONFIG.Dice.rolls.find(a => a.name === 'DamageRoll') as typeof Roll;
+    let dmgRoll: Roll;
+    if (Array.isArray(roll)) {
+      dmgRoll = new DamageRoll('0', {}, options) as Roll & {configureDamage: () => void};
+      dmgRoll.terms = roll;
+      (dmgRoll as Roll & {configureDamage: () => void}).configureDamage();
+    } else {
+      dmgRoll = new DamageRoll(roll, {}, options);
+    }
+    return dmgRoll;
   }
 
   /**
