@@ -19,7 +19,7 @@ export interface AttackCardData {
     actorUuid?: string;
     label?: string;
     rollBonus?: string;
-    evaluatedRoll?: RollData;
+    roll?: RollData;
     critTreshold: number;
     isCrit?: boolean;
   }
@@ -206,12 +206,12 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         continue;
       }
 
-      if (!newRow.data.calc$.evaluatedRoll?.evaluated) {
+      if (!newRow.data.calc$.roll?.evaluated) {
         newRow.data.calc$.isCrit = false;
         continue;
       }
 
-      const baseRollResult = (newRow.data.calc$.evaluatedRoll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
+      const baseRollResult = (newRow.data.calc$.roll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
       newRow.data.calc$.isCrit = baseRollResult.result >= newRow.data.calc$.critTreshold;
     }
   }
@@ -304,7 +304,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       }
 
       // Rolling the attack happens automatically in rollAttack and retains previous rolled dice
-      newRow.data.calc$.evaluatedRoll = UtilsRoll.toRollData(new Roll(parts.join(' + ')));
+      newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(parts.join(' + ')));
     }
   }
 
@@ -316,16 +316,16 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       
       const oldRoll: RollData = oldRow?.data?.calc$?.evaluatedRoll;
 
-      if ((newRow.data.phase === 'result') !== newRow.data.calc$.evaluatedRoll?.evaluated && !oldRoll?.evaluated) {
+      if ((newRow.data.phase === 'result') !== newRow.data.calc$.roll?.evaluated && !oldRoll?.evaluated) {
         // Make new roll
-        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.evaluatedRoll);
-        newRow.data.calc$.evaluatedRoll = UtilsRoll.toRollData(await newRoll.roll({async: true}));
+        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
+        newRow.data.calc$.roll = UtilsRoll.toRollData(await newRoll.roll({async: true}));
         UtilsDiceSoNice.showRoll({roll: newRoll});
-      } else if (newRow.data.calc$.evaluatedRoll.formula !== oldRoll?.formula && oldRoll) {
+      } else if (newRow.data.calc$.roll.formula !== oldRoll?.formula && oldRoll) {
         // Roll changed => reroll
-        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.evaluatedRoll);
+        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
         const result = await UtilsRoll.setRoll(UtilsRoll.fromRollData(oldRoll).terms, newRoll.terms);
-        newRow.data.calc$.evaluatedRoll = UtilsRoll.toRollData(Roll.fromTerms(result.result));
+        newRow.data.calc$.roll = UtilsRoll.toRollData(Roll.fromTerms(result.result));
         if (result.rollToDisplay) {
           UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
         }

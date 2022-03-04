@@ -1,14 +1,14 @@
 <div class="{{@root.moduleName}}-attack">
   <div class="{{@root.moduleName}}-flavor">
-    {{#if @root.data.calc$.evaluatedRoll}}
+    {{#if @root.data.calc$.roll.evaluated}}
       {{ localize (nacConcat "DND5E." (nacCapitalize @root.data.mode)) }}
     {{/if}}
   </div>
   <div class="{{@root.moduleName}}-roll-wrapper">
-    {{#if @root.data.calc$.evaluatedRoll.evaluated }}
+    {{#if @root.data.calc$.roll.evaluated }}
       <div>
         {{> modules/nils-automated-compendium/templates/roll/roll.hbs 
-          roll=@root.data.calc$.evaluatedRoll
+          roll=@root.data.calc$.roll
           highlightTotalOnFirstTerm=true
           overrideMaxRoll=@root.data.calc$.critTreshold
         }}
