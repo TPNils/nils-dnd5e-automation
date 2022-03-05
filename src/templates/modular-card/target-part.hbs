@@ -1,0 +1,22 @@
+<table>
+  <thead>
+    <tr>
+      <th>{{! name/img }}</th>
+      {{#each data.tableHeader}}
+        <th>{{this}}</th>
+      {{/each}}
+      <th>{{! apply/undo }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.tableBody as |row|}}
+      <tr>
+        <td>{{row.name}}</td>
+          {{#each row.row}}
+            <td>{{this}}</td>
+          {{/each}}
+        <td>A/U {{! TODO apply/undo }}</td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>

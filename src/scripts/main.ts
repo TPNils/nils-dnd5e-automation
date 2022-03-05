@@ -11,6 +11,7 @@ import { DescriptionCardPart } from "./modular-card/description-card-part";
 import { PropertyCardPart } from "./modular-card/property-card-part";
 import { TemplateCardPart } from "./modular-card/template-card-part";
 import { MutableDiceTerm } from "./lib/roll/mutable-dice-term";
+import { TargetCardPart } from "./modular-card/target-card-part";
 
 registerGlobalApiHooks();
 registerHtmlHooks();
@@ -23,6 +24,7 @@ AttackCardPart.instance.registerHooks();
 DamageCardPart.instance.registerHooks();
 DescriptionCardPart.instance.registerHooks();
 PropertyCardPart.instance.registerHooks();
+TargetCardPart.instance.registerHooks();
 TemplateCardPart.instance.registerHooks();
 
 Hooks.on('init', () => {

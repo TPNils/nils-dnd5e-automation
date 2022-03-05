@@ -89,10 +89,11 @@ export interface HtmlContext<T> {
   messageId: string;
   partId: string;
   data: T;
+  allMessageParts: ModularCardPartData[];
 }
 
 export interface ModularCardPart<D = any> extends ITrigger<ModularCardTriggerData> {
-  generate(args: {actor?: MyActor, token?: TokenDocument, item: MyItem}): D[];
+  generate(args: {actor?: MyActor, token?: TokenDocument, item: MyItem}): D[]; // TODO should support promise
   getType(): string;
   getHtml(context: HtmlContext<D>): string | Promise<string>;
   getCallbackActions(): ICallbackAction<D>[];

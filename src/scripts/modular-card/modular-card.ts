@@ -11,6 +11,7 @@ import { DamageCardPart } from "./damage-card-part";
 import { DescriptionCardPart } from "./description-card-part";
 import { ActionParam, ClickEvent, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 import { PropertyCardPart } from "./property-card-part";
+import { TargetCardPart } from "./target-card-part";
 import { TemplateCardPart } from "./template-card-part";
 
 export interface ModularCardPartData<T = any> {
@@ -236,6 +237,13 @@ export class ModularCard {
         data: part
       });
     }
+    for (const part of TargetCardPart.instance.generate(data)) {
+      parts.push({
+        id: `${id++}`,
+        type: TargetCardPart.name,
+        data: part
+      });
+    }
 
     return parts;
   }
@@ -352,7 +360,7 @@ export class ModularCard {
       }
 
       // TODO error handeling during render
-      const htmlPart = ModularCard.registeredPartsByType.get(partData.type).part.getHtml({messageId: messageId, partId: partData.id, data: partData.data});
+      const htmlPart = ModularCard.registeredPartsByType.get(partData.type).part.getHtml({messageId: messageId, partId: partData.id, data: partData.data, allMessageParts: parts});
       if (htmlPart instanceof Promise) {
         htmlParts$.push(htmlPart.then(html => {return {html: html, id: partData.id}}));
       } else {

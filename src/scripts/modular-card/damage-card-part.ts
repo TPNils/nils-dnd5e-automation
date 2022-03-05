@@ -9,6 +9,7 @@ import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
+import { State, StateContext, TargetCallbackData, TargetCardPart, VisualState } from "./target-card-part";
 
 type TermJson = ReturnType<RollTerm['toJSON']> & {
   class: string;
@@ -154,6 +155,12 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
+    const dummyState: VisualState[] = [{state: 'applied', tokenUuid: 'Scene.rhYsxhXlttrMf6yi.Token.Cot3LIe8TnSoav4A', columns: [{key: '1', label: 'one', rowValue: 'idk'}]}];
+    TargetCardPart.instance.register({
+      onChange: data => this.targetCallback(data),
+      getState: context => dummyState,
+      getVisualState: context => dummyState,
+    });
   }
 
   public getType(): string {
@@ -271,6 +278,10 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     // TODO recalc whole item on level change to support custom scaling level scaling formulas
     await this.calcDamageFormulas(context);
     // TODO auto apply healing, but it needs to be sync?
+  }
+
+  private targetCallback(data: TargetCallbackData[]): void {
+    
   }
   
   private async calcDamageFormulas(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
