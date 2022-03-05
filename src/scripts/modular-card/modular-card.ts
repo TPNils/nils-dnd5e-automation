@@ -230,17 +230,17 @@ export class ModularCard {
         data: part
       });
     }
-    for (const part of PropertyCardPart.instance.generate(data)) {
-      parts.push({
-        id: `${id++}`,
-        type: PropertyCardPart.name,
-        data: part
-      });
-    }
     for (const part of TargetCardPart.instance.generate(data)) {
       parts.push({
         id: `${id++}`,
         type: TargetCardPart.name,
+        data: part
+      });
+    }
+    for (const part of PropertyCardPart.instance.generate(data)) {
+      parts.push({
+        id: `${id++}`,
+        type: PropertyCardPart.name,
         data: part
       });
     }
