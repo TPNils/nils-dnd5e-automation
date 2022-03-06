@@ -7,10 +7,16 @@ import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
-import { ModularCard, ModularCardTriggerData } from "./modular-card";
+import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
+import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
+
+interface TargetCache {
+  targetUuid: string;
+  ac: number;
+}
 
 export interface AttackCardData {
   phase: RollPhase;
@@ -24,6 +30,7 @@ export interface AttackCardData {
     roll?: RollData;
     critTreshold: number;
     isCrit?: boolean;
+    targetCaches: TargetCache[]
   }
 }
 
@@ -78,6 +85,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       phase: 'mode-select',
       userBonus: "",
       calc$: {
+        targetCaches: [],
         hasHalflingLucky: actor?.getFlag("dnd5e", "halflingLucky") === true,
         actorUuid: actor?.uuid,
         rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
@@ -101,6 +109,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
+    TargetCardPart.instance.registerIntegration({
+      getVisualState: context => this.getTargetState(context),
+    });
   }
 
   public getType(): string {
@@ -144,6 +155,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     ]
   }
 
+  //#region Front end
   private static processItemAttack(data: AttackCardData, clickEvent: ClickEvent | null): void {
     if (data.phase === 'result') {
       return;
@@ -196,6 +208,48 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
   }
 
+  private getTargetState(context: StateContext): VisualState[] {
+    const visualStates: VisualState[] = [];
+
+    const rolledAttacks: ModularCardPartData<AttackCardData>[] = context.allMessageParts.filter(part => this.isThisType(part));
+    if (rolledAttacks.length === 0) {
+      return [];
+    }
+
+    const cache = this.getTargetCache(rolledAttacks.map(attack => attack.data));
+    for (let i = 0; i < rolledAttacks.length; i++) {
+      const attack = rolledAttacks[i];
+      // TODO either this should be a (mini) template to use permission check 
+      //      or permissions should be configured via the columns
+      for (const tokenUuid of context.selectedTokenUuids) {
+        let rowValue: string;
+        // TODO cache the hit/mis and why this is the state
+        if (!attack.data.calc$.roll?.evaluated || !cache.has(tokenUuid)) {
+          rowValue = '';
+        } else if (attack.data.calc$.roll.terms[0].results.find(r => r.active)?.result === 20) {
+          rowValue = `<span title="Crit!">HIT</span>`;
+        } else if (attack.data.calc$.roll.terms[0].results.find(r => r.active)?.result === 1) {
+          rowValue = `<span title="Crit miss!">MISS</span>`;
+        } else {
+          const isHit = cache.get(tokenUuid).ac <= attack.data.calc$.roll?.total;
+          rowValue = `<span title="AC: ${cache.get(tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">${isHit ? 'HIT' : 'MISS'}</span>`;
+        }
+        visualStates.push({
+          tokenUuid: tokenUuid,
+          columns: [{
+            key: `${this.getType()}-attack-${i}`,
+            label: `Attack ${(rolledAttacks.length === 1) ? '' : ` ${i+1}`}`,
+            rowValue: rowValue,
+          }],
+        })
+      }
+    }
+
+    return visualStates;
+  }
+  //#endregion
+
+  //#region Back end
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {
     this.calcIsCrit(context);
     this.setDamageAsCrit(context);
@@ -204,10 +258,82 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
     await this.calcAttackRoll(context);
     await this.rollAttack(context);
+    await this.addTargetCache(context);
   }
 
   public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<any>>): void | Promise<void> {
     this.onBonusChange(context);
+  }
+
+  private async addTargetCache(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+    const partsByMessageId = new Map<string, ModularCardTriggerData[]>();
+    for (const {newRow} of context.rows) {
+      if (!partsByMessageId.has(newRow.messageId)) {
+        partsByMessageId.set(newRow.messageId, []);
+      }
+      partsByMessageId.get(newRow.messageId).push(newRow);
+    }
+
+    const missingTargetUuids = new Set<string>();
+    for (const rows of partsByMessageId.values()) {
+      const allTargetUuids = new Set<string>();
+      const cachedTargetUuids = new Set<string>();
+      for (const row of rows) {
+        if (this.isAnyTargetType(row)) {
+          for (const targetUuid of row.data.selectedTokenUuids) {
+            allTargetUuids.add(targetUuid);
+          }
+        }
+
+        if (this.isThisType(row) && this.assumeThisType(row)) {
+          for (const target of row.data.calc$.targetCaches) {
+            cachedTargetUuids.add(target.targetUuid);
+          }
+        }
+      }
+
+      for (const expectedUuid of allTargetUuids) {
+        if (!cachedTargetUuids.has(expectedUuid)) {
+          missingTargetUuids.add(expectedUuid);
+        }
+      }
+    }
+
+    if (missingTargetUuids.size === 0) {
+      return;
+    }
+
+    // Cache the values of the tokens
+    const tokens = await UtilsDocument.tokenFromUuid(missingTargetUuids);
+    for (const rows of partsByMessageId.values()) {
+      const allTargetUuids = new Set<string>();
+      for (const row of rows) {
+        if (this.isAnyTargetType(row)) {
+          for (const targetUuid of row.data.selectedTokenUuids) {
+            allTargetUuids.add(targetUuid);
+          }
+        }
+      }
+
+      for (const row of rows) {
+        if (this.isThisType(row) && this.assumeThisType(row)) {
+          const cachedTargetUuids = new Set<string>();
+          for (const target of row.data.calc$.targetCaches) {
+            cachedTargetUuids.add(target.targetUuid);
+          }
+
+          for (const expectedUuid of allTargetUuids) {
+            if (!cachedTargetUuids.has(expectedUuid)) {
+              row.data.calc$.targetCaches.push({
+                targetUuid: expectedUuid,
+                ac: (tokens.get(expectedUuid).getActor() as MyActor).data.data.attributes.ac.value,
+              });
+              cachedTargetUuids.add(expectedUuid);
+            }
+          }
+        }
+      }
+    }
   }
 
   private calcIsCrit(context: IDmlContext<ModularCardTriggerData>): void {
@@ -348,17 +474,40 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       }
     }
   }
+  //#endregion
 
-  private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData> {
-    return row.type === this.getType() && row.typeHandler instanceof AttackCardPart;
+  private isThisType(row: ModularCardPartData): row is ModularCardPartData<AttackCardData>
+  private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData>
+  private isThisType(row: {type: string, typeHandler?: ModularCardPart}): boolean {
+    if (row.type !== this.getType()) {
+      return false;
+    }
+    if (row.typeHandler) {
+      return row.typeHandler instanceof AttackCardPart;
+    }
+    return ModularCard.getTypeHandler(row.type) instanceof AttackCardPart;
+  }
+
+  private isAnyTargetType(row: ModularCardTriggerData): row is ModularCardTriggerData<TargetCardData> {
+    return row.typeHandler instanceof TargetCardPart;
   }
 
   private isAnyDamageType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
     return row.typeHandler instanceof DamageCardPart;
   }
 
-  private assumeThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
+  private assumeThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData> {
     return true;
+  }
+
+  private getTargetCache(caches: AttackCardData[]): Map<string, TargetCache> {
+    const cacheByUuid = new Map<string, TargetCache>();
+    for (const cache of caches) {
+      for (const targetCache of cache.calc$.targetCaches) {
+        cacheByUuid.set(targetCache.targetUuid, targetCache);
+      }
+    }
+    return cacheByUuid;
   }
 
 }

@@ -19,7 +19,7 @@
       <tr>
         <td {{#nacPerm (nacConcat "ActorObserverUuid:" target.actorUuid)}}title="{{target.name}}"{{/nacPerm}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
         {{#each target.row}}
-          <td>{{this}}</td>
+          <td>{{{this}}}</td>
         {{/each}}
         <td>
           <button data-{{@root.moduleName}}-action="apply-{{target.tokenUuid}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
