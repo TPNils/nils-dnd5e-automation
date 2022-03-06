@@ -54,13 +54,13 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
     return [
       {
         regex: /^toggle-collapse$/,
-        execute: ({messageId}) => DescriptionCardPart.toggleCollapse(messageId),
+        execute: ({messageId}) => this.toggleCollapse(messageId),
       },
     ]
   }
 
   
-  private static toggleCollapse(messageId: string): void {
+  private toggleCollapse(messageId: string): void {
     MemoryStorageService.setCardCollapse(messageId, !MemoryStorageService.isCardCollapsed(messageId));
     ui.chat.updateMessage(game.messages.get(messageId));
   }

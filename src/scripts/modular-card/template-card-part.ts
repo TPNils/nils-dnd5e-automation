@@ -67,12 +67,12 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
       {
         regex: /^item-template$/,
         permissionCheck: permissionCheck,
-        execute: ({data, messageId, partId}) => TemplateCardPart.processItemTemplate(data, messageId, partId),
+        execute: ({data, messageId, partId}) => this.processItemTemplate(data, messageId, partId),
       }
     ]
   }
   
-  private static async processItemTemplate(data: TemplateCardData, messageId: string, partId: string): Promise<void> {
+  private async processItemTemplate(data: TemplateCardData, messageId: string, partId: string): Promise<void> {
     // TODO
     // if (!InternalFunctions.canChangeTargets(messageData.items[itemIndex])) {
     //   return;

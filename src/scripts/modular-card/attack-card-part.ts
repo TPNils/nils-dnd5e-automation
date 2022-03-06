@@ -149,23 +149,23 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       {
         regex: /^item-attack$/,
         permissionCheck: permissionCheck,
-        execute: ({data, clickEvent}) => AttackCardPart.processItemAttack(data, clickEvent),
+        execute: ({data, clickEvent}) => this.processItemAttack(data, clickEvent),
       },
       {
         regex: /^item-attack-bonus$/,
         permissionCheck: permissionCheck,
-        execute: ({data, keyEvent, inputValue}) => AttackCardPart.processItemAttackBonus(data, keyEvent, inputValue as string),
+        execute: ({data, keyEvent, inputValue}) => this.processItemAttackBonus(data, keyEvent, inputValue as string),
       },
       {
         regex: /^item-attack-mode-(minus|plus)$/,
         permissionCheck: permissionCheck,
-        execute: ({data, clickEvent, regexResult}) => AttackCardPart.processItemAttackMode(data, clickEvent, regexResult[1] as ('plus' | 'minus')),
+        execute: ({data, clickEvent, regexResult}) => this.processItemAttackMode(data, clickEvent, regexResult[1] as ('plus' | 'minus')),
       },
     ]
   }
 
   //#region Front end
-  private static processItemAttack(data: AttackCardData, clickEvent: ClickEvent | null): void {
+  private processItemAttack(data: AttackCardData, clickEvent: ClickEvent | null): void {
     if (data.phase === 'result') {
       return;
     }
@@ -178,7 +178,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
   }
   
-  private static processItemAttackBonus(data: AttackCardData, keyEvent: KeyEvent | null, attackBonus: string): void {
+  private processItemAttackBonus(data: AttackCardData, keyEvent: KeyEvent | null, attackBonus: string): void {
     if (attackBonus) {
       data.userBonus = attackBonus;
     } else {
@@ -197,7 +197,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
   }
 
-  private static async processItemAttackMode(data: AttackCardData, event: ClickEvent | null, modName: 'plus' | 'minus'): Promise<void> {
+  private async processItemAttackMode(data: AttackCardData, event: ClickEvent | null, modName: 'plus' | 'minus'): Promise<void> {
     let modifier = modName === 'plus' ? 1 : -1;
     if (event?.shiftKey && modifier > 0) {
       modifier++;

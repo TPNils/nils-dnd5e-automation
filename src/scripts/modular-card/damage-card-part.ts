@@ -184,22 +184,22 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       {
         regex: /^item-damage$/,
         permissionCheck: permissionCheck,
-        execute: ({data, clickEvent}) => DamageCardPart.processNextPhase(data, clickEvent),
+        execute: ({data, clickEvent}) => this.processNextPhase(data, clickEvent),
       },
       {
         regex: /^item-damage-bonus$/,
         permissionCheck: permissionCheck,
-        execute: ({data, keyEvent, inputValue}) => DamageCardPart.processDamageBonus(data, keyEvent, inputValue as string),
+        execute: ({data, keyEvent, inputValue}) => this.processDamageBonus(data, keyEvent, inputValue as string),
       },
       {
         regex: /^item-damage-mode-(minus|plus)$/,
         permissionCheck: permissionCheck,
-        execute: ({data, clickEvent, regexResult}) => DamageCardPart.processDamageMode(data, clickEvent, regexResult[1] as ('plus' | 'minus')),
+        execute: ({data, clickEvent, regexResult}) => this.processDamageMode(data, clickEvent, regexResult[1] as ('plus' | 'minus')),
       },
     ]
   }
 
-  private static async processNextPhase(data: DamageCardData,event: ClickEvent | null): Promise<void> {
+  private async processNextPhase(data: DamageCardData,event: ClickEvent | null): Promise<void> {
     if (data.phase === 'result') {
       return;
     }
@@ -212,7 +212,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     }
   }
 
-  private static async processDamageMode(data: DamageCardData, event: ClickEvent, modName: 'plus' | 'minus'): Promise<void> {
+  private async processDamageMode(data: DamageCardData, event: ClickEvent, modName: 'plus' | 'minus'): Promise<void> {
     let modifier = modName === 'plus' ? 1 : -1;
     
     const order: Array<DamageCardData['mode']> = ['normal', 'critical'];
@@ -227,7 +227,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     }
   }
   
-  private static async processDamageBonus(data: DamageCardData, keyEvent: KeyEvent | null, damageBonus: string): Promise<void> {
+  private async processDamageBonus(data: DamageCardData, keyEvent: KeyEvent | null, damageBonus: string): Promise<void> {
     if (keyEvent?.key === 'Escape') {
       data.phase = 'mode-select';
       return;
