@@ -268,21 +268,42 @@ function buildManifest() {
    }
  }
  
- /**
-  * Watch for changes for each build step
-  */
- function buildWatch() {
-   buildManifest().then(() => startFoundry())
-   const copyFiles = [...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs'], options: {override: false}}];
-   gulp.watch('src/**/*.ts', { ignoreInitial: false }, buildTS);
-   gulp.watch('src/**/*.less', { ignoreInitial: false }, buildLess);
-   gulp.watch(['dist/**/*.css', 'dist/**/*.hbs'], { ignoreInitial: false, delay: 500, queue: false }, buildManifest);
-   gulp.watch('src/**/*.scss', { ignoreInitial: false }, buildSASS);
-   gulp.watch(
-     [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
-     { ignoreInitial: false },
-     createCopyFiles(copyFiles)
-   );
+/**
+ * Watch for changes for each build step
+ */
+function buildWatch() {
+  const copyFiles = [...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs'], options: {override: false}}];
+  const copyFilesFunc = createCopyFiles(copyFiles);
+  
+  return gulp.series(
+    async function initialSetup() {
+      // Initial build
+      //console.log(buildTS().eventNames())
+      // finish, close, end
+      await Promise.all([
+        new Promise((resolve) => buildTS().once('end', () => resolve())),
+        new Promise((resolve) => buildLess().once('end', () => resolve())),
+        new Promise((resolve) => buildSASS().once('end', () => resolve())),
+        copyFilesFunc(),
+      ]);
+      // Only build manifest once all hbs & css files are generated
+      await buildManifest();
+
+      // Only start foundry when the manifest is build
+      startFoundry();
+    },
+    function watch() {
+      gulp.watch('src/**/*.ts', { ignoreInitial: true }, buildTS);
+      gulp.watch('src/**/*.less', { ignoreInitial: true }, buildLess);
+      gulp.watch('src/**/*.scss', { ignoreInitial: true }, buildSASS);
+      gulp.watch(['dist/**/*.css', 'dist/**/*.hbs'], { ignoreInitial: true, delay: 500, queue: false }, buildManifest);
+      gulp.watch(
+        [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
+        { ignoreInitial: true },
+        copyFilesFunc
+      )
+    }
+  )
  }
  
  /********************/
@@ -614,7 +635,7 @@ function buildManifest() {
  
  export const build = gulp.series(clean, execBuild, buildManifest);
  export const updateSrcPacks = gulp.parallel(createCopyFiles([{from: ['dist','packs'], to: ['src','packs']}]));
- export const watch = buildWatch;
+ export const watch = buildWatch();
  export {clean};
  export const link = linkUserData;
  export const buildZip = packageBuild;
