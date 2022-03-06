@@ -293,10 +293,10 @@ function buildWatch() {
       startFoundry();
     },
     function watch() {
+      // Do not watch to build the manifest since it only gets loaded on server start
       gulp.watch('src/**/*.ts', { ignoreInitial: true }, buildTS);
       gulp.watch('src/**/*.less', { ignoreInitial: true }, buildLess);
       gulp.watch('src/**/*.scss', { ignoreInitial: true }, buildSASS);
-      gulp.watch(['dist/**/*.css', 'dist/**/*.hbs'], { ignoreInitial: true, delay: 500, queue: false }, buildManifest);
       gulp.watch(
         [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
         { ignoreInitial: true },
