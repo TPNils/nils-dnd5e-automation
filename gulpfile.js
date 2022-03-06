@@ -226,7 +226,7 @@
 	* Build Less
 	*/
  function buildLess() {
-	 return gulp.src('src/styles/*.less').pipe(less()).pipe(gulp.dest('dist/styles'));
+	 return gulp.src('src/**/*.less').pipe(less()).pipe(gulp.dest('dist/styles'));
  }
  
  /**
@@ -234,9 +234,9 @@
 	*/
  function buildSASS() {
 	 return gulp
-		 .src('src/styles/*.scss')
+		 .src('src/**/*.scss')
 		 .pipe(sass().on('error', sass.logError))
-		 .pipe(gulp.dest('dist/styles'));
+		 .pipe(gulp.dest('dist'));
  }
  
  const staticCopyFiles = [
@@ -272,11 +272,11 @@
 	* Watch for changes for each build step
 	*/
  function buildWatch() {
-	 startFoundry();
+	 buildManifest().then(() => startFoundry())
 	 const copyFiles = [...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs'], options: {override: false}}];
 	 gulp.watch('src/**/*.ts', { ignoreInitial: false }, buildTS);
 	 gulp.watch('src/**/*.less', { ignoreInitial: false }, buildLess);
-	 gulp.watch(['dist/**/*.css', 'dist/**/*.hbs'], { ignoreInitial: false, events: 'add', delay: 500, queue: false }, buildManifest);
+	 gulp.watch(['dist/**/*.css', 'dist/**/*.hbs'], { ignoreInitial: false, delay: 500, queue: false }, buildManifest);
 	 gulp.watch('src/**/*.scss', { ignoreInitial: false }, buildSASS);
 	 gulp.watch(
 		 [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
