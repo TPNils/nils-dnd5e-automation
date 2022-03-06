@@ -452,6 +452,12 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       }
 
       let baseRoll = new Die({faces: 20, number: 1});
+      if (newRow.data.calc$.hasHalflingLucky) {
+        // reroll a base roll 1 once
+        // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
+        // second 2 = reroll when the roll result is equal to 1 (=1)
+        baseRoll.modifiers.push('r1=1');
+      }
       switch (newRow.data.mode) {
         case 'advantage': {
           baseRoll.number = 2;
@@ -463,12 +469,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           baseRoll.modifiers.push('kl');
           break;
         }
-      }
-      if (newRow.data.calc$.hasHalflingLucky) {
-        // reroll a base roll 1 once
-        // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
-        // second 2 = reroll when the roll result is equal to 1 (=1)
-        baseRoll.modifiers.push('r1=1');
       }
       const parts: string[] = [baseRoll.formula];
       if (newRow.data.calc$.rollBonus) {
