@@ -155,12 +155,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
-    const dummyState: VisualState[] = [{state: 'applied', tokenUuid: 'Scene.rhYsxhXlttrMf6yi.Token.Cot3LIe8TnSoav4A', columns: [{key: '1', label: 'one', rowValue: 'idk'}]}];
-    TargetCardPart.instance.register({
-      onChange: data => this.targetCallback(data),
-      getState: context => dummyState,
-      getVisualState: context => dummyState,
-    });
   }
 
   public getType(): string {
