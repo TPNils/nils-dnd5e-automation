@@ -200,52 +200,37 @@ export class ModularCard {
   public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardPartData[]> {
     // TODO this is proof of concept, when finished to should dynamically assign which parts to use for creation
     let id = 0;
-    const parts: ModularCardPartData[] = [];
+    const parts: Promise<{datas: any[], cardPart: ModularCardPart}>[] = [];
 
-    for (const part of DescriptionCardPart.instance.generate(data)) {
-      parts.push({
-        id: `${id++}`,
-        type: DescriptionCardPart.name,
-        data: part
-      });
-    }
-    for (const part of AttackCardPart.instance.generate(data)) {
-      parts.push({
-        id: `${id++}`,
-        type: AttackCardPart.name,
-        data: part
-      });
-    }
-    for (const part of DamageCardPart.instance.generate(data)) {
-      parts.push({
-        id: `${id++}`,
-        type: DamageCardPart.name,
-        data: part
-      });
-    }
-    for (const part of TemplateCardPart.instance.generate(data)) {
-      parts.push({
-        id: `${id++}`,
-        type: TemplateCardPart.name,
-        data: part
-      });
-    }
-    for (const part of TargetCardPart.instance.generate(data)) {
-      parts.push({
-        id: `${id++}`,
-        type: TargetCardPart.name,
-        data: part
-      });
-    }
-    for (const part of PropertyCardPart.instance.generate(data)) {
-      parts.push({
-        id: `${id++}`,
-        type: PropertyCardPart.name,
-        data: part
-      });
+    const cardParts: ModularCardPart[] = [
+      DescriptionCardPart.instance,
+      AttackCardPart.instance,
+      DamageCardPart.instance,
+      TemplateCardPart.instance,
+      TargetCardPart.instance,
+      PropertyCardPart.instance,
+    ];
+    
+    for (const cardPart of cardParts) {
+      const response = cardPart.generate(data);
+      if (response instanceof Promise) {
+        parts.push(response.then(data => ({datas: data, cardPart: cardPart})))
+      } else {
+        parts.push(Promise.resolve({datas: response, cardPart: cardPart}));
+      }
     }
 
-    return parts;
+    const response: ModularCardPartData[] = [];
+    for (const part of await Promise.all(parts)) {
+      for (const data of part.datas) {
+        response.push({
+          id: `${id++}`,
+          data: data,
+          type: part.cardPart.getType(),
+        })
+      }
+    }
+    return response;
   }
   
   public static async createCard(parts: ModularCardPartData[], insert: boolean = true): Promise<ChatMessage> {

@@ -93,8 +93,8 @@ export interface HtmlContext<T> {
 }
 
 export interface ModularCardPart<D = any> extends ITrigger<ModularCardTriggerData> {
-  generate(args: {actor?: MyActor, token?: TokenDocument, item: MyItem}): D[]; // TODO should support promise
   getType(): string;
-  getHtml(context: HtmlContext<D>): string | Promise<string>;
+  generate(args: {actor?: MyActor, token?: TokenDocument, item: MyItem}): PromiseOrSync<D[]>; // TODO should support promise
+  getHtml(context: HtmlContext<D>): PromiseOrSync<string>;
   getCallbackActions(): ICallbackAction<D>[];
 }
