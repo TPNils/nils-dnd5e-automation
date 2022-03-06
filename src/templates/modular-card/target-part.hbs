@@ -1,32 +1,28 @@
-<table class="{{moduleName}}-target-part">
-  <thead>
-    <tr>
-      <th style="width: 24px;">{{! name/img }}</th>
-      {{#each data.tableHeader}}
-        <th>{{{this}}}</th>
-      {{/each}}
-      <th style="width: 50px;">
-        {{#nacExpr data.tableBody.length '>' 1}}
-          <button data-{{@root.moduleName}}-action="apply-*" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
-          <button data-{{@root.moduleName}}-action="undo-*" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
-        {{/nacExpr}}
-      </th>
-    </tr>
-  </thead>
-  <tbody>
-    {{#each data.tableBody as |target|}}
-      <tr>
-        <td {{#nacPerm (nacConcat "ObserverUuid:" target.actorUuid)}}title="{{target.name}}"{{/nacPerm}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
-        {{#each target.row}}
-          <td>{{{this}}}</td>
-        {{/each}}
-        <td>
-          {{#nacPerm (nacConcat "UpdateUuid:" target.actorUuid)}}
-            <button data-{{@root.moduleName}}-action="apply-{{target.tokenUuid}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
-            <button data-{{@root.moduleName}}-action="undo-{{target.tokenUuid}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
-          {{/nacPerm}}
-        </td>
-      </tr>
+<div class="table target-table" style="grid-template-columns: 25px {{#if data.tableHeader.length}}repeat({{data.tableHeader.length}}, min-content){{/if}} auto 50px;">
+  {{!header}}
+  <div class="header-cell">{{! name/img }}</div>
+  {{#each data.tableHeader}}
+    <div class="header-cell">{{{this}}}</div>
+  {{/each}}
+  <div class="header-cell">{{! filler }}</div>
+  <div class="header-cell">
+    {{#nacExpr data.tableBody.length '>' 1}}
+      <button data-{{@root.moduleName}}-action="apply-*" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
+      <button data-{{@root.moduleName}}-action="undo-*" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+    {{/nacExpr}}
+  </div>
+  {{!body}}
+  {{#each data.tableBody as |target|}}
+    <div class="body-cell" {{#nacPerm (nacConcat "ObserverUuid:" target.actorUuid)}}title="{{target.name}}"{{/nacPerm}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</div>
+    {{#each target.row}}
+      <div class="body-cell">{{{this}}}</div>
     {{/each}}
-  </tbody>
-</table>
+    <div class="body-cell">{{! filler }}</div>
+    <div class="body-cell">
+      {{#nacPerm (nacConcat "UpdateUuid:" target.actorUuid)}}
+        <button data-{{@root.moduleName}}-action="apply-{{target.tokenUuid}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
+        <button data-{{@root.moduleName}}-action="undo-{{target.tokenUuid}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+      {{/nacPerm}}
+    </div>
+  {{/each}}
+</div>

@@ -85,6 +85,22 @@
     color: #aa0200;
     filter: sepia(0.5) hue-rotate(-60deg);
   }
+
+  .table {
+    padding-left: 2px;
+
+    .header-cell {
+      background: rgba(0, 0, 0, 0.5);
+      color: #f0f0e0;
+      text-shadow: 1px 1px #000;
+      border-bottom: 1px solid #000;
+    }
+    
+    .body-cell,
+    .header-cell {
+      padding: 0.25em 0;
+    }
+  }
 }
 
 .#{$module-name}-item-card {
