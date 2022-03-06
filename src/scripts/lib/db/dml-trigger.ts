@@ -201,7 +201,7 @@ class CallbackGroup<T extends foundry.abstract.Document<any, any>, R> {
   }
 }
 
-type OnFoundryTargetToken = (user: User, token: TokenDocument, targeted: boolean) => Promise<void>;
+type OnFoundryTargetToken = (user: User, token: Token, targeted: boolean) => Promise<void>;
 
 class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
@@ -565,18 +565,32 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const simulatedOldRow: User = new User(deepClone(user.data), {parent: user.parent, pack: user.pack});
       
       // Prevent the hook from going off again
+      documentSnapshot.targets.add = Set.prototype.add;
+      documentSnapshot.targets.delete = Set.prototype.delete;
       simulatedOldRow.targets.add = Set.prototype.add;
       simulatedOldRow.targets.delete = Set.prototype.delete;
       
+      // Targets do not get cloned => manually fill them
+      const newlyAddedTokenUuids: string[] = [];
       for (const event of events) {
         if (event[2]) {
-          // new target added => remove it from the old
-          simulatedOldRow.targets.delete(event[1].object as Token);
+          newlyAddedTokenUuids.push(event[1].document.uuid)
         } else {
           // target removed => add it to the old
-          simulatedOldRow.targets.add(event[1].object as Token);
+          simulatedOldRow.targets.add(event[1]);
         }
       }
+      for (const target of user.targets) {
+        // new target added => remove it from the old
+        documentSnapshot.targets.add(target);
+        if (!newlyAddedTokenUuids.includes(target.document.uuid)) {
+          simulatedOldRow.targets.add(target);
+        }
+      }
+      
+      // Re-enable hook events, not for oldRow since it should be immutable anyway
+      documentSnapshot.targets.add = UserTargets.prototype.add;
+      documentSnapshot.targets.delete = UserTargets.prototype.delete;
 
       rows.push({
         newRow: documentSnapshot as any,
