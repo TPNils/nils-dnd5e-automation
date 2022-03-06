@@ -16,6 +16,8 @@ type RollPhase = 'mode-select' | 'bonus-input' | 'result';
 interface TargetCache {
   targetUuid: string;
   ac: number;
+  resultType?: 'hit' | 'critical-hit' | 'mis' | 'critical-mis';
+  visibleToUsers: string[];
 }
 
 export interface AttackCardData {
@@ -224,21 +226,38 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       for (const tokenUuid of context.selectedTokenUuids) {
         let rowValue: string;
         // TODO cache the hit/mis and why this is the state
-        if (!attack.data.calc$.roll?.evaluated || !cache.has(tokenUuid)) {
-          rowValue = '';
-        } else if (attack.data.calc$.roll.terms[0].results.find(r => r.active)?.result === 20) {
-          rowValue = `<span title="Crit!">HIT</span>`;
-        } else if (attack.data.calc$.roll.terms[0].results.find(r => r.active)?.result === 1) {
-          rowValue = `<span title="Crit miss!">MISS</span>`;
+        if (!attack.data.calc$.roll?.evaluated || !cache.has(tokenUuid) || !cache.get(tokenUuid).visibleToUsers.includes(game.userId)) {
+          if (attack.data.calc$.roll?.evaluated) {
+            rowValue = '';
+          } else {
+            rowValue = '';
+          }
         } else {
-          const isHit = cache.get(tokenUuid).ac <= attack.data.calc$.roll?.total;
-          rowValue = `<span title="AC: ${cache.get(tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">${isHit ? 'HIT' : 'MISS'}</span>`;
+          switch (cache.get(tokenUuid).resultType) {
+            case 'critical-hit': {
+              rowValue = `<div style="color: green;" title="${game.i18n.localize('DND5E.CriticalHit')}!">✓</div>`;
+              break;
+            }
+            case 'critical-mis': {
+              // TODO not great localization, should probably add my own
+              rowValue = `<div style="color: red;" title="${game.i18n.localize('Minimum')}!">✗</div>`;
+              break;
+            }
+            case 'hit': {
+              rowValue = `<div style="color: green;" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">✓</div>`;
+              break;
+            }
+            case 'mis': {
+              rowValue = `<div style="color: red;" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">✗</div>`;
+              break;
+            }
+          }
         }
         visualStates.push({
           tokenUuid: tokenUuid,
           columns: [{
             key: `${this.getType()}-attack-${i}`,
-            label: `Attack ${(rolledAttacks.length === 1) ? '' : ` ${i+1}`}`,
+            label: `${game.i18n.localize('DND5E.Attack')}${(rolledAttacks.length === 1) ? '' : ` ${i+1}`}`,
             rowValue: rowValue,
           }],
         })
@@ -253,6 +272,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {
     this.calcIsCrit(context);
     this.setDamageAsCrit(context);
+    this.calcResultCache(context);
   }
 
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
@@ -324,9 +344,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
           for (const expectedUuid of allTargetUuids) {
             if (!cachedTargetUuids.has(expectedUuid)) {
+              const actor = (tokens.get(expectedUuid).getActor() as MyActor);
               row.data.calc$.targetCaches.push({
                 targetUuid: expectedUuid,
-                ac: (tokens.get(expectedUuid).getActor() as MyActor).data.data.attributes.ac.value,
+                ac: actor.data.data.attributes.ac.value,
+                visibleToUsers: Array.from(game.users.values()).filter(user => actor.testUserPermission(user, 'OWNER')).map(user => user.id),
               });
               cachedTargetUuids.add(expectedUuid);
             }
@@ -349,6 +371,34 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
       const baseRollResult = (newRow.data.calc$.roll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
       newRow.data.calc$.isCrit = baseRollResult.result >= newRow.data.calc$.critTreshold;
+    }
+  }
+
+  private calcResultCache(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow} of context.rows) {
+      if (!this.isThisType(newRow) || !this.assumeThisType(newRow)) {
+        continue;
+      }
+
+      for (const targetCache of newRow.data.calc$.targetCaches) {
+        if (newRow.data.calc$.roll?.evaluated) {
+          const firstRoll = newRow.data.calc$.roll.terms[0].results.find(r => r.active);
+          if (firstRoll.result === 20 || targetCache.ac <= newRow.data.calc$.roll.total) {
+            // 20 always hits, lower crit treshold does not
+            if (firstRoll.result >= newRow.data.calc$.critTreshold) {
+              targetCache.resultType = 'critical-hit';
+            } else {
+              targetCache.resultType = 'hit';
+            }
+          } else if (firstRoll.result === 1) {
+            targetCache.resultType = 'critical-mis';
+          } else {
+            targetCache.resultType = 'mis';
+          }
+        } else if (targetCache.resultType) {
+          delete targetCache.resultType;
+        }
+      }
     }
   }
 
