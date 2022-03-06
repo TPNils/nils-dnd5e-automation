@@ -15,18 +15,18 @@
   </thead>
   <tbody>
     {{#each data.tableBody as |target|}}
-    {{#nacPerm (nacConcat "ActorOwnerUuid:" target.actorUuid)}}
       <tr>
-        <td {{#nacPerm (nacConcat "ActorObserverUuid:" target.actorUuid)}}title="{{target.name}}"{{/nacPerm}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
+        <td {{#nacPerm (nacConcat "ObserverUuid:" target.actorUuid)}}title="{{target.name}}"{{/nacPerm}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</td>
         {{#each target.row}}
           <td>{{{this}}}</td>
         {{/each}}
         <td>
-          <button data-{{@root.moduleName}}-action="apply-{{target.tokenUuid}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
-          <button data-{{@root.moduleName}}-action="undo-{{target.tokenUuid}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+          {{#nacPerm (nacConcat "UpdateUuid:" target.actorUuid)}}
+            <button data-{{@root.moduleName}}-action="apply-{{target.tokenUuid}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
+            <button data-{{@root.moduleName}}-action="undo-{{target.tokenUuid}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+          {{/nacPerm}}
         </td>
       </tr>
-    {{/nacPerm}}
     {{/each}}
   </tbody>
 </table>
