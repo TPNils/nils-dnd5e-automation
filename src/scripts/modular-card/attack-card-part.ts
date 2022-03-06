@@ -213,7 +213,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   private getTargetState(context: StateContext): VisualState[] {
     const visualStates: VisualState[] = [];
 
-    const rolledAttacks: ModularCardPartData<AttackCardData>[] = context.allMessageParts.filter(part => this.isThisType(part));
+    const rolledAttacks: ModularCardPartData<AttackCardData>[] = context.allMessageParts.filter(part => part.type === this.getType() && ModularCard.getTypeHandler(part.type) instanceof AttackCardPart);
     if (rolledAttacks.length === 0) {
       return [];
     }
@@ -526,9 +526,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
   //#endregion
 
-  private isThisType(row: ModularCardPartData): row is ModularCardPartData<AttackCardData>
-  private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData>
-  private isThisType(row: {type: string, typeHandler?: ModularCardPart}): boolean {
+  private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData> {
     if (row.type !== this.getType()) {
       return false;
     }
