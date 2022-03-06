@@ -13,6 +13,10 @@ import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./tar
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
 
+const svg = `<svg version="1.1" font-size: 16px; height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 454.635 454.635" style="enable-background:new 0 0 454.635 454.635;" xml:space="preserve">
+<path fill="currentColor" d="M286.306,301.929h-17.472L295.141,82.85c0.708-5.89-1.709-13.694-5.621-18.155L236.506,4.255 C234.134,1.551,230.785,0,227.317,0s-6.816,1.551-9.188,4.255l-53.015,60.439c-3.912,4.461-6.328,12.266-5.621,18.155 l26.307,219.079h-17.472c-8.412,0-15.256,6.844-15.256,15.256v18.984c0,8.412,6.844,15.256,15.256,15.256h37.118v33.143 c-10.014,6.95-16.588,18.523-16.588,31.609c0,21.206,17.252,38.458,38.458,38.458s38.458-17.252,38.458-38.458 c0-13.086-6.574-24.659-16.588-31.609v-33.143h37.118c8.412,0,15.256-6.844,15.256-15.256v-18.984 C301.562,308.772,294.718,301.929,286.306,301.929z"/>
+</svg>`
+
 interface TargetCache {
   targetUuid: string;
   ac: number;
@@ -233,22 +237,27 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             rowValue = '';
           }
         } else {
+          const styles = [];
           switch (cache.get(tokenUuid).resultType) {
             case 'critical-hit': {
-              rowValue = `<div style="color: green;" title="${game.i18n.localize('DND5E.CriticalHit')}!">✓</div>`;
+              styles.push('color: green');
+              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.CriticalHit')}!">✓</div>`;
               break;
             }
             case 'critical-mis': {
               // TODO not great localization, should probably add my own
-              rowValue = `<div style="color: red;" title="${game.i18n.localize('Minimum')}!">✗</div>`;
+              styles.push('color: red');
+              rowValue = `<div style="style="${styles.join(';')};" title="${game.i18n.localize('Minimum')}!">✗</div>`;
               break;
             }
             case 'hit': {
-              rowValue = `<div style="color: green;" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">✓</div>`;
+              styles.push('color: green');
+              rowValue = `<div style="style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">✓</div>`;
               break;
             }
             case 'mis': {
-              rowValue = `<div style="color: red;" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">✗</div>`;
+              styles.push('color: red');
+              rowValue = `<div style="style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">✗</div>`;
               break;
             }
           }
@@ -257,7 +266,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           tokenUuid: tokenUuid,
           columns: [{
             key: `${this.getType()}-attack-${i}`,
-            label: `${game.i18n.localize('DND5E.Attack')}${(rolledAttacks.length === 1) ? '' : ` ${i+1}`}`,
+            label: `${svg} ${(rolledAttacks.length === 1) ? '' : ` ${i+1}`}`,
             rowValue: rowValue,
           }],
         })

@@ -3,7 +3,7 @@
     <tr>
       <th style="width: 24px;">{{! name/img }}</th>
       {{#each data.tableHeader}}
-        <th>{{this}}</th>
+        <th>{{{this}}}</th>
       {{/each}}
       <th style="width: 50px;">
         {{#nacExpr data.tableBody.length '>' 1}}
