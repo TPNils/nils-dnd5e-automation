@@ -48,12 +48,16 @@ export interface CreatePermissionCheckArgs {
      */
     security?: boolean
   }>;
+  /**
+   * Default: true
+   */
+  updatesMessage?: boolean;
   mustBeGm?: boolean;
 }
 
 export function createPermissionCheck<T>(args: CreatePermissionCheckArgs | (({}: ActionParam<T>) => PromiseOrSync<CreatePermissionCheckArgs>)): ActionPermissionCheck<T> {
   return async (action) => {
-    const {mustBeGm, documents} = typeof args === 'function' ? await args(action) : args;
+    const {mustBeGm, documents, updatesMessage} = typeof args === 'function' ? await args(action) : args;
     const user = game.users.get(action.userId);
     let successAction: 'can-run-local' | 'can-run-as-gm' = 'can-run-local';
     if (user.isGM) {
@@ -62,6 +66,11 @@ export function createPermissionCheck<T>(args: CreatePermissionCheckArgs | (({}:
     }
     if (mustBeGm === true && !user.isGM) {
       return 'prevent-action';
+    }
+    if (updatesMessage !== false) {
+      if (!game.messages.get(action.messageId).canUserModify(user, 'update')) {
+        successAction = 'can-run-as-gm';
+      }
     }
     if (Array.isArray(documents)) {
       const documentsByUuid = await UtilsDocument.fromUuid(documents.map(d => d.uuid));

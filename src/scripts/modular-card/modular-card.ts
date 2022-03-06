@@ -522,7 +522,7 @@ export class ModularCard {
       element.disabled = true;
     }
     try {
-      if (actions.every(a => a.permissionCheckResult === 'can-run-local') && message.canUserModify(game.user, 'update')) {
+      if (actions.every(a => a.permissionCheckResult === 'can-run-local')) {
         // User has all required permissions, run locally
         response = await ModularCard.onInteractionProcessor(request);
       } else {
