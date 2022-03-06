@@ -276,7 +276,7 @@
 	 const copyFiles = [...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs'], options: {override: false}}];
 	 gulp.watch('src/**/*.ts', { ignoreInitial: false }, buildTS);
 	 gulp.watch('src/**/*.less', { ignoreInitial: false }, buildLess);
-	 gulp.watch(['dist/**/*.css', 'dist/**/*.hbs'], { ignoreInitial: false }, buildManifest);
+	 gulp.watch(['dist/**/*.css', 'dist/**/*.hbs'], { ignoreInitial: false, events: 'add', delay: 500, queue: false }, buildManifest);
 	 gulp.watch('src/**/*.scss', { ignoreInitial: false }, buildSASS);
 	 gulp.watch(
 		 [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
