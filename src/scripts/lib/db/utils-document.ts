@@ -2,6 +2,20 @@ import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 
 type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
 
+type EntityPermission = keyof typeof foundry.CONST.ENTITY_PERMISSIONS;
+type ModifyPermission = Parameters<foundry.abstract.Document<any, any>['canUserModify']>[1];
+export interface PermissionCheck<T = any> {
+  uuid: string;
+  permission: EntityPermission | ModifyPermission;
+  user: User;
+  meta?: T;
+}
+
+export interface PermissionResponse<T = any> {
+  requestedCheck: PermissionCheck<T>;
+  result: boolean;
+}
+
 class MaybePromise<T> {
   constructor(private value: T | Promise<T>){}
 
@@ -133,7 +147,7 @@ export class UtilsDocument {
     }).getValue() as any;
   }
 
-  private static fromUuidInternal(uuids: Iterable<string>): Promise<Map<string, FoundryDocument>>
+  private static fromUuidInternal(uuids: Iterable<string>, options?: {sync?: true}): Promise<Map<string, FoundryDocument>>
   private static fromUuidInternal(uuids: Iterable<string>, options: {sync: true}): Map<string, FoundryDocument>
   private static fromUuidInternal(uuids: Iterable<string>, options: {sync?: boolean} = {}): Promise<Map<string, FoundryDocument>> | Map<string, FoundryDocument> {
     // Fixes map keyset iterators, maybe you can only iterate them onces? not sure why it breaks without converting
@@ -368,6 +382,62 @@ export class UtilsDocument {
     }
 
      return dmlsPerDocumentName;
+  }
+  //#endregion
+
+  //#region permission
+  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<PermissionResponse<T>[]>
+  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync: true}): PermissionResponse<T>[]
+  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): PermissionResponse<T>[] | Promise<PermissionResponse<T>[]> {
+    permissionChecks = permissionChecks.filter(check => check != null);
+    const response: PermissionResponse[] = [];
+    {
+      // GM can do anything
+      const processing = permissionChecks;
+      permissionChecks = [];
+      for (const permissionCheck of processing) {
+        if (permissionCheck.user.isGM) {
+          response.push({
+            requestedCheck: permissionCheck,
+            result: true,
+          })
+        } else {
+          permissionChecks.push(permissionCheck);
+        }
+      }
+    }
+    if (permissionChecks.length === 0) {
+      if (options.sync) {
+        return response;
+      } else {
+        return Promise.resolve(response);
+      }
+    }
+    const permissionChecksByUuid = new Map<string, PermissionCheck[]>();
+    for (const permissionCheck of permissionChecks) {
+      if (!permissionChecksByUuid.has(permissionCheck.uuid)) {
+        permissionChecksByUuid.set(permissionCheck.uuid, []);
+      }
+      permissionChecksByUuid.get(permissionCheck.uuid).push(permissionCheck);
+    }
+    return new MaybePromise(UtilsDocument.fromUuidInternal(permissionChecksByUuid.keys(), options as any)).then(documents => {
+      for (let [uuid, document] of documents.entries()) {
+        for (const permissionCheck of permissionChecksByUuid.get(uuid)) {
+          if (permissionCheck.permission.toUpperCase() in foundry.CONST.ENTITY_PERMISSIONS) {
+            response.push({
+              requestedCheck: permissionCheck,
+              result: document.testUserPermission(permissionCheck.user, permissionCheck.permission.toUpperCase() as EntityPermission)
+            });
+          } else {
+            response.push({
+              requestedCheck: permissionCheck,
+              result: document.canUserModify(permissionCheck.user, permissionCheck.permission.toLowerCase() as ModifyPermission)
+            });
+          }
+        }
+      }
+      return response;
+    }).getValue();
   }
   //#endregion
 

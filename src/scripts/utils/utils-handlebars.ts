@@ -2,7 +2,7 @@ import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { MyActor, MyActorData, SpellData } from "../types/fixed-types";
 import { ItemCardItem } from "./utils-chat-message";
-import { UtilsDocument } from "../lib/db/utils-document";
+import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 
 interface InlineHelperOption {
   blockParams: any;
@@ -29,13 +29,14 @@ export class UtilsHandlebars {
     return args.join('');
   }
 
-  private static documentPermission = /(actor)?(exact)?(owner|observer|limited|none)(uuid|id):(.*)/i;
+  private static documentPermission = /(owner|observer|limited|none|create|update|delete)(uuid|actorid):(.*)/i;
   private static hasPermissionCheck(secretFilters: string[]): boolean {
     // no filters = always visible
     if (secretFilters.length === 0) {
       return true;
     }
 
+    const permissionChecks: PermissionCheck[] = [];
     for (const filter of secretFilters) {
       if ((filter.toLowerCase() === 'gm' || filter.toLowerCase() === 'dm') && game.user.isGM) {
         return true;
@@ -48,34 +49,34 @@ export class UtilsHandlebars {
       }
       const documentMatch = UtilsHandlebars.documentPermission.exec(filter);
       if (documentMatch) {
-        if (documentMatch[5].length === 0) {
-          // No uuid/id = don't need permissions
-          return true;
-        }
-        let document: foundry.abstract.Document<any, any>;
-        if (documentMatch[4].toLocaleLowerCase() === 'uuid') {
-          document = UtilsDocument.fromUuid(documentMatch[5], {sync: true});
-        } else {
-          switch (documentMatch[1].toLocaleLowerCase()) {
-            // Don't support token owner filter. They are too short lived and are based on actor anyway
-            case 'actor': {
-              document = game.actors.get(documentMatch[5]);
-              break;
-            }
+        const matchType = documentMatch[2].toLowerCase();
+        const matchValue = documentMatch[3];
+        let uuid: string;
+
+        switch (matchType) {
+          case 'uuid': {
+            uuid = matchValue;
+            break;
+          }
+          case 'actorid': {
+            uuid = game.actors.get(matchValue).uuid;
+            break;
           }
         }
         if (document == null) {
-          // always show missing/invalid/deleted/null actors for gms
+          // always show invalid parts to GM
           return game.user.isGM;
         }
-
-        if (document.testUserPermission(game.user, CONST.ENTITY_PERMISSIONS[documentMatch[3].toLocaleLowerCase().toUpperCase()], {exact: documentMatch[2] != null})) {
-          return true;
-        }
+        
+        permissionChecks.push({
+          permission: documentMatch[1] as PermissionCheck['permission'],
+          uuid: uuid,
+          user: game.user,
+        });
       }
     }
 
-    return false;
+    return UtilsDocument.hasPermissions(permissionChecks, {sync: true}).find(response => response.result) != null;
   }
 
   public static hasPermission(...args: any[]): any {

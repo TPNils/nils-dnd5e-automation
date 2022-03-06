@@ -1,5 +1,5 @@
 import { ITrigger } from "../lib/db/dml-trigger";
-import { UtilsDocument } from "../lib/db/utils-document";
+import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 
@@ -41,15 +41,17 @@ type ActionPermissionExecute<T> = ({}: ActionParam<T>) => PromiseOrSync<void>;
 export interface CreatePermissionCheckArgs {
   documents?: Array<{
     uuid: string;
-    permission: keyof typeof foundry.CONST.ENTITY_PERMISSIONS,
+    permission: PermissionCheck['permission'],
     /** 
-     * if false or not defined, this permissions is used to determen if this action can run local or must be run by the gm 
+     * Default: false
+     * if false, this permissions is used to determen if this action can run local or must be run by the gm 
      * if true, it will be used to prevent the action
      */
     security?: boolean
   }>;
   /**
    * Default: true
+   * When true, this action updates the message, thus requiring the update permission
    */
   updatesMessage?: boolean;
   mustBeGm?: boolean;
@@ -72,15 +74,31 @@ export function createPermissionCheck<T>(args: CreatePermissionCheckArgs | (({}:
         successAction = 'can-run-as-gm';
       }
     }
+    const permissionChecks: PermissionCheck<{security: boolean}>[] = [];
+    if (updatesMessage !== false) {
+      permissionChecks.push({
+        uuid: game.messages.get(action.messageId).uuid,
+        permission: 'update',
+        user: user,
+        meta: {security: false}
+      })
+    }
     if (Array.isArray(documents)) {
-      const documentsByUuid = await UtilsDocument.fromUuid(documents.map(d => d.uuid));
       for (const document of documents) {
-        if (!documentsByUuid.get(document.uuid).testUserPermission(user, document.permission)) {
-          if (document.security === true) {
-            return 'prevent-action';
-          } else {
-            successAction = 'can-run-as-gm';
-          }
+        permissionChecks.push({
+          uuid: document.uuid,
+          permission: document.permission,
+          user: user,
+          meta: {security: document.security === true}
+        });
+      }
+    }
+    for (const checkResult of await UtilsDocument.hasPermissions(permissionChecks)) {
+      if (!checkResult.result) {
+        if (checkResult.requestedCheck.meta.security) {
+          return 'prevent-action';
+        } else {
+          successAction = 'can-run-as-gm';
         }
       }
     }
