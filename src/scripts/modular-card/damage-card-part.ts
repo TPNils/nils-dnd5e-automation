@@ -409,7 +409,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       const tempHpDiff = tokenHp.tempHp - actor.data.data.attributes.hp.temp;
       const failedDeathSavesDiff = tokenHp.failedDeathSaves - (actor.data.data.attributes.death?.failure ?? 0);
       if (hpDiff || tempHpDiff || failedDeathSavesDiff) {
-        // TODO is this correct?
         updateActors.push({document: actor as any, data: {
           'data.attributes.hp.value': tokenHp.hp,
           'data.attributes.hp.temp': tokenHp.tempHp,
