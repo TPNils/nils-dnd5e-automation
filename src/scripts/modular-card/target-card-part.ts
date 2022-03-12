@@ -168,9 +168,9 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       return '';
     }
 
-    const htmlTableHeader: string[] = [];
+    const htmlTableHeader: {row: string[], state: VisualState['state']} = {row: [], state: 'not-applied'};
     for (const key of columnKeyOrder) {
-      htmlTableHeader.push(columnsByKey.get(key).label);
+      htmlTableHeader.row.push(columnsByKey.get(key).label);
     }
     const htmlTableBody: Array<{tokenUuid: string, actorUuid: string, name: string, img: string, state: VisualState['state'], row: string[]}> = [];
     const tokens = Array.from((await UtilsDocument.tokenFromUuid(tokenData.keys())).values()).sort((a, b) => {
@@ -182,11 +182,13 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
 
       return a.name.localeCompare(b.name);
     });
+    const allStates = new Set<VisualState['state']>();
     for (const token of tokens) {
       const row: string[] = [];
       for (const key of columnKeyOrder) {
         row.push(tokenData.get(token.uuid).columnData.get(key) ?? '');
       }
+      allStates.add(tokenData.get(token.uuid).state);
       htmlTableBody.push({
         tokenUuid: token.uuid,
         actorUuid: (token.actor as MyActor)?.uuid,
@@ -195,6 +197,22 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
         state: tokenData.get(token.uuid).state,
         row: row,
       });
+    }
+    allStates.delete(null);
+    allStates.delete(undefined);
+    {
+      let allStatesArray = Array.from(allStates);
+      // If all are disabled
+      if (allStatesArray.length === 1) {
+        htmlTableHeader.state = allStatesArray[0];
+      }
+      allStatesArray = allStatesArray.filter(state => state !== 'disabled');
+      // If all are the same or disabled
+      if (allStatesArray.length === 1) {
+        htmlTableHeader.state = allStatesArray[0];
+      } else {
+        htmlTableHeader.state = 'partial-applied';
+      }
     }
 
     return renderTemplate(

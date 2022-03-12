@@ -1,14 +1,14 @@
-<div class="table target-table" style="grid-template-columns: 25px {{#if data.tableHeader.length}}repeat({{data.tableHeader.length}}, min-content){{/if}} auto 50px;">
+<div class="table target-table" style="grid-template-columns: 25px {{#if data.tableHeader.row.length}}repeat({{data.tableHeader.row.length}}, min-content){{/if}} auto 50px;">
   {{!header}}
   <div class="header-cell">{{! name/img }}</div>
-  {{#each data.tableHeader}}
+  {{#each data.tableHeader.row}}
     <div class="header-cell">{{{this}}}</div>
   {{/each}}
   <div class="header-cell">{{! filler }}</div>
   <div class="header-cell">
     {{#nacExpr data.tableBody.length '>' 1}}
-      <button data-{{@root.moduleName}}-action="apply-*" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
-      <button data-{{@root.moduleName}}-action="undo-*" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+      <button data-{{@root.moduleName}}-action="apply-*" data-{{@root.moduleName}}-state="{{data.tableHeader.state}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
+      <button data-{{@root.moduleName}}-action="undo-*" data-{{@root.moduleName}}-state="{{data.tableHeader.state}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
     {{/nacExpr}}
   </div>
   {{!body}}
@@ -20,8 +20,8 @@
     <div class="body-cell">{{! filler }}</div>
     <div class="body-cell">
       {{#nacPerm (nacConcat "UpdateUuid:" target.actorUuid)}}
-        <button data-{{@root.moduleName}}-action="apply-{{target.tokenUuid}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
-        <button data-{{@root.moduleName}}-action="undo-{{target.tokenUuid}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+        <button data-{{@root.moduleName}}-action="apply-{{target.tokenUuid}}" data-{{@root.moduleName}}-state="{{target.state}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
+        <button data-{{@root.moduleName}}-action="undo-{{target.tokenUuid}}" data-{{@root.moduleName}}-state="{{target.state}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
       {{/nacPerm}}
     </div>
   {{/each}}
