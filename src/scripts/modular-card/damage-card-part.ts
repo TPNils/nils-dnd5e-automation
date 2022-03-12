@@ -282,16 +282,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   //#endregion
 
   //#region Backend
-  public afterUpdate(context: IDmlContext<ModularCardTriggerData>): void {
-    this.onBonusChange(context);
-  }
-
-  public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
-    // TODO recalc whole item on level change to support custom scaling level scaling formulas
-    await this.calcDamageFormulas(context);
-    // TODO auto apply healing, but it needs to be sync?
-  }
-
   private async targetCallback(targetEvents: TargetCallbackData[]): Promise<void> {
     const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.targetUuid));
     let tokenHpSnapshot = new Map<string, {hp: number; failedDeathSaves: number; maxHp: number; tempHp: number}>();
@@ -483,6 +473,16 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         return visualState;
       }
     );
+  }
+
+  public afterUpdate(context: IDmlContext<ModularCardTriggerData>): void {
+    this.onBonusChange(context);
+  }
+
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+    // TODO recalc whole item on level change to support custom scaling level scaling formulas
+    await this.calcDamageFormulas(context);
+    // TODO auto apply healing, but it needs to be sync?
   }
   
   private async calcDamageFormulas(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
