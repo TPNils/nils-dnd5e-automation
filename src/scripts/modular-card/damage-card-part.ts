@@ -531,8 +531,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     const tokenDocuments = await UtilsDocument.tokenFromUuid(fetchTokenUuids);
     for (const recalcToken of recalcTokens) {
       const actor: MyActor = tokenDocuments.get(recalcToken.tokenUuid).getActor();
+      const currentCache = this.getTargetCache(recalcToken.data, recalcToken.tokenUuid);
       const cache: TargetCache = {
-        ...this.getTargetCache(recalcToken.data, recalcToken.tokenUuid) ?? {targetUuid: recalcToken.tokenUuid, appliedState: 'not-applied'},
+        ...currentCache ?? {targetUuid: recalcToken.tokenUuid, appliedState: 'not-applied'},
         calcHpChange: 0,
         calcAddTmpHp: 0,
         calcFailedDeathSaved: 0,
@@ -570,6 +571,18 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           }
         }
       }
+
+      if ((cache.appliedHpChange + cache.appliedTmpHpChange) === (cache.calcHpChange + cache.calcAddTmpHp) &&
+        cache.appliedFailedDeathSaved === cache.calcFailedDeathSaved
+      ) {
+        cache.appliedState = 'applied';
+      } else if (cache.appliedHpChange !== 0 ||
+        cache.appliedTmpHpChange !== 0 ||
+        cache.appliedFailedDeathSaved !== 0
+      ) {
+        cache.appliedState = 'partial-applied';
+      }
+      console.log(cache)
 
       this.setTargetCache(recalcToken.data, cache);
     }
