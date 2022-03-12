@@ -582,7 +582,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       ) {
         cache.appliedState = 'partial-applied';
       }
-      console.log(cache)
 
       this.setTargetCache(recalcToken.data, cache);
     }
