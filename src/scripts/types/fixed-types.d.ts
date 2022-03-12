@@ -58,6 +58,10 @@ export type MyActorData = {
         shield?: number;
         value: number;
       };
+      death?: {
+        success?: number;
+        failure?: number;
+      }
       hp: {
         formula?: string;
         max: number;

@@ -1,6 +1,6 @@
 import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 
-type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
+export type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
 
 type EntityPermission = keyof typeof foundry.CONST.ENTITY_PERMISSIONS;
 type ModifyPermission = Parameters<foundry.abstract.Document<any, any>['canUserModify']>[1];

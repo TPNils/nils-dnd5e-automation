@@ -1,4 +1,5 @@
 import { IAfterDmlContext, IDmlContext} from "../lib/db/dml-trigger";
+import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
@@ -7,7 +8,7 @@ import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { ItemCardHelpers } from "./item-card-helpers";
-import { ModularCard, ModularCardTriggerData } from "./modular-card";
+import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardPart, VisualState } from "./target-card-part";
 
@@ -21,6 +22,14 @@ type RollJson = TermJson[];
 export interface AddedDamage {
   normalRoll: RollJson;
   additionalCriticalRoll?: RollJson;
+}
+
+interface TargetCache {
+  targetUuid: string;
+  appliedState: State['state'];
+  appliedFailedDeathSaved?: number;
+  appliedHpChange?: number;
+  appliedTmpHpChange?: number;
 }
 
 export interface DamageCardData {
@@ -37,6 +46,7 @@ export interface DamageCardData {
     roll?: RollData;
     displayFormula?: string;
     displayDamageTypes?: string;
+    targetCaches: TargetCache[]
   }
 }
 
@@ -63,6 +73,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         calc$: {
           label: 'DND5E.Damage',
           baseRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).terms.map(t => t.toJSON() as TermJson),
+          targetCaches: [],
         }
       }
       // Consider it healing if all damage types are healing
@@ -94,6 +105,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           calc$: {
             label: 'DND5E.Damage',
             baseRoll: new Roll('0').terms.map(t => t.toJSON() as TermJson),
+            targetCaches: [],
           }
         });
       }
@@ -120,6 +132,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
             calc$: {
               label: 'DND5E.Damage',
               baseRoll: new Roll('0').terms.map(t => t.toJSON() as TermJson),
+              targetCaches: [],
             }
           });
         }
@@ -155,6 +168,11 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
+    TargetCardPart.instance.registerIntegration({
+      onChange: event => this.targetCallback(event),
+      getState: context => this.getTargetState(context),
+      getVisualState: context => this.getTargetState(context),
+    })
   }
 
   public getType(): string {
@@ -274,13 +292,203 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     // TODO auto apply healing, but it needs to be sync?
   }
 
-  private targetCallback(data: TargetCallbackData[]): void {
-    
+  private async targetCallback(targetEvents: TargetCallbackData[]): Promise<void> {
+    const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.targetUuid));
+    let tokenHpSnapshot = new Map<string, {hp: number; failedDeathSaves: number; maxHp: number; tempHp: number}>();
+    for (const token of tokenDocuments.values()) {
+      const actor: MyActor = token.getActor();
+      tokenHpSnapshot.set(token.uuid, {
+        hp: actor.data.data.attributes.hp.value,
+        failedDeathSaves: actor.data.data.attributes.death.failure,
+        maxHp: actor.data.data.attributes.hp.max,
+        tempHp: actor.data.data.attributes.hp.temp ?? 0,
+      });
+    }
+    for (const targetEvent of targetEvents) {
+      const actor: MyActor = tokenDocuments.get(targetEvent.targetUuid).getActor();
+      const immunities = [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))];
+      const resistances = [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))];
+      const vulnerabilities = [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))];
+      const snapshot = tokenHpSnapshot.get(targetEvent.targetUuid);
+      const tokenHp = deepClone(snapshot);
+      
+      const damagesCards: ModularCardPartData<DamageCardData>[] = targetEvent.messageCardParts
+        .filter(part => part.type === this.getType() && ModularCard.getTypeHandler(part.type) instanceof DamageCardPart)
+
+      // Undo already applied damage
+      for (const dmg of damagesCards) {
+        const cache = this.getTargetCache(dmg.data, targetEvent.targetUuid);
+        if (!cache) {
+          continue;
+        }
+        if (cache.appliedHpChange) {
+          tokenHp.hp -= cache.appliedHpChange;
+        }
+        if (cache.appliedTmpHpChange) {
+          tokenHp.tempHp -= cache.appliedTmpHpChange;
+        }
+        if (cache.appliedFailedDeathSaved) {
+          tokenHp.failedDeathSaves -= cache.appliedFailedDeathSaved;
+        }
+      }
+
+      const beforeApplyTokenHp = deepClone(tokenHp);
+
+      // Calculate (new) damage
+      for (const dmg of damagesCards) {
+        if (dmg.data.calc$.roll?.evaluated && targetEvent.apply) {
+          // hp could have gone over the max with some homebrew or manual changes
+          const maxHp = Math.max(snapshot.maxHp, snapshot.hp);
+          for (let [dmgType, amount] of UtilsRoll.rollToDamageResults(UtilsRoll.fromRollData(dmg.data.calc$.roll)).entries()) {
+            if (immunities.includes(dmgType)) {
+              continue;
+            }
+            if (resistances.includes(dmgType)) {
+              amount /= 2;
+            }
+            if (vulnerabilities.includes(dmgType)) {
+              amount *= 2;
+            }
+            amount = Math.ceil(amount);
+            // Assume that negative amounts are from negative modifiers => should be 0.
+            //  Negative healing does not become damage & negative damage does no become healing.
+            amount = Math.max(0, amount);
+            if (ItemCardHelpers.tmpHealingDamageTypes.includes(dmgType)) {
+              tokenHp.tempHp += amount;
+            } else if (ItemCardHelpers.healingDamageTypes.includes(dmgType)) {
+              tokenHp.hp += amount;
+            } else /* damage */ {
+              if (tokenHp.tempHp > 0) {
+                const dmgTempHp = Math.min(tokenHp.tempHp, amount);
+                tokenHp.tempHp -= dmgTempHp;
+                amount -= dmgTempHp;
+              }
+              tokenHp.hp -= amount;
+
+              // TODO calculate seath saves.
+              //  RAW: Crit = 2 fails
+              //  RAW: magic missile = 1 damage source => 1 failed save
+              //  RAW: Scorching Ray = multiple damage sources => multiple failed saves
+            }
+          }
+          
+          // Stay within the min/max bounderies
+          tokenHp.hp = Math.max(0, Math.min(tokenHp.hp, maxHp));
+          tokenHp.tempHp = Math.max(0, tokenHp.tempHp);
+          
+          const hpDiff = tokenHp.hp - beforeApplyTokenHp.hp;
+          const tempHpDiff = tokenHp.tempHp - beforeApplyTokenHp.tempHp;
+          const failedDeathSavesDiff = tokenHp.failedDeathSaves - beforeApplyTokenHp.failedDeathSaves;
+          this.setTargetCache(dmg.data, {
+            targetUuid: targetEvent.targetUuid,
+            appliedState: 'applied',
+            appliedHpChange: hpDiff,
+            appliedTmpHpChange: tempHpDiff,
+            appliedFailedDeathSaved: failedDeathSavesDiff,
+          });
+        } else {
+          this.setTargetCache(dmg.data, {
+            targetUuid: targetEvent.targetUuid,
+            appliedState: 'not-applied',
+            appliedHpChange: 0,
+            appliedTmpHpChange: 0,
+            appliedFailedDeathSaved: 0,
+          });
+        }
+      }
+
+      tokenHpSnapshot.set(targetEvent.targetUuid, tokenHp);
+    }
+
+    // Apply healing/damage/death saves to the token
+    const updateActors: Parameters<(typeof UtilsDocument)['bulkUpdate']>[0] = [];
+    for (const [uuid, tokenHp] of tokenHpSnapshot.entries()) {
+      const token = tokenDocuments.get(uuid);
+      const actor: MyActor = token.getActor();
+      const hpDiff = tokenHp.hp - actor.data.data.attributes.hp.value;
+      const tempHpDiff = tokenHp.tempHp - actor.data.data.attributes.hp.temp;
+      const failedDeathSavesDiff = tokenHp.failedDeathSaves - (actor.data.data.attributes.death?.failure ?? 0);
+      if (hpDiff || tempHpDiff || failedDeathSavesDiff) {
+        // TODO is this correct?
+        updateActors.push({document: actor as any, data: {
+          'data.attributes.hp.value': tokenHp.hp,
+          'data.attributes.hp.temp': tokenHp.tempHp,
+          'data.attributes.death.failure': tokenHp.failedDeathSaves
+        }});
+      }
+    }
+
+    if (updateActors.length > 0) {
+      await UtilsDocument.bulkUpdate(updateActors);
+    }
+  }
+
+  private getTargetState(context: StateContext): VisualState[] {
+    const states = new Map<string, State & {hpDiff?: number}>();
+    for (const uuid of context.selectedTokenUuids) {
+      states.set(uuid, {tokenUuid: uuid, state: 'not-applied'});
+    }
+    for (const part of context.allMessageParts) {
+      if (!this.isThisPartType(part)) {
+        continue;
+      }
+
+      for (const targetCache of part.data.calc$.targetCaches) {
+        if (!states.has(targetCache.targetUuid)) {
+          states.set(targetCache.targetUuid, {tokenUuid: targetCache.targetUuid, state: 'not-applied'});
+        }
+        const state = states.get(targetCache.targetUuid);
+        if (state.hpDiff == null) {
+          state.hpDiff = 0;
+          state.state = targetCache.appliedState;
+        }
+        
+        if (state.state !== targetCache.appliedState) {
+          state.state === 'partial-applied';
+        }
+        state.hpDiff += (targetCache.appliedHpChange ?? 0);
+        state.hpDiff += (targetCache.appliedTmpHpChange ?? 0);
+      }
+    }
+
+    return Array.from(states.values())
+      .filter(state => state.state !== 'not-applied' || context.selectedTokenUuids.includes(state.tokenUuid))
+      .map(state => {
+        const visualState: VisualState = {
+          tokenUuid: state.tokenUuid,
+          columns: [],
+        };
+        if (state.state != null) {
+          visualState.state = state.state;
+        }
+      
+        if (state.hpDiff == null) {
+          return visualState;
+        }
+
+        const column: VisualState['columns'][0] = {
+          key: 'dmg',
+          label: 'dmg', // TODO icon
+          rowValue: '',
+        };
+        // TODO this is wrong, should display the amount it will deal, not what has been applied
+        if (state.hpDiff === 0) {
+          column.rowValue = '0';
+        } else if (state.hpDiff > 0) /* heal */ {
+          column.rowValue = `<span style="color: green">+${state.hpDiff}</span>`;
+        } else /* damage */ {
+          column.rowValue = `<span style="color: red">${state.hpDiff}</span>`;
+        }
+        visualState.columns.push(column);
+
+        return visualState;
+      }
+    );
   }
   
   private async calcDamageFormulas(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
     for (const {newRow, oldRow} of context.rows) {
-      if (!this.isThisType(newRow) || !this.assumeThisType(oldRow)) {
+      if (!this.isThisTriggerType(newRow) || !this.assumeThisType(oldRow)) {
         continue;
       }
 
@@ -357,12 +565,41 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     return rollProperties;
   }
   
-  private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
+  private isThisPartType(row: ModularCardPartData): row is ModularCardPartData<DamageCardData> {
+    return row.type === this.getType() && ModularCard.getTypeHandler(row.type) instanceof DamageCardPart;
+  }
+  
+  private isThisTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
     return row.type === this.getType() && row.typeHandler instanceof DamageCardPart;
   }
   
   private assumeThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
     return true;
+  }
+
+  private setTargetCache(cache: DamageCardData, targetCache: TargetCache): void {
+    if (!cache.calc$.targetCaches) {
+      cache.calc$.targetCaches = [];
+    }
+    for (let i = 0; i < cache.calc$.targetCaches.length; i++) {
+      if (cache.calc$.targetCaches[i].targetUuid === targetCache.targetUuid) {
+        cache.calc$.targetCaches[i] = targetCache;
+        return;
+      }
+    }
+    cache.calc$.targetCaches.push(targetCache);
+  }
+
+  private getTargetCache(cache: DamageCardData, tokenUuid: string): TargetCache | null {
+    if (!cache.calc$.targetCaches) {
+      return null;
+    }
+    for (const targetCache of cache.calc$.targetCaches) {
+      if (targetCache.targetUuid === tokenUuid) {
+        return targetCache;
+      }
+    }
+    return null;
   }
   //#endregion
 }
