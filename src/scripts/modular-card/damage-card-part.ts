@@ -440,10 +440,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
         const column: VisualState['columns'][0] = {
           key: 'dmg',
-          label: 'dmg', // TODO icon
+          label: `<i class="fas fa-heart" title="${game.i18n.localize('DND5E.Damage')}"></i>`,
           rowValue: '',
         };
-        // TODO this is wrong, should display the amount it will deal, not what has been applied
         if (state.hpDiff === 0) {
           column.rowValue = '0';
         } else if (state.hpDiff > 0) /* heal */ {
