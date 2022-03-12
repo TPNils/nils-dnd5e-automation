@@ -10,7 +10,7 @@ import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
-import { State, StateContext, TargetCallbackData, TargetCardPart, VisualState } from "./target-card-part";
+import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type TermJson = ReturnType<RollTerm['toJSON']> & {
   class: string;
@@ -27,9 +27,14 @@ export interface AddedDamage {
 interface TargetCache {
   targetUuid: string;
   appliedState: State['state'];
+  // What has actually been applied, accounting the current hp at the time when applied
   appliedFailedDeathSaved?: number;
   appliedHpChange?: number;
   appliedTmpHpChange?: number;
+  // What a calculation thinks should be applied, not accounting for current hp
+  calcFailedDeathSaved: number;
+  calcHpChange: number;
+  calcAddTmpHp: number;
 }
 
 export interface DamageCardData {
@@ -295,10 +300,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       });
     }
     for (const targetEvent of targetEvents) {
-      const actor: MyActor = tokenDocuments.get(targetEvent.targetUuid).getActor();
-      const immunities = [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))];
-      const resistances = [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))];
-      const vulnerabilities = [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))];
       const snapshot = tokenHpSnapshot.get(targetEvent.targetUuid);
       const tokenHp = deepClone(snapshot);
       
@@ -322,45 +323,22 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         }
       }
 
-      const beforeApplyTokenHp = deepClone(tokenHp);
-
       // Calculate (new) damage
       for (const dmg of damagesCards) {
-        if (dmg.data.calc$.roll?.evaluated && targetEvent.apply) {
-          // hp could have gone over the max with some homebrew or manual changes
+        const cache = this.getTargetCache(dmg.data, targetEvent.targetUuid);
+        if (targetEvent.apply) {
           const maxHp = Math.max(snapshot.maxHp, snapshot.hp);
-          for (let [dmgType, amount] of UtilsRoll.rollToDamageResults(UtilsRoll.fromRollData(dmg.data.calc$.roll)).entries()) {
-            if (immunities.includes(dmgType)) {
-              continue;
-            }
-            if (resistances.includes(dmgType)) {
-              amount /= 2;
-            }
-            if (vulnerabilities.includes(dmgType)) {
-              amount *= 2;
-            }
-            amount = Math.ceil(amount);
-            // Assume that negative amounts are from negative modifiers => should be 0.
-            //  Negative healing does not become damage & negative damage does no become healing.
-            amount = Math.max(0, amount);
-            if (ItemCardHelpers.tmpHealingDamageTypes.includes(dmgType)) {
-              tokenHp.tempHp += amount;
-            } else if (ItemCardHelpers.healingDamageTypes.includes(dmgType)) {
-              tokenHp.hp += amount;
-            } else /* damage */ {
-              if (tokenHp.tempHp > 0) {
-                const dmgTempHp = Math.min(tokenHp.tempHp, amount);
-                tokenHp.tempHp -= dmgTempHp;
-                amount -= dmgTempHp;
-              }
-              tokenHp.hp -= amount;
+          const beforeApplyTokenHp = deepClone(tokenHp);
 
-              // TODO calculate seath saves.
-              //  RAW: Crit = 2 fails
-              //  RAW: magic missile = 1 damage source => 1 failed save
-              //  RAW: Scorching Ray = multiple damage sources => multiple failed saves
-            }
+          tokenHp.tempHp += cache.calcAddTmpHp;
+          let hpChange = cache.calcHpChange;
+          if (tokenHp.tempHp > 0 && hpChange < 0) {
+            const dmgTempHp = Math.min(tokenHp.tempHp, -hpChange);
+            tokenHp.tempHp -= dmgTempHp;
+            hpChange += dmgTempHp;
           }
+          tokenHp.hp += hpChange;
+          tokenHp.failedDeathSaves += cache.calcFailedDeathSaved;
           
           // Stay within the min/max bounderies
           tokenHp.hp = Math.max(0, Math.min(tokenHp.hp, maxHp));
@@ -370,6 +348,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           const tempHpDiff = tokenHp.tempHp - beforeApplyTokenHp.tempHp;
           const failedDeathSavesDiff = tokenHp.failedDeathSaves - beforeApplyTokenHp.failedDeathSaves;
           this.setTargetCache(dmg.data, {
+            ...cache,
             targetUuid: targetEvent.targetUuid,
             appliedState: 'applied',
             appliedHpChange: hpDiff,
@@ -377,10 +356,14 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
             appliedFailedDeathSaved: failedDeathSavesDiff,
           });
         } else {
+          // When undoing damage after a heal, it could over heal above max hp.
+          const originalHp = tokenHp.hp;
+          tokenHp.hp = Math.min(snapshot.maxHp, tokenHp.hp);
           this.setTargetCache(dmg.data, {
+            ...cache,
             targetUuid: targetEvent.targetUuid,
             appliedState: 'not-applied',
-            appliedHpChange: 0,
+            appliedHpChange: tokenHp.hp - originalHp,
             appliedTmpHpChange: 0,
             appliedFailedDeathSaved: 0,
           });
@@ -435,8 +418,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         if (state.state !== targetCache.appliedState) {
           state.state === 'partial-applied';
         }
-        state.hpDiff += (targetCache.appliedHpChange ?? 0);
-        state.hpDiff += (targetCache.appliedTmpHpChange ?? 0);
+        state.hpDiff += (targetCache.calcHpChange ?? 0);
+        state.hpDiff += (targetCache.calcAddTmpHp ?? 0);
       }
     }
 
@@ -482,7 +465,115 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
     // TODO recalc whole item on level change to support custom scaling level scaling formulas
     await this.calcDamageFormulas(context);
+    await this.calcTargetCache(context);
     // TODO auto apply healing, but it needs to be sync?
+  }
+  
+  private async calcTargetCache(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+    const selectedTokensByMessageId = new Map<string, Set<string>>();
+    const newSelectedTokensByMessageId = new Map<string, Set<string>>();
+    for (const {newRow, oldRow} of context.rows) {
+      if (!this.isTargetTriggerType(newRow)) {
+        continue;
+      }
+
+      if (!newSelectedTokensByMessageId.has(newRow.messageId)) {
+        newSelectedTokensByMessageId.set(newRow.messageId, new Set());
+      }
+      if (!selectedTokensByMessageId.has(newRow.messageId)) {
+        selectedTokensByMessageId.set(newRow.messageId, new Set());
+      }
+      const newTokenUuids = newSelectedTokensByMessageId.get(newRow.messageId);
+      const tokenUuids = selectedTokensByMessageId.get(newRow.messageId);
+      const oldSelectedTokens = (oldRow as ModularCardTriggerData<TargetCardData>)?.data?.selectedTokenUuids ?? [];
+      for (const target of newRow.data.selectedTokenUuids) {
+        tokenUuids.add(target);
+        if (!oldSelectedTokens.includes(target)) {
+          newTokenUuids.add(target);
+        }
+      }
+    }
+
+    const recalcTokens: Array<{tokenUuid: string, data: DamageCardData}> = [];
+    for (const {newRow, oldRow} of context.rows) {
+      if (!this.isThisTriggerType(newRow) || !this.assumeThisType(oldRow)) {
+        continue;
+      }
+      // Recalc all caches if damage changes
+      if (
+        (newRow.data.calc$.roll?.evaluated !== oldRow?.data?.calc$?.roll?.evaluated) || 
+        (newRow.data.calc$.roll?.evaluated && newRow.data.calc$.roll.formula !== oldRow?.data?.calc$?.roll?.formula)
+      ) {
+        if (selectedTokensByMessageId.has(newRow.messageId)) {
+          for (const targetedUuid of selectedTokensByMessageId.get(newRow.messageId)) {
+            recalcTokens.push({data: newRow.data, tokenUuid: targetedUuid});
+          }
+        }
+        continue;
+      }
+
+      // Calc new targets
+      if (newSelectedTokensByMessageId.has(newRow.messageId)) {
+        for (const targetedUuid of newSelectedTokensByMessageId.get(newRow.messageId)) {
+          // Ignore what is already cached, always fetch when a new target has been selected
+          recalcTokens.push({data: newRow.data, tokenUuid: targetedUuid});
+        }
+      }
+    }
+
+    if (recalcTokens.length === 0) {
+      return;
+    }
+
+    const fetchTokenUuids = new Set<string>();
+    for (const recalcToken of recalcTokens) {
+      fetchTokenUuids.add(recalcToken.tokenUuid);
+    }
+    const tokenDocuments = await UtilsDocument.tokenFromUuid(fetchTokenUuids);
+    for (const recalcToken of recalcTokens) {
+      const actor: MyActor = tokenDocuments.get(recalcToken.tokenUuid).getActor();
+      const cache: TargetCache = {
+        ...this.getTargetCache(recalcToken.data, recalcToken.tokenUuid) ?? {targetUuid: recalcToken.tokenUuid, appliedState: 'not-applied'},
+        calcHpChange: 0,
+        calcAddTmpHp: 0,
+        calcFailedDeathSaved: 0,
+      };
+      const immunities = [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))];
+      const resistances = [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))];
+      const vulnerabilities = [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))];
+
+      if (recalcToken.data.calc$.roll?.evaluated) {
+        for (let [dmgType, amount] of UtilsRoll.rollToDamageResults(UtilsRoll.fromRollData(recalcToken.data.calc$.roll)).entries()) {
+          if (immunities.includes(dmgType)) {
+            continue;
+          }
+          if (resistances.includes(dmgType)) {
+            amount /= 2;
+          }
+          if (vulnerabilities.includes(dmgType)) {
+            amount *= 2;
+          }
+          amount = Math.ceil(amount);
+          // Assume that negative amounts are from negative modifiers => should be 0.
+          //  Negative healing does not become damage & negative damage does no become healing.
+          amount = Math.max(0, amount);
+          if (ItemCardHelpers.tmpHealingDamageTypes.includes(dmgType)) {
+            cache.calcAddTmpHp += amount;
+          } else if (ItemCardHelpers.healingDamageTypes.includes(dmgType)) {
+            cache.calcHpChange += amount;
+          } else /* damage */ {
+            cache.calcHpChange -= amount;
+
+            // TODO calculate seath saves.
+            //  RAW: Crit = 2 fails
+            //  RAW: magic missile = 1 damage source => 1 failed save
+            //  RAW: Scorching Ray = multiple damage sources => multiple failed saves
+          }
+        }
+      }
+
+      this.setTargetCache(recalcToken.data, cache);
+    }
   }
   
   private async calcDamageFormulas(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
@@ -570,6 +661,10 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   
   private isThisTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
     return row.type === this.getType() && row.typeHandler instanceof DamageCardPart;
+  }
+  
+  private isTargetTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<TargetCardData> {
+    return row.typeHandler instanceof TargetCardPart;
   }
   
   private assumeThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
