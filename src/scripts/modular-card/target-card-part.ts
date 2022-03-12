@@ -136,9 +136,9 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     
     const columnsByKey = new Map<string, {label: string}>();
     const columnKeyOrder: string[] = [];
-    const tokenData = new Map<string, {state: VisualState['state'], columnData: Map<string, string>}>();
+    const tokenData = new Map<string, {state?: VisualState['state'], columnData: Map<string, string>}>();
     for (const targetUuid of context.data.selectedTokenUuids) {
-      tokenData.set(targetUuid, {state: 'not-applied', columnData: new Map()});
+      tokenData.set(targetUuid, {columnData: new Map()});
     }
     for (const visualState of await Promise.all(fetchedVisualStates).then(states => states.deepFlatten())) {
       if (!visualState?.tokenUuid) {
@@ -150,7 +150,9 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       }
       const currentData = tokenData.get(visualState.tokenUuid);
       const strictestVisualStateIndex = [visualStates.indexOf(currentData.state), visualStates.indexOf(visualState.state)].sort()[1];
-      currentData.state = visualStates[strictestVisualStateIndex];
+      if (strictestVisualStateIndex >= 0) {
+        currentData.state = visualStates[strictestVisualStateIndex];
+      }
 
       if (Array.isArray(visualState.columns)) {
         for (const column of visualState.columns) {
