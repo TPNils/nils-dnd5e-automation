@@ -253,9 +253,9 @@ export class ModularCard {
       }
     }
     if (game.settings.get('core', 'rollMode') === 'blindroll') {
+      chatMessageData.whisper = [];
+      chatMessageData.blind = true;
       for (const user of game.users.values()) {
-        chatMessageData.whisper = [];
-        chatMessageData.blind = true;
         if (user.isGM) {
           chatMessageData.whisper.push(user.id);
         }
