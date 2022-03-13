@@ -21,7 +21,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   public static readonly instance = new TemplateCardPart();
   private constructor(){}
   
-  public generate({item, actor}: {item: MyItem, actor?: MyActor}): TemplateCardData[] {
+  public create({item, actor}: {item: MyItem, actor?: MyActor}): TemplateCardData[] {
     // @ts-expect-error
     const hasAoe = CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type);
     if (!hasAoe) {

@@ -121,7 +121,7 @@ export interface HtmlContext<T> {
 
 export interface ModularCardPart<D = any> {
   getType(): string;
-  generate(args: {actor?: MyActor, token?: TokenDocument, item: MyItem}): PromiseOrSync<D[]>;
+  create(args: {actor?: MyActor, token?: TokenDocument, item: MyItem}): PromiseOrSync<D[]>;
   getHtml(context: HtmlContext<D>): PromiseOrSync<string>;
   getCallbackActions(): ICallbackAction<D>[];
 }

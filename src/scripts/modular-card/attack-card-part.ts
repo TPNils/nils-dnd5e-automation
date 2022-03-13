@@ -48,7 +48,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   public static readonly instance = new AttackCardPart();
   private constructor(){}
 
-  public generate({item, actor}: {item: MyItem, actor?: MyActor}): AttackCardData[] {
+  public create({item, actor}: {item: MyItem, actor?: MyActor}): AttackCardData[] {
     if (!['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
       return [];
     }

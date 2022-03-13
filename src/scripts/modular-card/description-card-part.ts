@@ -20,7 +20,7 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   public static readonly instance = new DescriptionCardPart();
   private constructor(){}
   
-  public generate({item}: {item: MyItem}): DescriptionCardData[] {
+  public create({item}: {item: MyItem}): DescriptionCardData[] {
     return [{
       calc$: {
         name: item.name,

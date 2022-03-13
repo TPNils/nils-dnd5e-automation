@@ -214,7 +214,7 @@ export class ModularCard {
     ];
     
     for (const cardPart of cardParts) {
-      const response = cardPart.generate(data);
+      const response = cardPart.create(data);
       if (response instanceof Promise) {
         parts.push(response.then(data => ({datas: data, cardPart: cardPart})))
       } else {

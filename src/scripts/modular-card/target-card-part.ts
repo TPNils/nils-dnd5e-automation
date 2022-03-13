@@ -74,7 +74,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   public static readonly instance = new TargetCardPart();
   private constructor(){}
   
-  public generate({item, token}: {item: MyItem, token?: TokenDocument}): TargetCardData[] {
+  public create({item, token}: {item: MyItem, token?: TokenDocument}): TargetCardData[] {
     const target: TargetCardData = {
       selectedTokenUuids: [],
       calc$: {

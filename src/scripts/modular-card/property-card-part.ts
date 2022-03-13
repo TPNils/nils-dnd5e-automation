@@ -15,7 +15,7 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
   public static readonly instance = new PropertyCardPart();
   private constructor(){}
   
-  public generate({item}: {item: MyItem}): PropertyCardData[] {
+  public create({item}: {item: MyItem}): PropertyCardData[] {
     return [{
       calc$: {
         properties: item.getChatData().properties,
