@@ -181,16 +181,18 @@ interface ActionResponse {
 
 export class ModularCard {
 
-  private static registeredPartsByType = new Map<string, {part: ModularCardPart, unregisterTrigger: IUnregisterTrigger}>();
+  private static registeredPartsByType = new Map<string, {part: ModularCardPart}>();
   private static typeToModule = new Map<string, string>();
   public static registerModularCardPart(moduleName: string, part: ModularCardPart): void {
     if (ModularCard.registeredPartsByType.has(part.getType())) {
       console.info(`ModularCardPart type "${part.getType()}" from module ${ModularCard.typeToModule.get(part.getType())} gets overwritten by module ${moduleName}`);
-      ModularCard.registeredPartsByType.get(part.getType()).unregisterTrigger.unregister();
     }
-    const unregisterTrigger = chatMessageTransformer.register(part);
-    ModularCard.registeredPartsByType.set(part.getType(), {part: part, unregisterTrigger: unregisterTrigger});
+    ModularCard.registeredPartsByType.set(part.getType(), {part: part});
     ModularCard.typeToModule.set(part.getType(), moduleName);
+  }
+  
+  public static registerModularCardTrigger(trigger: ITrigger<ModularCardTriggerData>): IUnregisterTrigger {
+    return chatMessageTransformer.register(trigger);
   }
 
   public static getTypeHandler<T extends ModularCardPart = ModularCardPart>(type: string): T | null {

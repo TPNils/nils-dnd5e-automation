@@ -1,4 +1,4 @@
-import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger } from "../lib/db/dml-trigger";
+import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import MyAbilityTemplate from "../pixi/ability-template";
@@ -38,6 +38,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
+    ModularCard.registerModularCardTrigger(new TemplateCardTrigger());
     DmlTrigger.registerTrigger(new DmlTriggerTemplate());
   }
 
@@ -90,29 +91,45 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
     template.drawPreview();
   }
 
+}
+
+class TemplateCardTrigger implements ITrigger<ModularCardTriggerData> {
+
+  //#region afterCreate
   public afterCreate(context: IAfterDmlContext<ModularCardTriggerData>): void | Promise<void> {
-    for (const row of context.rows) {
-      if (row.newRow.type === this.getType()) {
-        // Initiate measured template creation
-        const template = MyAbilityTemplate.fromItem({
-          target: (row.newRow.data as TemplateCardData).calc$.target,
-          flags: {
-            [staticValues.moduleName]: {
-              dmlCallbackMessageId: row.newRow.messageId,
-              dmlCallbackPartId: row.newRow.id,
-            }
+    this.createTemplatePreview(context);
+  }
+
+  private createTemplatePreview(context: IAfterDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow} of context.rows) {
+      if (!this.isThisTriggerType(newRow)) {
+        continue;
+      }
+      // Initiate measured template creation
+      const template = MyAbilityTemplate.fromItem({
+        target: newRow.data.calc$.target,
+        flags: {
+          [staticValues.moduleName]: {
+            dmlCallbackMessageId: newRow.messageId,
+            dmlCallbackPartId: newRow.id,
           }
-        });
-        if (template) {
-          template.drawPreview();
-          return;
         }
+      });
+      if (template) {
+        template.drawPreview();
+        return;
       }
     }
   }
+  //#endregion
+  
+  //#region helpers
+  private isThisTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<TemplateCardData> {
+    return row.typeHandler instanceof TemplateCardPart;
+  }
+  //#endregion
 
 }
-
 
 class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
 

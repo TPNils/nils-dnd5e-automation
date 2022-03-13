@@ -1,4 +1,4 @@
-import { IAfterDmlContext, IDmlContext } from "../lib/db/dml-trigger";
+import { IAfterDmlContext, IDmlContext, ITrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
@@ -118,6 +118,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
+    ModularCard.registerModularCardTrigger(new AttackCardTrigger());
     TargetCardPart.instance.registerIntegration({
       getVisualState: context => this.getTargetState(context),
     });
@@ -164,7 +165,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     ]
   }
 
-  //#region Front end
+  //#region Card callbacks
   private processItemAttack(data: AttackCardData, clickEvent: ClickEvent | null): void {
     if (data.phase === 'result') {
       return;
@@ -216,7 +217,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       data.phase = 'result';
     }
   }
+  //#endregion
 
+  //#region Targeting
   private getTargetState(context: StateContext): VisualState[] {
     const visualStates: VisualState[] = [];
 
@@ -278,25 +281,192 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
     return visualStates;
   }
+
+  private getTargetCache(caches: AttackCardData[]): Map<string, TargetCache> {
+    const cacheByUuid = new Map<string, TargetCache>();
+    for (const cache of caches) {
+      for (const targetCache of cache.calc$.targetCaches) {
+        cacheByUuid.set(targetCache.targetUuid, targetCache);
+      }
+    }
+    return cacheByUuid;
+  }
   //#endregion
 
-  //#region Back end
+}
+
+class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
+
+  //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {
     this.calcIsCrit(context);
     this.setDamageAsCrit(context);
     this.calcResultCache(context);
   }
 
+  private calcIsCrit(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow} of context.rows) {
+      if (!this.isThisType(newRow)) {
+        continue;
+      }
+
+      if (!newRow.data.calc$.roll?.evaluated) {
+        newRow.data.calc$.isCrit = false;
+        continue;
+      }
+
+      const baseRollResult = (newRow.data.calc$.roll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
+      newRow.data.calc$.isCrit = baseRollResult.result >= newRow.data.calc$.critTreshold;
+    }
+  }
+
+  private setDamageAsCrit(context: IDmlContext<ModularCardTriggerData>): void {
+    const messagesBecameCrit = new Set<string>();
+    const messagesBecameNormal = new Set<string>();
+    for (const {newRow, oldRow} of context.rows) {
+      if (!this.isThisType(newRow)) {
+        continue;
+      }
+      if (newRow.data.calc$.isCrit !== oldRow?.data?.calc$?.isCrit) {
+        if (newRow.data.calc$.isCrit) {
+          messagesBecameCrit.add(newRow.messageId);
+        } else {
+          messagesBecameNormal.add(newRow.messageId);
+        }
+      }
+    }
+    messagesBecameCrit.delete(null);
+    messagesBecameCrit.delete(undefined);
+    messagesBecameNormal.delete(null);
+    messagesBecameNormal.delete(undefined);
+
+    if (messagesBecameCrit.size === 0 && messagesBecameNormal.size === 0) {
+      return;
+    }
+
+    for (const {newRow} of context.rows) {
+      if (!messagesBecameCrit.has(newRow.messageId) && !messagesBecameNormal.has(newRow.messageId)) {
+        continue;
+      }
+
+      if (!this.isAnyDamageType(newRow)) {
+        continue;
+      }
+
+      if (newRow.data.phase === 'mode-select') {
+        if (messagesBecameCrit.has(newRow.messageId)) {
+          newRow.data.mode = 'critical';
+        } else {
+          newRow.data.mode = 'normal';
+        }
+      }
+    }
+  }
+
+  private calcResultCache(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow} of context.rows) {
+      if (!this.isThisType(newRow) || !this.assumeThisType(newRow)) {
+        continue;
+      }
+
+      for (const targetCache of newRow.data.calc$.targetCaches) {
+        if (newRow.data.calc$.roll?.evaluated) {
+          const firstRoll = newRow.data.calc$.roll.terms[0].results.find(r => r.active);
+          if (firstRoll.result === 20 || targetCache.ac <= newRow.data.calc$.roll.total) {
+            // 20 always hits, lower crit treshold does not
+            if (firstRoll.result >= newRow.data.calc$.critTreshold) {
+              targetCache.resultType = 'critical-hit';
+            } else {
+              targetCache.resultType = 'hit';
+            }
+          } else if (firstRoll.result === 1) {
+            targetCache.resultType = 'critical-mis';
+          } else {
+            targetCache.resultType = 'mis';
+          }
+        } else if (targetCache.resultType) {
+          delete targetCache.resultType;
+        }
+      }
+    }
+  }
+  //#endregion
+
+  //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
     await this.calcAttackRoll(context);
     await this.rollAttack(context);
     await this.addTargetCache(context);
   }
 
-  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<any>>): void | Promise<void> {
-    this.onBonusChange(context);
+  private async calcAttackRoll(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+    for (const {newRow} of context.rows) {
+      if (!this.isThisType(newRow)) {
+        continue;
+      }
+
+      let baseRoll = new Die({faces: 20, number: 1});
+      if (newRow.data.calc$.hasHalflingLucky) {
+        // reroll a base roll 1 once
+        // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
+        // second 2 = reroll when the roll result is equal to 1 (=1)
+        baseRoll.modifiers.push('r1=1');
+      }
+      switch (newRow.data.mode) {
+        case 'advantage': {
+          baseRoll.number = 2;
+          baseRoll.modifiers.push('kh');
+          break;
+        }
+        case 'disadvantage': {
+          baseRoll.number = 2;
+          baseRoll.modifiers.push('kl');
+          break;
+        }
+      }
+      const parts: string[] = [baseRoll.formula];
+      if (newRow.data.calc$.rollBonus) {
+        parts.push(newRow.data.calc$.rollBonus);
+      }
+      
+      if (newRow.data.userBonus && Roll.validate(newRow.data.userBonus)) {
+        parts.push(newRow.data.userBonus);
+      }
+
+      const formula = parts.join(' + ');
+      if (newRow.data.calc$.roll?.formula !== formula) {
+        // Rolling the attack happens automatically in rollAttack and retains previous rolled dice
+        newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(formula));
+      }
+    }
   }
 
+  private async rollAttack(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+    for (const {newRow, oldRow} of context.rows) {
+      if (!this.isThisType(newRow) || !this.assumeThisType(oldRow)) {
+        continue;
+      }
+      
+      const oldRoll: RollData = oldRow?.data?.calc$?.roll;
+      const shouldEvaluate = newRow.data.phase === 'result';
+
+      if (shouldEvaluate !== newRow.data.calc$.roll?.evaluated && !oldRoll?.evaluated) {
+        // Make new roll
+        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
+        newRow.data.calc$.roll = UtilsRoll.toRollData(await newRoll.roll({async: true}));
+        UtilsDiceSoNice.showRoll({roll: newRoll});
+      } else if (newRow.data.calc$.roll.formula !== oldRoll?.formula && oldRoll) {
+        // Roll changed => reroll
+        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
+        const result = await UtilsRoll.setRoll(UtilsRoll.fromRollData(oldRoll).terms, newRoll.terms);
+        newRow.data.calc$.roll = UtilsRoll.toRollData(Roll.fromTerms(result.result));
+        if (result.rollToDisplay) {
+          UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
+        }
+      }
+    }
+  }
+  
   private async addTargetCache(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
     const partsByMessageId = new Map<string, ModularCardTriggerData[]>();
     for (const {newRow} of context.rows) {
@@ -369,160 +539,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       }
     }
   }
+  //#endregion
 
-  private calcIsCrit(context: IDmlContext<ModularCardTriggerData>): void {
-    for (const {newRow} of context.rows) {
-      if (!this.isThisType(newRow)) {
-        continue;
-      }
-
-      if (!newRow.data.calc$.roll?.evaluated) {
-        newRow.data.calc$.isCrit = false;
-        continue;
-      }
-
-      const baseRollResult = (newRow.data.calc$.roll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
-      newRow.data.calc$.isCrit = baseRollResult.result >= newRow.data.calc$.critTreshold;
-    }
-  }
-
-  private calcResultCache(context: IDmlContext<ModularCardTriggerData>): void {
-    for (const {newRow} of context.rows) {
-      if (!this.isThisType(newRow) || !this.assumeThisType(newRow)) {
-        continue;
-      }
-
-      for (const targetCache of newRow.data.calc$.targetCaches) {
-        if (newRow.data.calc$.roll?.evaluated) {
-          const firstRoll = newRow.data.calc$.roll.terms[0].results.find(r => r.active);
-          if (firstRoll.result === 20 || targetCache.ac <= newRow.data.calc$.roll.total) {
-            // 20 always hits, lower crit treshold does not
-            if (firstRoll.result >= newRow.data.calc$.critTreshold) {
-              targetCache.resultType = 'critical-hit';
-            } else {
-              targetCache.resultType = 'hit';
-            }
-          } else if (firstRoll.result === 1) {
-            targetCache.resultType = 'critical-mis';
-          } else {
-            targetCache.resultType = 'mis';
-          }
-        } else if (targetCache.resultType) {
-          delete targetCache.resultType;
-        }
-      }
-    }
-  }
-
-  private setDamageAsCrit(context: IDmlContext<ModularCardTriggerData>): void {
-    const messagesBecameCrit = new Set<string>();
-    const messagesBecameNormal = new Set<string>();
-    for (const {newRow, oldRow} of context.rows) {
-      if (!this.isThisType(newRow)) {
-        continue;
-      }
-      if (newRow.data.calc$.isCrit !== oldRow?.data?.calc$?.isCrit) {
-        if (newRow.data.calc$.isCrit) {
-          messagesBecameCrit.add(newRow.messageId);
-        } else {
-          messagesBecameNormal.add(newRow.messageId);
-        }
-      }
-    }
-    messagesBecameCrit.delete(null);
-    messagesBecameCrit.delete(undefined);
-    messagesBecameNormal.delete(null);
-    messagesBecameNormal.delete(undefined);
-
-    if (messagesBecameCrit.size === 0 && messagesBecameNormal.size === 0) {
-      return;
-    }
-
-    for (const {newRow} of context.rows) {
-      if (!messagesBecameCrit.has(newRow.messageId) && !messagesBecameNormal.has(newRow.messageId)) {
-        continue;
-      }
-
-      if (!this.isAnyDamageType(newRow)) {
-        continue;
-      }
-
-      if (newRow.data.phase === 'mode-select') {
-        if (messagesBecameCrit.has(newRow.messageId)) {
-          newRow.data.mode = 'critical';
-        } else {
-          newRow.data.mode = 'normal';
-        }
-      }
-    }
-  }
-
-  private async calcAttackRoll(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
-    for (const {newRow} of context.rows) {
-      if (!this.isThisType(newRow)) {
-        continue;
-      }
-
-      let baseRoll = new Die({faces: 20, number: 1});
-      if (newRow.data.calc$.hasHalflingLucky) {
-        // reroll a base roll 1 once
-        // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
-        // second 2 = reroll when the roll result is equal to 1 (=1)
-        baseRoll.modifiers.push('r1=1');
-      }
-      switch (newRow.data.mode) {
-        case 'advantage': {
-          baseRoll.number = 2;
-          baseRoll.modifiers.push('kh');
-          break;
-        }
-        case 'disadvantage': {
-          baseRoll.number = 2;
-          baseRoll.modifiers.push('kl');
-          break;
-        }
-      }
-      const parts: string[] = [baseRoll.formula];
-      if (newRow.data.calc$.rollBonus) {
-        parts.push(newRow.data.calc$.rollBonus);
-      }
-      
-      if (newRow.data.userBonus && Roll.validate(newRow.data.userBonus)) {
-        parts.push(newRow.data.userBonus);
-      }
-
-      const formula = parts.join(' + ');
-      if (newRow.data.calc$.roll?.formula !== formula) {
-        // Rolling the attack happens automatically in rollAttack and retains previous rolled dice
-        newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(formula));
-      }
-    }
-  }
-
-  private async rollAttack(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
-    for (const {newRow, oldRow} of context.rows) {
-      if (!this.isThisType(newRow) || !this.assumeThisType(oldRow)) {
-        continue;
-      }
-      
-      const oldRoll: RollData = oldRow?.data?.calc$?.roll;
-      const shouldEvaluate = newRow.data.phase === 'result';
-
-      if (shouldEvaluate !== newRow.data.calc$.roll?.evaluated && !oldRoll?.evaluated) {
-        // Make new roll
-        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
-        newRow.data.calc$.roll = UtilsRoll.toRollData(await newRoll.roll({async: true}));
-        UtilsDiceSoNice.showRoll({roll: newRoll});
-      } else if (newRow.data.calc$.roll.formula !== oldRoll?.formula && oldRoll) {
-        // Roll changed => reroll
-        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
-        const result = await UtilsRoll.setRoll(UtilsRoll.fromRollData(oldRoll).terms, newRoll.terms);
-        newRow.data.calc$.roll = UtilsRoll.toRollData(Roll.fromTerms(result.result));
-        if (result.rollToDisplay) {
-          UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
-        }
-      }
-    }
+  //#region afterUpdate
+  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<any>>): void | Promise<void> {
+    this.onBonusChange(context);
   }
   
   private onBonusChange(context: IDmlContext<ModularCardTriggerData>): void {
@@ -536,10 +557,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       }
     }
   }
-  //#endregion
-
+  //#endregion 
+  
+  //#region helpers
   private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData> {
-    if (row.type !== this.getType()) {
+    if (row.type !== AttackCardPart.instance.getType()) {
       return false;
     }
     if (row.typeHandler) {
@@ -559,15 +581,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   private assumeThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData> {
     return true;
   }
-
-  private getTargetCache(caches: AttackCardData[]): Map<string, TargetCache> {
-    const cacheByUuid = new Map<string, TargetCache>();
-    for (const cache of caches) {
-      for (const targetCache of cache.calc$.targetCaches) {
-        cacheByUuid.set(targetCache.targetUuid, targetCache);
-      }
-    }
-    return cacheByUuid;
-  }
+  //#endregion
 
 }

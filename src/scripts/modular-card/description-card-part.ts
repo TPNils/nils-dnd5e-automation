@@ -58,7 +58,6 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
       },
     ]
   }
-
   
   private toggleCollapse(messageId: string): void {
     MemoryStorageService.setCardCollapse(messageId, !MemoryStorageService.isCardCollapsed(messageId));

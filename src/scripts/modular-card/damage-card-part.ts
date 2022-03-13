@@ -1,4 +1,4 @@
-import { IAfterDmlContext, IDmlContext} from "../lib/db/dml-trigger";
+import { IAfterDmlContext, IDmlContext, ITrigger} from "../lib/db/dml-trigger";
 import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
@@ -53,6 +53,31 @@ export interface DamageCardData {
     displayDamageTypes?: string;
     targetCaches: TargetCache[]
   }
+}
+
+function setTargetCache(cache: DamageCardData, targetCache: TargetCache): void {
+  if (!cache.calc$.targetCaches) {
+    cache.calc$.targetCaches = [];
+  }
+  for (let i = 0; i < cache.calc$.targetCaches.length; i++) {
+    if (cache.calc$.targetCaches[i].targetUuid === targetCache.targetUuid) {
+      cache.calc$.targetCaches[i] = targetCache;
+      return;
+    }
+  }
+  cache.calc$.targetCaches.push(targetCache);
+}
+
+function getTargetCache(cache: DamageCardData, tokenUuid: string): TargetCache | null {
+  if (!cache.calc$.targetCaches) {
+    return null;
+  }
+  for (const targetCache of cache.calc$.targetCaches) {
+    if (targetCache.targetUuid === tokenUuid) {
+      return targetCache;
+    }
+  }
+  return null;
 }
 
 export class DamageCardPart implements ModularCardPart<DamageCardData> {
@@ -173,6 +198,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
+    ModularCard.registerModularCardTrigger(new DamageCardTrigger());
     TargetCardPart.instance.registerIntegration({
       onChange: event => this.targetCallback(event),
       getState: context => this.getTargetState(context),
@@ -286,7 +312,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
   //#endregion
 
-  //#region Backend
+  //#region Targeting
   private async targetCallback(targetEvents: TargetCallbackData[]): Promise<void> {
     const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.targetUuid));
     let tokenHpSnapshot = new Map<string, {hp: number; failedDeathSaves: number; maxHp: number; tempHp: number}>();
@@ -308,7 +334,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
       // Undo already applied damage
       for (const dmg of damagesCards) {
-        const cache = this.getTargetCache(dmg.data, targetEvent.targetUuid);
+        const cache = getTargetCache(dmg.data, targetEvent.targetUuid);
         if (!cache) {
           continue;
         }
@@ -325,7 +351,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
       // Calculate (new) damage
       for (const dmg of damagesCards) {
-        const cache = this.getTargetCache(dmg.data, targetEvent.targetUuid);
+        const cache = getTargetCache(dmg.data, targetEvent.targetUuid);
         if (targetEvent.apply) {
           const maxHp = Math.max(snapshot.maxHp, snapshot.hp);
           const beforeApplyTokenHp = deepClone(tokenHp);
@@ -347,7 +373,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           const hpDiff = tokenHp.hp - beforeApplyTokenHp.hp;
           const tempHpDiff = tokenHp.tempHp - beforeApplyTokenHp.tempHp;
           const failedDeathSavesDiff = tokenHp.failedDeathSaves - beforeApplyTokenHp.failedDeathSaves;
-          this.setTargetCache(dmg.data, {
+          setTargetCache(dmg.data, {
             ...cache,
             targetUuid: targetEvent.targetUuid,
             appliedState: 'applied',
@@ -359,7 +385,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           // When undoing damage after a heal, it could over heal above max hp.
           const originalHp = tokenHp.hp;
           tokenHp.hp = Math.min(snapshot.maxHp, tokenHp.hp);
-          this.setTargetCache(dmg.data, {
+          setTargetCache(dmg.data, {
             ...cache,
             targetUuid: targetEvent.targetUuid,
             appliedState: 'not-applied',
@@ -457,10 +483,16 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     );
   }
 
-  public afterUpdate(context: IDmlContext<ModularCardTriggerData>): void {
-    this.onBonusChange(context);
+  private isThisPartType(row: ModularCardPartData): row is ModularCardPartData<DamageCardData> {
+    return row.type === this.getType() && ModularCard.getTypeHandler(row.type) instanceof DamageCardPart;
   }
+  //#endregion
 
+}
+
+class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
+
+  //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
     // TODO recalc whole item on level change to support custom scaling level scaling formulas
     await this.calcDamageFormulas(context);
@@ -531,7 +563,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     const tokenDocuments = await UtilsDocument.tokenFromUuid(fetchTokenUuids);
     for (const recalcToken of recalcTokens) {
       const actor: MyActor = tokenDocuments.get(recalcToken.tokenUuid).getActor();
-      const currentCache = this.getTargetCache(recalcToken.data, recalcToken.tokenUuid);
+      const currentCache = getTargetCache(recalcToken.data, recalcToken.tokenUuid);
       const cache: TargetCache = {
         ...currentCache ?? {targetUuid: recalcToken.tokenUuid, appliedState: 'not-applied'},
         calcHpChange: 0,
@@ -583,7 +615,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         cache.appliedState = 'partial-applied';
       }
 
-      this.setTargetCache(recalcToken.data, cache);
+      setTargetCache(recalcToken.data, cache);
     }
   }
   
@@ -640,6 +672,12 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
     }
   }
+  //#endregion
+
+  //#region afterUpdate
+  public afterUpdate(context: IDmlContext<ModularCardTriggerData>): void {
+    this.onBonusChange(context);
+  }
   
   private onBonusChange(context: IDmlContext<ModularCardTriggerData>): void {
     for (const {newRow, oldRow, changedByUserId} of context.rows) {
@@ -652,7 +690,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
     }
   }
+  //#endregion
 
+  //#region helpers
   private getRollProperties(data: DamageCardData): string[][] {
     const rollProperties: string[][] = [
       ['calc$', 'baseRoll'],
@@ -666,12 +706,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     return rollProperties;
   }
   
-  private isThisPartType(row: ModularCardPartData): row is ModularCardPartData<DamageCardData> {
-    return row.type === this.getType() && ModularCard.getTypeHandler(row.type) instanceof DamageCardPart;
-  }
-  
   private isThisTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
-    return row.type === this.getType() && row.typeHandler instanceof DamageCardPart;
+    return row.typeHandler instanceof DamageCardPart;
   }
   
   private isTargetTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<TargetCardData> {
@@ -681,30 +717,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   private assumeThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
     return true;
   }
-
-  private setTargetCache(cache: DamageCardData, targetCache: TargetCache): void {
-    if (!cache.calc$.targetCaches) {
-      cache.calc$.targetCaches = [];
-    }
-    for (let i = 0; i < cache.calc$.targetCaches.length; i++) {
-      if (cache.calc$.targetCaches[i].targetUuid === targetCache.targetUuid) {
-        cache.calc$.targetCaches[i] = targetCache;
-        return;
-      }
-    }
-    cache.calc$.targetCaches.push(targetCache);
-  }
-
-  private getTargetCache(cache: DamageCardData, tokenUuid: string): TargetCache | null {
-    if (!cache.calc$.targetCaches) {
-      return null;
-    }
-    for (const targetCache of cache.calc$.targetCaches) {
-      if (targetCache.targetUuid === tokenUuid) {
-        return targetCache;
-      }
-    }
-    return null;
-  }
   //#endregion
+
 }
