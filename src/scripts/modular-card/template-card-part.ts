@@ -7,6 +7,7 @@ import { MyActor, MyItem, MyItemData } from "../types/fixed-types";
 import { UtilsTemplate } from "../utils/utils-template";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { TargetCardData, TargetCardPart } from "./target-card-part";
 
 interface TemplateCardData {
   calc$: {
@@ -159,29 +160,29 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
       }
 
       const partId = newTemplate.getFlag(staticValues.moduleName, 'dmlCallbackPartId') as string;
-      let part: ModularCardPartData<TemplateCardData> = parts.find(part => part.id === partId && part.type === 'TemplateCardPart');
-      if (!part) {
+      let templatePart: ModularCardPartData<TemplateCardData> = parts.find(part => part.id === partId && ModularCard.getTypeHandler(part.type) instanceof TemplateCardPart);
+      let targetPart: ModularCardPartData<TargetCardData> = parts.find(part => ModularCard.getTypeHandler(part.type) instanceof TargetCardPart);
+      if (!templatePart || !targetPart) {
         continue;
       }
 
-      if (part.data.calc$.createdTemplateUuid !== newTemplate.uuid) {
-        deleteTemplateUuids.add(part.data.calc$.createdTemplateUuid);
+      if (templatePart.data.calc$.createdTemplateUuid !== newTemplate.uuid) {
+        deleteTemplateUuids.add(templatePart.data.calc$.createdTemplateUuid);
         
-        part.data.calc$.createdTemplateUuid = newTemplate.uuid;
+        templatePart.data.calc$.createdTemplateUuid = newTemplate.uuid;
         updateChatMessageMap.set(chatMessage.id, parts);
       }
 
       if (newTemplate.data.x !== oldTemplate?.data?.x || newTemplate.data.y !== oldTemplate?.data?.y) {
         const templateDetails = UtilsTemplate.getTemplateDetails(newTemplate);
         const scene = newTemplate.parent;
-        const newTargets: {uuid: string}[] = [];
+        const newTargets = new Set<string>();
         for (const token of scene.getEmbeddedCollection('Token').values() as Iterable<TokenDocument>) {
           if (UtilsTemplate.isTokenInside(templateDetails, token, true)) {
-            newTargets.push({uuid: token.uuid});
+            newTargets.add(token.uuid);
           }
         }
-        // TODO set targets
-        console.log('new targets: ', Array.from(((await UtilsDocument.tokenFromUuid(newTargets.map(t => t.uuid))).values())).map(token => token.name));
+        targetPart.data.selectedTokenUuids = Array.from(newTargets);
       }
     }
 
