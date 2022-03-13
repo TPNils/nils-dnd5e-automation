@@ -11,6 +11,7 @@ import { DamageCardPart } from "./damage-card-part";
 import { DescriptionCardPart } from "./description-card-part";
 import { ActionParam, ClickEvent, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
 import { PropertyCardPart } from "./property-card-part";
+import { SpellLevelCardPart } from "./spell-level-card-part";
 import { TargetCardPart } from "./target-card-part";
 import { TemplateCardPart } from "./template-card-part";
 
@@ -206,6 +207,7 @@ export class ModularCard {
 
     const cardParts: ModularCardPart[] = [
       DescriptionCardPart.instance,
+      SpellLevelCardPart.instance,
       AttackCardPart.instance,
       DamageCardPart.instance,
       TemplateCardPart.instance,

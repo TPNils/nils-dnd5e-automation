@@ -101,6 +101,11 @@
       padding: 0.25em 0;
     }
   }
+
+  /* Fix some defaut foundry css */
+  select option {
+    color: white;
+  }
 }
 
 .#{$module-name}-item-card {

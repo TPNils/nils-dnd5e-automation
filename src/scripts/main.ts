@@ -12,6 +12,7 @@ import { PropertyCardPart } from "./modular-card/property-card-part";
 import { TemplateCardPart } from "./modular-card/template-card-part";
 import { MutableDiceTerm } from "./lib/roll/mutable-dice-term";
 import { TargetCardPart } from "./modular-card/target-card-part";
+import { SpellLevelCardPart } from "./modular-card/spell-level-card-part";
 
 registerGlobalApiHooks();
 registerHtmlHooks();
@@ -24,6 +25,7 @@ AttackCardPart.instance.registerHooks();
 DamageCardPart.instance.registerHooks();
 DescriptionCardPart.instance.registerHooks();
 PropertyCardPart.instance.registerHooks();
+SpellLevelCardPart.instance.registerHooks();
 TargetCardPart.instance.registerHooks();
 TemplateCardPart.instance.registerHooks();
 
