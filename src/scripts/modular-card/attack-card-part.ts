@@ -8,7 +8,7 @@ import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
+import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
@@ -113,6 +113,26 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     attack.calc$.critTreshold = critTreshold;
 
     return [attack];
+  }
+
+  public refresh(oldDatas: AttackCardData[], args: ModularCardCreateArgs): AttackCardData[] {
+    const results: AttackCardData[] = [];
+    const newCreated = this.create(args);
+    for (let i = 0; i < newCreated.length; i++) {
+      const newData = newCreated.length < i ? newCreated[i] : null;
+      const oldData = oldDatas.length < i ? oldDatas[i] : null;
+
+      if (!oldData) {
+        results.push(newData);
+        continue;
+      }
+
+      const result = deepClone(oldData);
+      result.calc$ = newData.calc$;
+      result.calc$.roll = oldData.calc$.roll;// contains already rolled dice which should not be discarded
+      results.push(result);
+    }
+    return results;
   }
 
   @RunOnce()

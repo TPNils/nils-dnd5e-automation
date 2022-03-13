@@ -6,11 +6,12 @@ import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { ModularCard, ModularCardPartData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 export interface TargetCardData {
   selectedTokenUuids: string[];
   calc$: {
+    // TODO expectedTargetAmount
     tokenData: Array<{
       tokenUuid: string;
       name: string;
@@ -103,6 +104,10 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     }
 
     return [target];
+  }
+
+  public refresh(data: TargetCardData[], args: ModularCardCreateArgs): TargetCardData[] {
+    return data;
   }
 
   private callbacks: TargetIntegrationCallback[] = [];

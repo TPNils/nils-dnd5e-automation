@@ -9,7 +9,7 @@ import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
+import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type TermJson = ReturnType<RollTerm['toJSON']> & {
@@ -193,6 +193,26 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     }
     
     return inputDamages;
+  }
+
+  public refresh(oldDatas: DamageCardData[], args: ModularCardCreateArgs): DamageCardData[] {
+    const results: DamageCardData[] = [];
+    const newCreated = this.create(args);
+    for (let i = 0; i < newCreated.length; i++) {
+      const newData = newCreated.length < i ? newCreated[i] : null;
+      const oldData = oldDatas.length < i ? oldDatas[i] : null;
+
+      if (!oldData) {
+        results.push(newData);
+        continue;
+      }
+
+      const result = deepClone(oldData);
+      result.calc$ = newData.calc$;
+      result.calc$.roll = oldData.calc$.roll;// contains already rolled dice which should not be discarded
+      results.push(result);
+    }
+    return results;
   }
 
   @RunOnce()

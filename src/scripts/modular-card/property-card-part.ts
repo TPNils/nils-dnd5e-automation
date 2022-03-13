@@ -2,7 +2,7 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { MyItem } from "../types/fixed-types";
 import { ModularCard } from "./modular-card";
-import { HtmlContext, ICallbackAction, ModularCardPart } from "./modular-card-part";
+import { HtmlContext, ICallbackAction, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 interface PropertyCardData {
   calc$: {
@@ -21,6 +21,10 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
         properties: item.getChatData().properties,
       }
     }];
+  }
+
+  public refresh(data: PropertyCardData[], args: ModularCardCreateArgs): PropertyCardData[] {
+    return this.create(args);
   }
 
   @RunOnce()

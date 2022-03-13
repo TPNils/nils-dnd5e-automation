@@ -4,7 +4,7 @@ import { staticValues } from "../static-values";
 import { MyItem } from "../types/fixed-types";
 import { ItemCard } from "../utils/utils-chat-message";
 import { ModularCard } from "./modular-card";
-import { HtmlContext, ICallbackAction, ModularCardPart } from "./modular-card-part";
+import { HtmlContext, ICallbackAction, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 interface DescriptionCardData {
   calc$: {
@@ -20,7 +20,7 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   public static readonly instance = new DescriptionCardPart();
   private constructor(){}
   
-  public create({item}: {item: MyItem}): DescriptionCardData[] {
+  public create({item}: ModularCardCreateArgs): DescriptionCardData[] {
     return [{
       calc$: {
         name: item.name,
@@ -29,6 +29,10 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
         materials: item.data?.data?.materials?.value,
       }
     }];
+  }
+
+  public refresh(data: DescriptionCardData[], args: ModularCardCreateArgs): DescriptionCardData[] {
+    return this.create(args);
   }
 
   @RunOnce()

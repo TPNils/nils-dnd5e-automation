@@ -6,7 +6,7 @@ import { staticValues } from "../static-values";
 import { MyActor, MyItem, MyItemData } from "../types/fixed-types";
 import { UtilsTemplate } from "../utils/utils-template";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 interface TemplateCardData {
   calc$: {
@@ -21,7 +21,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   public static readonly instance = new TemplateCardPart();
   private constructor(){}
   
-  public create({item, actor}: {item: MyItem, actor?: MyActor}): TemplateCardData[] {
+  public create({item, actor}: ModularCardCreateArgs): TemplateCardData[] {
     // @ts-expect-error
     const hasAoe = CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type);
     if (!hasAoe) {
@@ -33,6 +33,10 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
         target: item.data.data.target,
       }
     }];
+  }
+
+  public refresh(data: TemplateCardData[], args: ModularCardCreateArgs): TemplateCardData[] {
+    return this.create(args);
   }
 
   @RunOnce()

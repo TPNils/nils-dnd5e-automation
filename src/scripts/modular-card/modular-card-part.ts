@@ -119,9 +119,16 @@ export interface HtmlContext<T> {
   allMessageParts: ModularCardPartData[];
 }
 
+export interface ModularCardCreateArgs {
+  item: MyItem;
+  actor?: MyActor;
+  token?: TokenDocument;
+}
+
 export interface ModularCardPart<D = any> {
   getType(): string;
-  create(args: {actor?: MyActor, token?: TokenDocument, item: MyItem}): PromiseOrSync<D[]>;
+  create(args: ModularCardCreateArgs): PromiseOrSync<D[]>;
+  refresh(data: D[],args: ModularCardCreateArgs): PromiseOrSync<D[]>;
   getHtml(context: HtmlContext<D>): PromiseOrSync<string>;
   getCallbackActions(): ICallbackAction<D>[];
 }
