@@ -4,7 +4,7 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
-import { MyActor } from "../types/fixed-types";
+import { MyActor, MyItem } from "../types/fixed-types";
 import { ModularCard, ModularCardPartData } from "./modular-card";
 import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, ModularCardPart } from "./modular-card-part";
 
@@ -74,7 +74,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   public static readonly instance = new TargetCardPart();
   private constructor(){}
   
-  public generate({}: {}): TargetCardData[] {
+  public generate({item, token}: {item: MyItem, token?: TokenDocument}): TargetCardData[] {
     const target: TargetCardData = {
       selectedTokenUuids: [],
       calc$: {
@@ -82,13 +82,24 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       },
     };
 
-    for (const token of game.user.targets) {
-      target.selectedTokenUuids.push(token.document.uuid);
+    const selectedTargets: TokenDocument[] = [];
+    if (item.data.data.target?.type === 'none') {
+      // no selection
+    } else if (item.data.data.target?.type === 'self' && token) {
+      selectedTargets.push(token);
+    } else {
+      for (const token of game.user.targets) {
+        selectedTargets.push(token.document);
+      }
+    }
+    
+    for (const token of selectedTargets) {
+      target.selectedTokenUuids.push(token.uuid);
       target.calc$.tokenData.push({
-        tokenUuid: token.document.uuid,
-        name: token.document.data.name,
-        img: token.document.data.img,
-      })
+        tokenUuid: token.uuid,
+        name: token.data.name,
+        img: token.data.img,
+      });
     }
 
     return [target];
