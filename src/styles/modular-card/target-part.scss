@@ -3,23 +3,29 @@
 .#{$module-name}-item-card {
   .target-table {
     display: grid;
-  }
 
-  .#{$module-name}-apply {
-    &[data-#{$module-name}-state="applied"] {
-      color: green;
+    .one-line {
+      display: flex;
+      width: max-content;
     }
     
-    &[data-#{$module-name}-state="disabled"] {
-      opacity: .5;
-      pointer-events: none;
+    .#{$module-name}-apply {
+      &[data-#{$module-name}-state="applied"] {
+        color: green;
+      }
+      
+      &[data-#{$module-name}-state="disabled"] {
+        opacity: .5;
+        pointer-events: none;
+      }
+    }
+
+    .#{$module-name}-undo {
+      &[data-#{$module-name}-state="not-applied"] {
+        opacity: .5;
+        pointer-events: none;
+      }
     }
   }
 
-  .#{$module-name}-undo {
-    &[data-#{$module-name}-state="not-applied"] {
-      opacity: .5;
-      pointer-events: none;
-    }
-  }
 }

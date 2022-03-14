@@ -29,6 +29,12 @@ export interface State {
   state?: typeof visualStates[number];
 
   /**
+   * Indicate if the if the actions are applied by the smart state.
+   * null if there is nothing to apply
+   */
+  smartState?: typeof visualStates[number];
+
+  /**
    * The applied state to which this applies
    */
   tokenUuid: string;
@@ -55,7 +61,7 @@ export interface TargetCallbackData {
   readonly messageId: string;
   readonly messageCardParts: ModularCardPartData[];
   readonly targetUuid: string;
-  readonly apply: boolean;
+  readonly apply: 'undo' | 'smart-apply' | 'force-apply'; // TODO 'undo' | 'smart-apply' | 'force-apply' => smart = take into account if target hit
 }
 
 export interface StateContext {
@@ -152,7 +158,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     
     const columnsByKey = new Map<string, {label: string}>();
     const columnKeyOrder: string[] = [];
-    const tokenData = new Map<string, {state?: VisualState['state'], columnData: Map<string, string>}>();
+    const tokenData = new Map<string, {state?: VisualState['state'], smartState?: VisualState['state'], columnData: Map<string, string>}>();
     for (const targetUuid of context.data.selectedTokenUuids) {
       tokenData.set(targetUuid, {columnData: new Map()});
     }
@@ -162,12 +168,20 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       }
 
       if (!tokenData.has(visualState.tokenUuid)) {
-        tokenData.set(visualState.tokenUuid, {state: visualState.state, columnData: new Map()});
+        tokenData.set(visualState.tokenUuid, {state: visualState.state, smartState: visualState.smartState, columnData: new Map()});
       }
       const currentData = tokenData.get(visualState.tokenUuid);
-      const strictestVisualStateIndex = [visualStates.indexOf(currentData.state), visualStates.indexOf(visualState.state)].sort()[1];
-      if (strictestVisualStateIndex >= 0) {
-        currentData.state = visualStates[strictestVisualStateIndex];
+      {
+        const strictestVisualStateIndex = [visualStates.indexOf(currentData.state), visualStates.indexOf(visualState.state)].sort()[1];
+        if (strictestVisualStateIndex >= 0) {
+          currentData.state = visualStates[strictestVisualStateIndex];
+        }
+      }
+      {
+        const strictestVisualStateIndex = [visualStates.indexOf(currentData.smartState), visualStates.indexOf(visualState.smartState)].sort()[1];
+        if (strictestVisualStateIndex >= 0) {
+          currentData.smartState = visualStates[strictestVisualStateIndex];
+        }
       }
 
       if (Array.isArray(visualState.columns)) {
@@ -186,11 +200,11 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       return '';
     }
 
-    const htmlTableHeader: {row: string[], state: VisualState['state']} = {row: [], state: 'not-applied'};
+    const htmlTableHeader: {row: string[], state: VisualState['state'], smartState: VisualState['state']} = {row: [], state: 'not-applied', smartState: 'not-applied'};
     for (const key of columnKeyOrder) {
       htmlTableHeader.row.push(columnsByKey.get(key).label);
     }
-    const htmlTableBody: Array<{tokenUuid: string, actorUuid: string, name: string, img: string, state: VisualState['state'], row: string[]}> = [];
+    const htmlTableBody: Array<{tokenUuid: string, actorUuid: string, name: string, img: string, state: VisualState['state'], smartState: VisualState['state'], row: string[]}> = [];
     const tokens = Array.from((await UtilsDocument.tokenFromUuid(tokenData.keys())).values()).sort((a, b) => {
       // Since tokens are displayed with their image, group them together
       let compare = a.data.img.localeCompare(b.data.img);
@@ -201,18 +215,21 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       return a.name.localeCompare(b.name);
     });
     const allStates = new Set<VisualState['state']>();
+    const allSmartStates = new Set<VisualState['state']>();
     for (const token of tokens) {
       const row: string[] = [];
       for (const key of columnKeyOrder) {
         row.push(tokenData.get(token.uuid).columnData.get(key) ?? '');
       }
       allStates.add(tokenData.get(token.uuid).state);
+      allSmartStates.add(tokenData.get(token.uuid).smartState);
       htmlTableBody.push({
         tokenUuid: token.uuid,
         actorUuid: (token.actor as MyActor)?.uuid,
         name: token.name,
         img: token.data.img,
         state: tokenData.get(token.uuid).state,
+        smartState: tokenData.get(token.uuid).smartState,
         row: row,
       });
     }
@@ -232,6 +249,20 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
         htmlTableHeader.state = 'partial-applied';
       }
     }
+    
+    {
+      let allSmartStatesArray = Array.from(allSmartStates);
+      if (allSmartStatesArray.length === 1) {
+        htmlTableHeader.smartState = allSmartStates[0];
+      }
+      allSmartStatesArray = allSmartStatesArray.filter(state => state !== 'disabled');
+      // If all are the same or disabled
+      if (allSmartStatesArray.length === 1) {
+        htmlTableHeader.smartState = allSmartStatesArray[0];
+      } else {
+        htmlTableHeader.smartState = 'partial-applied';
+      }
+    }
 
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/target-part.hbs`, {
@@ -247,7 +278,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   public getCallbackActions(): ICallbackAction<TargetCardData>[] {
     return [
       {
-        regex: /^apply-((?:[a-zA-Z0-9\.]+)|\*)$/,
+        regex: /^(force-apply|smart-apply|undo)-((?:[a-zA-Z0-9\.]+)|\*)$/,
         permissionCheck: createPermissionCheck<TargetCardData>(({data, regexResult, messageId, allCardParts}) => {
           const documents: CreatePermissionCheckArgs['documents'] = [];
           for (const uuid of this.getTokenUuids([regexResult[1]], data, messageId, allCardParts)) {
@@ -255,46 +286,17 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
           }
           return {documents: documents};
         }),
-        execute: ({regexResult, data, messageId, allCardParts}) => this.apply([regexResult[1]], data, messageId, allCardParts),
-      },
-      {
-        regex: /^undo-((?:[a-zA-Z0-9\.]+)|\*)$/,
-        permissionCheck: createPermissionCheck<TargetCardData>(({data, regexResult, messageId, allCardParts}) => {
-          const documents: CreatePermissionCheckArgs['documents'] = [];
-          for (const uuid of this.getTokenUuids([regexResult[1]], data, messageId, allCardParts)) {
-            documents.push({uuid: uuid, permission: 'OWNER', security: true});
-          }
-          return {documents: documents};
-        }),
-        execute: ({regexResult, data, messageId, allCardParts}) => this.undo([regexResult[1]], data, messageId, allCardParts),
+        execute: ({regexResult, data, messageId, allCardParts}) => this.fireEvent(regexResult[1] as TargetCallbackData['apply'], [regexResult[2]], data, messageId, allCardParts),
       }
     ];
   }
 
-  private async apply(requestUuids: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[]): Promise<void> {
+  private async fireEvent(type: TargetCallbackData['apply'], requestUuids: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[]): Promise<void> {
     const callbackData: TargetCallbackData[] = this.getTokenUuids(requestUuids, data, messageId, allCardParts).map(uuid => ({
       messageId: messageId,
       messageCardParts: allCardParts,
       targetUuid: uuid,
-      apply: true,
-    }));
-
-    for (const integration of this.callbacks) {
-      if (integration.onChange) {
-        const response = integration.onChange(callbackData);
-        if (response instanceof Promise) {
-          await response;
-        }
-      }
-    }
-  }
-
-  private async undo(requestUuids: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[]): Promise<void> {
-    const callbackData: TargetCallbackData[] = this.getTokenUuids(requestUuids, data, messageId, allCardParts).map(uuid => ({
-      messageId: messageId,
-      messageCardParts: allCardParts,
-      targetUuid: uuid,
-      apply: false,
+      apply: type,
     }));
 
     for (const integration of this.callbacks) {

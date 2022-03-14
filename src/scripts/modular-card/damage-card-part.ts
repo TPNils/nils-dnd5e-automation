@@ -7,6 +7,7 @@ import { UtilsObject } from "../lib/utils/utils-object";
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
+import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
@@ -26,6 +27,7 @@ export interface AddedDamage {
 
 interface TargetCache {
   targetUuid: string;
+  smartState: State['state'];
   appliedState: State['state'];
   // What has actually been applied, accounting the current hp at the time when applied
   appliedFailedDeathSaved?: number;
@@ -349,6 +351,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       const snapshot = tokenHpSnapshot.get(targetEvent.targetUuid);
       const tokenHp = deepClone(snapshot);
       
+      const attackCards: ModularCardPartData<AttackCardData>[] = targetEvent.messageCardParts
+        .filter(part => ModularCard.getTypeHandler(part.type) instanceof AttackCardPart)
       const damagesCards: ModularCardPartData<DamageCardData>[] = targetEvent.messageCardParts
         .filter(part => part.type === this.getType() && ModularCard.getTypeHandler(part.type) instanceof DamageCardPart)
 
@@ -371,8 +375,34 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
       // Calculate (new) damage
       for (const dmg of damagesCards) {
-        const cache = getTargetCache(dmg.data, targetEvent.targetUuid);
-        if (targetEvent.apply) {
+        const cache = deepClone(getTargetCache(dmg.data, targetEvent.targetUuid));
+        let apply = false;
+        cache.smartState = 'not-applied';
+        switch (targetEvent.apply) {
+          case 'smart-apply': {
+            const allHit = attackCards.every(attack => {
+              const hitType = attack.data.calc$.targetCaches.find(target => target.targetUuid === targetEvent.targetUuid)?.resultType;
+              return hitType === 'hit' || hitType === 'critical-hit';
+            });
+            cache.smartState = 'applied';
+            if (!allHit) {
+              apply = false;
+              break;
+            }
+            apply = true;
+            break;
+          }
+          case 'force-apply': {
+            apply = true;
+            break;
+          }
+          case 'undo': {
+            apply = false;
+            break;
+          }
+        }
+
+        if (apply) {
           const maxHp = Math.max(snapshot.maxHp, snapshot.hp);
           const beforeApplyTokenHp = deepClone(tokenHp);
 
@@ -444,7 +474,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   private getTargetState(context: StateContext): VisualState[] {
     const states = new Map<string, State & {hpDiff?: number}>();
     for (const uuid of context.selectedTokenUuids) {
-      states.set(uuid, {tokenUuid: uuid, state: 'not-applied'});
+      states.set(uuid, {tokenUuid: uuid, state: 'not-applied', smartState: 'not-applied'});
     }
     for (const part of context.allMessageParts) {
       if (!this.isThisPartType(part)) {
@@ -453,16 +483,20 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
       for (const targetCache of part.data.calc$.targetCaches) {
         if (!states.has(targetCache.targetUuid)) {
-          states.set(targetCache.targetUuid, {tokenUuid: targetCache.targetUuid, state: 'not-applied'});
+          states.set(targetCache.targetUuid, {tokenUuid: targetCache.targetUuid, state: 'not-applied', smartState: 'not-applied'});
         }
         const state = states.get(targetCache.targetUuid);
         if (state.hpDiff == null) {
           state.hpDiff = 0;
           state.state = targetCache.appliedState;
+          state.smartState = targetCache.smartState;
         }
         
         if (state.state !== targetCache.appliedState) {
           state.state === 'partial-applied';
+        }
+        if (state.smartState !== targetCache.smartState) {
+          state.smartState === 'partial-applied';
         }
         state.hpDiff += (targetCache.calcHpChange ?? 0);
         state.hpDiff += (targetCache.calcAddTmpHp ?? 0);
@@ -478,6 +512,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         };
         if (state.state != null) {
           visualState.state = state.state;
+        }
+        if (state.smartState != null) {
+          visualState.smartState = state.smartState;
         }
       
         if (state.hpDiff == null) {
@@ -585,7 +622,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
       const actor: MyActor = tokenDocuments.get(recalcToken.tokenUuid).getActor();
       const currentCache = getTargetCache(recalcToken.data, recalcToken.tokenUuid);
       const cache: TargetCache = {
-        ...currentCache ?? {targetUuid: recalcToken.tokenUuid, appliedState: 'not-applied'},
+        ...currentCache ?? {targetUuid: recalcToken.tokenUuid, appliedState: 'not-applied', smartState: 'not-applied'},
         calcHpChange: 0,
         calcAddTmpHp: 0,
         calcFailedDeathSaved: 0,

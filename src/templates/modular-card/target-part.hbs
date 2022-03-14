@@ -1,13 +1,14 @@
-<div class="table target-table" style="grid-template-columns: 25px {{#if data.tableHeader.row.length}}repeat({{data.tableHeader.row.length}}, min-content){{/if}} auto 50px;">
+<div class="table target-table" style="grid-template-columns: 25px {{#if data.tableHeader.row.length}}repeat({{data.tableHeader.row.length}}, min-content){{/if}} auto max-content;">
   {{!header}}
   <div class="header-cell">{{! name/img }}</div>
   {{#each data.tableHeader.row}}
     <div class="header-cell">{{{this}}}</div>
   {{/each}}
   <div class="header-cell">{{! filler }}</div>
-  <div class="header-cell">
+  <div class="header-cell one-line">
     {{#nacExpr data.tableBody.length '>' 1}}
-      <button data-{{@root.moduleName}}-action="apply-*" data-{{@root.moduleName}}-state="{{data.tableHeader.state}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
+      <button data-{{@root.moduleName}}-action="smart-apply-*" data-{{@root.moduleName}}-state="{{data.tableHeader.smartState}}" class="{{@root.moduleName}}-apply"><i class="fas fa-brain"></i></button>
+      <button data-{{@root.moduleName}}-action="force-apply-*" data-{{@root.moduleName}}-state="{{data.tableHeader.state}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
       <button data-{{@root.moduleName}}-action="undo-*" data-{{@root.moduleName}}-state="{{data.tableHeader.state}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
     {{/nacExpr}}
   </div>
@@ -18,9 +19,10 @@
       <div class="body-cell">{{{this}}}</div>
     {{/each}}
     <div class="body-cell">{{! filler }}</div>
-    <div class="body-cell">
+    <div class="body-cell one-line">
       {{#nacPerm (nacConcat "UpdateUuid:" target.actorUuid)}}
-        <button data-{{@root.moduleName}}-action="apply-{{target.tokenUuid}}" data-{{@root.moduleName}}-state="{{target.state}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
+        <button data-{{@root.moduleName}}-action="smart-apply-{{target.tokenUuid}}" data-{{@root.moduleName}}-state="{{target.smartState}}" class="{{@root.moduleName}}-apply"><i class="fas fa-brain"></i></button>
+        <button data-{{@root.moduleName}}-action="force-apply-{{target.tokenUuid}}" data-{{@root.moduleName}}-state="{{target.state}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
         <button data-{{@root.moduleName}}-action="undo-{{target.tokenUuid}}" data-{{@root.moduleName}}-state="{{target.state}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
       {{/nacPerm}}
     </div>
