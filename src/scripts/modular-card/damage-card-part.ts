@@ -472,7 +472,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   private getTargetState(context: StateContext): VisualState[] {
-    const states = new Map<string, State & {hpDiff?: number}>();
+    const states = new Map<string, Omit<VisualState, 'columns'> & {hpDiff?: number}>();
     for (const uuid of context.selectedTokenUuids) {
       states.set(uuid, {tokenUuid: uuid, state: 'not-applied', smartState: 'not-applied'});
     }

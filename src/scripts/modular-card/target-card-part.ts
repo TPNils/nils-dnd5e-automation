@@ -29,17 +29,17 @@ export interface State {
   state?: typeof visualStates[number];
 
   /**
-   * Indicate if the if the actions are applied by the smart state.
-   * null if there is nothing to apply
-   */
-  smartState?: typeof visualStates[number];
-
-  /**
    * The applied state to which this applies
    */
   tokenUuid: string;
 }
 export interface VisualState extends State {
+  /**
+   * Indicate if the if the actions are applied by the smart state.
+   * null if there is nothing to apply
+   */
+  smartState?: typeof visualStates[number];
+
   columns: Array<{
     /**
      * Unique key of the column where the value must be placed
