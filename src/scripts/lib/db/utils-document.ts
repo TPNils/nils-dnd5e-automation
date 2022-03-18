@@ -152,7 +152,7 @@ export class UtilsDocument {
   private static fromUuidInternal(uuids: Iterable<string>, options: {sync?: boolean} = {}): Promise<Map<string, FoundryDocument>> | Map<string, FoundryDocument> {
     // Fixes map keyset iterators, maybe you can only iterate them onces? not sure why it breaks without converting
     uuids = Array.from(new Set<string>(uuids));
-    const getIdsPerPack = new Map<string, string[]>();
+    const getIdsPerPack = new Map<string, Array<string[]>>();
     const documentsByUuid = new Map<string, FoundryDocument>();
     for (const uuid of uuids) {
       let parts = uuid.split(".");
@@ -167,13 +167,8 @@ export class UtilsDocument {
         if (!getIdsPerPack.has(pack)) {
           getIdsPerPack.set(pack, []);
         }
-        getIdsPerPack.get(pack).push(parts[3])
+        getIdsPerPack.get(pack).push(parts.slice(2));
       }
-    }
-
-    const documentPromises: Promise<FoundryDocument[]>[] = [];
-    for (const [packName, ids] of getIdsPerPack.entries()) {
-      documentPromises.push(game.packs.get(`${packName}`).getDocuments({_id: {$in: ids}} as any));
     }
 
     for (const uuid of uuids) {
@@ -206,10 +201,48 @@ export class UtilsDocument {
 
     // When async, always return a promise, even when there are no 'documentPromises'
     if (options.sync !== true) {
+      const documentPromises: Promise<FoundryDocument[]>[] = [];
+      for (const [packName, ids] of getIdsPerPack.entries()) {
+        const missingIds: string[] = [];
+        const pack = game.packs.get(packName);
+        for (const idParts of ids) {
+          if (pack.has(idParts[0])) {
+            documentPromises.push(Promise.resolve(pack.get(idParts[0])));
+          } else {
+            missingIds.push()
+          }
+        }
+        if (missingIds.length > 0) {
+          documentPromises.push(game.packs.get(`${packName}`).getDocuments({_id: {$in: missingIds}} as any));
+        }
+      }
+
       return Promise.all(documentPromises).then(queryResponses => {
+        const documentsByKey = new Map<string, FoundryDocument>();
         for (const documents of queryResponses) {
           for (const document of documents) {
-            documentsByUuid.set(document.uuid, document);
+            documentsByKey.set(`Compendium.${document.pack}.${document.id}`, document);
+          }
+        }
+
+        for (const [packName, ids] of getIdsPerPack.entries()) {
+          for (const idParts of ids) {
+            let document = documentsByKey.get(`Compendium.${packName}.${idParts[0]}`);
+            if (!document) {
+              continue;
+            }
+
+            
+            for (let i = 4; i < idParts.length && document != null; i = i+2) {
+              const documentName = idParts[i];
+              const id = idParts[i+1];
+              
+              document = document.getEmbeddedDocument(documentName, id) as FoundryDocument;
+            }
+
+            if (document) {
+              documentsByUuid.set(document.uuid, document);
+            }
           }
         }
         return documentsByUuid;
