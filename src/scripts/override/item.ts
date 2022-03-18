@@ -8,18 +8,14 @@ async function roll(this: MyItem, {rollMode, createMessage=true}: {configureDial
 }
 
 async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage> {
-  let itemData = await ModularCard.getDefaultItemParts({
+  const chatMessageData = await ModularCard.getDefaultItemCard({
     item: this as any,
     actor: this.actor as MyActor,
     token: ((this.actor as any).token) == null ? undefined : (this.actor as any).token,
   });
 
-  // TODO auto set targets
-  // itemData.targets = Array.from(game.user.targets).map(token => {return {uuid: token.document.uuid}});
-
-  // TODO spell scaling, both dmg and targets
-
-  return await ModularCard.createCard(itemData);
+  console.log(chatMessageData)
+  return ChatMessage.create(chatMessageData);
 }
 
 export function registerHooks(): void {

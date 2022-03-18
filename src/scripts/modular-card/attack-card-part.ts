@@ -6,6 +6,7 @@ import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
+import { AttackCardElement } from "./attack-card-element";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
@@ -137,6 +138,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
   @RunOnce()
   public registerHooks(): void {
+    AttackCardElement.registerHooks();
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(new AttackCardTrigger());
     TargetCardPart.instance.registerIntegration({
@@ -145,16 +147,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return AttackCardElement.selector;
   }
 
-  public getHtml({data}: HtmlContext<AttackCardData>): string | Promise<string> {
-    return renderTemplate(
-      `modules/${staticValues.moduleName}/templates/modular-card/attack-part.hbs`, {
-        data: data,
-        moduleName: staticValues.moduleName
-      }
-    );
+  public getHtml({data, messageId, partId}: HtmlContext<AttackCardData>): string | Promise<string> {
+    return `<${AttackCardElement.selector} data-message-id="${messageId}" data-part-id="${partId}"></${AttackCardElement.selector}>`;
   }
 
   public getCallbackActions(): ICallbackAction<AttackCardData>[] {
