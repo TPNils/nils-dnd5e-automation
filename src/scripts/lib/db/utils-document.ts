@@ -1,6 +1,20 @@
 import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 
-type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
+export type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
+
+type EntityPermission = keyof typeof foundry.CONST.ENTITY_PERMISSIONS;
+type ModifyPermission = Parameters<foundry.abstract.Document<any, any>['canUserModify']>[1];
+export interface PermissionCheck<T = any> {
+  uuid: string;
+  permission: EntityPermission | ModifyPermission;
+  user: User;
+  meta?: T;
+}
+
+export interface PermissionResponse<T = any> {
+  requestedCheck: PermissionCheck<T>;
+  result: boolean;
+}
 
 class MaybePromise<T> {
   constructor(private value: T | Promise<T>){}
@@ -133,12 +147,12 @@ export class UtilsDocument {
     }).getValue() as any;
   }
 
-  private static fromUuidInternal(uuids: Iterable<string>): Promise<Map<string, FoundryDocument>>
+  private static fromUuidInternal(uuids: Iterable<string>, options?: {sync?: true}): Promise<Map<string, FoundryDocument>>
   private static fromUuidInternal(uuids: Iterable<string>, options: {sync: true}): Map<string, FoundryDocument>
   private static fromUuidInternal(uuids: Iterable<string>, options: {sync?: boolean} = {}): Promise<Map<string, FoundryDocument>> | Map<string, FoundryDocument> {
     // Fixes map keyset iterators, maybe you can only iterate them onces? not sure why it breaks without converting
     uuids = Array.from(new Set<string>(uuids));
-    const getIdsPerPack = new Map<string, string[]>();
+    const getIdsPerPack = new Map<string, Array<string[]>>();
     const documentsByUuid = new Map<string, FoundryDocument>();
     for (const uuid of uuids) {
       let parts = uuid.split(".");
@@ -153,13 +167,8 @@ export class UtilsDocument {
         if (!getIdsPerPack.has(pack)) {
           getIdsPerPack.set(pack, []);
         }
-        getIdsPerPack.get(pack).push(parts[3])
+        getIdsPerPack.get(pack).push(parts.slice(2));
       }
-    }
-
-    const documentPromises: Promise<FoundryDocument[]>[] = [];
-    for (const [packName, ids] of getIdsPerPack.entries()) {
-      documentPromises.push(game.packs.get(`${packName}`).getDocuments({_id: {$in: ids}} as any));
     }
 
     for (const uuid of uuids) {
@@ -192,10 +201,48 @@ export class UtilsDocument {
 
     // When async, always return a promise, even when there are no 'documentPromises'
     if (options.sync !== true) {
+      const documentPromises: Promise<FoundryDocument[]>[] = [];
+      for (const [packName, ids] of getIdsPerPack.entries()) {
+        const missingIds: string[] = [];
+        const pack = game.packs.get(packName);
+        for (const idParts of ids) {
+          if (pack.has(idParts[0])) {
+            documentPromises.push(Promise.resolve(pack.get(idParts[0])));
+          } else {
+            missingIds.push()
+          }
+        }
+        if (missingIds.length > 0) {
+          documentPromises.push(game.packs.get(`${packName}`).getDocuments({_id: {$in: missingIds}} as any));
+        }
+      }
+
       return Promise.all(documentPromises).then(queryResponses => {
+        const documentsByKey = new Map<string, FoundryDocument>();
         for (const documents of queryResponses) {
           for (const document of documents) {
-            documentsByUuid.set(document.uuid, document);
+            documentsByKey.set(`Compendium.${document.pack}.${document.id}`, document);
+          }
+        }
+
+        for (const [packName, ids] of getIdsPerPack.entries()) {
+          for (const idParts of ids) {
+            let document = documentsByKey.get(`Compendium.${packName}.${idParts[0]}`);
+            if (!document) {
+              continue;
+            }
+
+            
+            for (let i = 4; i < idParts.length && document != null; i = i+2) {
+              const documentName = idParts[i];
+              const id = idParts[i+1];
+              
+              document = document.getEmbeddedDocument(documentName, id) as FoundryDocument;
+            }
+
+            if (document) {
+              documentsByUuid.set(document.uuid, document);
+            }
           }
         }
         return documentsByUuid;
@@ -368,6 +415,62 @@ export class UtilsDocument {
     }
 
      return dmlsPerDocumentName;
+  }
+  //#endregion
+
+  //#region permission
+  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<PermissionResponse<T>[]>
+  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync: true}): PermissionResponse<T>[]
+  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): PermissionResponse<T>[] | Promise<PermissionResponse<T>[]> {
+    permissionChecks = permissionChecks.filter(check => check != null);
+    const response: PermissionResponse[] = [];
+    {
+      // GM can do anything
+      const processing = permissionChecks;
+      permissionChecks = [];
+      for (const permissionCheck of processing) {
+        if (permissionCheck.user.isGM) {
+          response.push({
+            requestedCheck: permissionCheck,
+            result: true,
+          })
+        } else {
+          permissionChecks.push(permissionCheck);
+        }
+      }
+    }
+    if (permissionChecks.length === 0) {
+      if (options.sync) {
+        return response;
+      } else {
+        return Promise.resolve(response);
+      }
+    }
+    const permissionChecksByUuid = new Map<string, PermissionCheck[]>();
+    for (const permissionCheck of permissionChecks) {
+      if (!permissionChecksByUuid.has(permissionCheck.uuid)) {
+        permissionChecksByUuid.set(permissionCheck.uuid, []);
+      }
+      permissionChecksByUuid.get(permissionCheck.uuid).push(permissionCheck);
+    }
+    return new MaybePromise(UtilsDocument.fromUuidInternal(permissionChecksByUuid.keys(), options as any)).then(documents => {
+      for (let [uuid, document] of documents.entries()) {
+        for (const permissionCheck of permissionChecksByUuid.get(uuid)) {
+          if (permissionCheck.permission.toUpperCase() in foundry.CONST.ENTITY_PERMISSIONS) {
+            response.push({
+              requestedCheck: permissionCheck,
+              result: document.testUserPermission(permissionCheck.user, permissionCheck.permission.toUpperCase() as EntityPermission)
+            });
+          } else {
+            response.push({
+              requestedCheck: permissionCheck,
+              result: document.canUserModify(permissionCheck.user, permissionCheck.permission.toLowerCase() as ModifyPermission)
+            });
+          }
+        }
+      }
+      return response;
+    }).getValue();
   }
   //#endregion
 
