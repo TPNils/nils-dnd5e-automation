@@ -203,6 +203,11 @@ class CallbackGroup<T extends foundry.abstract.Document<any, any>, R> {
 
 type OnFoundryTargetToken = (user: User, token: Token, targeted: boolean) => Promise<void>;
 
+/**
+ * Output the diff when detection a recurring dml
+ * Automatically gets activated AFTER the first infinit loop is detected
+ */
+let outputDiff = false;
 class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   private isInit: boolean = false;
@@ -442,8 +447,16 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
       const diff = UtilsCompare.findDiff(document.data, documentSnapshot.data);
       if (diff.changed) {
+        if (outputDiff) {
+          console.log('trigger diff', {
+            documentName: document.collectionName,
+            uuid: (document as any).uuid,
+            diff: diff
+          });
+        }
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
           console.error('Infinite update loop. Stopping any further updates.', {diff: diff});
+          outputDiff = true;
         } else {
           await document.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}});
         }
