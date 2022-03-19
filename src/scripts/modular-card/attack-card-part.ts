@@ -460,10 +460,10 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
         parts.push(newRow.data.userBonus);
       }
 
-      const formula = parts.join(' + ');
-      if (newRow.data.calc$.roll?.formula !== formula) {
+      const newRoll = UtilsRoll.simplifyTerms(new Roll(parts.join(' + ')));
+      if (newRow.data.calc$.roll?.formula !== newRoll.formula) {
         // Rolling the attack happens automatically in rollAttack and retains previous rolled dice
-        newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(formula));
+        newRow.data.calc$.roll = UtilsRoll.toRollData(newRoll);
       }
     }
   }
