@@ -338,7 +338,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       const actor: MyActor = token.getActor();
       tokenHpSnapshot.set(token.uuid, {
         hp: actor.data.data.attributes.hp.value,
-        failedDeathSaves: actor.data.data.attributes.death.failure,
+        failedDeathSaves: actor.data.data.attributes.death?.failure,
         maxHp: actor.data.data.attributes.hp.max,
         tempHp: actor.data.data.attributes.hp.temp ?? 0,
       });
