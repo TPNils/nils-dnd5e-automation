@@ -81,7 +81,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   public static readonly instance = new DamageCardPart();
   private constructor(){}
 
-  public create({item, actor}: {item: MyItem, actor?: MyActor}): DamageCardData[] {
+  public async create({item, actor}: {item: MyItem, actor?: MyActor}): Promise<DamageCardData[]> {
     // TODO what about other interactions like spell scaling (modifier with html) and hunters mark (automatic, but only to a specific target)
     const rollData: {[key: string]: any} = actor == null ? {} : item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
@@ -121,22 +121,25 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     // Spell scaling
     const scaling = item.data.data.scaling;
     if (scaling?.mode === 'level' && scaling.formula) {
-      // TODO level scaling should be migrated to a its own card
-      const scalingRollJson: TermData[] = UtilsRoll.toRollData(new Roll(scaling.formula, rollData)).terms;
-      if (inputDamages.length === 0) {
-        // when only dealing damage by upcasting? not sure if that ever happens
-        inputDamages.push({
-          mode: 'normal',
-          phase: 'mode-select',
-          calc$: {
-            label: 'DND5E.Damage',
-            baseRoll: UtilsRoll.toRollData(new Roll('0')).terms,
-            targetCaches: [],
-          }
-        });
-      }
-      for (const damage of inputDamages) {
-        damage.calc$.upcastRoll = scalingRollJson;
+      const originalItem = await UtilsDocument.itemFromUuid(item.uuid);
+      if (originalItem && item.data.data.level > originalItem.data.data.level) {
+        const upcastLevels = item.data.data.level - originalItem.data.data.level;
+        const scalingRollJson: TermData[] = UtilsRoll.toRollData(new Roll(scaling.formula, rollData).alter(upcastLevels, 0)).terms;
+        if (inputDamages.length === 0) {
+          // when only dealing damage by upcasting? not sure if that ever happens
+          inputDamages.push({
+            mode: 'normal',
+            phase: 'mode-select',
+            calc$: {
+              label: 'DND5E.Damage',
+              baseRoll: UtilsRoll.toRollData(new Roll('0')).terms,
+              targetCaches: [],
+            }
+          });
+        }
+        for (const damage of inputDamages) {
+          damage.calc$.upcastRoll = scalingRollJson;
+        }
       }
     } else if (scaling?.mode === 'cantrip' && actor) {
       let actorLevel = 0;
@@ -191,9 +194,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     return inputDamages;
   }
 
-  public refresh(oldDatas: DamageCardData[], args: ModularCardCreateArgs): DamageCardData[] {
+  public async refresh(oldDatas: DamageCardData[], args: ModularCardCreateArgs): Promise<DamageCardData[]> {
     const results: DamageCardData[] = [];
-    const newCreated = this.create(args);
+    const newCreated = await this.create(args);
     for (let i = 0; i < newCreated.length; i++) {
       const newData = newCreated.length < i ? newCreated[i] : null;
       const oldData = oldDatas.length < i ? oldDatas[i] : null;
@@ -758,6 +761,9 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
     ];
     if (data.calc$.actorBonusRoll) {
       rollProperties.push(['calc$', 'actorBonusRoll']);
+    }
+    if (data.calc$.upcastRoll) {
+      rollProperties.push(['calc$', 'upcastRoll']);
     }
     return rollProperties;
   }
