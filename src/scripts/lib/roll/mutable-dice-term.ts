@@ -76,7 +76,7 @@ export class MutableDiceTerm extends Die {
       return result;
     }
     const result = super.roll(args);
-    this.results.push(result);
+    // super.roll already adds result to this.results
     this.newRollsSinceEvaluate.push(result);
     return result;
   }
