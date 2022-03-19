@@ -759,11 +759,11 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
     const rollProperties: string[][] = [
       ['calc$', 'baseRoll'],
     ];
-    if (data.calc$.actorBonusRoll) {
-      rollProperties.push(['calc$', 'actorBonusRoll']);
-    }
     if (data.calc$.upcastRoll) {
       rollProperties.push(['calc$', 'upcastRoll']);
+    }
+    if (data.calc$.actorBonusRoll) {
+      rollProperties.push(['calc$', 'actorBonusRoll']);
     }
     return rollProperties;
   }

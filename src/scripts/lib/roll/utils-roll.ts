@@ -67,18 +67,32 @@ export class UtilsRoll {
     }).join(' + '), rollData);
   }
 
+  /**
+   * Example formula and how it gets parsed (this is based on how I believe it will be user friendly)
+   * 1d12 + 1d10[cold] + 1d8 + 1d6[fire] + 1d4 
+   *  everything unlisted inherits from the right 
+   *   => 1d12 & 1d10 = cold
+   *   => 1d8  & 1d6  = fire
+   *  Everything at the end which is unlisted inherits from the left
+   *   => 1d4 = fire
+   */
   public static rollToDamageResults(roll: Roll): Map<DamageType, number> {
     const damageFormulaMap = new Map<DamageType, Array<string | number>>();
 
     const terms = roll.terms;
-    let latestDamageType: DamageType = '';
+    let latestDamageType: DamageType | null = null;
+    damageFormulaMap.set(latestDamageType, []);
     for (let i = terms.length-1; i >= 0; i--) {
       const flavor = terms[i].options?.flavor?.toLowerCase();
       if (UtilsRoll.isValidDamageType(flavor)) {
+        if (!damageFormulaMap.has(flavor)) {
+          damageFormulaMap.set(flavor, []);
+        }
+        if (damageFormulaMap.has(null)) {
+          damageFormulaMap.get(flavor).push(...damageFormulaMap.get(null));
+          damageFormulaMap.delete(null);
+        }
         latestDamageType = flavor;
-      }
-      if (!damageFormulaMap.has(latestDamageType)) {
-        damageFormulaMap.set(latestDamageType, []);
       }
       if (typeof terms[i].total === 'number') {
         damageFormulaMap.get(latestDamageType).unshift(terms[i].total);
