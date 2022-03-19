@@ -126,7 +126,7 @@ export class UtilsRoll {
 
     for (const term of newTerms) {
       if (term instanceof MutableDiceTerm) {
-        if (originalResultsFromByDieFaces.get(term.faces).length) {
+        if (originalResultsFromByDieFaces.get(term.faces)?.length) {
           const originalTerm = originalResultsFromByDieFaces.get(term.faces).splice(0, 1)[0];
           term.allResults = [...originalTerm.allResults];
         }
