@@ -501,7 +501,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           console.log('trigger diff', {
             documentName: document.collectionName,
             uuid: (document as any).uuid,
-            diff: diff
+            diff: diff,
+            original: oldDocument.data
           });
         }
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
