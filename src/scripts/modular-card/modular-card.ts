@@ -2,14 +2,12 @@ import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/fo
 import { DmlTrigger, IDmlContext, IDmlTrigger, ITrigger, IUnregisterTrigger } from "../lib/db/dml-trigger";
 import { TransformTrigger } from "../lib/db/transform-trigger";
 import { RunOnce } from "../lib/decorator/run-once";
-import { UtilsCompare } from "../lib/utils/utils-compare";
-import { provider } from "../provider/provider";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { AttackCardPart } from "./attack-card-part";
 import { DamageCardPart } from "./damage-card-part";
 import { DescriptionCardPart } from "./description-card-part";
-import { ActionParam, ClickEvent, ICallbackAction, KeyEvent, ModularCardPart } from "./modular-card-part";
+import { ModularCardPart } from "./modular-card-part";
 import { PropertyCardPart } from "./property-card-part";
 import { SpellLevelCardPart } from "./spell-level-card-part";
 import { TargetCardPart } from "./target-card-part";
@@ -172,14 +170,6 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
 
 const chatMessageTransformer = new ChatMessageTransformer();
 
-type InteractionResponse = {success: true;} | {success: false; errorMessage: string, stackTrace?: string, errorType: 'warn' | 'error'}
-
-interface ActionResponse {
-  permissionCheckResult: 'can-run-local' | 'can-run-as-gm' | 'prevent-action';
-  action: ICallbackAction<any>;
-  regex: RegExpExecArray;
-}
-
 export class ModularCard {
 
   private static registeredPartsByType = new Map<string, {part: ModularCardPart}>();
@@ -205,13 +195,13 @@ export class ModularCard {
     const parts: Promise<{datas: any[], cardPart: ModularCardPart}>[] = [];
 
     const cardParts: ModularCardPart[] = [
-      //DescriptionCardPart.instance,
-      //SpellLevelCardPart.instance,
+      DescriptionCardPart.instance,
+      SpellLevelCardPart.instance,
       AttackCardPart.instance,
-      //DamageCardPart.instance,
-      //TemplateCardPart.instance,
-      //TargetCardPart.instance,
-      //PropertyCardPart.instance,
+      DamageCardPart.instance,
+      TemplateCardPart.instance,
+      TargetCardPart.instance,
+      PropertyCardPart.instance,
     ];
     
     for (const cardPart of cardParts) {
@@ -350,25 +340,9 @@ export class ModularCard {
     chatMessageTransformer.register(new TriggerMessagePart());
     
     // Override render behaviour
-    //DmlTrigger.registerTrigger(new ChatMessageTrigger());
+    DmlTrigger.registerTrigger(new ChatMessageTrigger());
     Hooks.on('setup', () => {
       libWrapper.register(staticValues.moduleName, 'ChatMessage.prototype.getHTML', getHTML, 'WRAPPER');
-    });
-
-    // Html listeners
-    Hooks.on('renderChatLog', () => {
-      const chatElement = document.getElementById('chat-log');
-      chatElement.addEventListener('click', event => ModularCard.onClick(event));
-      chatElement.addEventListener('focusout', event => ModularCard.onBlur(event));
-      chatElement.addEventListener('keydown', event => ModularCard.onKeyDown(event));
-      chatElement.addEventListener('change', event => ModularCard.onChange(event));
-    });
-
-    // Register remote execution
-    provider.getSocket().then(socket => {
-      socket.register('ModularCard.onInteraction', (params: Parameters<typeof ModularCard['onInteractionProcessor']>[0]) => {
-        return ModularCard.onInteractionProcessor(params);
-      })
     });
   }
 
@@ -444,279 +418,5 @@ export class ModularCard {
     htmlParts.push(`</div>`);
     return htmlParts.join('');
   }
-  
-  //#region User interaction
-  private static async onClick(event: MouseEvent): Promise<void> {
-    if (event.target instanceof HTMLInputElement) {
-      // do not register clicks on inputs, except checkboxes
-      const input = event.target as HTMLInputElement;
-      if (input.type !== 'checkbox') {
-        return;
-      }
-    }
-    if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLOptionElement) {
-      return;
-    }
-    if (event.target instanceof Node) {
-      ModularCard.onInteraction({
-        clickEvent: event,
-        element: event.target as Node
-      });
-    }
-  }
-
-  private static async onBlur(event: FocusEvent): Promise<void> {
-    if (event.target instanceof HTMLInputElement) {
-      // blur does not work very well with checkboxes => listen to click event
-      const input = event.target as HTMLInputElement;
-      if (input.type === 'checkbox') {
-        return;
-      }
-      if (event.target instanceof Node) {
-        ModularCard.onInteraction({
-          element: event.target as Node
-        });
-      }
-    }
-  }
-
-  private static async onKeyDown(event: KeyboardEvent): Promise<void> {
-    if (event.target instanceof HTMLInputElement && ['Enter', 'Escape'].includes(event.key)) {
-      ModularCard.onInteraction({
-        element: event.target as Node,
-        keyEvent: {
-          key: event.key as KeyEvent['key']
-        },
-      });
-    }
-  }
-
-  private static async onChange(event: Event): Promise<void> {
-    if (event.target instanceof Node) {
-      ModularCard.onInteraction({
-        element: event.target as Node
-      });
-    }
-  }
-
-  private static async onInteraction({clickEvent, element, keyEvent}: {element: Node, clickEvent?: ClickEvent, keyEvent?: KeyEvent}): Promise<void> {
-    clickEvent = {
-      altKey: clickEvent?.altKey === true,
-      ctrlKey: clickEvent?.ctrlKey === true,
-      metaKey: clickEvent?.metaKey === true,
-      shiftKey: clickEvent?.shiftKey === true,
-    }
-    keyEvent = !keyEvent ? null : {
-      key: keyEvent.key
-    };
-
-    let messageId: string;
-    let partId: string;
-    let action: string;
-    let currentElement = element;
-    let inputValue: boolean | number | string;
-    while (currentElement != null) {
-      if (currentElement instanceof HTMLElement) {
-        if (currentElement.dataset.messageId != null) {
-          messageId = currentElement.dataset.messageId;
-        }
-        if (currentElement.hasAttribute(`data-${staticValues.moduleName}-card-part`)) {
-          partId = currentElement.getAttribute(`data-${staticValues.moduleName}-card-part`);
-        }
-        if (currentElement.hasAttribute(`data-${staticValues.moduleName}-action`)) {
-          action = currentElement.getAttribute(`data-${staticValues.moduleName}-action`);
-          
-          if (currentElement instanceof HTMLInputElement) {
-            if (['radio', 'checkbox'].includes(currentElement.type)) {
-              inputValue = currentElement.checked;
-            } else if (['number'].includes(currentElement.type)) {
-              inputValue = Number(currentElement.value);
-            } else {
-              inputValue = currentElement.value;
-            }
-          } else if (currentElement instanceof HTMLSelectElement) {
-            inputValue = currentElement.value;
-          }
-        }
-      }
-
-      currentElement = currentElement.parentNode;
-    }
-
-    if (!action || !partId || !messageId) {
-      return;
-    }
-    
-    const message = game.messages.get(messageId);
-    const messageData = ModularCard.getCardPartDatas(message);
-    if (!Array.isArray(messageData)) {
-      console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId} but no data was found`);
-      return;
-    }
-    let partData: ModularCardPartData;
-    for (const part of messageData) {
-      if (part.id === partId) {
-        partData = part;
-      }
-    }
-    if (!partData) {
-      console.warn(`pressed a ${staticValues.moduleName} action button for message ${messageId}.${partId} but no part was found`);
-      return;
-    }
-
-    const modularCardPart = ModularCard.registeredPartsByType.get(partData.type);
-    if (modularCardPart == null) {
-      console.error(`Could not interact with ModularCardPart ${partData.type} of module ${ModularCard.typeToModule.get(partData.type)}`);
-      return;
-    }
-
-    const actions = await ModularCard.getActions(action, clickEvent, keyEvent, game.userId, messageId, partData);
-    if (actions.some(a => a.permissionCheckResult === 'prevent-action')) {
-      console.warn(`Pressed a ${staticValues.moduleName} action button for message part ${messageId}.${partId} with action ${action} for current user but permissions are missing`)
-      return;
-    }
-    if (actions.length === 0) {
-      console.info('no actions found')
-      return;
-    }
-
-    const request: Parameters<typeof ModularCard['onInteractionProcessor']>[0] = {
-      clickEvent: clickEvent,
-      keyEvent: keyEvent,
-      userId: game.userId,
-      partId: partId,
-      messageId: messageId,
-      action: action,
-      inputValue: inputValue,
-    }
-
-    let response: InteractionResponse;
-    
-    if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
-      element.disabled = true;
-    }
-    try {
-      if (actions.every(a => a.permissionCheckResult === 'can-run-local')) {
-        // User has all required permissions, run locally
-        response = await ModularCard.onInteractionProcessor(request);
-      } else {
-        response = await provider.getSocket().then(socket => socket.executeAsGM('ModularCard.onInteraction', request));
-      }
-    } finally {
-      if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
-        element.disabled = false;
-      }
-    }
-
-    if (response.success === false) {
-      if (response.errorType === 'warn') {
-        console.warn(response.errorMessage);
-        ui.notifications.warn(response.errorMessage);
-      }
-      if (response.errorType === 'error') {
-        console.error(response.errorMessage);
-        ui.notifications.error(response.errorMessage);
-      }
-      if (response.stackTrace) {
-        console.error('Stacktrace:\n' + response.stackTrace)
-      }
-    }
-  }
-
-  private static async onInteractionProcessor({clickEvent, keyEvent, userId, messageId, partId, action, inputValue}: {
-    clickEvent: ClickEvent,
-    keyEvent: KeyEvent,
-    userId: string,
-    partId: string,
-    messageId: string,
-    action: string,
-    inputValue?: ActionParam<any>['inputValue'];
-  }): Promise<InteractionResponse> {
-    const message = game.messages.get(messageId);
-    const originalAllCardParts = ModularCard.getCardPartDatas(message);
-
-    let allCardParts = deepClone(originalAllCardParts);
-    const messagePartData = ModularCard.getCardPartDatas(message).find(part => part.id === partId);
-    if (messagePartData == null) {
-      return {
-        success: false,
-        errorType: 'warn',
-        errorMessage: `Pressed a ${staticValues.moduleName} action button for message part ${messageId}.${partId} but no data was found`,
-      };
-    }
-
-    const actions = await ModularCard.getActions(action, clickEvent, keyEvent, userId, messageId, messagePartData);
-    if (actions.some(a => a.permissionCheckResult === 'prevent-action')) {
-      return {
-        success: false,
-        errorType: 'error',
-        errorMessage: `Pressed a ${staticValues.moduleName} action button for message message part ${messageId}.${partId} with action ${action} for user ${userId} but permissions are missing`,
-      };
-    }
-    
-    for (const action of actions) {
-      const param: ActionParam<any> = {
-        partId: partId,
-        data: allCardParts.find(p => p.id === partId).data,
-        regexResult: action.regex,
-        messageId: messageId,
-        allCardParts: allCardParts,
-        userId: userId,
-        clickEvent: clickEvent,
-        keyEvent: keyEvent,
-        inputValue: inputValue,
-      };
-      try {
-        await action.action.execute(param);
-      } catch (err) {
-        return {
-          success: false,
-          errorMessage: err instanceof Error ? `${err.message}` : String(err),
-          stackTrace: err instanceof Error ? err.stack : null,
-          errorType: 'error'
-        }
-      }
-    }
-
-    if (!UtilsCompare.deepEquals(originalAllCardParts, allCardParts)) {
-      // Don't use await so you can return a response faster to the client
-      await ModularCard.setCardPartDatas(message, allCardParts);
-    }
-
-    return {
-      success: true,
-    }
-  }
-
-  private static async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, partData: ModularCardPartData): Promise<Array<ActionResponse>> {
-    if (!action) {
-      return [];
-    }
-    const response: ActionResponse[] = [];
-
-    for (const actionMatch of ModularCard.registeredPartsByType.get(partData.type).part.getCallbackActions()) {
-      const result = actionMatch.regex.exec(action);
-      if (result) {
-        response.push({
-          action: actionMatch,
-          regex: result,
-          permissionCheckResult: actionMatch.permissionCheck == null ? 'can-run-local' : await actionMatch.permissionCheck({
-            partId: partData.id,
-            data: partData.data,
-            regexResult: result,
-            messageId: messageId,
-            allCardParts: [], // TODO
-            userId: userId,
-            clickEvent: clickEvent,
-            keyEvent: keyEvent,
-          })
-        });
-      }
-    }
-
-
-    return response;
-  }
-  //#endregion
 
 }

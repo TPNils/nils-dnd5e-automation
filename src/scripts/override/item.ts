@@ -14,7 +14,6 @@ async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode
     token: ((this.actor as any).token) == null ? undefined : (this.actor as any).token,
   });
 
-  console.log(chatMessageData)
   return ChatMessage.create(chatMessageData);
 }
 

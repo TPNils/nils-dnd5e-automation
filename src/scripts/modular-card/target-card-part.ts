@@ -2,11 +2,11 @@ import { DmlTrigger, IDmlContext, IDmlTrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsCompare } from "../lib/utils/utils-compare";
-import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
+import { createElement, ICallbackAction } from "./card-part-element";
 import { ModularCard, ModularCardPartData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 export interface TargetCardData {
   selectedTokenUuids: string[];
@@ -124,15 +124,21 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
 
   @RunOnce()
   public registerHooks(): void {
+    createElement({
+      selector: this.getType(),
+      getHtml: context => this.getElementHtml(context),
+      getCallbackActions: () => this.getCallbackActions(),
+    });
+
     ModularCard.registerModularCardPart(staticValues.moduleName, TargetCardPart.instance);
     DmlTrigger.registerTrigger(new DmlTriggerUser());
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return `${staticValues.code}-target-part`;
   }
 
-  public async getHtml(context: HtmlContext<TargetCardData>): Promise<string> {
+  public async getElementHtml(context: HtmlContext<TargetCardData>): Promise<string> {
     const stateContext: StateContext = {
       messageId: context.messageId,
       selectedTokenUuids: context.data.selectedTokenUuids,

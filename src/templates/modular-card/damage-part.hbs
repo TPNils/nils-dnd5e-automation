@@ -14,7 +14,7 @@
       </div>
     {{else}}
       <div class="{{@root.moduleName}}-bonus-container">
-        <button data-{{@root.moduleName}}-action="item-damage" class="{{@root.moduleName}}-item-damage" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}>
+        <button data-action="item-damage" class="{{@root.moduleName}}-item-damage" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}>
           {{#if (eq @root.data.mode 'critical')}}
             {{localize "DND5E.Critical"}}
           {{else}}
@@ -23,13 +23,13 @@
         </button>
         
         {{#if (and (eq @root.data.phase "bonus-input") (nacPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)) )}}
-          <input class="{{@root.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{@root.data.userBonus}}" data-{{@root.moduleName}}-action="item-damage-bonus" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
+          <input class="{{@root.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{@root.data.userBonus}}" data-action="item-damage-bonus" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
         {{/if}}
       </div>
     {{/if}}
     {{#nacPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}
-      <button data-{{@root.moduleName}}-action="item-damage-mode-minus" class="{{@root.moduleName}}-mode-minus" {{#if (eq @root.data.mode 'normal')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
-      <button data-{{@root.moduleName}}-action="item-damage-mode-plus" class="{{@root.moduleName}}-mode-plus" {{#if (eq @root.data.mode 'critical')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+      <button data-action="item-damage-mode-minus" class="{{@root.moduleName}}-mode-minus" {{#if (eq @root.data.mode 'normal')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+      <button data-action="item-damage-mode-plus" class="{{@root.moduleName}}-mode-plus" {{#if (eq @root.data.mode 'critical')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
     {{/nacPerm}}
   </div>
 </div>
