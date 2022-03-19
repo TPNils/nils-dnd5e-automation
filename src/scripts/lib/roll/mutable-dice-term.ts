@@ -1,5 +1,9 @@
 import { RunOnce } from "../decorator/run-once";
 
+interface DiceTermResult extends DiceTerm.Result {
+  notRolled?: boolean;
+}
+
 /**
  * Allow to change the number of dice, its modifiers and allowing to reevaluate it.
  */
@@ -7,16 +11,12 @@ export class MutableDiceTerm extends Die {
 
   public static SERIALIZE_ATTRIBUTES: string[] = [...Die.SERIALIZE_ATTRIBUTES];
 
-  public allResults: number[] = [];
   public deactivatedResults: number[] = [];
   public newRollsSinceEvaluate: Die['results'] = [];
 
   constructor(args: Partial<Die.TermData>) {
     super(args);
-    if (args.results) {
-      this.allResults = args.results.map(r => r.result);
-    }
-    if (this.allResults.length > 0) {
+    if (this.results.length > 0) {
       this.evaluate();
     }
   }
@@ -25,10 +25,7 @@ export class MutableDiceTerm extends Die {
     if (die instanceof MutableDiceTerm) {
       return die;
     }
-    const dieData: any = die.toJSON();
-    dieData.allResults = (dieData.results as Die['results']).map(r => r.result);
-    delete dieData.results;
-    return new MutableDiceTerm(dieData);
+    return new MutableDiceTerm(deepClone(die.toJSON()));
   }
 
   public evaluate(options?: Partial<RollTerm.EvaluationOptions & { async: false }>): this;
@@ -46,9 +43,9 @@ export class MutableDiceTerm extends Die {
     if (this.number > 999) {
       throw new Error(`You may not evaluate a DiceTerm with more than 999 requested results`);
     }
+    this.deactivatedResults = this.results.filter((r: DiceTermResult) => !r.notRolled).map(r => r.result);
     this.results = [];
     this.newRollsSinceEvaluate = [];
-    this.deactivatedResults = deepClone(this.allResults);
     for (let i = this.results.length; i < this.number; i++) {
       this.roll({minimize, maximize});
     }
@@ -64,10 +61,10 @@ export class MutableDiceTerm extends Die {
   public roll(args: { minimize: boolean; maximize: boolean; } = {minimize: false, maximize: false}): DiceTerm.Result {
     // Recycle deactivated rolls
     if (args.minimize || args.maximize) {
-      // Do not add min & max rolls to allRolls
-      // This is to ensure a real roll may be returned from the cache
-      const result = super.roll(args);
+      const result: DiceTermResult = super.roll(args);
+      result.notRolled = true; // Track that this was never rolled and can be discarded on reroll (without min/max)
       this.newRollsSinceEvaluate.push(result);
+      this.results.push(result);
       return result;
     }
     if (this.deactivatedResults.length > 0) {
@@ -79,7 +76,7 @@ export class MutableDiceTerm extends Die {
       return result;
     }
     const result = super.roll(args);
-    this.allResults.push(result.result);
+    this.results.push(result);
     this.newRollsSinceEvaluate.push(result);
     return result;
   }

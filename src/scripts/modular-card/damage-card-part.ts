@@ -697,10 +697,10 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
       if (newRoll.formula !== newRow?.data?.calc$?.roll?.formula) {
         if (!newRow.data.calc$.roll) {
           newRow.data.calc$.roll = UtilsRoll.toRollData(newRoll);
-        } else {
-          const oldRollTerms = UtilsRoll.fromRollData(newRow.data.calc$.roll).terms;
-          const result = await UtilsRoll.setRoll(oldRollTerms, newRoll.terms);
-          newRow.data.calc$.roll = UtilsRoll.toRollData(Roll.fromTerms(result.result));
+        } else if (!newRow.data.calc$.roll.evaluated) {
+          const oldRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
+          const result = await UtilsRoll.setRoll(oldRoll, newRoll.formula);
+          newRow.data.calc$.roll = UtilsRoll.toRollData(result.result);
           if (result.rollToDisplay) {
             // Auto rolls if original roll was already evaluated
             UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});

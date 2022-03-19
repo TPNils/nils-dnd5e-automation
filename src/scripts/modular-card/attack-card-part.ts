@@ -343,7 +343,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
 
       const baseRollResult = (newRow.data.calc$.roll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
-      newRow.data.calc$.isCrit = baseRollResult.result >= newRow.data.calc$.critTreshold;
+      newRow.data.calc$.isCrit = baseRollResult?.result >= newRow.data.calc$.critTreshold;
     }
   }
 
@@ -482,10 +482,9 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
         const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
         newRow.data.calc$.roll = UtilsRoll.toRollData(await newRoll.roll({async: true}));
         UtilsDiceSoNice.showRoll({roll: newRoll});
-      } else if (newRow.data.calc$.roll.formula !== oldRoll?.formula && oldRoll) {
+      } else if (newRow.data.calc$.roll.formula !== oldRoll?.formula && oldRoll && !newRow.data.calc$.roll.evaluated) {
         // Roll changed => reroll
-        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
-        const result = await UtilsRoll.setRoll(UtilsRoll.fromRollData(oldRoll).terms, newRoll.terms);
+        const result = await UtilsRoll.setRoll(UtilsRoll.fromRollData(oldRoll).terms, newRow.data.calc$.roll.formula);
         newRow.data.calc$.roll = UtilsRoll.toRollData(Roll.fromTerms(result.result));
         if (result.rollToDisplay) {
           UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
