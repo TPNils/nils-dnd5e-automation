@@ -6,9 +6,10 @@ import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
+import { ClickEvent, createElement, ICallbackAction, KeyEvent } from "./card-part-element";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
@@ -137,6 +138,12 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
   @RunOnce()
   public registerHooks(): void {
+    createElement({
+      selector: this.getType(),
+      getHtml: context => this.getElementHtml(context),
+      getCallbackActions: () => this.getCallbackActions(),
+    });
+    
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(new AttackCardTrigger());
     TargetCardPart.instance.registerIntegration({
@@ -145,10 +152,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return `${staticValues.code}-attack-part`;
   }
 
-  public getHtml({data}: HtmlContext<AttackCardData>): string | Promise<string> {
+  public getElementHtml({data}: HtmlContext<AttackCardData>): string | Promise<string> {
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/attack-part.hbs`, {
         data: data,

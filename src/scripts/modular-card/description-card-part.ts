@@ -1,10 +1,9 @@
 import { RunOnce } from "../lib/decorator/run-once";
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
-import { MyItem } from "../types/fixed-types";
-import { ItemCard } from "../utils/utils-chat-message";
+import { createElement, ICallbackAction } from "./card-part-element";
 import { ModularCard } from "./modular-card";
-import { HtmlContext, ICallbackAction, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 interface DescriptionCardData {
   calc$: {
@@ -37,14 +36,19 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
 
   @RunOnce()
   public registerHooks(): void {
+    createElement({
+      selector: this.getType(),
+      getHtml: context => this.getElementHtml(context),
+      getCallbackActions: () => this.getCallbackActions(),
+    });
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return `${staticValues.code}-description-part`;
   }
 
-  public getHtml(context: HtmlContext<DescriptionCardData>): string | Promise<string> {
+  public getElementHtml(context: HtmlContext<DescriptionCardData>): string | Promise<string> {
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/description-part.hbs`, {
         data: context.data,

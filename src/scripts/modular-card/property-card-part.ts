@@ -1,8 +1,9 @@
 import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { MyItem } from "../types/fixed-types";
+import { createElement } from "./card-part-element";
 import { ModularCard } from "./modular-card";
-import { HtmlContext, ICallbackAction, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 interface PropertyCardData {
   calc$: {
@@ -29,14 +30,19 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
 
   @RunOnce()
   public registerHooks(): void {
+    createElement({
+      selector: this.getType(),
+      getHtml: context => this.getElementHtml(context),
+    });
+    
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return `${staticValues.code}-property-part`;
   }
 
-  public getHtml(context: HtmlContext<PropertyCardData>): string | Promise<string> {
+  public getElementHtml(context: HtmlContext<PropertyCardData>): string | Promise<string> {
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/property-part.hbs`, {
         data: context.data,
@@ -44,10 +50,6 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
         moduleName: staticValues.moduleName
       }
     );
-  }
-
-  public getCallbackActions(): ICallbackAction<PropertyCardData>[] {
-    return []
   }
 
 }

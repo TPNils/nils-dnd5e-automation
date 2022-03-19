@@ -8,9 +8,10 @@ import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { ClickEvent, createElement, ICallbackAction, KeyEvent } from "./card-part-element";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { ClickEvent, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, KeyEvent, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type TermJson = ReturnType<RollTerm['toJSON']> & {
@@ -219,6 +220,11 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   @RunOnce()
   public registerHooks(): void {
+    createElement({
+      selector: this.getType(),
+      getHtml: context => this.getElementHtml(context),
+      getCallbackActions: () => this.getCallbackActions(),
+    });
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(new DamageCardTrigger());
     TargetCardPart.instance.registerIntegration({
@@ -229,11 +235,11 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return `${staticValues.code}-damage-part`;
   }
 
   //#region Front end
-  public getHtml({data}: HtmlContext<DamageCardData>): string | Promise<string> {
+  public getElementHtml({data}: HtmlContext<DamageCardData>): string | Promise<string> {
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/damage-part.hbs`, {
         data: data,

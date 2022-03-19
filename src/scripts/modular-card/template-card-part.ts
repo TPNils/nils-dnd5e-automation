@@ -5,8 +5,9 @@ import MyAbilityTemplate from "../pixi/ability-template";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem, MyItemData } from "../types/fixed-types";
 import { UtilsTemplate } from "../utils/utils-template";
+import { createElement, ICallbackAction } from "./card-part-element";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ICallbackAction, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { TargetCardData, TargetCardPart } from "./target-card-part";
 
 interface TemplateCardData {
@@ -42,16 +43,22 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
 
   @RunOnce()
   public registerHooks(): void {
+    createElement({
+      selector: this.getType(),
+      getHtml: context => this.getElementHtml(context),
+      getCallbackActions: () => this.getCallbackActions(),
+    });
+    
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(new TemplateCardTrigger());
     DmlTrigger.registerTrigger(new DmlTriggerTemplate());
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return `${staticValues.code}-template-part`;
   }
 
-  public getHtml(context: HtmlContext<TemplateCardData>): string | Promise<string> {
+  public getElementHtml(context: HtmlContext<TemplateCardData>): string | Promise<string> {
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/template-part.hbs`, {
         data: context.data,

@@ -2,8 +2,9 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { ModularCard, ModularCardPartData } from "./modular-card";
 import { MyActor, SpellData } from "../types/fixed-types";
-import { HtmlContext, ICallbackAction, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { UtilsDocument } from "../lib/db/utils-document";
+import { createElement, ICallbackAction } from "./card-part-element";
 
 interface SpellLevelCardData {
   selectedLevel: number | 'pact';
@@ -88,14 +89,20 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
 
   @RunOnce()
   public registerHooks(): void {
+    createElement({
+      selector: this.getType(),
+      getHtml: context => this.getElementHtml(context),
+      getCallbackActions: () => this.getCallbackActions(),
+    });
+
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return `${staticValues.code}-spell-level-part`;
   }
 
-  public getHtml(context: HtmlContext<SpellLevelCardData>): string | Promise<string> {
+  public getElementHtml(context: HtmlContext<SpellLevelCardData>): string | Promise<string> {
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/spell-level-part.hbs`, {
         data: context.data,

@@ -1,42 +1,7 @@
-import { ITrigger } from "../lib/db/dml-trigger";
 import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { MyActor, MyItem } from "../types/fixed-types";
-import { ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-
-export interface ClickEvent {
-  readonly altKey: boolean;
-  readonly ctrlKey: boolean;
-  readonly metaKey: boolean;
-  readonly shiftKey: boolean;
-}
-export interface KeyEvent {
-  readonly key: 'Enter' | 'Escape';
-}
-
-interface ActionParamBase<T> {
-  partId: string;
-  data: T;
-  regexResult: RegExpExecArray;
-  messageId: string;
-  allCardParts: ModularCardPartData[];
-  userId: string;
-}
-
-interface ActionParamClick {
-  clickEvent: ClickEvent;
-  inputValue: boolean | number | string
-}
-
-interface ActionParamKey {
-  keyEvent: KeyEvent;
-  inputValue: boolean | number | string
-}
-
-export type ActionParam<T> = ActionParamBase<T> & Partial<ActionParamClick> & Partial<ActionParamKey>;
-
-type PromiseOrSync<T> = T | Promise<T>;
-type ActionPermissionCheck<T> = ({}: ActionParam<T>) => PromiseOrSync<'can-run-local' | 'can-run-as-gm' | 'prevent-action'>;
-type ActionPermissionExecute<T> = ({}: ActionParam<T>) => PromiseOrSync<void>;
+import { ActionParam, ActionPermissionCheck } from "./card-part-element";
+import { ModularCardPartData } from "./modular-card";
 
 export interface CreatePermissionCheckArgs {
   documents?: Array<{
@@ -57,6 +22,7 @@ export interface CreatePermissionCheckArgs {
   mustBeGm?: boolean;
 }
 
+type PromiseOrSync<T> = T | Promise<T>;
 export function createPermissionCheck<T>(args: CreatePermissionCheckArgs | (({}: ActionParam<T>) => PromiseOrSync<CreatePermissionCheckArgs>)): ActionPermissionCheck<T> {
   return async (action) => {
     const {mustBeGm, documents, updatesMessage} = typeof args === 'function' ? await args(action) : args;
@@ -106,12 +72,6 @@ export function createPermissionCheck<T>(args: CreatePermissionCheckArgs | (({}:
   }
 }
 
-export interface ICallbackAction<T> {
-  regex: RegExp;
-  permissionCheck?: ActionPermissionCheck<T>;
-  execute: ActionPermissionExecute<T>;
-}
-
 export interface HtmlContext<T> {
   messageId: string;
   partId: string;
@@ -129,6 +89,4 @@ export interface ModularCardPart<D = any> {
   getType(): string;
   create(args: ModularCardCreateArgs): PromiseOrSync<D[]>;
   refresh(data: D[],args: ModularCardCreateArgs): PromiseOrSync<D[]>;
-  getHtml(context: HtmlContext<D>): PromiseOrSync<string>;
-  getCallbackActions(): ICallbackAction<D>[];
 }

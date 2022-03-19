@@ -1,4 +1,4 @@
-  <select class="form-fields" {{#nacExpr data.calc$.spellSlots.length '<=' 1}}disabled{{/nacExpr}} data-{{moduleName}}-action="spell-level-change">
+  <select class="form-fields" {{#nacExpr data.calc$.spellSlots.length '<=' 1}}disabled{{/nacExpr}} data-action="spell-level-change">
     {{#each data.calc$.spellSlots as |spellSlot|}}
       {{#nacExpr spellSlot.type '===' 'spell'}}
         <option {{#nacExpr @root.data.selectedLevel '===' spellSlot.level}}selected{{/nacExpr}} value="{{spellSlot.level}}">{{ localize "DND5E.SpellLevelSlot" level=(localize (nacConcat "DND5E.SpellLevel" spellSlot.level)) n=spellSlot.availableSlots }}</option>
