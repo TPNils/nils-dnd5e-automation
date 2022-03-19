@@ -2,7 +2,7 @@ import { IAfterDmlContext, IDmlContext, ITrigger} from "../lib/db/dml-trigger";
 import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
-import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
+import { RollData, TermData, UtilsRoll } from "../lib/roll/utils-roll";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
@@ -14,16 +14,9 @@ import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modu
 import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
-type TermJson = ReturnType<RollTerm['toJSON']> & {
-  class: string;
-  options: any;
-  evaluated: boolean;
-};
-type RollJson = TermJson[];
-
 export interface AddedDamage {
-  normalRoll: RollJson;
-  additionalCriticalRoll?: RollJson;
+  normalRoll: TermData[];
+  additionalCriticalRoll?: TermData[];
 }
 
 interface TargetCache {
@@ -48,9 +41,9 @@ export interface DamageCardData {
     actorUuid?: string;
     label: string;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
-    baseRoll: RollJson;
-    upcastRoll?: RollJson;
-    actorBonusRoll?: RollJson;
+    baseRoll: TermData[];
+    upcastRoll?: TermData[];
+    actorBonusRoll?: TermData[];
     roll?: RollData;
     displayFormula?: string;
     displayDamageTypes?: string;
@@ -105,7 +98,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         phase: 'mode-select',
         calc$: {
           label: 'DND5E.Damage',
-          baseRoll: UtilsRoll.damagePartsToRoll(damageParts, rollData).terms.map(t => t.toJSON() as TermJson),
+          baseRoll: UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(damageParts, rollData)).terms,
           targetCaches: [],
         }
       }
@@ -121,7 +114,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     if (mainDamage && item.data.data.damage?.versatile) {
       const versatileDamage = deepClone(mainDamage);
       versatileDamage.calc$.label = 'DND5E.Versatile';
-      versatileDamage.calc$.baseRoll = new Roll(item.data.data.damage.versatile, rollData).terms.map(t => t.toJSON() as TermJson);
+      versatileDamage.calc$.baseRoll = UtilsRoll.toRollData(new Roll(item.data.data.damage.versatile, rollData)).terms;
       inputDamages.push(versatileDamage);
     }
 
@@ -129,7 +122,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     const scaling = item.data.data.scaling;
     if (scaling?.mode === 'level' && scaling.formula) {
       // TODO level scaling should be migrated to a its own card
-      const scalingRollJson: RollJson = new Roll(scaling.formula, rollData).terms.map(t => t.toJSON() as TermJson);
+      const scalingRollJson: TermData[] = UtilsRoll.toRollData(new Roll(scaling.formula, rollData)).terms;
       if (inputDamages.length === 0) {
         // when only dealing damage by upcasting? not sure if that ever happens
         inputDamages.push({
@@ -137,7 +130,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           phase: 'mode-select',
           calc$: {
             label: 'DND5E.Damage',
-            baseRoll: new Roll('0').terms.map(t => t.toJSON() as TermJson),
+            baseRoll: UtilsRoll.toRollData(new Roll('0')).terms,
             targetCaches: [],
           }
         });
@@ -164,7 +157,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
             phase: 'mode-select',
             calc$: {
               label: 'DND5E.Damage',
-              baseRoll: new Roll('0').terms.map(t => t.toJSON() as TermJson),
+              baseRoll: UtilsRoll.toRollData(new Roll('0')).terms,
               targetCaches: [],
             }
           });
@@ -174,7 +167,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           // DND5e spell compendium has cantrip formula empty => default to the base damage formula
           const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? Roll.getFormula(damage.calc$.baseRoll.map(RollTerm.fromData)) : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
           // Override normal roll since cantrip scaling is static, not dynamic like level scaling
-          damage.calc$.baseRoll = UtilsRoll.mergeRolls(Roll.fromJSON(JSON.stringify(damage.calc$.baseRoll)), scalingRoll).terms.map(t => t.toJSON() as TermJson);
+          damage.calc$.baseRoll = UtilsRoll.toRollData(UtilsRoll.mergeRolls(Roll.fromJSON(JSON.stringify(damage.calc$.baseRoll)), scalingRoll)).terms;
         }
       }
     }
@@ -184,7 +177,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       const actorBonus = actor.data.data.bonuses?.[item.data.data.actionType];
       if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
         for (const damage of inputDamages) {
-          damage.calc$.actorBonusRoll = new Roll(actorBonus.damage, rollData).terms.map(t => t.toJSON() as TermJson);
+          damage.calc$.actorBonusRoll = UtilsRoll.toRollData(new Roll(actorBonus.damage, rollData)).terms;
         }
       }
     }
@@ -682,21 +675,21 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
         continue;
       }
 
-      const newRollTerms: RollJson = [];
+      const newRollTerms: TermData[] = [];
       for (const rollProperty of this.getRollProperties(newRow.data)) {
         if (newRollTerms.length > 0) {
-          newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermJson);
+          newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermData);
         }
-        newRollTerms.push(...(UtilsObject.getProperty(newRow.data, rollProperty) as RollJson));
+        newRollTerms.push(...(UtilsObject.getProperty(newRow.data, rollProperty)));
       }
       if (newRow.data.userBonus) {
         if (newRollTerms.length > 0) {
-          newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermJson);
+          newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermData);
         }
-        newRollTerms.push(...(UtilsRoll.fromRollData(newRow.data.userBonus).terms.map(t => t.toJSON() as TermJson)));
+        newRollTerms.push(...newRow.data.userBonus.terms);
       }
       if (newRollTerms.length === 0) {
-        newRollTerms.push(new NumericTerm({number: 0}).toJSON() as TermJson);
+        newRollTerms.push(new NumericTerm({number: 0}).toJSON() as TermData);
       }
       
       const newRoll = UtilsRoll.createDamageRoll(newRollTerms.map(t => RollTerm.fromData(t)), {critical: newRow.data.mode === 'critical'});

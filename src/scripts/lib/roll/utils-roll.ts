@@ -5,18 +5,16 @@ import { MutableDiceTerm } from "./mutable-dice-term";
 
 const validDamageTypes: DamageType[] = ['' /* none */, 'acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder', 'healing', 'temphp'];
 
+export type TermData = ((PoolTerm.TermData & { class: 'DicePool' }) | DiceTerm.Data) & {
+  evaluated: boolean;
+}
+
 export interface RollData {
   formula: string;
-  terms: Array<(PoolTerm.TermData & { class: 'DicePool' }) | DiceTerm.Data>;
+  terms: Array<TermData>;
   total: number | null;
   evaluated: boolean;
   options: Roll['options'],
-}
-
-export interface TermData {
-  formula: string;
-  terms: Array<(PoolTerm.TermData & { class: 'DicePool' }) | DiceTerm.Data>;
-  total: number | null;
 }
 
 export interface DamageRollOptions extends Partial<RollTerm.EvaluationOptions> {
@@ -43,6 +41,10 @@ export class UtilsRoll {
 
   public static fromRollData(rollData: RollData): Roll {
     return Roll.fromData(rollData as any);
+  }
+
+  public static fromRollTermData(rollTermsData: TermData[]): Roll {
+    return Roll.fromTerms(rollTermsData.map(termData => RollTerm.fromData(termData)));
   }
 
   public static toRollData(roll: Roll): RollData {

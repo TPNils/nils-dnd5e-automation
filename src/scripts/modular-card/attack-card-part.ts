@@ -350,7 +350,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
         continue;
       }
 
-      const baseRollResult = (newRow.data.calc$.roll.terms[0] as RollTerm & DiceTerm.TermData).results.filter(result => result.active)[0];
+      const baseRollResult = newRow.data.calc$.roll.terms[0].results.filter(result => result.active)[0];
       newRow.data.calc$.isCrit = baseRollResult?.result >= newRow.data.calc$.critTreshold;
     }
   }
