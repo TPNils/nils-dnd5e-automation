@@ -9,7 +9,9 @@ import { createElement, ICallbackAction } from "./card-part-element";
 interface SpellLevelCardData {
   selectedLevel: number | 'pact';
   calc$: {
-    actorUuid?: string;
+    tokenUuid?: string;
+    actorUuid: string;
+    itemUuid: string;
     spellSlots: Array<{
       type: 'pact' | 'spell';
       level: number;
@@ -25,7 +27,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
   public static readonly instance = new SpellLevelCardPart();
   private constructor(){}
   
-  public async create({item, actor}: ModularCardCreateArgs): Promise<SpellLevelCardData[]> {
+  public async create({item, actor, token}: ModularCardCreateArgs): Promise<SpellLevelCardData[]> {
     if (item.data.data.level <= 0 || item.data.data.level == null || !actor) {
       return [];
     }
@@ -78,6 +80,8 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       selectedLevel: selectedLevel,
       calc$: {
         actorUuid: actor.uuid,
+        itemUuid: item.uuid,
+        tokenUuid: token?.uuid,
         spellSlots: spellSlots,
       }
     }];
@@ -129,12 +133,24 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
     ]
   }
   
-  private onSpellLevelChange(partId: string, data: SpellLevelCardData, allCardParts: ModularCardPartData[], level: string): void {
+  private async onSpellLevelChange(partId: string, data: SpellLevelCardData, allCardParts: ModularCardPartData[], level: string): Promise<void> {
     if (level === 'pact') {
       data.selectedLevel = 'pact';
     } else if (!Number.isNaN(Number(level))) {
       data.selectedLevel = Number(level);
     }
+    const spellSlot = data.calc$.spellSlots.find(slot => slot.type === level || slot.level === Number(level));
+    if (!spellSlot) {
+      // Selected an invalid spell slot (too low of a level or has no pact slots)
+      return;
+    }
+
+    const [item, actor, token] = await Promise.all([
+      UtilsDocument.itemFromUuid(data.calc$.itemUuid),
+      UtilsDocument.actorFromUuid(data.calc$.actorUuid),
+      data.calc$.tokenUuid == null ? Promise.resolve(null) : UtilsDocument.tokenFromUuid(data.calc$.tokenUuid)
+    ]);
+
     // TODO refresh
   }
   //#endregion
