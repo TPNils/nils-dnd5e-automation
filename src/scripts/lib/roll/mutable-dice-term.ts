@@ -5,15 +5,17 @@ import { RunOnce } from "../decorator/run-once";
  */
 export class MutableDiceTerm extends Die {
 
-  public static SERIALIZE_ATTRIBUTES: string[] = [...Die.SERIALIZE_ATTRIBUTES, 'allResults'];
+  public static SERIALIZE_ATTRIBUTES: string[] = [...Die.SERIALIZE_ATTRIBUTES];
 
   public allResults: number[] = [];
   public deactivatedResults: number[] = [];
   public newRollsSinceEvaluate: Die['results'] = [];
 
-  constructor(args: Partial<Die.TermData & {allResults: MutableDiceTerm['allResults']}>) {
+  constructor(args: Partial<Die.TermData>) {
     super(args);
-    this.allResults = args.allResults ?? [];
+    if (args.results) {
+      this.allResults = args.results.map(r => r.result);
+    }
     if (this.allResults.length > 0) {
       this.evaluate();
     }
