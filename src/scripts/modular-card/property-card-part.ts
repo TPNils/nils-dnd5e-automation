@@ -33,7 +33,6 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
     createElement({
       selector: this.getType(),
       getHtml: context => this.getElementHtml(context),
-      getCallbackActions: () => [],
     });
     
     ModularCard.registerModularCardPart(staticValues.moduleName, this);

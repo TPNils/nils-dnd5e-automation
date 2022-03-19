@@ -52,8 +52,8 @@ export interface HtmlContext<T> {
 
 export interface CardPartElementConfig<T = any> {
   selector: string;
-  getHtml(context: HtmlContext<T>): string | Promise<string>
-  getCallbackActions(): ICallbackAction<T>[];
+  getHtml?(context: HtmlContext<T>): string | Promise<string>
+  getCallbackActions?(): ICallbackAction<T>[];
 }
 
 export function createElement(config: CardPartElementConfig): (typeof HTMLElement) {
@@ -122,6 +122,9 @@ class CardPartElement extends HTMLElement {
   
   private renderedKey: string;
   private async calcInner(): Promise<void> {
+    if (!this.config.getHtml) {
+      return;
+    }
     const messageId = this.getMessageId();
     const partId = this.getPartId();
     const renderKey = `${messageId}/${partId}`;
@@ -163,6 +166,9 @@ class CardPartElement extends HTMLElement {
 
   //#region User interaction
   private registerListeners(): void {
+    if (!this.config.getCallbackActions) {
+      return;
+    }
     this.addEventListener('click', event => this.onClick(event));
     this.addEventListener('focusout', event => this.onBlur(event));
     this.addEventListener('keydown', event => this.onKeyDown(event));
