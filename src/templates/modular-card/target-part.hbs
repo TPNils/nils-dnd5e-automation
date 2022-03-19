@@ -7,9 +7,9 @@
   <div class="header-cell">{{! filler }}</div>
   <div class="header-cell one-line">
     {{#nacExpr data.tableBody.length '>' 1}}
-      <button data-action="smart-apply-*" data-state="{{data.tableHeader.smartState}}" class="{{@root.moduleName}}-apply"><i class="fas fa-brain"></i></button>
-      <button data-action="force-apply-*" data-state="{{data.tableHeader.state}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
-      <button data-action="undo-*" data-state="{{data.tableHeader.state}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+      <button data-action="smart-apply-*" data-state="{{data.tableHeader.smartState}}" class="apply"><i class="fas fa-brain"></i></button>
+      <button data-action="force-apply-*" data-state="{{data.tableHeader.state}}" class="apply"><i class="fas fa-check"></i></button>
+      <button data-action="undo-*" data-state="{{data.tableHeader.state}}" class="undo"><i class="fas fa-undo"></i></button>
     {{/nacExpr}}
   </div>
   {{!body}}
@@ -21,9 +21,9 @@
     <div class="body-cell">{{! filler }}</div>
     <div class="body-cell one-line">
       {{#nacPerm (nacConcat "UpdateUuid:" target.actorUuid)}}
-        <button data-action="smart-apply-{{target.tokenUuid}}" data-state="{{target.smartState}}" class="{{@root.moduleName}}-apply"><i class="fas fa-brain"></i></button>
-        <button data-action="force-apply-{{target.tokenUuid}}" data-state="{{target.state}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
-        <button data-action="undo-{{target.tokenUuid}}" data-state="{{target.state}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+        <button data-action="smart-apply-{{target.tokenUuid}}" data-state="{{target.smartState}}" class="apply"><i class="fas fa-brain"></i></button>
+        <button data-action="force-apply-{{target.tokenUuid}}" data-state="{{target.state}}" class="apply"><i class="fas fa-check"></i></button>
+        <button data-action="undo-{{target.tokenUuid}}" data-state="{{target.state}}" class="undo"><i class="fas fa-undo"></i></button>
       {{/nacPerm}}
     </div>
   {{/each}}

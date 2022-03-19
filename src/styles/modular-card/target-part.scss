@@ -1,6 +1,6 @@
 @import '../global-variables.scss';
 
-.#{$module-name}-item-card {
+#{$module-code}-target-part {
   .target-table {
     display: grid;
 
@@ -9,19 +9,27 @@
       min-width: max-content;
     }
     
-    .#{$module-name}-apply {
-      &[data-#{$module-name}-state="applied"] {
+  .apply,
+  .undo {
+    font-size: 10px;
+    height: 2em;
+    width: 2em;
+    line-height: 1em;
+  }
+    
+    .apply {
+      &[data-state="applied"] {
         color: green;
       }
       
-      &[data-#{$module-name}-state="disabled"] {
+      &[data-state="disabled"] {
         opacity: .5;
         pointer-events: none;
       }
     }
 
-    .#{$module-name}-undo {
-      &[data-#{$module-name}-state="not-applied"] {
+    .undo {
+      &[data-state="not-applied"] {
         opacity: .5;
         pointer-events: none;
       }
