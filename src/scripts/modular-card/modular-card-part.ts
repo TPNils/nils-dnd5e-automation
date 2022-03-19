@@ -72,7 +72,7 @@ export function createPermissionCheck<T>(args: CreatePermissionCheckArgs | (({}:
   }
 }
 
-export interface HtmlContext<T> {
+export interface HtmlContext<T = any> {
   messageId: string;
   partId: string;
   data: T;
@@ -89,4 +89,5 @@ export interface ModularCardPart<D = any> {
   getType(): string;
   create(args: ModularCardCreateArgs): PromiseOrSync<D[]>;
   refresh(data: D[],args: ModularCardCreateArgs): PromiseOrSync<D[]>;
+  getHtml?(data: HtmlContext<D>): PromiseOrSync<string | null>;
 }

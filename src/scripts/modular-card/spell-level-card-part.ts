@@ -90,7 +90,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
   @RunOnce()
   public registerHooks(): void {
     createElement({
-      selector: this.getType(),
+      selector: this.getSelector(),
       getHtml: context => this.getElementHtml(context),
       getCallbackActions: () => this.getCallbackActions(),
     });
@@ -99,7 +99,16 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
   }
 
   public getType(): string {
+    return this.constructor.name;
+  }
+
+  //#region Front end
+  public getSelector(): string {
     return `${staticValues.code}-spell-level-part`;
+  }
+
+  public getHtml(data: HtmlContext): string {
+    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
   }
 
   public getElementHtml(context: HtmlContext<SpellLevelCardData>): string | Promise<string> {
@@ -128,5 +137,6 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
     }
     // TODO refresh
   }
+  //#endregion
 
 }

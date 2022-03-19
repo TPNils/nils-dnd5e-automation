@@ -125,7 +125,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   @RunOnce()
   public registerHooks(): void {
     createElement({
-      selector: this.getType(),
+      selector: this.getSelector(),
       getHtml: context => this.getElementHtml(context),
       getCallbackActions: () => this.getCallbackActions(),
     });
@@ -135,7 +135,16 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   }
 
   public getType(): string {
+    return this.constructor.name;
+  }
+
+  //#region Front end
+  public getSelector(): string {
     return `${staticValues.code}-target-part`;
+  }
+
+  public getHtml(data: HtmlContext): string {
+    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
   }
 
   public async getElementHtml(context: HtmlContext<TargetCardData>): Promise<string> {
@@ -339,6 +348,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       return requestUuids.filter(uuid => allTokenUuids.has(uuid));
     }
   }
+  //#endregion
 
 }
 

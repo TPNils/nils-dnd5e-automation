@@ -190,75 +190,6 @@ export class ModularCard {
     return ModularCard.registeredPartsByType.get(type).part as T;
   }
 
-  public static async getDefaultItemCard(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ChatMessageDataConstructorData> {
-    let id = 0;
-    const parts: Promise<{datas: any[], cardPart: ModularCardPart}>[] = [];
-
-    const cardParts: ModularCardPart[] = [
-      DescriptionCardPart.instance,
-      SpellLevelCardPart.instance,
-      AttackCardPart.instance,
-      DamageCardPart.instance,
-      TemplateCardPart.instance,
-      TargetCardPart.instance,
-      PropertyCardPart.instance,
-    ];
-    
-    for (const cardPart of cardParts) {
-      const response = cardPart.create(data);
-      if (response instanceof Promise) {
-        parts.push(response.then(data => ({datas: data, cardPart: cardPart})))
-      } else {
-        parts.push(Promise.resolve({datas: response, cardPart: cardPart}));
-      }
-    }
-
-    const dataParts: ModularCardPartData[] = [];
-    for (const part of await Promise.all(parts)) {
-      for (const data of part.datas) {
-        const cardId = `${id++}`;
-        dataParts.push({
-          id: cardId,
-          data: data,
-          type: part.cardPart.getType(),
-        })
-      }
-    }
-    
-    const chatMessageData: ChatMessageDataConstructorData = {
-      flags: {
-        [staticValues.moduleName]: {
-          itemUuid: data.item.uuid,
-          tokenUuid: data.token?.uuid,
-          modularCardData: dataParts,
-        }
-      }
-    };
-
-    if (game.settings.get('core', 'rollMode') === 'gmroll') {
-      chatMessageData.whisper = [game.userId];
-      for (const user of game.users.values()) {
-        if (user.isGM) {
-          chatMessageData.whisper.push(user.id);
-        }
-      }
-    }
-    if (game.settings.get('core', 'rollMode') === 'blindroll') {
-      chatMessageData.whisper = [];
-      chatMessageData.blind = true;
-      for (const user of game.users.values()) {
-        if (user.isGM) {
-          chatMessageData.whisper.push(user.id);
-        }
-      }
-    }
-    if (game.settings.get('core', 'rollMode') === 'selfroll') {
-      chatMessageData.whisper = [game.userId];
-    }
-
-    return chatMessageData;
-  }
-
   public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardPartData[]> {
     // TODO this is proof of concept, when finished to should dynamically assign which parts to use for creation
     let id = 0;
@@ -327,7 +258,7 @@ export class ModularCard {
     }
 
     if (insert) {
-      return await ChatMessage.create(chatMessageData)
+      return await ChatMessage.createDocuments([chatMessageData]).then(documents => documents[0]);
     } else {
       return new ChatMessage(chatMessageData);
     }
@@ -392,11 +323,15 @@ export class ModularCard {
       }
 
       // TODO error handeling during render
-
-      htmlParts$.push({
-        html: `<${partData.type} data-part-id="${partData.id}" data-message-id="${messageId}"></${partData.type}>`,
-        id: partData.id
-      });
+      const typeHandler = ModularCard.getTypeHandler(partData.type);
+      if (typeHandler?.getHtml) {
+        const htmlPart = typeHandler.getHtml({messageId: messageId, partId: partData.id, data: partData.data, allMessageParts: parts});
+        if (htmlPart instanceof Promise) {
+          htmlParts$.push(htmlPart.then(html => {return {html: html, id: partData.id}}));
+        } else if (typeof htmlPart === 'string') {
+          htmlParts$.push({html: htmlPart, id: partData.id});
+        }
+      }
     }
 
     const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {};

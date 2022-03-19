@@ -139,7 +139,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   @RunOnce()
   public registerHooks(): void {
     createElement({
-      selector: this.getType(),
+      selector: this.getSelector(),
       getHtml: context => this.getElementHtml(context),
       getCallbackActions: () => this.getCallbackActions(),
     });
@@ -152,7 +152,16 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   public getType(): string {
+    return this.constructor.name;
+  }
+
+  //#region Front end
+  public getSelector(): string {
     return `${staticValues.code}-attack-part`;
+  }
+
+  public getHtml(data: HtmlContext): string {
+    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
   }
 
   public getElementHtml({data}: HtmlContext<AttackCardData>): string | Promise<string> {
@@ -192,7 +201,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     ]
   }
 
-  //#region Card callbacks
   private processItemAttack(data: AttackCardData, clickEvent: ClickEvent | null): void {
     if (data.phase === 'result') {
       return;

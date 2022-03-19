@@ -8,13 +8,13 @@ async function roll(this: MyItem, {rollMode, createMessage=true}: {configureDial
 }
 
 async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage> {
-  const chatMessageData = await ModularCard.getDefaultItemCard({
+  const parts = await ModularCard.getDefaultItemParts({
     item: this as any,
     actor: this.actor as MyActor,
     token: ((this.actor as any).token) == null ? undefined : (this.actor as any).token,
   });
 
-  return ChatMessage.createDocuments([chatMessageData]).then(messages => messages[0]);
+  return ModularCard.createCard(parts, true);
 }
 
 export function registerHooks(): void {

@@ -37,7 +37,7 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   @RunOnce()
   public registerHooks(): void {
     createElement({
-      selector: this.getType(),
+      selector: this.getSelector(),
       getHtml: context => this.getElementHtml(context),
       getCallbackActions: () => this.getCallbackActions(),
     });
@@ -45,7 +45,16 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   }
 
   public getType(): string {
+    return this.constructor.name;
+  }
+
+  //#region Front end
+  public getSelector(): string {
     return `${staticValues.code}-description-part`;
+  }
+
+  public getHtml(data: HtmlContext): string {
+    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
   }
 
   public getElementHtml(context: HtmlContext<DescriptionCardData>): string | Promise<string> {
@@ -71,5 +80,6 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
     MemoryStorageService.setCardCollapse(messageId, !MemoryStorageService.isCardCollapsed(messageId));
     ui.chat.updateMessage(game.messages.get(messageId));
   }
+  //#endregion
 
 }

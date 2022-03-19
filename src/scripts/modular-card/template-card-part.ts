@@ -44,7 +44,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   @RunOnce()
   public registerHooks(): void {
     createElement({
-      selector: this.getType(),
+      selector: this.getSelector(),
       getHtml: context => this.getElementHtml(context),
       getCallbackActions: () => this.getCallbackActions(),
     });
@@ -55,7 +55,16 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   }
 
   public getType(): string {
+    return this.constructor.name;
+  }
+
+  //#region Front end
+  public getSelector(): string {
     return `${staticValues.code}-template-part`;
+  }
+
+  public getHtml(data: HtmlContext): string {
+    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
   }
 
   public getElementHtml(context: HtmlContext<TemplateCardData>): string | Promise<string> {
@@ -102,6 +111,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
     });
     template.drawPreview();
   }
+  //#endregion
 
 }
 
