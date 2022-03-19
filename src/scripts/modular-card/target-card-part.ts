@@ -386,7 +386,6 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
     }
 
-    console.log('missing: ', missingTokenCaches)
     if (missingTokenCaches.size === 0) {
       return;
     }
