@@ -32,6 +32,29 @@ export class UtilsDiceSoNice {
       }
     }
 
+    // DiceSoNice does something weird to find the dice, but I think this is to solve some weird foundry behaviour
+    // Simplified: only give DiceSoNice vanilla foundry dice
+    const vanillaTerms: RollTerm[] = [];
+    let hasCustomTerms = false;
+    for (const term of roll.terms) {
+      if (term instanceof Die && term.constructor !== Die) {
+        vanillaTerms.push(new Die(term.toJSON()));
+        hasCustomTerms = true;
+      } else if (term instanceof FateDie && term.constructor !== FateDie) {
+        vanillaTerms.push(new FateDie(term.toJSON()));
+        hasCustomTerms = true;
+      } else if (term instanceof Coin && term.constructor !== Coin) {
+        vanillaTerms.push(new Coin(term.toJSON()));
+        hasCustomTerms = true;
+      } else {
+        vanillaTerms.push(term);
+      }
+    }
+
+    if (hasCustomTerms) {
+      roll = Roll.fromTerms(vanillaTerms);
+    }
+
     return (game as any).dice3d.showForRoll(roll, user, synchronize, whispers, blind);
   }
 
