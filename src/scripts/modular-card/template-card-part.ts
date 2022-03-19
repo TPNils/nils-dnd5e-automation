@@ -80,9 +80,9 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
     const permissionCheck = createPermissionCheck<TemplateCardData>(({data}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (data.calc$.actorUuid) {
-        documents.push({uuid: data.calc$.actorUuid, permission: 'OWNER'});
+        documents.push({uuid: data.calc$.actorUuid, permission: 'OWNER', security: true});
       }
-      return {documents: documents};
+      return {documents: documents, updatesMessage: false};
     })
 
     return [
@@ -123,8 +123,11 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData> {
   }
 
   private createTemplatePreview(context: IAfterDmlContext<ModularCardTriggerData>): void {
-    for (const {newRow} of context.rows) {
+    for (const {newRow, changedByUserId} of context.rows) {
       if (!this.isThisTriggerType(newRow)) {
+        continue;
+      }
+      if (changedByUserId !== game.userId) {
         continue;
       }
       // Initiate measured template creation
@@ -163,9 +166,6 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
     const updateChatMessageMap = new Map<string, ModularCardPartData[]>();
     const deleteTemplateUuids = new Set<string>();
     for (const {newRow: newTemplate, oldRow: oldTemplate, changedByUserId} of context.rows) {
-      if (game.userId !== changedByUserId) {
-        continue;
-      }
       const messageId = newTemplate.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
       if (!messageId || !game.messages.has(messageId)) {
         continue;
@@ -174,6 +174,25 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
       const parts = updateChatMessageMap.has(messageId) ? updateChatMessageMap.get(messageId) : deepClone(ModularCard.getCardPartDatas(chatMessage));
       if (parts == null) {
         continue;
+      }
+      
+      const executingUserCanModify = chatMessage.canUserModify(game.users.get(changedByUserId), 'update');
+      if (executingUserCanModify) {
+        if (game.userId !== changedByUserId) {
+          // User can edit message => user should edit message
+          continue;
+        }
+      } else {
+        // User can't edit message => find someone who can.
+        // Order doesn't really matter, what is important is that every client selects the same one
+        const firstUserWithEditPermissions = Array.from(game.users.values()).sort((a, b) => a.id.localeCompare(b.id)).find(user => user.active && chatMessage.canUserModify(user, 'update'));
+        if (!firstUserWithEditPermissions) {
+          // To bad I guess.
+          continue;
+        }
+        if (game.userId !== firstUserWithEditPermissions.id) {
+          continue;
+        }
       }
 
       const partId = newTemplate.getFlag(staticValues.moduleName, 'dmlCallbackPartId') as string;

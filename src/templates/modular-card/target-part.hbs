@@ -14,7 +14,7 @@
   </div>
   {{!body}}
   {{#each data.tableBody as |target|}}
-    <div class="body-cell" {{#nacPerm (nacConcat "ObserverUuid:" target.actorUuid)}}title="{{target.name}}"{{/nacPerm}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</div>
+    <div class="body-cell" {{#if (or target.nameVisibleAnyone (nacPerm (nacConcat "ObserverUuid:" target.actorUuid)) )}}title="{{target.name}}"{{/if}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</div>
     {{#each target.row}}
       <div class="body-cell">{{{this}}}</div>
     {{/each}}

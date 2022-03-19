@@ -1,3 +1,4 @@
+import { data } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
 import { DmlTrigger, IDmlContext, IDmlTrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
@@ -14,7 +15,9 @@ export interface TargetCardData {
     // TODO expectedTargetAmount
     tokenData: Array<{
       tokenUuid: string;
+      actorUuid: string;
       name: string;
+      nameVisibleAnyone: boolean;
       img: string;
     }>
   }
@@ -104,7 +107,9 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       target.selectedTokenUuids.push(token.uuid);
       target.calc$.tokenData.push({
         tokenUuid: token.uuid,
+        actorUuid: (token.getActor() as MyActor)?.uuid,
         name: token.data.name,
+        nameVisibleAnyone: [CONST.TOKEN_DISPLAY_MODES.HOVER, CONST.TOKEN_DISPLAY_MODES.ALWAYS as number].includes(token.data.displayName),
         img: token.data.img,
       });
     }
@@ -219,10 +224,10 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     for (const key of columnKeyOrder) {
       htmlTableHeader.row.push(columnsByKey.get(key).label);
     }
-    const htmlTableBody: Array<{tokenUuid: string, actorUuid: string, name: string, img: string, state: VisualState['state'], smartState: VisualState['state'], row: string[]}> = [];
-    const tokens = Array.from((await UtilsDocument.tokenFromUuid(tokenData.keys())).values()).sort((a, b) => {
+    const htmlTableBody: Array<{tokenUuid: string, actorUuid: string, name: string, nameVisibleAnyone: boolean, img: string, state: VisualState['state'], smartState: VisualState['state'], row: string[]}> = [];
+    const tokens = context.data.calc$.tokenData.sort((a, b) => {
       // Since tokens are displayed with their image, group them together
-      let compare = a.data.img.localeCompare(b.data.img);
+      let compare = a.img.localeCompare(b.img);
       if (compare !== 0) {
         return compare;
       }
@@ -234,17 +239,18 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     for (const token of tokens) {
       const row: string[] = [];
       for (const key of columnKeyOrder) {
-        row.push(tokenData.get(token.uuid).columnData.get(key) ?? '');
+        row.push(tokenData.get(token.tokenUuid).columnData.get(key) ?? '');
       }
-      allStates.add(tokenData.get(token.uuid).state);
-      allSmartStates.add(tokenData.get(token.uuid).smartState);
+      allStates.add(tokenData.get(token.tokenUuid).state);
+      allSmartStates.add(tokenData.get(token.tokenUuid).smartState);
       htmlTableBody.push({
-        tokenUuid: token.uuid,
-        actorUuid: (token.actor as MyActor)?.uuid,
+        tokenUuid: token.tokenUuid,
+        actorUuid: token.actorUuid,
         name: token.name,
-        img: token.data.img,
-        state: tokenData.get(token.uuid).state,
-        smartState: tokenData.get(token.uuid).smartState,
+        nameVisibleAnyone: token.nameVisibleAnyone,
+        img: token.img,
+        state: tokenData.get(token.tokenUuid).state,
+        smartState: tokenData.get(token.tokenUuid).smartState,
         row: row,
       });
     }
@@ -295,22 +301,32 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       {
         regex: /^(force-apply|smart-apply|undo)-((?:[a-zA-Z0-9\.]+)|\*)$/,
         permissionCheck: createPermissionCheck<TargetCardData>(({data, regexResult, messageId, allCardParts}) => {
+          if (regexResult[2] === '*') {
+            // select all is filtered in the execute => always have permission for this
+            return {};
+          }
           const documents: CreatePermissionCheckArgs['documents'] = [];
-          for (const uuid of this.getTokenUuids([regexResult[1]], data, messageId, allCardParts)) {
-            documents.push({uuid: uuid, permission: 'OWNER', security: true});
+          for (const uuid of this.getTokenUuids([regexResult[2]], data, messageId, allCardParts)) {
+            documents.push({uuid: uuid, permission: 'update', security: true});
           }
           return {documents: documents};
         }),
-        execute: ({regexResult, data, messageId, allCardParts}) => this.fireEvent(regexResult[1] as TargetCallbackData['apply'], [regexResult[2]], data, messageId, allCardParts),
+        execute: ({regexResult, data, messageId, allCardParts, userId}) => this.fireEvent(regexResult[1] as TargetCallbackData['apply'], [regexResult[2]], data, messageId, allCardParts, userId),
       }
     ];
   }
 
-  private async fireEvent(type: TargetCallbackData['apply'], requestUuids: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[]): Promise<void> {
-    const callbackData: TargetCallbackData[] = this.getTokenUuids(requestUuids, data, messageId, allCardParts).map(uuid => ({
+  private async fireEvent(type: TargetCallbackData['apply'], requestUuids: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[], userId: string): Promise<void> {
+    const tokenPermissions = await UtilsDocument.hasPermissions(this.getTokenUuids(requestUuids, data, messageId, allCardParts).map(uuid => ({
+      uuid: uuid,
+      permission: 'update',
+      user: game.users.get(userId),
+    })));
+    
+    const callbackData: TargetCallbackData[] = tokenPermissions.filter(permission => permission.result).map(permission => ({
       messageId: messageId,
       messageCardParts: allCardParts,
-      targetUuid: uuid,
+      targetUuid: permission.requestedCheck.uuid,
       apply: type,
     }));
 

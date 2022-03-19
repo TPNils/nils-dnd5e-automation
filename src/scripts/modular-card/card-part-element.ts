@@ -13,13 +13,14 @@ export interface KeyEvent {
   readonly key: 'Enter' | 'Escape';
 }
 
-interface ActionParamBase<T> {
+interface ActionParamBase<T, C> {
   partId: string;
   data: T;
   regexResult: RegExpExecArray;
   messageId: string;
   allCardParts: ModularCardPartData[];
   userId: string;
+  customData: C;
 }
 
 interface ActionParamClick {
@@ -33,14 +34,14 @@ interface ActionParamKey {
 }
 
 type PromiseOrSync<T> = T | Promise<T>;
-export type ActionParam<T> = ActionParamBase<T> & Partial<ActionParamClick> & Partial<ActionParamKey>;
-export type ActionPermissionCheck<T> = ({}: ActionParam<T>) => PromiseOrSync<'can-run-local' | 'can-run-as-gm' | 'prevent-action'>;
-export type ActionPermissionExecute<T> = ({}: ActionParam<T>) => PromiseOrSync<void>;
+export type ActionParam<T, C> = ActionParamBase<T, C> & Partial<ActionParamClick> & Partial<ActionParamKey>;
+export type ActionPermissionCheck<T, C> = ({}: ActionParam<T, C>) => PromiseOrSync<'can-run-local' | 'can-run-as-gm' | 'prevent-action'>;
+export type ActionPermissionExecute<T, C> = ({}: ActionParam<T, C>) => PromiseOrSync<void>;
 
-export interface ICallbackAction<T> {
+export interface ICallbackAction<T, C = any> {
   regex: RegExp;
-  permissionCheck?: ActionPermissionCheck<T>;
-  execute: ActionPermissionExecute<T>;
+  permissionCheck?: ActionPermissionCheck<T, C>;
+  execute: ActionPermissionExecute<T, C>;
 }
 
 export interface HtmlContext<T> {
@@ -50,10 +51,14 @@ export interface HtmlContext<T> {
   allMessageParts: ModularCardPartData[];
 }
 
-export interface CardPartElementConfig<T = any> {
+export interface CardPartElementConfig<T = any, C = {[key: string]: string}> {
   selector: string;
+  /**
+   * {myType: 'my-type'} will include the value of the attribute 'data-my-type' within the field 'myType' of customData for callbacks
+   */
+  callbackData?: C;
   getHtml?(context: HtmlContext<T>): string | Promise<string>
-  getCallbackActions?(): ICallbackAction<T>[];
+  getCallbackActions?(): ICallbackAction<T, C>[];
 }
 
 export function createElement(config: CardPartElementConfig): (typeof HTMLElement) {
@@ -87,7 +92,7 @@ export function createElement(config: CardPartElementConfig): (typeof HTMLElemen
 
 interface ActionResponse {
   permissionCheckResult: 'can-run-local' | 'can-run-as-gm' | 'prevent-action';
-  action: ICallbackAction<any>;
+  action: ICallbackAction<any, any>;
   regex: RegExpExecArray;
 }
 type InteractionResponse = {success: true;} | {success: false; errorMessage: string, stackTrace?: string, errorType: 'warn' | 'error'}
@@ -244,6 +249,7 @@ class CardPartElement extends HTMLElement {
     let action: string;
     let currentElement = element;
     let inputValue: boolean | number | string;
+    let customData: any = {};
     while (currentElement != null) {
       if (currentElement instanceof HTMLElement) {
         if (currentElement.hasAttribute(`data-action`)) {
@@ -260,8 +266,14 @@ class CardPartElement extends HTMLElement {
           } else if (currentElement instanceof HTMLSelectElement) {
             inputValue = currentElement.value;
           }
+        }
 
-          break;
+        if (this.config.callbackData) {
+          for (const [dataKey, attribute] of Object.entries(this.config)) {
+            if (customData[dataKey] !== undefined && currentElement.hasAttribute(`data-${attribute}`)) {
+              customData[dataKey] = currentElement.getAttribute(`data-${attribute}`);;
+            }
+          }
         }
       }
 
@@ -292,7 +304,7 @@ class CardPartElement extends HTMLElement {
       return;
     }
 
-    const actions = await this.getActions(action, clickEvent, keyEvent, game.userId, messageId, partData);
+    const actions = await this.getActions(action, clickEvent, keyEvent, game.userId, messageId, customData, partData);
     if (actions.some(a => a.permissionCheckResult === 'prevent-action')) {
       console.warn(`Pressed an action button for message part ${messageId}.${partId} with action ${action} for current user but permissions are missing.`, this);
       return;
@@ -310,6 +322,7 @@ class CardPartElement extends HTMLElement {
       messageId: messageId,
       action: action,
       inputValue: inputValue,
+      customData: customData,
     }
 
     let response: InteractionResponse;
@@ -322,7 +335,7 @@ class CardPartElement extends HTMLElement {
         // User has all required permissions, run locally
         response = await this.onInteractionProcessor(request);
       } else {
-        response = await provider.getSocket().then(socket => socket.executeAsGM('ModularCard.onInteraction', request));
+        response = await provider.getSocket().then(socket => socket.executeAsGM(`${this.config.selector}.onInteraction`, request));
       }
     } finally {
       if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
@@ -345,14 +358,15 @@ class CardPartElement extends HTMLElement {
     }
   }
 
-  public async onInteractionProcessor({clickEvent, keyEvent, userId, messageId, partId, action, inputValue}: {
+  public async onInteractionProcessor({clickEvent, keyEvent, userId, messageId, partId, action, customData, inputValue}: {
     clickEvent: ClickEvent,
     keyEvent: KeyEvent,
     userId: string,
     partId: string,
     messageId: string,
     action: string,
-    inputValue?: ActionParam<any>['inputValue'];
+    customData: any,
+    inputValue?: ActionParam<any, any>['inputValue'];
   }): Promise<InteractionResponse> {
     const message = game.messages.get(messageId);
     const originalAllCardParts = ModularCard.getCardPartDatas(message);
@@ -367,7 +381,7 @@ class CardPartElement extends HTMLElement {
       };
     }
 
-    const actions = await this.getActions(action, clickEvent, keyEvent, userId, messageId, messagePartData);
+    const actions = await this.getActions(action, clickEvent, keyEvent, userId, messageId, customData, messagePartData);
     if (actions.some(a => a.permissionCheckResult === 'prevent-action')) {
       return {
         success: false,
@@ -377,7 +391,7 @@ class CardPartElement extends HTMLElement {
     }
     
     for (const action of actions) {
-      const param: ActionParam<any> = {
+      const param: ActionParam<any, any> = {
         partId: partId,
         data: allCardParts.find(p => p.id === partId).data,
         regexResult: action.regex,
@@ -387,6 +401,7 @@ class CardPartElement extends HTMLElement {
         clickEvent: clickEvent,
         keyEvent: keyEvent,
         inputValue: inputValue,
+        customData: customData,
       };
       try {
         await action.action.execute(param);
@@ -409,7 +424,7 @@ class CardPartElement extends HTMLElement {
     }
   }
 
-  private async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, partData: ModularCardPartData): Promise<Array<ActionResponse>> {
+  private async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, customData: any, partData: ModularCardPartData): Promise<Array<ActionResponse>> {
     if (!action) {
       return [];
     }
@@ -430,6 +445,7 @@ class CardPartElement extends HTMLElement {
             userId: userId,
             clickEvent: clickEvent,
             keyEvent: keyEvent,
+            customData: customData,
           })
         });
       }
