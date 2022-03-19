@@ -83,9 +83,7 @@ export class MutableDiceTerm extends Die {
 
   @RunOnce()
   public static registerHooks(): void {
-    Hooks.on('ready', () => {
-      CONFIG.Dice.termTypes[MutableDiceTerm.name] = MutableDiceTerm;
-    })
+    CONFIG.Dice.termTypes[MutableDiceTerm.name] = MutableDiceTerm;
   }
   
 }

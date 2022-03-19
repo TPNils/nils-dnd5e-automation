@@ -14,11 +14,11 @@ import { MutableDiceTerm } from "./lib/roll/mutable-dice-term";
 import { TargetCardPart } from "./modular-card/target-card-part";
 import { SpellLevelCardPart } from "./modular-card/spell-level-card-part";
 
+MutableDiceTerm.registerHooks();
 registerGlobalApiHooks();
 registerHtmlHooks();
 provider.registerHooks();
 registerOverrideHooks()
-MutableDiceTerm.registerHooks();
 UtilsHandlebars.registerHooks();
 ModularCard.registerHooks();
 AttackCardPart.instance.registerHooks();
