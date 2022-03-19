@@ -6,7 +6,7 @@
 
     .one-line {
       display: flex;
-      width: max-content;
+      min-width: max-content;
     }
     
     .#{$module-name}-apply {
