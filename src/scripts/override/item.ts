@@ -14,7 +14,7 @@ async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode
     token: ((this.actor as any).token) == null ? undefined : (this.actor as any).token,
   });
 
-  return ChatMessage.create(chatMessageData);
+  return ChatMessage.createDocuments([chatMessageData]).then(messages => messages[0]);
 }
 
 export function registerHooks(): void {
