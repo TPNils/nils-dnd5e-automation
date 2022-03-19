@@ -43,7 +43,7 @@ interface TargetCache {
 export interface DamageCardData {
   phase: 'mode-select' | 'bonus-input' | 'result';
   mode: 'normal' | 'critical';
-  userBonus?: RollJson;
+  userBonus?: RollData;
   calc$: {
     actorUuid?: string;
     label: string;
@@ -310,28 +310,14 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       return;
     }
 
-    const canOverride = data.userBonus == null || data.userBonus.every(t => !t.evaluated);
-    if (canOverride) {
-      if (damageBonus) {
-        if (!Roll.validate(damageBonus) && keyEvent) {
-          // Only show error on key press
-          throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-        }
-        data.userBonus = new Roll(damageBonus).terms.map(t => t.toJSON() as TermJson);
-      } else {
-        delete data.userBonus;
+    if (damageBonus) {
+      if (!Roll.validate(damageBonus) && keyEvent) {
+        // Only show error on key press
+        throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
       }
+      data.userBonus = UtilsRoll.toRollData(new Roll(damageBonus));
     } else {
-      if (damageBonus) {
-        if (!Roll.validate(damageBonus) && keyEvent) {
-          // Only show error on key press
-          throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-        }
-        if (data.userBonus == null) {
-          data.userBonus = [];
-        }
-        data.userBonus.push(...new Roll(damageBonus).terms.map(t => t.toJSON() as TermJson));
-      }
+      delete data.userBonus;
     }
 
     if (keyEvent?.key === 'Enter') {
@@ -690,7 +676,16 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
 
       const newRollTerms: RollJson = [];
       for (const rollProperty of this.getRollProperties(newRow.data)) {
+        if (newRollTerms.length > 0) {
+          newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermJson);
+        }
         newRollTerms.push(...(UtilsObject.getProperty(newRow.data, rollProperty) as RollJson));
+      }
+      if (newRow.data.userBonus) {
+        if (newRollTerms.length > 0) {
+          newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermJson);
+        }
+        newRollTerms.push(...(UtilsRoll.fromRollData(newRow.data.userBonus).terms.map(t => t.toJSON() as TermJson)));
       }
       if (newRollTerms.length === 0) {
         newRollTerms.push(new NumericTerm({number: 0}).toJSON() as TermJson);
@@ -762,9 +757,6 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
     ];
     if (data.calc$.actorBonusRoll) {
       rollProperties.push(['calc$', 'actorBonusRoll']);
-    }
-    if (data.userBonus) {
-      rollProperties.push(['userBonus']);
     }
     return rollProperties;
   }

@@ -23,7 +23,7 @@
         </button>
         
         {{#if (and (eq @root.data.phase "bonus-input") (nacPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)) )}}
-          <input class="{{@root.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{@root.data.userBonus}}" data-action="item-damage-bonus" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
+          <input class="{{@root.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{@root.data.userBonus.formula}}" data-action="item-damage-bonus" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
         {{/if}}
       </div>
     {{/if}}
