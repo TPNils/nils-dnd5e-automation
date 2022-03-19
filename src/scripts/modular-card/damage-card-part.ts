@@ -167,7 +167,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           // DND5e spell compendium has cantrip formula empty => default to the base damage formula
           const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? Roll.getFormula(damage.calc$.baseRoll.map(RollTerm.fromData)) : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
           // Override normal roll since cantrip scaling is static, not dynamic like level scaling
-          damage.calc$.baseRoll = UtilsRoll.toRollData(UtilsRoll.mergeRolls(Roll.fromJSON(JSON.stringify(damage.calc$.baseRoll)), scalingRoll)).terms;
+          damage.calc$.baseRoll = UtilsRoll.toRollData(UtilsRoll.mergeRolls(UtilsRoll.fromRollTermData(damage.calc$.baseRoll), scalingRoll)).terms;
         }
       }
     }
