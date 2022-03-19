@@ -1,12 +1,12 @@
 import { data } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
-import { DmlTrigger, IDmlContext, IDmlTrigger } from "../lib/db/dml-trigger";
+import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { createElement, ICallbackAction } from "./card-part-element";
-import { ModularCard, ModularCardPartData } from "./modular-card";
+import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 export interface TargetCardData {
@@ -105,13 +105,6 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     
     for (const token of selectedTargets) {
       target.selectedTokenUuids.push(token.uuid);
-      target.calc$.tokenData.push({
-        tokenUuid: token.uuid,
-        actorUuid: (token.getActor() as MyActor)?.uuid,
-        name: token.data.name,
-        nameVisibleAnyone: [CONST.TOKEN_DISPLAY_MODES.HOVER, CONST.TOKEN_DISPLAY_MODES.ALWAYS as number].includes(token.data.displayName),
-        img: token.data.img,
-      });
     }
 
     return [target];
@@ -136,6 +129,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     });
 
     ModularCard.registerModularCardPart(staticValues.moduleName, TargetCardPart.instance);
+    ModularCard.registerModularCardTrigger(new TargetCardTrigger());
     DmlTrigger.registerTrigger(new DmlTriggerUser());
   }
 
@@ -225,15 +219,17 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       htmlTableHeader.row.push(columnsByKey.get(key).label);
     }
     const htmlTableBody: Array<{tokenUuid: string, actorUuid: string, name: string, nameVisibleAnyone: boolean, img: string, state: VisualState['state'], smartState: VisualState['state'], row: string[]}> = [];
-    const tokens = context.data.calc$.tokenData.sort((a, b) => {
-      // Since tokens are displayed with their image, group them together
-      let compare = a.img.localeCompare(b.img);
-      if (compare !== 0) {
-        return compare;
-      }
+    const tokens = context.data.calc$.tokenData
+      .filter(t => tokenData.has(t.tokenUuid))
+      .sort((a, b) => {
+        // Since tokens are displayed with their image, group them together
+        let compare = a.img.localeCompare(b.img);
+        if (compare !== 0) {
+          return compare;
+        }
 
-      return a.name.localeCompare(b.name);
-    });
+        return a.name.localeCompare(b.name);
+      });
     const allStates = new Set<VisualState['state']>();
     const allSmartStates = new Set<VisualState['state']>();
     for (const token of tokens) {
@@ -363,6 +359,71 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     } else {
       return requestUuids.filter(uuid => allTokenUuids.has(uuid));
     }
+  }
+  //#endregion
+
+}
+
+class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
+
+  //#region upsert
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+    await this.calcTargetCache(context);
+  }
+
+  private async calcTargetCache(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+    const missingTokenCaches = new Set<string>();
+    for (const {newRow} of context.rows) {
+      if (!this.isTargetTriggerType(newRow)) {
+        continue;
+      }
+
+      const cachedUuids = newRow.data.calc$.tokenData.map(t => t.tokenUuid);
+      for (const tokenUuid of newRow.data.selectedTokenUuids) {
+        if (!cachedUuids.includes(tokenUuid)) {
+          missingTokenCaches.add(tokenUuid);
+        }
+      }
+    }
+
+    console.log('missing: ', missingTokenCaches)
+    if (missingTokenCaches.size === 0) {
+      return;
+    }
+
+    const tokenMap = await UtilsDocument.tokenFromUuid(missingTokenCaches);
+    for (const {newRow} of context.rows) {
+      if (!this.isTargetTriggerType(newRow)) {
+        continue;
+      }
+
+      const cache = new Map<string, TargetCardData['calc$']['tokenData'][0]>();
+      for (const entry of newRow.data.calc$.tokenData) {
+        cache.set(entry.tokenUuid, entry);
+      }
+      for (const tokenUuid of newRow.data.selectedTokenUuids) {
+        if (!cache.has(tokenUuid) && tokenMap.has(tokenUuid)) {
+          const token = tokenMap.get(tokenUuid);
+          cache.set(token.uuid, {
+            tokenUuid: token.uuid,
+            actorUuid: (token.getActor() as MyActor)?.uuid,
+            name: token.data.name,
+            nameVisibleAnyone: [CONST.TOKEN_DISPLAY_MODES.HOVER, CONST.TOKEN_DISPLAY_MODES.ALWAYS as number].includes(token.data.displayName),
+            img: token.data.img,
+          })
+        }
+      }
+
+      if (cache.size !== newRow.data.calc$.tokenData.length) {
+        newRow.data.calc$.tokenData = Array.from(cache.values());
+      }
+    }
+  }
+  //#endregion
+  
+  //#region helpers
+  private isTargetTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<TargetCardData> {
+    return row.typeHandler instanceof TargetCardPart;
   }
   //#endregion
 
