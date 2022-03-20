@@ -37,6 +37,7 @@ export interface AttackCardData {
     hasHalflingLucky: boolean;
     label?: string;
     rollBonus?: string;
+    requestRollFormula?: string;
     roll?: RollData;
     critTreshold: number;
     isCrit?: boolean;
@@ -468,11 +469,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
         parts.push(newRow.data.userBonus);
       }
 
-      const newRoll = UtilsRoll.simplifyTerms(new Roll(parts.join(' + ')));
-      if (newRow.data.calc$.roll?.formula !== newRoll.formula) {
-        // Rolling the attack happens automatically in rollAttack and retains previous rolled dice
-        newRow.data.calc$.roll = UtilsRoll.toRollData(newRoll);
-      }
+      newRow.data.calc$.requestRollFormula = UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).formula;
     }
   }
 
@@ -481,22 +478,26 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
       if (!this.isThisType(newRow) || !this.assumeThisType(oldRow)) {
         continue;
       }
-      
-      const oldRoll: RollData = oldRow?.data?.calc$?.roll;
-      const shouldEvaluate = newRow.data.phase === 'result';
 
-      if (shouldEvaluate !== newRow.data.calc$.roll?.evaluated && !oldRoll?.evaluated) {
-        // Make new roll
-        const newRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
-        newRow.data.calc$.roll = UtilsRoll.toRollData(await newRoll.roll({async: true}));
-        UtilsDiceSoNice.showRoll({roll: newRoll});
-      } else if (newRow.data.calc$.roll.formula !== oldRoll?.formula && oldRoll && !newRow.data.calc$.roll.evaluated) {
-        // Roll changed => reroll
-        const result = await UtilsRoll.setRoll(UtilsRoll.fromRollData(oldRoll).terms, newRow.data.calc$.roll.formula);
-        newRow.data.calc$.roll = UtilsRoll.toRollData(Roll.fromTerms(result.result));
-        if (result.rollToDisplay) {
-          UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
+      if (newRow.data.calc$.requestRollFormula !== oldRow.data.calc$.requestRollFormula) {
+        if (!newRow.data.calc$.roll) {
+          newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(newRow.data.calc$.requestRollFormula));
+        } else {
+          const oldRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
+          const result = await UtilsRoll.setRoll(oldRoll, newRow.data.calc$.requestRollFormula);
+          newRow.data.calc$.roll = UtilsRoll.toRollData(result.result);
+          if (result.rollToDisplay) {
+            // Auto rolls if original roll was already evaluated
+            UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
+          }
         }
+      }
+
+      // Execute initial roll
+      if ((newRow.data.phase === 'result') !== newRow.data.calc$.roll?.evaluated) {
+        const roll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
+        newRow.data.calc$.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
+        UtilsDiceSoNice.showRoll({roll: roll});
       }
     }
   }
