@@ -36,20 +36,25 @@ interface TargetCache {
 export interface DamageCardData {
   phase: 'mode-select' | 'bonus-input' | 'result';
   mode: 'normal' | 'critical';
+  source: 'normal' | 'versatile';
   userBonus?: RollData;
   calc$: {
     actorUuid?: string;
     label: string;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
-    baseRoll: TermData[];
+    normalBaseRoll: TermData[];
+    versatileBaseRoll?: TermData[];
     upcastRoll?: TermData[];
     actorBonusRoll?: TermData[];
+    requestRollFormula: string;
     roll?: RollData;
     displayFormula?: string;
     displayDamageTypes?: string;
     targetCaches: TargetCache[]
   }
 }
+
+const rollBaseKeys = ['normalBaseRoll', 'versatileBaseRoll'] as const;
 
 function setTargetCache(cache: DamageCardData, targetCache: TargetCache): void {
   if (!cache.calc$.targetCaches) {
@@ -88,34 +93,38 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       rollData.prof = item.data.data.prof.term;
     }
 
-    const inputDamages: Array<DamageCardData> = [];
+    const inputDamages: DamageCardData = {
+      mode: 'normal',
+      phase: 'mode-select',
+      source: 'normal',
+      calc$: {
+        label: 'DND5E.Damage',
+        normalBaseRoll: UtilsRoll.toRollData(new Roll('0')).terms,
+        requestRollFormula: '',
+        targetCaches: [],
+      }
+    };
     // Main damage
-    const damageParts = item.data.data.damage?.parts;
-    let mainDamage: typeof inputDamages[0];
-    if (damageParts && damageParts.length > 0) {
-      mainDamage = {
-        mode: 'normal',
-        phase: 'mode-select',
-        calc$: {
-          label: 'DND5E.Damage',
-          baseRoll: UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(damageParts, rollData)).terms,
-          targetCaches: [],
-        }
+    {
+      const damageParts = item.data.data.damage?.parts;
+      if (damageParts && damageParts.length > 0) {
+        inputDamages.calc$.normalBaseRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(damageParts, rollData)).terms;
       }
-      // Consider it healing if all damage types are healing
-      const isHealing = damageParts.filter(roll => ItemCardHelpers.healingDamageTypes.includes(roll[1])).length === damageParts.length;
-      if (isHealing) {
-        mainDamage.calc$.label = 'DND5E.Healing';
-      }
-      inputDamages.push(mainDamage);
     }
 
     // Versatile damage
-    if (mainDamage && item.data.data.damage?.versatile) {
-      const versatileDamage = deepClone(mainDamage);
-      versatileDamage.calc$.label = 'DND5E.Versatile';
-      versatileDamage.calc$.baseRoll = UtilsRoll.toRollData(new Roll(item.data.data.damage.versatile, rollData)).terms;
-      inputDamages.push(versatileDamage);
+    if (item.data.data.damage?.versatile) {
+      inputDamages.calc$.versatileBaseRoll = UtilsRoll.toRollData(new Roll(item.data.data.damage.versatile, rollData)).terms;
+      const versatileTermWithDamageType = inputDamages.calc$.versatileBaseRoll.find(term => UtilsRoll.isValidDamageType(term.options?.flavor));
+      if (!versatileTermWithDamageType) {
+        const noramlTermWithDamageType = inputDamages.calc$.versatileBaseRoll.find(term => UtilsRoll.isValidDamageType(term.options?.flavor));
+        if (noramlTermWithDamageType) {
+          for (const term of inputDamages.calc$.versatileBaseRoll) {
+            term.options = term.options ?? {};
+            term.options.flavor = noramlTermWithDamageType.options.flavor;
+          }
+        }
+      }
     }
 
     // Spell scaling
@@ -125,21 +134,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       if (originalItem && item.data.data.level > originalItem.data.data.level) {
         const upcastLevels = item.data.data.level - originalItem.data.data.level;
         const scalingRollJson: TermData[] = UtilsRoll.toRollData(new Roll(scaling.formula, rollData).alter(upcastLevels, 0)).terms;
-        if (inputDamages.length === 0) {
-          // when only dealing damage by upcasting? not sure if that ever happens
-          inputDamages.push({
-            mode: 'normal',
-            phase: 'mode-select',
-            calc$: {
-              label: 'DND5E.Damage',
-              baseRoll: UtilsRoll.toRollData(new Roll('0')).terms,
-              targetCaches: [],
-            }
-          });
-        }
-        for (const damage of inputDamages) {
-          damage.calc$.upcastRoll = scalingRollJson;
-        }
+        inputDamages.calc$.upcastRoll = scalingRollJson;
       }
     } else if (scaling?.mode === 'cantrip' && actor) {
       let actorLevel = 0;
@@ -153,65 +148,45 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       const applyScalingXTimes = Math.floor((actorLevel + 1) / 6);
 
       if (applyScalingXTimes > 0) {
-        if (inputDamages.length === 0) {
-          // when only dealing damage by upcasting? not sure if that ever happens
-          inputDamages.push({
-            mode: 'normal',
-            phase: 'mode-select',
-            calc$: {
-              label: 'DND5E.Damage',
-              baseRoll: UtilsRoll.toRollData(new Roll('0')).terms,
-              targetCaches: [],
-            }
-          });
-        }
-
-        for (const damage of inputDamages) {
+        for (const rollBaseKey of rollBaseKeys) {
           // DND5e spell compendium has cantrip formula empty => default to the base damage formula
-          const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? Roll.getFormula(damage.calc$.baseRoll.map(RollTerm.fromData)) : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
+          const currentValue: TermData[] = inputDamages.calc$[rollBaseKey];
+          if (!currentValue) {
+            continue;
+          }
+          const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? Roll.getFormula(currentValue.map(RollTerm.fromData)) : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
           // Override normal roll since cantrip scaling is static, not dynamic like level scaling
-          damage.calc$.baseRoll = UtilsRoll.toRollData(UtilsRoll.mergeRolls(UtilsRoll.fromRollTermData(damage.calc$.baseRoll), scalingRoll)).terms;
+          inputDamages.calc$[rollBaseKey] = UtilsRoll.toRollData(UtilsRoll.mergeRolls(UtilsRoll.fromRollTermData(currentValue), scalingRoll)).terms;
         }
       }
     }
     
     // Add damage bonus formula
-    if (inputDamages.length > 0) {
+    {
       const actorBonus = actor.data.data.bonuses?.[item.data.data.actionType];
       if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
-        for (const damage of inputDamages) {
-          damage.calc$.actorBonusRoll = UtilsRoll.toRollData(new Roll(actorBonus.damage, rollData)).terms;
-        }
+        inputDamages.calc$.actorBonusRoll = UtilsRoll.toRollData(new Roll(actorBonus.damage, rollData)).terms;
       }
     }
 
     if (actor) {
-      for (const dmg of inputDamages) {
-        dmg.calc$.actorUuid = actor.uuid;
-      }
+      inputDamages.calc$.actorUuid = actor.uuid;
     }
     
-    return inputDamages;
+    return [inputDamages];
   }
 
-  public async refresh(oldDatas: DamageCardData[], args: ModularCardCreateArgs): Promise<DamageCardData[]> {
-    const results: DamageCardData[] = [];
-    const newCreated = await this.create(args);
-    for (let i = 0; i < newCreated.length; i++) {
-      const newData = newCreated.length < i ? newCreated[i] : null;
-      const oldData = oldDatas.length < i ? oldDatas[i] : null;
+  public async refresh(oldData: DamageCardData[], args: ModularCardCreateArgs): Promise<DamageCardData[]> {
+    const newData = (await this.create(args))[0];
 
-      if (!oldData) {
-        results.push(newData);
-        continue;
-      }
-
-      const result = deepClone(oldData);
-      result.calc$ = newData.calc$;
-      result.calc$.roll = oldData.calc$.roll;// contains already rolled dice which should not be discarded
-      results.push(result);
+    if (!oldData || oldData.length === 0) {
+      return [newData];
     }
-    return results;
+
+    const result = deepClone(oldData[0]);
+    result.calc$ = newData.calc$;
+    result.calc$.roll = oldData[0].calc$.roll;// contains already rolled dice which should not be discarded
+    return [newData];
   }
 
   @RunOnce()
@@ -256,7 +231,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     const permissionCheck = createPermissionCheck<DamageCardData>(({data}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (data.calc$.actorUuid) {
-        documents.push({uuid: data.calc$.actorUuid, permission: 'OWNER'});
+        documents.push({uuid: data.calc$.actorUuid, permission: 'OWNER', security: true});
       }
       return {documents: documents};
     })
@@ -266,6 +241,11 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         regex: /^item-damage$/,
         permissionCheck: permissionCheck,
         execute: ({data, clickEvent}) => this.processNextPhase(data, clickEvent),
+      },
+      {
+        regex: /^item-damage-source-toggle$/,
+        permissionCheck: permissionCheck,
+        execute: ({data}) => this.procesToggleSource(data),
       },
       {
         regex: /^item-damage-bonus$/,
@@ -278,6 +258,14 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         execute: ({data, clickEvent, regexResult}) => this.processDamageMode(data, clickEvent, regexResult[1] as ('plus' | 'minus')),
       },
     ]
+  }
+
+  private async procesToggleSource(data: DamageCardData): Promise<void> {
+    if (data.source === 'normal' && data.calc$.versatileBaseRoll != null) {
+      data.source = 'versatile';
+    } else {
+      data.source = 'normal';
+    }
   }
 
   private async processNextPhase(data: DamageCardData,event: ClickEvent | null): Promise<void> {
@@ -545,6 +533,38 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
 class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
 
+  //#region beforeUpsert
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData>): boolean | void {
+    this.calculateLabel(context);
+  }
+
+  private calculateLabel(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow} of context.rows) {
+      if (!this.isThisTriggerType(newRow)) {
+        continue;
+      }
+
+      if (newRow.data.mode === 'critical') {
+        newRow.data.calc$.label = 'DND5E.Critical';
+        continue;
+      }
+
+      const baseRoll = newRow.data.source === 'versatile' ? newRow.data.calc$.versatileBaseRoll : newRow.data.calc$.normalBaseRoll;
+      const damageTypes: DamageType[] = baseRoll.map(roll => roll.options?.flavor).filter(flavor => UtilsRoll.isValidDamageType(flavor)) as DamageType[];
+      const isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
+      if (isHealing) {
+        newRow.data.calc$.label = 'DND5E.Healing';
+      } else {
+        if (newRow.data.source === 'versatile') {
+          newRow.data.calc$.label = 'DND5E.Versatile';
+        } else {
+          newRow.data.calc$.label = 'DND5E.Damage';
+        }
+      }
+    }
+  }
+  //#endregion
+
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
     // TODO recalc whole item on level change to support custom scaling level scaling formulas
@@ -757,9 +777,12 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
 
   //#region helpers
   private getRollProperties(data: DamageCardData): string[][] {
-    const rollProperties: string[][] = [
-      ['calc$', 'baseRoll'],
-    ];
+    const rollProperties: string[][] = [];
+    if (data.source === 'versatile') {
+      rollProperties.push(['calc$', 'versatileBaseRoll']);
+    } else {
+      rollProperties.push(['calc$', 'normalBaseRoll']);
+    }
     if (data.calc$.upcastRoll) {
       rollProperties.push(['calc$', 'upcastRoll']);
     }
