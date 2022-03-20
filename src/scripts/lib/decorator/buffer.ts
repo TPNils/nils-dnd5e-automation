@@ -1,14 +1,18 @@
 function bufferInternal<T>(bufferTime: number, originalFunction: (args: Array<Array<T>>) => any): (...args: T[]) => any {
-  let bufferedCalls: Array<Array<T>> = [];
+  let bufferedCallsByThis = new Map<any, Array<Array<T>>>();
   // use 'function' to retain the original context from the caller (use another this context)
   return function (...args: T[]): any {
+    if (!bufferedCallsByThis.has(this)) {
+      bufferedCallsByThis.set(this, []);
+    }
+    const bufferedCalls = bufferedCallsByThis.get(this);
     const isFirstCall = bufferedCalls.length === 0;
     bufferedCalls.push(args);
     if (isFirstCall) {
       // use '=>' to keep the context within this function (don't create a new this context)
       setTimeout(() => {
         const calls = bufferedCalls;
-        bufferedCalls = [];
+        bufferedCallsByThis.delete(this);
         originalFunction.call(this, calls);
       }, bufferTime);
     }
