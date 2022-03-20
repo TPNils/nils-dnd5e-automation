@@ -695,15 +695,16 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
         newRollTerms.push(new NumericTerm({number: 0}).toJSON() as TermData);
       }
       
-      const newRoll = UtilsRoll.createDamageRoll(newRollTerms.map(t => RollTerm.fromData(t)), {critical: newRow.data.mode === 'critical'});
+      // Store the requested formula seperatly since the UtilsRoll.setRoll may change it, causing an infinite loop to changing the formula
+      newRow.data.calc$.requestRollFormula = UtilsRoll.createDamageRoll(newRollTerms.map(t => RollTerm.fromData(t)), {critical: newRow.data.mode === 'critical'}).formula;
 
       // Calc roll
-      if (newRoll.formula !== newRow?.data?.calc$?.roll?.formula) {
+      if (newRow.data.calc$.requestRollFormula !== oldRow?.data?.calc$?.requestRollFormula) {
         if (!newRow.data.calc$.roll) {
-          newRow.data.calc$.roll = UtilsRoll.toRollData(newRoll);
+          newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(newRow.data.calc$.requestRollFormula));
         } else {
           const oldRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
-          const result = await UtilsRoll.setRoll(oldRoll, newRoll.formula);
+          const result = await UtilsRoll.setRoll(oldRoll, newRow.data.calc$.requestRollFormula);
           newRow.data.calc$.roll = UtilsRoll.toRollData(result.result);
           if (result.rollToDisplay) {
             // Auto rolls if original roll was already evaluated
