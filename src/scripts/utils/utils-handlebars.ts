@@ -289,7 +289,6 @@ export class UtilsHandlebars {
       }
     }
 
-    console.log('term', {hasDie, max, overrideMaxRoll}, roll)
     const matches = hasDie && max;
     
     if (!UtilsHandlebars.isBlockHelper(options)) {
