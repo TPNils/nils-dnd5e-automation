@@ -123,7 +123,20 @@ export class UtilsRoll {
   public static async setRoll(original: RollTerm[], newFormula: string): Promise<{result: RollTerm[], rollToDisplay: Roll | null}>
   public static async setRoll(original: RollTerm[] | Roll, newFormula: string): Promise<{result: RollTerm[] | Roll, rollToDisplay: Roll | null}> {
     const originalWasRoll = original instanceof Roll;
-    original = (original instanceof Roll ? original.terms : original).map(t => {
+    original = original = (original instanceof Roll ? original.terms : original);
+
+    {
+      const hasAnyOriginalEvaluated = original.find(term => (term as any)._evaluated) != null;
+      if (!hasAnyOriginalEvaluated) {
+        const newRoll = new Roll(newFormula);
+        if (originalWasRoll) {
+          return {result: newRoll, rollToDisplay: null};
+        }
+        return {result: newRoll.terms, rollToDisplay: null};
+      }
+    }
+
+    original = original.map(t => {
       if (t instanceof Die) {
         return MutableDiceTerm.fromDie(t);
       }
@@ -135,8 +148,6 @@ export class UtilsRoll {
       }
       return t;
     });
-
-    const hasAnyOriginalEvaluated = original.find(term => (term as any)._evaluated) != null;
 
     const originalResultsFromByDieFaces = new Map<number, MutableDiceTerm[]>();
     for (const term of original) {
@@ -166,14 +177,11 @@ export class UtilsRoll {
       newTerms.push(term);
     }
 
-    const hasAnyNewEvaluated = newTerms.find(term => (term as any)._evaluated) != null;
     const pendingTermRolls: Promise<RollTerm>[] = [];
-    if (hasAnyOriginalEvaluated || hasAnyNewEvaluated) {
-      for (const term of newTerms) {
-        // @ts-expect-error
-        if (!term._evaluated) {
-          pendingTermRolls.push(term.evaluate({async: true}));
-        }
+    for (const term of newTerms) {
+      // @ts-expect-error
+      if (!term._evaluated) {
+        pendingTermRolls.push(term.evaluate({async: true}));
       }
     }
 
