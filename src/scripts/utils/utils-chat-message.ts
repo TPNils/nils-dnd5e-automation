@@ -255,15 +255,6 @@ export class UtilsChatMessage {
       chatElement.addEventListener('keydown', event => UtilsChatMessage.onKeyDown(event));
       chatElement.addEventListener('change', event => UtilsChatMessage.onChange(event));
     });
-
-    Hooks.on("init", () => {
-      // register templates parts
-      loadTemplates([
-        'modules/nils-automated-compendium/templates/damage.hbs',
-        'modules/nils-automated-compendium/templates/roll/roll.hbs',
-        'modules/nils-automated-compendium/templates/roll/tooltip.hbs'
-      ]);
-    });
     
     DmlTrigger.registerTrigger(new DmlTriggerChatMessage());
     DmlTrigger.registerTrigger(new DmlTriggerTemplate());

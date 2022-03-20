@@ -6,13 +6,11 @@
   </div>
   <div class="{{@root.moduleName}}-roll-wrapper">
     {{#if @root.data.calc$.roll.evaluated }}
-      <div>
-        {{> modules/nils-automated-compendium/templates/roll/roll.hbs 
-          roll=@root.data.calc$.roll
-          highlightTotalOnFirstTerm=true
-          overrideMaxRoll=@root.data.calc$.critTreshold
-        }}
-      </div>
+      <nac-roll-result 
+        roll="{{nacToJsonString @root.data.calc$.roll}}"
+        highlight-total-on-firstTerm="true"
+        override-max-roll="{{@root.data.calc$.critTreshold}}">
+      </nac-roll-result>
     {{else}}
       <div class="{{@root.moduleName}}-bonus-container">
         <button data-action="item-attack" class="{{@root.moduleName}}-item-attack" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}>

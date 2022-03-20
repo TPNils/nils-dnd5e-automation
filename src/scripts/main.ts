@@ -13,7 +13,9 @@ import { TemplateCardPart } from "./modular-card/template-card-part";
 import { MutableDiceTerm } from "./lib/roll/mutable-dice-term";
 import { TargetCardPart } from "./modular-card/target-card-part";
 import { SpellLevelCardPart } from "./modular-card/spell-level-card-part";
+import { RollResultElement } from "./elements/roll-result-element";
 
+RollResultElement.registerHooks();
 MutableDiceTerm.registerHooks();
 registerGlobalApiHooks();
 registerHtmlHooks();

@@ -5,13 +5,12 @@
     {{/if}}
   </div>
   <div class="{{@root.moduleName}}-roll-wrapper">
+    <nac-roll-result data-roll="{{nacToJsonString @root.data.calc$.roll}}"></nac-roll-result>
     {{#if @root.data.calc$.roll.evaluated}}
-      <div>
-        {{> modules/nils-automated-compendium/templates/roll/roll.hbs 
-          roll=@root.data.calc$.roll
-          overrideFormula=@root.data.calc$.displayFormula
-        }}
-      </div>
+      <nac-roll-result 
+        roll="{{nacToJsonString @root.data.calc$.roll}}"
+        override-formula="{{@root.data.calc$.displayFormula}}">
+      </nac-roll-result>
     {{else}}
       <div class="{{@root.moduleName}}-bonus-container">
         <button data-action="item-damage" class="{{@root.moduleName}}-item-damage" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}>

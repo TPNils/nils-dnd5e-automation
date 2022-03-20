@@ -6,10 +6,32 @@
   overrideMaxRoll?=number (example: 19 for Improved Critical)
   highlightTotalOnFirstTerm?=boolean
 }}
+{{#*inline "tooltip"}}
+<div class="dice-tooltip">
+  {{#each terms as |term|}}
+    {{#if this.results}}
+    <section class="tooltip-part">
+      <div class="dice">
+        <header class="part-header flexrow">
+          <span class="part-formula">{{this.expression}}</span>
+          {{#if this.flavor}}<span class="part-flavor">{{this.flavor}}</span>{{/if}}
+          <span class="part-total">{{this.total}}</span>
+        </header>
+        <ol class="dice-rolls">
+        {{#each this.results}}
+          <li class="roll die d{{term.faces}}{{#if this.success}} success{{/if}}{{#if this.failure}} failure{{/if}}{{#if this.rerolled}} rerolled{{/if}}{{#if this.exploded}} exploded{{/if}}{{#if this.discarded}} discarded{{/if}}{{#if (eq this.result term.faces)}} max{{/if}}{{#if (eq this.result 1)}} min{{/if}}">
+            <span class="result">{{this.result}}</span>
+          </li>
+        {{/each}}
+        </ol>
+      </div>
+    </section>
+    {{/if}}
+  {{/each}}
+</div>
+{{/inline}}
+
 <div class="dice-roll">
-  {{#if flavor}}
-    <div class="dice-flavor">{{flavor}}</div>
-  {{/if}}
   <div class="dice-result">
     {{#if compact}}
       <h4 class="dice-total compact">
@@ -26,7 +48,7 @@
       <div class="dice-formula">
         {{#if overrideFormula}}{{overrideFormula}}{{else}}{{roll.formula}}{{/if}}
       </div>
-      {{> modules/nils-automated-compendium/templates/roll/tooltip.hbs terms=roll.terms}}
+      {{> tooltip terms=roll.terms}}
       <h4 class="dice-total {{#if (nacIsMaxRoll roll highlightTotalOnFirstTerm overrideMaxRoll)}} success{{/if}}{{#if (nacIsMinRoll roll)}} failure{{/if}}">{{roll.total}}</h4>
     {{/if}}
   </div>

@@ -1,0 +1,86 @@
+@import 'global-variables';
+
+/* default foundry css */
+#{$module-code}-roll-result {
+  display: block;
+
+  .dice-total.compact .roll {
+    position: relative;
+    width: var(--font-size-24, 24px);
+    line-height: var(--font-size-24, 24px);
+    float: left;
+    margin-right: 1px;
+    font-size: var(--font-size-16, 16px);
+  
+    color: var(--color-text-dark-primary, #000);
+    font-weight: bold;
+    text-align: center;
+  
+    .result {
+      position: relative;
+    }
+  
+    &::before {
+      content: "";
+      display: block;
+      position: absolute;
+      background-image: url("/icons/svg/d20-grey.svg");
+      background-size: var(--font-size-24, 24px) var(--font-size-24, 24px);
+      filter: brightness(0) invert(.9); // white background image
+      width: var(--font-size-24, 24px);
+      height: var(--font-size-24, 24px);
+    }
+    &.d4::before {
+      background-image: url("/icons/svg/d4-grey.svg");
+    }
+    &.d6::before {
+      background-image: url("/icons/svg/d6-grey.svg");
+    }
+    &.d8::before {
+      background-image: url("/icons/svg/d8-grey.svg");
+    }
+    &.d10::before {
+      background-image: url("/icons/svg/d10-grey.svg");
+    }
+    &.d12::before {
+      background-image: url("/icons/svg/d12-grey.svg");
+    }
+    &.d20::before {
+      background-image: url("/icons/svg/d20-grey.svg");
+    }
+  
+    &.min {
+      color: #aa0200;
+      &::before {
+        filter: sepia(5) hue-rotate(-20deg);
+      }
+    }
+    &.max {
+      color: #18520b;
+      &::before {
+        filter: sepia(0.5) hue-rotate(60deg);
+      }
+    }
+    &.discarded,
+    &.rerolled {
+      filter: sepia(0.5) contrast(0.75) opacity(0.4);
+    }
+    
+  }
+  .roll.exploded:before {
+    font-size: var(--font-size-8, 8px);
+    font-family: "Font Awesome 5 Free";
+    content: "\f666";
+    position: absolute;
+    top: -8px;
+    right: 0px;
+  }
+  .roll.success {
+    color: #18520b;
+    filter: sepia(0.5) hue-rotate(60deg);
+  }
+  .roll.failure {
+    color: #aa0200;
+    filter: sepia(0.5) hue-rotate(-60deg);
+  }
+}

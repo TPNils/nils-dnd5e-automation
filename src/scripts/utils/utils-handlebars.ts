@@ -355,6 +355,10 @@ export class UtilsHandlebars {
     return value.toLocaleLowerCase().capitalize();
   }
 
+  public static toJsonString(value: any): string {
+    return JSON.stringify(value);
+  }
+
   public static registerHooks(): void {
     Hooks.on("init", () => {
       Handlebars.registerHelper(`${staticValues.code}Concat`, UtilsHandlebars.concat);
@@ -368,6 +372,7 @@ export class UtilsHandlebars {
       Handlebars.registerHelper(`${staticValues.code}SpellLevels`, UtilsHandlebars.spellLevels);
       Handlebars.registerHelper(`${staticValues.code}IsMinRoll`, UtilsHandlebars.isMinRoll);
       Handlebars.registerHelper(`${staticValues.code}IsMaxRoll`, UtilsHandlebars.isMaxRoll);
+      Handlebars.registerHelper(`${staticValues.code}ToJsonString`, UtilsHandlebars.toJsonString);
     });
   }
 
