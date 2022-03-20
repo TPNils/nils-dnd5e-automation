@@ -10,7 +10,9 @@
         </header>
         <ol class="dice-rolls">
         {{#each this.results}}
-          <li class="roll die d{{term.faces}}{{#if this.success}} success{{/if}}{{#if this.failure}} failure{{/if}}{{#if this.rerolled}} rerolled{{/if}}{{#if this.exploded}} exploded{{/if}}{{#if this.discarded}} discarded{{/if}}{{#if (eq this.result term.faces)}} max{{/if}}{{#if (eq this.result 1)}} min{{/if}}">{{this.result}}</li>
+          <li class="roll die d{{term.faces}}{{#if this.success}} success{{/if}}{{#if this.failure}} failure{{/if}}{{#if this.rerolled}} rerolled{{/if}}{{#if this.exploded}} exploded{{/if}}{{#if this.discarded}} discarded{{/if}}{{#if (eq this.result term.faces)}} max{{/if}}{{#if (eq this.result 1)}} min{{/if}}">
+            <span class="result">{{this.result}}</span>
+          </li>
         {{/each}}
         </ol>
       </div>
