@@ -479,7 +479,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
         continue;
       }
 
-      if (newRow.data.calc$.requestRollFormula !== oldRow.data.calc$.requestRollFormula) {
+      if (newRow.data.calc$.requestRollFormula !== oldRow?.data?.calc$?.requestRollFormula) {
         if (!newRow.data.calc$.roll) {
           newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(newRow.data.calc$.requestRollFormula));
         } else {
