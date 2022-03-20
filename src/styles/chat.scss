@@ -175,10 +175,27 @@
   .#{$module-name}-item-attack {
     text-transform: capitalize;
   }
-  
-  :hover .#{$module-name}-roll-wrapper .#{$module-name}-mode-minus,
-  :hover .#{$module-name}-roll-wrapper .#{$module-name}-mode-plus{
-    display: block;
+
+  .overlay {
+    display: flex;
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    padding: 3px;
+
+    > .left,
+    > .right {
+      pointer-events: initial;
+      display: flex;
+      width: fit-content;
+    }
+
+    .middel {
+      flex-grow: 1;
+    }
   }
 
   .#{$module-name}-applied {
@@ -186,33 +203,53 @@
       color: green;
     }
   }
+
+  &:not(:hover) .#{$module-name}-roll-wrapper .overlay {
+    display: none;
+  }
   
   .#{$module-name}-roll-wrapper {
     position: relative;
     
     .#{$module-name}-mode-minus,
-    .#{$module-name}-mode-plus {
-      display: none;
-      background: rgba(255, 255, 240, 0.8);
+    .#{$module-name}-mode-plus,
+    .damage-source-toggle {
+      background: #f2f2e3;
       border: 1px solid #b5b3a4;
-      position: absolute;
       line-height: 0px;
       font-size: 10px;
       height: 2em;
       width: 2em;
-      top: 3px;
-      //top: 50%;
-      //transform: translate(0, -50%);
+    }
+    
+    .damage-source-toggle {
+      position: relative;
+
+      &.source-normal {
+        .hand-1 {
+          opacity: .5;
+        }
+      }
+      .hand-1 {
+        transform: translateY(-50%) rotate(90deg) scaleX(-1);
+        position: absolute;
+        left: 2px;
+        top: 50%;
+      }
+      .hand-2 {
+        transform: translateY(-50%) rotate(270deg);
+        position: absolute;
+        right: 1px;
+        top: 50%;
+      }
     }
 
     .#{$module-name}-mode-minus {
       color: red;
-      left: 2px;
     }
 
     .#{$module-name}-mode-plus {
       color: #4F8A10;
-      right: 2px;
     }
 
     .#{$module-name}-mode-plus[disabled],

@@ -29,8 +29,15 @@
       </div>
     {{/if}}
     {{#nacPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}
-      <button data-action="item-attack-mode-minus" class="{{@root.moduleName}}-mode-minus" {{#if (eq @root.data.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
-      <button data-action="item-attack-mode-plus" class="{{@root.moduleName}}-mode-plus" {{#if (eq @root.data.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+      <div class="overlay">
+        <div class="left">
+          <button data-action="item-attack-mode-minus" class="{{@root.moduleName}}-mode-minus" {{#if (eq @root.data.mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+        </div>
+        <div class="middel"></div>
+        <div class="right">
+          <button data-action="item-attack-mode-plus" class="{{@root.moduleName}}-mode-plus" {{#if (eq @root.data.mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+        </div>
+      </div>
     {{/nacPerm}}
   </div>
 </div>

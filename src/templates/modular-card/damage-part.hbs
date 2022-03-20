@@ -28,8 +28,21 @@
       </div>
     {{/if}}
     {{#nacPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}
-      <button data-action="item-damage-mode-minus" class="{{@root.moduleName}}-mode-minus" {{#if (eq @root.data.mode 'normal')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
-      <button data-action="item-damage-mode-plus" class="{{@root.moduleName}}-mode-plus" {{#if (eq @root.data.mode 'critical')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+      <div class="overlay">
+        <div class="left">
+          <button data-action="item-damage-mode-minus" class="{{@root.moduleName}}-mode-minus" {{#if (eq @root.data.mode 'normal')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+        </div>
+        <div class="middel"></div>
+        <div class="right">
+          {{#if @root.data.calc$.versatileBaseRoll}}
+            <button data-action="item-damage-source-toggle" class="damage-source-toggle source-{{@root.data.source}}">
+              <i class="fas fa-hand-holding hand-1" data-fa-transform="rotate-90"></i>
+              <i class="fas fa-hand-holding hand-2" data-fa-transform="rotate-90"></i>
+            </button>
+          {{/if}}
+          <button data-action="item-damage-mode-plus" class="{{@root.moduleName}}-mode-plus" {{#if (eq @root.data.mode 'critical')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+        </div>
+      </div>
     {{/nacPerm}}
   </div>
 </div>
