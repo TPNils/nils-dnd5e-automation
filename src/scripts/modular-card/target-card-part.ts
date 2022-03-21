@@ -12,7 +12,7 @@ import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularC
 export interface TargetCardData {
   selectedTokenUuids: string[];
   calc$: {
-    // TODO expectedTargetAmount
+    expectedTargets?: number;
     tokenData: Array<{
       tokenUuid: string;
       actorUuid: string;
@@ -79,6 +79,9 @@ interface TargetIntegrationCallback {
   getVisualState?(context: StateContext): VisualState[] | Promise<VisualState[]>;
 }
 
+// TODO Allow the same tokens to be targeted multiple times
+//  Visualization: done
+//  Interaction: Add a + & - button in the target table to increase/decrease selecting the same target multipe times
 export class TargetCardPart implements ModularCardPart<TargetCardData> {
 
   public static readonly instance = new TargetCardPart();
@@ -105,6 +108,12 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     
     for (const token of selectedTargets) {
       target.selectedTokenUuids.push(token.uuid);
+    }
+
+    // TODO "item.data.data.target.value" does not support formulas => does not support spell scaling
+    //  Solutions: hook into the sheet and add an option for target scaling
+    if (item.data.data.target?.value > 0 && ['ally', 'creature', 'enemy', 'object'].includes(item.data.data.target?.type)) {
+      target.calc$.expectedTargets = item.data.data.target?.value;
     }
 
     return target;
@@ -210,15 +219,39 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       }
     }
 
-    if (columnsByKey.size === 0) {
+    if (columnsByKey.size === 0 && context.data.calc$.expectedTargets < 1) {
       return '';
     }
 
-    const htmlTableHeader: {row: string[], state: VisualState['state'], smartState: VisualState['state']} = {row: [], state: 'not-applied', smartState: 'not-applied'};
+    const htmlTableHeader: {
+      currentTargets: number;
+      expectedTargets?: number;
+      row: string[];
+      state: VisualState['state'];
+      smartState: VisualState['state'];
+    } = {
+      currentTargets: tokenData.size,
+      expectedTargets: context.data.calc$.expectedTargets,
+      row: [],
+      state: 'not-applied',
+      smartState: 'not-applied'
+    };
     for (const key of columnKeyOrder) {
       htmlTableHeader.row.push(columnsByKey.get(key).label);
     }
-    const htmlTableBody: Array<{tokenUuid: string, actorUuid: string, name: string, nameVisibleAnyone: boolean, img: string, state: VisualState['state'], smartState: VisualState['state'], row: string[]}> = [];
+    const htmlTableBody: Array<{
+      tokenUuid: string;
+      actorUuid: string;
+      name: string;
+      nameVisibleAnyone: boolean;
+      img: string;
+      state: VisualState['state'];
+      smartState: VisualState['state'];
+      row: string[];
+      isPlaceholder: false;
+    } | {
+      isPlaceholder: true;
+    }> = [];
     const tokens = context.data.calc$.tokenData
       .filter(t => tokenData.has(t.tokenUuid))
       .sort((a, b) => {
@@ -248,7 +281,11 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
         state: tokenData.get(token.tokenUuid).state,
         smartState: tokenData.get(token.tokenUuid).smartState,
         row: row,
+        isPlaceholder: false
       });
+    }
+    for (let i = htmlTableBody.length; i < context.data.calc$.expectedTargets; i++) {
+      htmlTableBody.push({isPlaceholder: true});
     }
     allStates.delete(null);
     allStates.delete(undefined);

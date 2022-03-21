@@ -1,6 +1,6 @@
 <div class="table target-table" style="grid-template-columns: 25px {{#if data.tableHeader.row.length}}repeat({{data.tableHeader.row.length}}, min-content){{/if}} auto max-content;">
   {{!header}}
-  <div class="header-cell">{{! name/img }}</div>
+  <div class="header-cell">{{data.tableHeader.currentTargets}}{{#if data.tableHeader.expectedTargets}}/{{data.tableHeader.expectedTargets}}{{/if}}</div>
   {{#each data.tableHeader.row}}
     <div class="header-cell">{{{this}}}</div>
   {{/each}}
@@ -14,17 +14,28 @@
   </div>
   {{!body}}
   {{#each data.tableBody as |target|}}
-    <div class="body-cell" {{#if (or target.nameVisibleAnyone (nacPerm (nacConcat "ObserverUuid:" target.actorUuid)) )}}title="{{target.name}}"{{/if}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</div>
-    {{#each target.row}}
-      <div class="body-cell">{{{this}}}</div>
-    {{/each}}
-    <div class="body-cell">{{! filler }}</div>
-    <div class="body-cell one-line">
-      {{#nacPerm (nacConcat "UpdateUuid:" target.actorUuid)}}
-        <button data-action="smart-apply-{{target.tokenUuid}}" data-state="{{target.smartState}}" class="apply"><i class="fas fa-brain"></i></button>
-        <button data-action="force-apply-{{target.tokenUuid}}" data-state="{{target.state}}" class="apply"><i class="fas fa-check"></i></button>
-        <button data-action="undo-{{target.tokenUuid}}" data-state="{{target.state}}" class="undo"><i class="fas fa-undo"></i></button>
-      {{/nacPerm}}
-    </div>
+    {{#if target.isPlaceholder}}
+      <div class="body-cell placeholder">
+        <i class="placeholder-image fas fa-bullseye"></i>
+      </div>
+      {{#each @root.data.tableHeader.row}}
+        <div class="body-cell placeholder">{{! dummy data rows }}</div>
+      {{/each}}
+      <div class="body-cell placeholder">{{! filler }}</div>
+      <div class="body-cell placeholder">{{! apply buttons }}</div>
+    {{else}}
+      <div class="body-cell" {{#if (or target.nameVisibleAnyone (nacPerm (nacConcat "ObserverUuid:" target.actorUuid)) )}}title="{{target.name}}"{{/if}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</div>
+      {{#each target.row}}
+        <div class="body-cell">{{{this}}}</div>
+      {{/each}}
+      <div class="body-cell">{{! filler }}</div>
+      <div class="body-cell one-line">
+        {{#nacPerm (nacConcat "UpdateUuid:" target.actorUuid)}}
+          <button data-action="smart-apply-{{target.tokenUuid}}" data-state="{{target.smartState}}" class="apply"><i class="fas fa-brain"></i></button>
+          <button data-action="force-apply-{{target.tokenUuid}}" data-state="{{target.state}}" class="apply"><i class="fas fa-check"></i></button>
+          <button data-action="undo-{{target.tokenUuid}}" data-state="{{target.state}}" class="undo"><i class="fas fa-undo"></i></button>
+        {{/nacPerm}}
+      </div>
+    {{/if}}
   {{/each}}
 </div>
