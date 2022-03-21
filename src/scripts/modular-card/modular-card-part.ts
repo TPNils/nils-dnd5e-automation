@@ -23,7 +23,7 @@ export interface CreatePermissionCheckArgs {
 }
 
 type PromiseOrSync<T> = T | Promise<T>;
-export function createPermissionCheck<T, C = any>(args: CreatePermissionCheckArgs | (({}: ActionParam<T, C>) => PromiseOrSync<CreatePermissionCheckArgs>)): ActionPermissionCheck<T, C> {
+export function createPermissionCheck<T>(args: CreatePermissionCheckArgs | (({}: ActionParam<T>) => PromiseOrSync<CreatePermissionCheckArgs>)): ActionPermissionCheck<T> {
   return async (action) => {
     const {mustBeGm, documents, updatesMessage} = typeof args === 'function' ? await args(action) : args;
     const user = game.users.get(action.userId);

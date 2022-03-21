@@ -1,4 +1,3 @@
-import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { provider } from "../provider/provider";
 import { ModularCard, ModularCardPartData } from "./modular-card";
@@ -13,14 +12,14 @@ export interface KeyEvent {
   readonly key: 'Enter' | 'Escape';
 }
 
-interface ActionParamBase<T, C> {
+interface ActionParamBase<T> {
   partId: string;
   data: T;
   regexResult: RegExpExecArray;
   messageId: string;
   allCardParts: ModularCardPartData[];
   userId: string;
-  customData: C;
+  subType?: string;
 }
 
 interface ActionParamClick {
@@ -34,31 +33,29 @@ interface ActionParamKey {
 }
 
 type PromiseOrSync<T> = T | Promise<T>;
-export type ActionParam<T, C> = ActionParamBase<T, C> & Partial<ActionParamClick> & Partial<ActionParamKey>;
-export type ActionPermissionCheck<T, C> = ({}: ActionParam<T, C>) => PromiseOrSync<'can-run-local' | 'can-run-as-gm' | 'prevent-action'>;
-export type ActionPermissionExecute<T, C> = ({}: ActionParam<T, C>) => PromiseOrSync<void>;
+export type ActionParam<T> = ActionParamBase<T> & Partial<ActionParamClick> & Partial<ActionParamKey>;
+export type ActionPermissionCheck<T> = ({}: ActionParam<T>) => PromiseOrSync<'can-run-local' | 'can-run-as-gm' | 'prevent-action'>;
+export type ActionPermissionExecute<T> = ({}: ActionParam<T>) => PromiseOrSync<void>;
 
-export interface ICallbackAction<T, C = any> {
+export interface ICallbackAction<T> {
   regex: RegExp;
-  permissionCheck?: ActionPermissionCheck<T, C>;
-  execute: ActionPermissionExecute<T, C>;
+  permissionCheck?: ActionPermissionCheck<T>;
+  execute: ActionPermissionExecute<T>;
 }
 
 export interface HtmlContext<T> {
   messageId: string;
   partId: string;
+  subType?: string;
   data: T;
   allMessageParts: ModularCardPartData[];
 }
 
-export interface CardPartElementConfig<T = any, C = {[key: string]: string}> {
+export interface CardPartElementConfig<T = any> {
   selector: string;
-  /**
-   * {myType: 'my-type'} will include the value of the attribute 'data-my-type' within the field 'myType' of customData for callbacks
-   */
-  callbackData?: C;
+  hasSubType?: boolean;
   getHtml?(context: HtmlContext<T>): string | Promise<string>
-  getCallbackActions?(): ICallbackAction<T, C>[];
+  getCallbackActions?(): ICallbackAction<T>[];
 }
 
 export function createElement(config: CardPartElementConfig): (typeof HTMLElement) {
@@ -78,12 +75,17 @@ export function createElement(config: CardPartElementConfig): (typeof HTMLElemen
         `[data-message-id="${params.messageId}"][data-part-id="${params.partId}"]${config.selector}`,
         `[data-message-id="${params.messageId}"][data-part-id="${params.partId}"] ${config.selector}`,
         `[data-message-id="${params.messageId}"] [data-part-id="${params.partId}"] ${config.selector}`,
-      ].join(', ');
-      const element = document.querySelector(`${config.selector}`);
+      ];
+      if (config.hasSubType) {
+        for (let i = 0; i < query.length; i++) {
+          query[i] += `[data-sub-type="${params.subType}"]`;
+        }
+      }
+      const element = document.querySelector(query.join(', '));
       if (element instanceof CardPartElement) {
         return element.onInteractionProcessor(params);
       } else {
-        return Promise.resolve<InteractionResponse>({success: false, errorMessage: 'Could not find element with querySelector: ' + query, errorType: 'error'});
+        return Promise.resolve<InteractionResponse>({success: false, errorMessage: 'Could not find element with querySelector: ' + query.join(', '), errorType: 'error'});
       }
     })
   });
@@ -92,7 +94,7 @@ export function createElement(config: CardPartElementConfig): (typeof HTMLElemen
 
 interface ActionResponse {
   permissionCheckResult: 'can-run-local' | 'can-run-as-gm' | 'prevent-action';
-  action: ICallbackAction<any, any>;
+  action: ICallbackAction<any>;
   regex: RegExpExecArray;
 }
 type InteractionResponse = {success: true;} | {success: false; errorMessage: string, stackTrace?: string, errorType: 'warn' | 'error'}
@@ -132,23 +134,38 @@ class CardPartElement extends HTMLElement {
     }
     const messageId = this.getMessageId();
     const partId = this.getPartId();
+    const subtype = this.getSubType();
     const renderKey = `${messageId}/${partId}`;
     if (this.renderedKey === renderKey) {
       return;
     }
-    if (!messageId || !partId || !game.messages.has(messageId)) {
-      if (this.innerHTML !== '') {
-        this.innerHTML = '';
+    if (!messageId || !partId || (this.config.hasSubType && !subtype)) {
+      const properties = [];
+      if (!messageId) {
+        properties.push('data-message-id')
       }
+      if (!partId) {
+        properties.push('data-part-id')
+      }
+      if (!this.config.hasSubType && !subtype) {
+        properties.push('data-sub-type')
+      }
+      this.innerHTML = `Missing properties: ` + properties.join(', ');
       return;
-    } 
+    }
+    if (this.config.hasSubType && !subtype) {
+      this.innerHTML = `Missing proprtties: ` + [(messageId == null ? 'data-message-id' : null), partId == null ? 'data-part-id' : null].filter(v => !!v).join(', ');
+      return;
+    }
+    if (!game.messages.has(messageId)) {
+      this.innerHTML = 'Message not found: ' + messageId;
+      return;
+    }
     const allCardParts = ModularCard.getCardPartDatas(game.messages.get(messageId)) ?? [];
     const cardPart = allCardParts.find(part => part.id === partId);
     // TODO store item uuid in message to allow for dynamic part creation (maybe? does not solve upcasting)
     if (!cardPart) {
-      if (this.innerHTML !== '') {
-        this.innerHTML = '';
-      }
+      this.innerHTML = `Message part not found: ${messageId}.${partId}`;
       return;
     }
 
@@ -157,6 +174,7 @@ class CardPartElement extends HTMLElement {
       data: cardPart.data,
       messageId: messageId,
       partId: partId,
+      subType: subtype,
       allMessageParts: allCardParts,
     });
   }
@@ -167,6 +185,10 @@ class CardPartElement extends HTMLElement {
 
   private getPartId(): string | null {
     return this.closest('[data-part-id]')?.getAttribute('data-part-id');
+  }
+
+  private getSubType(): string | null {
+    return this.getAttribute('data-sub-type');
   }
 
   //#region User interaction
@@ -246,6 +268,7 @@ class CardPartElement extends HTMLElement {
 
     let messageId = this.getMessageId();
     let partId = this.getPartId();
+    let subType = this.getSubType();
     let action: string;
     let currentElement = element;
     let inputValue: boolean | number | string;
@@ -268,7 +291,7 @@ class CardPartElement extends HTMLElement {
           }
         }
 
-        if (this.config.callbackData) {
+        if (this.config.hasSubType) {
           for (const [dataKey, attribute] of Object.entries(this.config)) {
             if (customData[dataKey] !== undefined && currentElement.hasAttribute(`data-${attribute}`)) {
               customData[dataKey] = currentElement.getAttribute(`data-${attribute}`);;
@@ -284,6 +307,9 @@ class CardPartElement extends HTMLElement {
     }
 
     if (!action || !partId || !messageId) {
+      return;
+    }
+    if (this.config.hasSubType && ! subType) {
       return;
     }
     
@@ -322,7 +348,7 @@ class CardPartElement extends HTMLElement {
       messageId: messageId,
       action: action,
       inputValue: inputValue,
-      customData: customData,
+      subType: subType,
     }
 
     let response: InteractionResponse;
@@ -358,15 +384,15 @@ class CardPartElement extends HTMLElement {
     }
   }
 
-  public async onInteractionProcessor({clickEvent, keyEvent, userId, messageId, partId, action, customData, inputValue}: {
+  public async onInteractionProcessor({clickEvent, keyEvent, userId, messageId, partId, action, subType, inputValue}: {
     clickEvent: ClickEvent,
     keyEvent: KeyEvent,
     userId: string,
     partId: string,
     messageId: string,
     action: string,
-    customData: any,
-    inputValue?: ActionParam<any, any>['inputValue'];
+    subType: string | null,
+    inputValue?: ActionParam<any>['inputValue'];
   }): Promise<InteractionResponse> {
     const message = game.messages.get(messageId);
     const originalAllCardParts = ModularCard.getCardPartDatas(message);
@@ -381,7 +407,7 @@ class CardPartElement extends HTMLElement {
       };
     }
 
-    const actions = await this.getActions(action, clickEvent, keyEvent, userId, messageId, customData, messagePartData);
+    const actions = await this.getActions(action, clickEvent, keyEvent, userId, messageId, subType, messagePartData);
     if (actions.some(a => a.permissionCheckResult === 'prevent-action')) {
       return {
         success: false,
@@ -391,7 +417,7 @@ class CardPartElement extends HTMLElement {
     }
     
     for (const action of actions) {
-      const param: ActionParam<any, any> = {
+      const param: ActionParam<any> = {
         partId: partId,
         data: allCardParts.find(p => p.id === partId).data,
         regexResult: action.regex,
@@ -401,7 +427,7 @@ class CardPartElement extends HTMLElement {
         clickEvent: clickEvent,
         keyEvent: keyEvent,
         inputValue: inputValue,
-        customData: customData,
+        subType: subType,
       };
       try {
         await action.action.execute(param);
@@ -424,7 +450,7 @@ class CardPartElement extends HTMLElement {
     }
   }
 
-  private async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, customData: any, partData: ModularCardPartData): Promise<Array<ActionResponse>> {
+  private async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, subType: string | null, partData: ModularCardPartData): Promise<Array<ActionResponse>> {
     if (!action) {
       return [];
     }
@@ -445,7 +471,7 @@ class CardPartElement extends HTMLElement {
             userId: userId,
             clickEvent: clickEvent,
             keyEvent: keyEvent,
-            customData: customData,
+            subType: subType,
           })
         });
       }
