@@ -536,6 +536,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData>): boolean | void {
     this.calculateLabel(context);
+    this.calculateRollDisplay(context);
   }
 
   private calculateLabel(context: IDmlContext<ModularCardTriggerData>): void {
@@ -561,6 +562,33 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
           newRow.data.calc$.label = 'DND5E.Damage';
         }
       }
+    }
+  }
+
+  private calculateRollDisplay(context: IDmlContext<ModularCardTriggerData>): void {
+    for (const {newRow} of context.rows) {
+      if (!this.isThisTriggerType(newRow)) {
+        continue;
+      }
+
+      if (!newRow.data.calc$.roll) {
+        newRow.data.calc$.displayFormula = null;
+        newRow.data.calc$.displayDamageTypes = null;
+        continue;
+      }
+    
+      const damageTypes: DamageType[] = [];
+      let shortenedFormula = newRow.data.calc$.roll.formula;
+      for (const damageType of UtilsRoll.getValidDamageTypes()) {
+        if (shortenedFormula.match(`\\[${damageType}\\]`)) {
+          damageTypes.push(damageType);
+          shortenedFormula = shortenedFormula.replace(new RegExp(`\\[${damageType}\\]`, 'g'), '');
+        }
+      }
+
+      // formula without damage comments
+      newRow.data.calc$.displayFormula = shortenedFormula;
+      newRow.data.calc$.displayDamageTypes = damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined;
     }
   }
   //#endregion
@@ -731,20 +759,6 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
             UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
           }
         }
-        
-
-        const damageTypes: DamageType[] = [];
-        let shortenedFormula = newRow.data.calc$.roll.formula;
-        for (const damageType of UtilsRoll.getValidDamageTypes()) {
-          if (shortenedFormula.match(`\\[${damageType}\\]`)) {
-            damageTypes.push(damageType);
-            shortenedFormula = shortenedFormula.replace(new RegExp(`\\[${damageType}\\]`, 'g'), '');
-          }
-        }
-
-        // formula without damage comments
-        newRow.data.calc$.displayFormula = shortenedFormula;
-        newRow.data.calc$.displayDamageTypes = damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined;
       }
       
       // Execute initial roll
