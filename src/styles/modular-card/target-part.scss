@@ -9,6 +9,11 @@
       min-width: max-content;
     }
 
+    .header-cell.target-amount-summary {
+      display: flex;
+      justify-content: center;
+    }
+
     .placeholder-image {
       margin-left: 4px;;
       opacity: .5;

@@ -1,6 +1,6 @@
 <div class="table target-table" style="grid-template-columns: 25px {{#if data.tableHeader.row.length}}repeat({{data.tableHeader.row.length}}, min-content){{/if}} auto max-content;">
   {{!header}}
-  <div class="header-cell">{{data.tableHeader.currentTargets}}{{#if data.tableHeader.expectedTargets}}/{{data.tableHeader.expectedTargets}}{{/if}}</div>
+  <div class="header-cell target-amount-summary">{{data.tableHeader.currentTargets}}{{#if data.tableHeader.expectedTargets}}/{{data.tableHeader.expectedTargets}}{{/if}}</div>
   {{#each data.tableHeader.row}}
     <div class="header-cell">{{{this}}}</div>
   {{/each}}
