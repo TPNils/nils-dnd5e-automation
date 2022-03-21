@@ -1,6 +1,7 @@
 import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
+import { UtilsCompare } from "../lib/utils/utils-compare";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem, MyItemData } from "../types/fixed-types";
@@ -230,7 +231,11 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
             newTargets.add(token.uuid);
           }
         }
-        targetPart.data.selectedTokenUuids = Array.from(newTargets);
+        const targets = Array.from(newTargets);
+        if (!UtilsCompare.deepEquals(targetPart.data.selectedTokenUuids, targets)) {
+          targetPart.data.selectedTokenUuids = targets;
+          updateChatMessageMap.set(chatMessage.id, parts);
+        }
       }
     }
 
