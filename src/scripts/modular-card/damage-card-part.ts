@@ -86,9 +86,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   public static readonly instance = new DamageCardPart();
   private constructor(){}
 
-  public async create({item, actor}: {item: MyItem, actor?: MyActor}): Promise<DamageCardData[]> {
+  public async create({item, actor}: {item: MyItem, actor?: MyActor}): Promise<DamageCardData> {
     // TODO what about other interactions like spell scaling (modifier with html) and hunters mark (automatic, but only to a specific target)
-    const rollData: {[key: string]: any} = actor == null ? {} : item.getRollData();
+    const rollData: {[key: string]: any} = item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
       rollData.prof = item.data.data.prof.term;
     }
@@ -173,20 +173,25 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       inputDamages.calc$.actorUuid = actor.uuid;
     }
     
-    return [inputDamages];
+    return inputDamages;
   }
 
-  public async refresh(oldData: DamageCardData[], args: ModularCardCreateArgs): Promise<DamageCardData[]> {
-    const newData = (await this.create(args))[0];
+  public async refresh(oldData: DamageCardData, args: ModularCardCreateArgs): Promise<DamageCardData> {
+    const newData = await this.create(args);
 
-    if (!oldData || oldData.length === 0) {
-      return [newData];
+    if (!newData) {
+      return null;
+    }
+    if (!oldData) {
+      return newData;
     }
 
-    const result = deepClone(oldData[0]);
+    const result = deepClone(oldData);
     result.calc$ = newData.calc$;
-    result.calc$.roll = oldData[0].calc$.roll;// contains already rolled dice which should not be discarded
-    return [newData];
+    result.calc$.roll = oldData.calc$.roll;// contains already rolled dice which should not be discarded
+    result.calc$.targetCaches = oldData.calc$.targetCaches;// contains already applied damage values
+    console.log('result', result)
+    return result;
   }
 
   @RunOnce()

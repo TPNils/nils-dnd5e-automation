@@ -5,6 +5,7 @@ import { MyActor, SpellData } from "../types/fixed-types";
 import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { createElement, ICallbackAction } from "./card-part-element";
+import { UtilsChatMessage } from "../utils/utils-chat-message";
 
 interface SpellLevelCardData {
   selectedLevel: number | 'pact';
@@ -27,9 +28,9 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
   public static readonly instance = new SpellLevelCardPart();
   private constructor(){}
   
-  public async create({item, actor, token}: ModularCardCreateArgs): Promise<SpellLevelCardData[]> {
+  public async create({item, actor, token}: ModularCardCreateArgs): Promise<SpellLevelCardData> {
     if (item.data.data.level <= 0 || item.data.data.level == null || !actor) {
-      return [];
+      return null;
     }
 
     let spellSlots: SpellLevelCardData['calc$']['spellSlots'] = [];
@@ -76,7 +77,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       }
     }
 
-    return [{
+    return {
       selectedLevel: selectedLevel,
       calc$: {
         actorUuid: actor.uuid,
@@ -84,11 +85,25 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
         tokenUuid: token?.uuid,
         spellSlots: spellSlots,
       }
-    }];
+    };
   }
 
-  public refresh(data: SpellLevelCardData[], args: ModularCardCreateArgs): Promise<SpellLevelCardData[]> {
-    return this.create(args);
+  public async refresh(oldData: SpellLevelCardData, args: ModularCardCreateArgs): Promise<SpellLevelCardData> {
+    const newData = await this.create(args);
+
+    if (!newData) {
+      return null;
+    }
+    if (!oldData) {
+      return newData;
+    }
+
+    if (newData.calc$.spellSlots.find(slot => slot.level === oldData.selectedLevel)) {
+      // Retain the selected level if still available
+      newData.selectedLevel = oldData.selectedLevel;
+    }
+
+    return newData;
   }
 
   @RunOnce()
@@ -145,13 +160,53 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       return;
     }
 
-    const [item, actor, token] = await Promise.all([
+    let [item, actor, token] = await Promise.all([
       UtilsDocument.itemFromUuid(data.calc$.itemUuid),
       UtilsDocument.actorFromUuid(data.calc$.actorUuid),
       data.calc$.tokenUuid == null ? Promise.resolve(null) : UtilsDocument.tokenFromUuid(data.calc$.tokenUuid)
     ]);
 
-    // TODO refresh
+    if (item.data.data.level !== spellSlot.level) {
+      item = item.clone({data: {level: spellSlot.level}}, {keepId: true});
+    }
+
+    const responses: Array<Promise<ModularCardPartData>> = [];
+    const partsById = new Map<string, ModularCardPartData>();
+    for (const part of allCardParts) {
+      partsById.set(part.id, part);
+      const typeHandler = ModularCard.getTypeHandler(part.type);
+      const response = typeHandler.refresh(part.data, {item, actor, token});
+      if (response instanceof Promise) {
+        responses.push(response.then(r => ({
+          id: part.id,
+          type: part.type,
+          data: r
+        })));
+      } else {
+        responses.push(Promise.resolve({
+          id: part.id,
+          type: part.type,
+          data: response
+        }));
+      }
+    }
+
+    // TODO should also be able to 'add' new types
+    //  Idea: have item templates which need to be registered
+    //  They contain all the types which should be used and in what order they are
+
+    const deleteIds = new Set<string>();
+    for (const response of await Promise.all(responses)) {
+      if (response.data == null) {
+        deleteIds.add(response.id);
+      } else {
+        partsById.get(response.id).data = response.data;
+      }
+    }
+
+    for (const id of Array.from(deleteIds)) {
+      allCardParts.splice(allCardParts.findIndex(part => part.id === id), 1);
+    }
   }
   //#endregion
 

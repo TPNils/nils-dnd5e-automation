@@ -2,6 +2,7 @@ import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/fo
 import { DmlTrigger, IDmlContext, IDmlTrigger, ITrigger, IUnregisterTrigger } from "../lib/db/dml-trigger";
 import { TransformTrigger } from "../lib/db/transform-trigger";
 import { RunOnce } from "../lib/decorator/run-once";
+import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { AttackCardPart } from "./attack-card-part";
@@ -16,7 +17,7 @@ import { TemplateCardPart } from "./template-card-part";
 export interface ModularCardPartData<T = any> {
   readonly id: string;
   readonly type: string;
-  readonly data: T;
+  data: T;
 }
 
 export interface ModularCardTriggerData<T = any> extends ModularCardPartData<T> {
@@ -193,7 +194,7 @@ export class ModularCard {
   public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardPartData[]> {
     // TODO this is proof of concept, when finished to should dynamically assign which parts to use for creation
     let id = 0;
-    const parts: Promise<{datas: any[], cardPart: ModularCardPart}>[] = [];
+    const parts: Promise<{data: any, cardPart: ModularCardPart}>[] = [];
 
     const cardParts: ModularCardPart[] = [
       DescriptionCardPart.instance,
@@ -208,18 +209,18 @@ export class ModularCard {
     for (const cardPart of cardParts) {
       const response = cardPart.create(data);
       if (response instanceof Promise) {
-        parts.push(response.then(data => ({datas: data, cardPart: cardPart})))
+        parts.push(response.then(resp => ({data: resp, cardPart: cardPart})))
       } else {
-        parts.push(Promise.resolve({datas: response, cardPart: cardPart}));
+        parts.push(Promise.resolve({data: response, cardPart: cardPart}));
       }
     }
 
     const response: ModularCardPartData[] = [];
     for (const part of await Promise.all(parts)) {
-      for (const data of part.datas) {
+      if (part.data != null) {
         response.push({
           id: `${id++}`,
-          data: data,
+          data: part.data,
           type: part.cardPart.getType(),
         })
       }
@@ -310,7 +311,13 @@ export class ModularCard {
         cardsObj[i] = data[i];
       }
     }
-    return message.setFlag(staticValues.moduleName, 'modularCardData', cardsObj);
+    UtilsObject.injectDeleteForDml(message.getFlag(staticValues.moduleName, 'modularCardData'), cardsObj);
+    console.log({cardsObj, original: message.getFlag(staticValues.moduleName, 'modularCardData')})
+    
+    return message.update({
+      [`flags.${staticValues.moduleName}.modularCardData`]: cardsObj
+    });
+    //return message.setFlag(staticValues.moduleName, 'modularCardData', cardsObj);
   }
 
   public static async getHtml(messageId: string, parts: ModularCardPartData[]): Promise<string> {

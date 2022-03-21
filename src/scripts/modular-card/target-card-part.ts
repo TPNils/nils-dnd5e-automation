@@ -84,7 +84,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   public static readonly instance = new TargetCardPart();
   private constructor(){}
   
-  public create({item, token}: {item: MyItem, token?: TokenDocument}): TargetCardData[] {
+  public create({item, token}: {item: MyItem, token?: TokenDocument}): TargetCardData {
     const target: TargetCardData = {
       selectedTokenUuids: [],
       calc$: {
@@ -107,11 +107,11 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       target.selectedTokenUuids.push(token.uuid);
     }
 
-    return [target];
+    return target;
   }
 
-  public refresh(data: TargetCardData[], args: ModularCardCreateArgs): TargetCardData[] {
-    return data;
+  public refresh(data: TargetCardData, args: ModularCardCreateArgs): TargetCardData {
+    return data; // There is nothing to refresh
   }
 
   private callbacks: TargetIntegrationCallback[] = [];

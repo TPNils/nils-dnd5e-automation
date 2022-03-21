@@ -23,22 +23,34 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   public static readonly instance = new TemplateCardPart();
   private constructor(){}
   
-  public create({item, actor}: ModularCardCreateArgs): TemplateCardData[] {
+  public create({item, actor}: ModularCardCreateArgs): TemplateCardData {
     // @ts-expect-error
     const hasAoe = CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type);
     if (!hasAoe) {
-      return [];
+      return null;
     }
-    return [{
+    return {
       calc$: {
         actorUuid: actor?.uuid,
         target: item.data.data.target,
       }
-    }];
+    };
   }
 
-  public refresh(data: TemplateCardData[], args: ModularCardCreateArgs): TemplateCardData[] {
-    return this.create(args);
+  public refresh(oldData: TemplateCardData, args: ModularCardCreateArgs): TemplateCardData {
+    const newData = this.create(args);
+
+    if (!newData) {
+      return null;
+    }
+    if (!oldData) {
+      return newData;
+    }
+
+    // Retain template link
+    newData.calc$.createdTemplateUuid = oldData.calc$.createdTemplateUuid;
+
+    return newData;
   }
 
   @RunOnce()

@@ -87,7 +87,7 @@ export interface ModularCardCreateArgs {
 
 export interface ModularCardPart<D = any> {
   getType(): string;
-  create(args: ModularCardCreateArgs): PromiseOrSync<D[]>;
-  refresh(data: D[],args: ModularCardCreateArgs): PromiseOrSync<D[]>;
+  create(args: ModularCardCreateArgs): PromiseOrSync<D>;
+  refresh(data: D, args: ModularCardCreateArgs): PromiseOrSync<D>;
   getHtml?(data: HtmlContext<D>): PromiseOrSync<string | null>;
 }

@@ -50,9 +50,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   public static readonly instance = new AttackCardPart();
   private constructor(){}
 
-  public create({item, actor}: {item: MyItem, actor?: MyActor}): AttackCardData[] {
+  public create({item, actor}: {item: MyItem, actor?: MyActor}): AttackCardData {
     if (!['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
-      return [];
+      return null;
     }
     const bonus = ['@mod'];
 
@@ -114,27 +114,25 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
     attack.calc$.critTreshold = critTreshold;
 
-    return [attack];
+    return attack;
   }
 
-  public refresh(oldDatas: AttackCardData[], args: ModularCardCreateArgs): AttackCardData[] {
+  public refresh(oldData: AttackCardData, args: ModularCardCreateArgs): AttackCardData {
     const results: AttackCardData[] = [];
-    const newCreated = this.create(args);
-    for (let i = 0; i < newCreated.length; i++) {
-      const newData = newCreated.length < i ? newCreated[i] : null;
-      const oldData = oldDatas.length < i ? oldDatas[i] : null;
+    const newData = this.create(args);
 
-      if (!oldData) {
-        results.push(newData);
-        continue;
-      }
-
-      const result = deepClone(oldData);
-      result.calc$ = newData.calc$;
-      result.calc$.roll = oldData.calc$.roll;// contains already rolled dice which should not be discarded
-      results.push(result);
+    if (!newData) {
+      return null;
     }
-    return results;
+    if (!oldData) {
+      return newData;
+    }
+
+    const result = deepClone(oldData);
+    result.calc$ = newData.calc$;
+    result.calc$.roll = oldData.calc$.roll;// contains already rolled dice which should not be discarded
+    results.push(result);
+    return result;
   }
 
   @RunOnce()

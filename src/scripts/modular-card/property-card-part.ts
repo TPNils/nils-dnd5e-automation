@@ -16,15 +16,15 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
   public static readonly instance = new PropertyCardPart();
   private constructor(){}
   
-  public create({item}: {item: MyItem}): PropertyCardData[] {
-    return [{
+  public create({item}: {item: MyItem}): PropertyCardData {
+    return {
       calc$: {
         properties: item.getChatData().properties,
       }
-    }];
+    };
   }
 
-  public refresh(data: PropertyCardData[], args: ModularCardCreateArgs): PropertyCardData[] {
+  public refresh(data: PropertyCardData, args: ModularCardCreateArgs): PropertyCardData {
     return this.create(args);
   }
 

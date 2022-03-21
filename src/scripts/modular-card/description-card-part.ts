@@ -19,18 +19,18 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   public static readonly instance = new DescriptionCardPart();
   private constructor(){}
   
-  public create({item}: ModularCardCreateArgs): DescriptionCardData[] {
-    return [{
+  public create({item}: ModularCardCreateArgs): DescriptionCardData {
+    return {
       calc$: {
         name: item.name,
         img: item.img,
         description: item.data?.data?.description?.value,
         materials: item.data?.data?.materials?.value,
       }
-    }];
+    };
   }
 
-  public refresh(data: DescriptionCardData[], args: ModularCardCreateArgs): DescriptionCardData[] {
+  public refresh(data: DescriptionCardData, args: ModularCardCreateArgs): DescriptionCardData {
     return this.create(args);
   }
 
