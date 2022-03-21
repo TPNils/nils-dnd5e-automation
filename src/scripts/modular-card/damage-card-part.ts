@@ -709,16 +709,6 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
         }
       }
 
-      if ((cache.appliedHpChange + cache.appliedTmpHpChange) === (cache.calcHpChange + cache.calcAddTmpHp) &&
-        cache.appliedFailedDeathSaved === cache.calcFailedDeathSaved
-      ) {
-        cache.appliedState = 'applied';
-      } else if (cache.appliedHpChange !== 0 ||
-        cache.appliedTmpHpChange !== 0 ||
-        cache.appliedFailedDeathSaved !== 0
-      ) {
-        cache.appliedState = 'partial-applied';
-      }
 
       setTargetCache(recalcToken.data, cache);
     }
