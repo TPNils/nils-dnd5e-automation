@@ -312,7 +312,6 @@ export class ModularCard {
       }
     }
     UtilsObject.injectDeleteForDml(message.getFlag(staticValues.moduleName, 'modularCardData'), cardsObj);
-    console.log({cardsObj, original: message.getFlag(staticValues.moduleName, 'modularCardData')})
     
     return message.update({
       [`flags.${staticValues.moduleName}.modularCardData`]: cardsObj

@@ -190,7 +190,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     result.calc$ = newData.calc$;
     result.calc$.roll = oldData.calc$.roll;// contains already rolled dice which should not be discarded
     result.calc$.targetCaches = oldData.calc$.targetCaches;// contains already applied damage values
-    console.log('result', result)
     return result;
   }
 
