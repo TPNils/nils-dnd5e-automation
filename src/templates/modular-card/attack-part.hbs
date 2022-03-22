@@ -7,9 +7,9 @@
   <div class="{{@root.moduleName}}-roll-wrapper">
     {{#if @root.data.calc$.roll.evaluated }}
       <nac-roll-result 
-        roll="{{nacToJsonString @root.data.calc$.roll}}"
-        highlight-total-on-firstTerm="true"
-        override-max-roll="{{@root.data.calc$.critTreshold}}">
+        data-roll="{{nacToJsonString @root.data.calc$.roll}}"
+        data-highlight-total-on-firstTerm="true"
+        data-override-max-roll="{{@root.data.calc$.critTreshold}}">
       </nac-roll-result>
     {{else}}
       <div class="{{@root.moduleName}}-bonus-container">

@@ -16,7 +16,7 @@ export class RollResultElement extends HTMLElement {
   }
   
   public static get observedAttributes() {
-    return ['roll', 'override-max-roll', 'compact', 'highlight-total-on-firstTerm', 'override-formula'];
+    return ['data-roll', 'data-override-max-roll', 'data-compact', 'data-highlight-total-on-firstTerm', 'data-override-formula'];
   }
 
   private elementsBySlotName: Map<string, Element[]> = new Map();
@@ -39,7 +39,7 @@ export class RollResultElement extends HTMLElement {
   }
 
   private async calcInner(): Promise<void> {
-    const rollJson: RollJson = UtilsElement.readAttrJson(this, 'roll');
+    const rollJson: RollJson = UtilsElement.readAttrJson(this, 'data-roll');
     if (!rollJson.evaluated) {
       this.textContent = '';
       return;
@@ -47,10 +47,10 @@ export class RollResultElement extends HTMLElement {
     const html = await renderTemplate(
       `modules/${staticValues.moduleName}/templates/roll/roll.hbs`, {
         roll: rollJson,
-        overrideFormula: UtilsElement.readAttrString(this, 'override-formula'),
-        compact: UtilsElement.readAttrBoolean(this, 'compact'),
-        highlightTotalOnFirstTerm: UtilsElement.readAttrBoolean(this, 'highlight-total-on-firstTerm'),
-        overrideMaxRoll: UtilsElement.readAttrInteger(this, 'override-max-roll'),
+        overrideFormula: UtilsElement.readAttrString(this, 'data-override-formula'),
+        compact: UtilsElement.readAttrBoolean(this, 'data-compact'),
+        highlightTotalOnFirstTerm: UtilsElement.readAttrBoolean(this, 'data-highlight-total-on-firstTerm'),
+        overrideMaxRoll: UtilsElement.readAttrInteger(this, 'data-override-max-roll'),
       }
     );
 

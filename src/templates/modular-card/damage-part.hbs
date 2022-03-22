@@ -8,8 +8,8 @@
     <nac-roll-result data-roll="{{nacToJsonString @root.data.calc$.roll}}"></nac-roll-result>
     {{#if @root.data.calc$.roll.evaluated}}
       <nac-roll-result 
-        roll="{{nacToJsonString @root.data.calc$.roll}}"
-        override-formula="{{@root.data.calc$.displayFormula}}">
+        data-roll="{{nacToJsonString @root.data.calc$.roll}}"
+        data-override-formula="{{@root.data.calc$.displayFormula}}">
       </nac-roll-result>
     {{else}}
       <div class="{{@root.moduleName}}-bonus-container">
