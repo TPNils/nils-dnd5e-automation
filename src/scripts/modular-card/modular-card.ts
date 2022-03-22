@@ -352,7 +352,7 @@ export class ModularCard {
         continue;
       }
       // TODO should not have to be wrapped anymore
-      htmlParts.push(`<div data-${staticValues.moduleName}-card-part="${part.id}">`);
+      htmlParts.push(`<div data-part-id="${part.id}">`);
       htmlParts.push(TextEditor.enrichHTML(part.html, enrichOptions as any))
       htmlParts.push(`</div>`);
     }
