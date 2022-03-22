@@ -5,7 +5,6 @@
     {{/if}}
   </div>
   <div class="{{@root.moduleName}}-roll-wrapper">
-    <nac-roll-result data-roll="{{nacToJsonString @root.data.calc$.roll}}"></nac-roll-result>
     {{#if @root.data.calc$.roll.evaluated}}
       <nac-roll-result 
         data-roll="{{nacToJsonString @root.data.calc$.roll}}"
