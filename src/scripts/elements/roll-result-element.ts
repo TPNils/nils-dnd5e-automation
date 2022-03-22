@@ -16,7 +16,15 @@ export class RollResultElement extends HTMLElement {
   }
   
   public static get observedAttributes() {
-    return ['data-roll', 'data-override-max-roll', 'data-compact', 'data-highlight-total-on-firstTerm', 'data-override-formula'];
+    return [
+      // Required
+      'data-roll',
+      // Optional
+      'data-compact',
+      'data-highlight-total-on-firstTerm',
+      'data-override-formula',
+      'data-override-max-roll',
+    ];
   }
 
   private elementsBySlotName: Map<string, Element[]> = new Map();
@@ -40,7 +48,7 @@ export class RollResultElement extends HTMLElement {
 
   private async calcInner(): Promise<void> {
     const rollJson: RollJson = UtilsElement.readAttrJson(this, 'data-roll');
-    if (!rollJson.evaluated) {
+    if (!rollJson?.evaluated) {
       this.textContent = '';
       return;
     }

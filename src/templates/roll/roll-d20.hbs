@@ -1,0 +1,54 @@
+{{!
+  roll=object
+  mode?='advantage' | 'normal' | 'disadvantage'
+  label?=string
+  showBonus?=boolean
+  bonusFormula?=boolean
+  compact?=boolean
+  overrideFormula?=string
+  overrideMaxRoll?=number (example: 19 for Improved Critical)
+  interactionPermission?=string
+  highlightTotalOnFirstTerm?=boolean
+}}
+<div class="flavor">
+  {{#if roll.evaluated}}
+    {{ localize (nacConcat "DND5E." (nacCapitalize mode)) }}
+  {{/if}}
+</div>
+{{log @root}}
+<div class="roll-wrapper">
+  {{#if roll.evaluated }}
+    <nac-roll-result 
+      data-roll="{{nacToJsonString roll}}"
+      data-compact="{{compact}}"
+      data-override-formula="{{overrideFormula}}"
+      data-highlight-total-on-firstTerm="{{highlightTotalOnFirstTerm}}"
+      data-override-max-roll="{{overrideMaxRoll}}">
+    </nac-roll-result>
+  {{else}}
+    <div class="bonus-container">
+      <button data-action="roll" class="roll-buton" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}>
+        {{#if (eq mode 'normal')}}
+          {{#if label}}{{localize label}}{{else}}{{localize "DND5E.Roll"}}{{/if}}
+        {{else}}
+          {{ localize (nacConcat "DND5E." (nacCapitalize mode)) }}
+        {{/if}}
+      </button>
+      
+      {{#if (and showBonus (nacPerm interactionPermission) )}}
+        <input class="user-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{bonusFormula}}" data-action="user-bonus" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}/>
+      {{/if}}
+    </div>
+  {{/if}}
+  {{#nacPerm interactionPermission}}
+    <div class="overlay">
+      <div class="left">
+        <button data-action="mode-minus" class="mode-minus" {{#if (eq mode 'disadvantage')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+      </div>
+      <div class="middel"></div>
+      <div class="right">
+        <button data-action="mode-plus" class="mode-plus" {{#if (eq mode 'advantage')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+      </div>
+    </div>
+  {{/nacPerm}}
+</div>

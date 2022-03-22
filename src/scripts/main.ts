@@ -14,8 +14,10 @@ import { MutableDiceTerm } from "./lib/roll/mutable-dice-term";
 import { TargetCardPart } from "./modular-card/target-card-part";
 import { SpellLevelCardPart } from "./modular-card/spell-level-card-part";
 import { RollResultElement } from "./elements/roll-result-element";
+import { RollD20Element } from "./elements/roll-d20-element";
 
 RollResultElement.registerHooks();
+RollD20Element.registerHooks();
 MutableDiceTerm.registerHooks();
 registerGlobalApiHooks();
 registerHtmlHooks();

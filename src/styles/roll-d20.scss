@@ -1,0 +1,71 @@
+@import 'global-variables';
+
+/* default foundry css */
+#{$module-code}-roll-d20 {
+  display: block;
+  
+  .overlay {
+    display: flex;
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    padding: 3px;
+
+    > .left,
+    > .right {
+      pointer-events: initial;
+      display: flex;
+      width: fit-content;
+    }
+
+    .middel {
+      flex-grow: 1;
+    }
+  }
+  
+  &:not(:hover) .roll-wrapper .overlay {
+    display: none;
+  }
+
+  .bonus-container {
+    position: relative;
+    
+    .user-bonus {
+      position: absolute;
+      background: rgb(193, 193, 182);
+      margin-left: 2px;
+      z-index: 1;
+    }
+  }
+  
+  .roll-wrapper {
+    position: relative;
+    
+    .mode-minus,
+    .mode-plus {
+      background: #f2f2e3;
+      border: 1px solid #b5b3a4;
+      line-height: 0px;
+      font-size: 10px;
+      height: 2em;
+      width: 2em;
+    }
+
+    .mode-plus[disabled],
+    .mode-minus[disabled] {
+      color: inherit;
+      opacity: .5;
+    }
+
+    .mode-minus {
+      color: red;
+    }
+
+    .mode-plus {
+      color: #4F8A10;
+    }
+  }
+}

@@ -1,3 +1,5 @@
+import { RollD20Element } from "../elements/roll-d20-element";
+import { UtilsElement } from "../elements/utils-element";
 import { IAfterDmlContext, IDmlContext, ITrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
@@ -35,7 +37,6 @@ export interface AttackCardData {
   calc$: {
     actorUuid?: string;
     hasHalflingLucky: boolean;
-    label?: string;
     rollBonus?: string;
     requestRollFormula?: string;
     roll?: RollData;
@@ -164,12 +165,22 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   public getElementHtml({data}: HtmlContext<AttackCardData>): string | Promise<string> {
-    return renderTemplate(
-      `modules/${staticValues.moduleName}/templates/modular-card/attack-part.hbs`, {
-        data: data,
-        moduleName: staticValues.moduleName
-      }
-    );
+    const attributes = {
+      ['data-roll']: data.calc$.roll,
+      ['data-bonus-formula']: data.userBonus,
+      ['data-show-bonus']: data.phase === 'bonus-input',
+      ['data-compact']: true,
+      ['data-label']: 'DND5E.Attack',
+      ['data-override-max-roll']: data.calc$.critTreshold,
+    };
+    if (data.calc$.actorUuid) {
+      attributes['data-interaction-permission'] = `OwnerUuid:${data.calc$.actorUuid}`
+    }
+    const attributeArray: string[] = [];
+    for (let [attr, value] of Object.entries(attributes)) {
+      attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
+    }
+    return `<${RollD20Element.selector()} ${attributeArray.join(' ')}></${RollD20Element.selector()}>`
   }
 
   public getCallbackActions(): ICallbackAction<AttackCardData>[] {
@@ -183,17 +194,17 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
     return [
       {
-        regex: /^item-attack$/,
+        regex: /^roll$/,
         permissionCheck: permissionCheck,
         execute: ({data, clickEvent}) => this.processItemAttack(data, clickEvent),
       },
       {
-        regex: /^item-attack-bonus$/,
+        regex: /^user-bonus$/,
         permissionCheck: permissionCheck,
         execute: ({data, keyEvent, inputValue}) => this.processItemAttackBonus(data, keyEvent, inputValue as string),
       },
       {
-        regex: /^item-attack-mode-(minus|plus)$/,
+        regex: /^mode-(minus|plus)$/,
         permissionCheck: permissionCheck,
         execute: ({data, clickEvent, regexResult}) => this.processItemAttackMode(data, clickEvent, regexResult[1] as ('plus' | 'minus')),
       },

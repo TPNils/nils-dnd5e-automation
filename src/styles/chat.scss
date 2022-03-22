@@ -191,17 +191,6 @@
     line-height: 1em;
   }
 
-  .#{$module-name}-bonus-container {
-    position: relative;
-    
-    .#{$module-name}-bonus {
-      position: absolute;
-      background: rgb(193, 193, 182);
-      margin-left: 2px;
-      z-index: 1;
-    }
-  }
-
   .#{$module-name}-footer {
     padding: 3px 0 0;
     border-top: 2px groove #FFF;
