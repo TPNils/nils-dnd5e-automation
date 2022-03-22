@@ -4,7 +4,7 @@ export class UtilsElement {
     if (!element.hasAttribute(attr)) {
       return undefined;
     }
-    if (/[0-9]+/.test(element.getAttribute(attr))) {
+    if (/^[0-9]+$/.test(element.getAttribute(attr))) {
       return Number(element.getAttribute(attr));
     }
     return undefined;
