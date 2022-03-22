@@ -2,6 +2,7 @@ import { buffer } from "../lib/decorator/buffer";
 import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { RollJson } from "../utils/utils-chat-message";
+import { UtilsElement } from "./utils-element";
 
 export class RollResultElement extends HTMLElement {
 
@@ -38,11 +39,7 @@ export class RollResultElement extends HTMLElement {
   }
 
   private async calcInner(): Promise<void> {
-    if (!this.hasAttribute('roll')) {
-      this.textContent = '';
-      return;
-    }
-    const rollJson: RollJson = JSON.parse(this.getAttribute('roll'));
+    const rollJson: RollJson = UtilsElement.readAttrJson(this, 'roll');
     if (!rollJson.evaluated) {
       this.textContent = '';
       return;
@@ -50,10 +47,10 @@ export class RollResultElement extends HTMLElement {
     const html = await renderTemplate(
       `modules/${staticValues.moduleName}/templates/roll/roll.hbs`, {
         roll: rollJson,
-        overrideFormula: this.getAttribute('override-formula'),
-        compact: this.readAttrBoolean('compact'),
-        highlightTotalOnFirstTerm: this.readAttrBoolean('highlight-total-on-firstTerm'),
-        overrideMaxRoll: this.readAttrInteger('override-max-roll'),
+        overrideFormula: UtilsElement.readAttrString(this, 'override-formula'),
+        compact: UtilsElement.readAttrBoolean(this, 'compact'),
+        highlightTotalOnFirstTerm: UtilsElement.readAttrBoolean(this, 'highlight-total-on-firstTerm'),
+        overrideMaxRoll: UtilsElement.readAttrInteger(this, 'override-max-roll'),
       }
     );
 
@@ -73,31 +70,6 @@ export class RollResultElement extends HTMLElement {
     }
     this.textContent = '';
     this.append(...Array.from(root.childNodes));
-  }
-
-  private readAttrInteger(attr: string): number | undefined {
-    if (!this.hasAttribute(attr)) {
-      return undefined;
-    }
-    if (/[0-9]+/.test(this.getAttribute(attr))) {
-      return Number(this.getAttribute(attr));
-    }
-    return undefined;
-  }
-
-  private readAttrBoolean(attr: string): boolean {
-    if (!this.hasAttribute(attr)) {
-      return false;
-    }
-
-    const value = this.getAttribute(attr);
-    if (value === '') {
-      return true;
-    }
-    if (value.toLowerCase() === 'false') {
-      return false;
-    }
-    return Boolean(value);
   }
 
 }
