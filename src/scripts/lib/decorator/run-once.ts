@@ -11,7 +11,6 @@ function runOnceInternal<T>(originalFunction: (args: Array<Array<T>>) => any): (
 }
 
 export function RunOnce() {
-  // TODO test this
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     if (descriptor.configurable === false) {
       throw new Error(`Can't change the property ${propertyKey}. configurable is disabled.`);

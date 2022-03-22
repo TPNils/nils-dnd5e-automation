@@ -330,7 +330,7 @@ class CardPartElement extends HTMLElement {
       return;
     }
 
-    const actions = await this.getActions(action, clickEvent, keyEvent, game.userId, messageId, customData, partData);
+    const actions = await this.getActions(action, clickEvent, keyEvent, game.userId, messageId, customData, messageData, partData);
     if (actions.some(a => a.permissionCheckResult === 'prevent-action')) {
       console.warn(`Pressed an action button for message part ${messageId}.${partId} with action ${action} for current user but permissions are missing.`, this);
       return;
@@ -407,7 +407,7 @@ class CardPartElement extends HTMLElement {
       };
     }
 
-    const actions = await this.getActions(action, clickEvent, keyEvent, userId, messageId, subType, messagePartData);
+    const actions = await this.getActions(action, clickEvent, keyEvent, userId, messageId, subType, allCardParts, messagePartData);
     if (actions.some(a => a.permissionCheckResult === 'prevent-action')) {
       return {
         success: false,
@@ -450,7 +450,7 @@ class CardPartElement extends HTMLElement {
     }
   }
 
-  private async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, subType: string | null, partData: ModularCardPartData): Promise<Array<ActionResponse>> {
+  private async getActions(action: string, clickEvent: ClickEvent, keyEvent: KeyEvent, userId: string, messageId: string, subType: string | null, allCardParts: ModularCardPartData[], partData: ModularCardPartData): Promise<Array<ActionResponse>> {
     if (!action) {
       return [];
     }
@@ -467,7 +467,7 @@ class CardPartElement extends HTMLElement {
             data: partData.data,
             regexResult: result,
             messageId: messageId,
-            allCardParts: [], // TODO
+            allCardParts: allCardParts,
             userId: userId,
             clickEvent: clickEvent,
             keyEvent: keyEvent,

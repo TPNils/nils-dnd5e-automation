@@ -280,7 +280,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       //      or permissions should be configured via the columns
       for (const tokenUuid of context.selectedTokenUuids) {
         let rowValue: string;
-        // TODO cache the hit/mis and why this is the state
         if (!attack.data.calc$.roll?.evaluated || !cache.has(tokenUuid) || !cache.get(tokenUuid).visibleToUsers.includes(game.userId)) {
           if (attack.data.calc$.roll?.evaluated) {
             rowValue = '';

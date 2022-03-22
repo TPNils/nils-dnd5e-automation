@@ -1,5 +1,4 @@
 <div class="{{@root.moduleName}}-section">
-  <!-- TODO disable if you can no longer change targets -->
   <button data-action="item-template" {{#if (nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid))}}disabled{{/if}}>
     {{localize "DND5E.PlaceTemplate"}}
   </button> 

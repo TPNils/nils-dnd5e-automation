@@ -64,7 +64,7 @@ export interface TargetCallbackData {
   readonly messageId: string;
   readonly messageCardParts: ModularCardPartData[];
   readonly targetUuid: string;
-  readonly apply: 'undo' | 'smart-apply' | 'force-apply'; // TODO 'undo' | 'smart-apply' | 'force-apply' => smart = take into account if target hit
+  readonly apply: 'undo' | 'smart-apply' | 'force-apply';
 }
 
 export interface StateContext {

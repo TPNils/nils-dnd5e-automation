@@ -87,7 +87,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   private constructor(){}
 
   public async create({item, actor}: {item: MyItem, actor?: MyActor}): Promise<DamageCardData> {
-    // TODO what about other interactions like spell scaling (modifier with html) and hunters mark (automatic, but only to a specific target)
+    // TODO what about other interactions like hunters mark (automatic, but only to a specific target)
     const rollData: {[key: string]: any} = item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
       rollData.prof = item.data.data.prof.term;
@@ -599,7 +599,6 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
 
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
-    // TODO recalc whole item on level change to support custom scaling level scaling formulas
     await this.calcDamageFormulas(context);
     await this.calcTargetCache(context);
     // TODO auto apply healing, but it needs to be sync?

@@ -108,11 +108,6 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   }
   
   private async processItemTemplate(data: TemplateCardData, messageId: string, partId: string): Promise<void> {
-    // TODO
-    // if (!InternalFunctions.canChangeTargets(messageData.items[itemIndex])) {
-    //   return;
-    // }
-
     const template = MyAbilityTemplate.fromItem({
       target: data.calc$.target,
       flags: {
