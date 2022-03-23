@@ -278,9 +278,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       const attack = rolledAttacks[i];
       // TODO either this should be a (mini) template to use permission check 
       //      or permissions should be configured via the columns
-      for (const tokenUuid of context.selectedTokenUuids) {
+      for (const selected of context.selected) {
         let rowValue: string;
-        if (!attack.data.calc$.roll?.evaluated || !cache.has(tokenUuid) || !cache.get(tokenUuid).visibleToUsers.includes(game.userId)) {
+        if (!attack.data.calc$.roll?.evaluated || !cache.has(selected.tokenUuid) || !cache.get(selected.tokenUuid).visibleToUsers.includes(game.userId)) {
           if (attack.data.calc$.roll?.evaluated) {
             rowValue = '';
           } else {
@@ -288,7 +288,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           }
         } else {
           const styles = ['text-align: center'];
-          switch (cache.get(tokenUuid).resultType) {
+          switch (cache.get(selected.tokenUuid).resultType) {
             case 'critical-hit': {
               styles.push('color: green');
               rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.CriticalHit')}!">✓</div>`;
@@ -302,18 +302,19 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             }
             case 'hit': {
               styles.push('color: green');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">✓</div>`;
+              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">✓</div>`;
               break;
             }
             case 'mis': {
               styles.push('color: red');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">✗</div>`;
+              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac} <= ${attack.data.calc$.roll?.total}">✗</div>`;
               break;
             }
           }
         }
         visualStates.push({
-          tokenUuid: tokenUuid,
+          selectionId: selected.selectionId,
+          tokenUuid: selected.tokenUuid,
           columns: [{
             key: `${this.getType()}-attack-${i}`,
             label: `<div style="font-size: 16px;" title="${game.i18n.localize('DND5E.Attack')}">${svg}</div> ${(rolledAttacks.length === 1) ? '' : ` ${i+1}`}`,
@@ -525,8 +526,8 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
       const cachedTargetUuids = new Set<string>();
       for (const row of rows) {
         if (this.isAnyTargetType(row)) {
-          for (const targetUuid of row.data.selectedTokenUuids) {
-            allTargetUuids.add(targetUuid);
+          for (const selected of row.data.selected) {
+            allTargetUuids.add(selected.tokenUuid);
           }
         }
 
@@ -554,8 +555,8 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
       const allTargetUuids = new Set<string>();
       for (const row of rows) {
         if (this.isAnyTargetType(row)) {
-          for (const targetUuid of row.data.selectedTokenUuids) {
-            allTargetUuids.add(targetUuid);
+          for (const selected of row.data.selected) {
+            allTargetUuids.add(selected.tokenUuid);
           }
         }
       }

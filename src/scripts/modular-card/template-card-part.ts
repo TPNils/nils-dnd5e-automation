@@ -9,7 +9,7 @@ import { UtilsTemplate } from "../utils/utils-template";
 import { createElement, ICallbackAction } from "./card-part-element";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
-import { TargetCardData, TargetCardPart } from "./target-card-part";
+import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-part";
 
 interface TemplateCardData {
   calc$: {
@@ -226,9 +226,9 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
             newTargets.add(token.uuid);
           }
         }
-        const targets = Array.from(newTargets);
-        if (!UtilsCompare.deepEquals(targetPart.data.selectedTokenUuids, targets)) {
-          targetPart.data.selectedTokenUuids = targets;
+        const targets = Array.from(newTargets).sort();
+        if (!UtilsCompare.deepEquals(targetPart.data.selected.map(s => s.tokenUuid).sort(), targets)) {
+          targetPart.data.selected = uuidsToSelected(targets);
           updateChatMessageMap.set(chatMessage.id, parts);
         }
       }

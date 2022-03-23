@@ -10,7 +10,7 @@ import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modu
 import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 export interface TargetCardData {
-  selectedTokenUuids: string[];
+  selected: Array<{selectionId: string, tokenUuid: string;}>;
   calc$: {
     expectedTargets?: number;
     tokenData: Array<{
@@ -34,6 +34,7 @@ export interface State {
   /**
    * The applied state to which this applies
    */
+  selectionId: string;
   tokenUuid: string;
 }
 export interface VisualState extends State {
@@ -63,13 +64,13 @@ export interface VisualState extends State {
 export interface TargetCallbackData {
   readonly messageId: string;
   readonly messageCardParts: ModularCardPartData[];
-  readonly targetUuid: string;
+  readonly selected: TargetCardData['selected'][0];
   readonly apply: 'undo' | 'smart-apply' | 'force-apply';
 }
 
 export interface StateContext {
   messageId: string;
-  selectedTokenUuids: string[];
+  selected: TargetCardData['selected'];
   allMessageParts: ModularCardPartData[];
 }
 
@@ -77,6 +78,20 @@ interface TargetIntegrationCallback {
   onChange?(data: TargetCallbackData[]): void | Promise<void>;
   getState?(context: StateContext): State[];
   getVisualState?(context: StateContext): VisualState[] | Promise<VisualState[]>;
+}
+
+export function uuidsToSelected(uuids: string[]): TargetCardData['selected'] {
+  const selected: TargetCardData['selected'] = [];
+  const indexByUuids = new Map<string, number>();
+  for (const uuid of uuids) {
+    const idIndex = (indexByUuids.get(uuid) ?? 0) + 1;
+    selected.push({
+      selectionId: `${uuid}.${idIndex}`,
+      tokenUuid: uuid,
+    });
+    indexByUuids.set(uuid, idIndex);
+  }
+  return selected;
 }
 
 // TODO Allow the same tokens to be targeted multiple times
@@ -89,7 +104,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   
   public create({item, token}: {item: MyItem, token?: TokenDocument}): TargetCardData {
     const target: TargetCardData = {
-      selectedTokenUuids: [],
+      selected: [],
       calc$: {
         tokenData: [],
       },
@@ -106,9 +121,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       }
     }
     
-    for (const token of selectedTargets) {
-      target.selectedTokenUuids.push(token.uuid);
-    }
+    target.selected = uuidsToSelected(selectedTargets.map(t => t.uuid));
 
     // TODO "item.data.data.target.value" does not support formulas => does not support spell scaling
     //  Solutions: hook into the sheet and add an option for target scaling
@@ -158,7 +171,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   public async getElementHtml(context: HtmlContext<TargetCardData>): Promise<string> {
     const stateContext: StateContext = {
       messageId: context.messageId,
-      selectedTokenUuids: context.data.selectedTokenUuids,
+      selected: context.data.selected,
       allMessageParts: context.allMessageParts,
     };
     const fetchedVisualStates: Promise<VisualState[]>[] = [];
@@ -181,19 +194,19 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     
     const columnsByKey = new Map<string, {label: string}>();
     const columnKeyOrder: string[] = [];
-    const tokenData = new Map<string, {state?: VisualState['state'], smartState?: VisualState['state'], columnData: Map<string, string>}>();
-    for (const targetUuid of context.data.selectedTokenUuids) {
-      tokenData.set(targetUuid, {columnData: new Map()});
+    const tokenData = new Map<string, {uuid: string, state?: VisualState['state'], smartState?: VisualState['state'], columnData: Map<string, string>}>();
+    for (const selected of context.data.selected) {
+      tokenData.set(selected.selectionId, {uuid: selected.tokenUuid, columnData: new Map()});
     }
     for (const visualState of await Promise.all(fetchedVisualStates).then(states => states.deepFlatten())) {
-      if (!visualState?.tokenUuid) {
+      if (!visualState?.selectionId) {
         continue;
       }
 
-      if (!tokenData.has(visualState.tokenUuid)) {
-        tokenData.set(visualState.tokenUuid, {state: visualState.state, smartState: visualState.smartState, columnData: new Map()});
+      if (!tokenData.has(visualState.selectionId)) {
+        tokenData.set(visualState.selectionId, {uuid: visualState.tokenUuid, state: visualState.state, smartState: visualState.smartState, columnData: new Map()});
       }
-      const currentData = tokenData.get(visualState.tokenUuid);
+      const currentData = tokenData.get(visualState.selectionId);
       {
         const strictestVisualStateIndex = [visualStates.indexOf(currentData.state), visualStates.indexOf(visualState.state)].sort()[1];
         if (strictestVisualStateIndex >= 0) {
@@ -240,6 +253,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       htmlTableHeader.row.push(columnsByKey.get(key).label);
     }
     const htmlTableBody: Array<{
+      selectionId: string;
       tokenUuid: string;
       actorUuid: string;
       name: string;
@@ -252,34 +266,52 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     } | {
       isPlaceholder: true;
     }> = [];
-    const tokens = context.data.calc$.tokenData
-      .filter(t => tokenData.has(t.tokenUuid))
+
+    const tokenCacheByUuid = new Map<string, TargetCardData['calc$']['tokenData'][number]>();
+    for (const token of context.data.calc$.tokenData) {
+      tokenCacheByUuid.set(token.tokenUuid, token);
+    }
+    
+    const sortedSelectionIds = Array.from(tokenData.entries())
+      .filter(([key, token]) => tokenCacheByUuid.has(token.uuid))
       .sort((a, b) => {
+        const aToken = tokenCacheByUuid.get(a[1].uuid);
+        const bToken = tokenCacheByUuid.get(b[1].uuid);
+        
         // Since tokens are displayed with their image, group them together
-        let compare = a.img.localeCompare(b.img);
+        let compare = aToken.img.localeCompare(bToken.img);
         if (compare !== 0) {
           return compare;
         }
 
-        return a.name.localeCompare(b.name);
-      });
+        compare = aToken.name.localeCompare(bToken.name);
+        if (compare !== 0) {
+          return compare;
+        }
+
+        return a[0].localeCompare(b[0]);
+      })
+      .map(([key]) => key);
     const allStates = new Set<VisualState['state']>();
     const allSmartStates = new Set<VisualState['state']>();
-    for (const token of tokens) {
+    for (const selectionId of sortedSelectionIds) {
+      const data = tokenData.get(selectionId);
+      const tokenCache = tokenCacheByUuid.get(data.uuid);
       const row: string[] = [];
       for (const key of columnKeyOrder) {
-        row.push(tokenData.get(token.tokenUuid).columnData.get(key) ?? '');
+        row.push(data.columnData.get(key) ?? '');
       }
-      allStates.add(tokenData.get(token.tokenUuid).state);
-      allSmartStates.add(tokenData.get(token.tokenUuid).smartState);
+      allStates.add(data.state);
+      allSmartStates.add(data.smartState);
       htmlTableBody.push({
-        tokenUuid: token.tokenUuid,
-        actorUuid: token.actorUuid,
-        name: token.name,
-        nameVisibleAnyone: token.nameVisibleAnyone,
-        img: token.img,
-        state: tokenData.get(token.tokenUuid).state,
-        smartState: tokenData.get(token.tokenUuid).smartState,
+        selectionId: selectionId,
+        tokenUuid: tokenCache.tokenUuid,
+        actorUuid: tokenCache.actorUuid,
+        name: tokenCache.name,
+        nameVisibleAnyone: tokenCache.nameVisibleAnyone,
+        img: tokenCache.img,
+        state: data.state,
+        smartState: data.smartState,
         row: row,
         isPlaceholder: false
       });
@@ -339,8 +371,8 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
             return {};
           }
           const documents: CreatePermissionCheckArgs['documents'] = [];
-          for (const uuid of this.getTokenUuids([regexResult[2]], data, messageId, allCardParts)) {
-            documents.push({uuid: uuid, permission: 'update', security: true});
+          for (const selected of this.getSelected([regexResult[2]], data, messageId, allCardParts)) {
+            documents.push({uuid: selected.tokenUuid, permission: 'update', security: true});
           }
           return {documents: documents};
         }),
@@ -349,17 +381,23 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     ];
   }
 
-  private async fireEvent(type: TargetCallbackData['apply'], requestUuids: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[], userId: string): Promise<void> {
-    const tokenPermissions = await UtilsDocument.hasPermissions(this.getTokenUuids(requestUuids, data, messageId, allCardParts).map(uuid => ({
-      uuid: uuid,
+  private async fireEvent(type: TargetCallbackData['apply'], requestIds: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[], userId: string): Promise<void> {
+    const tokenPermissions = await UtilsDocument.hasPermissions(this.getSelected(requestIds, data, messageId, allCardParts).map(selected => ({
+      uuid: selected.tokenUuid,
       permission: 'update',
       user: game.users.get(userId),
+      meta: {
+        selectionId: selected.selectionId
+      }
     })));
     
     const callbackData: TargetCallbackData[] = tokenPermissions.filter(permission => permission.result).map(permission => ({
       messageId: messageId,
       messageCardParts: allCardParts,
-      targetUuid: permission.requestedCheck.uuid,
+      selected: {
+        tokenUuid: permission.requestedCheck.uuid,
+        selectionId: permission.requestedCheck.meta.selectionId
+      },
       apply: type,
     }));
 
@@ -373,11 +411,11 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     }
   }
 
-  private getTokenUuids(requestUuids: (string | '*')[], data: TargetCardData, messageId: string, allMessageParts: ModularCardPartData[]): string[] {
-    const allTokenUuids = new Set<string>();
-    const stateContext: StateContext = {messageId: messageId, allMessageParts: allMessageParts, selectedTokenUuids: data.selectedTokenUuids};
-    for (const tokenUuid of data.selectedTokenUuids) {
-      allTokenUuids.add(tokenUuid);
+  private getSelected(requestSelectIds: (string | '*')[], data: TargetCardData, messageId: string, allMessageParts: ModularCardPartData[]): TargetCardData['selected'] {
+    const allSelected = new Map<string, TargetCardData['selected'][0]>();
+    const stateContext: StateContext = {messageId: messageId, allMessageParts: allMessageParts, selected: data.selected};
+    for (const selected of data.selected) {
+      allSelected.set(selected.selectionId, selected);
     }
     for (const integration of this.callbacks) {
       if (!integration.getState) {
@@ -387,14 +425,14 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
         if (state.state === 'disabled') {
           continue;
         }
-        allTokenUuids.add(state.tokenUuid);
+        allSelected.set(state.selectionId, {selectionId: state.selectionId, tokenUuid: state.tokenUuid});
       }
     }
     
-    if (requestUuids.includes('*')) {
-      return Array.from(allTokenUuids);
+    if (requestSelectIds.includes('*')) {
+      return Array.from(allSelected.values());
     } else {
-      return requestUuids.filter(uuid => allTokenUuids.has(uuid));
+      return Array.from(allSelected.values()).filter(selected => requestSelectIds.includes(selected.selectionId))
     }
   }
   //#endregion
@@ -416,9 +454,9 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
 
       const cachedUuids = newRow.data.calc$.tokenData.map(t => t.tokenUuid);
-      for (const tokenUuid of newRow.data.selectedTokenUuids) {
-        if (!cachedUuids.includes(tokenUuid)) {
-          missingTokenCaches.add(tokenUuid);
+      for (const selected of newRow.data.selected) {
+        if (!cachedUuids.includes(selected.tokenUuid)) {
+          missingTokenCaches.add(selected.tokenUuid);
         }
       }
     }
@@ -437,9 +475,9 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
       for (const entry of newRow.data.calc$.tokenData) {
         cache.set(entry.tokenUuid, entry);
       }
-      for (const tokenUuid of newRow.data.selectedTokenUuids) {
-        if (!cache.has(tokenUuid) && tokenMap.has(tokenUuid)) {
-          const token = tokenMap.get(tokenUuid);
+      for (const selected of newRow.data.selected) {
+        if (!cache.has(selected.tokenUuid) && tokenMap.has(selected.tokenUuid)) {
+          const token = tokenMap.get(selected.tokenUuid);
           cache.set(token.uuid, {
             tokenUuid: token.uuid,
             actorUuid: (token.getActor() as MyActor)?.uuid,
@@ -526,7 +564,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
 
     // Assume targets did not changes when non are selected at this time
     if (currentTargetUuids.size !== 0) {
-      const itemTargetUuids = new Set<string>(targetData.selectedTokenUuids);
+      const itemTargetUuids = new Set<string>(targetData.selected.map(s => s.tokenUuid));
       let targetsChanged = itemTargetUuids.size !== currentTargetUuids.size;
       
       if (!targetsChanged) {
@@ -540,10 +578,10 @@ class DmlTriggerUser implements IDmlTrigger<User> {
 
       if (targetsChanged) {
         const targetsUuids: string[] = [];
-        for (const tokenUuid of targetData.selectedTokenUuids) {
+        for (const selected of targetData.selected) {
           // The same target could have been originally targeted twice, keep that amount
-          if (currentTargetUuids.has(tokenUuid)) {
-            targetsUuids.push(tokenUuid);
+          if (currentTargetUuids.has(selected.tokenUuid)) {
+            targetsUuids.push(selected.tokenUuid);
           }
         }
         for (const currentTargetUuid of currentTargetUuids) {
@@ -551,7 +589,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
             targetsUuids.push(currentTargetUuid);
           }
         }
-        targetData.selectedTokenUuids = targetsUuids;
+        targetData.selected = uuidsToSelected(targetsUuids);
         
         await ModularCard.setCardPartDatas(chatMessage, parts);
       }

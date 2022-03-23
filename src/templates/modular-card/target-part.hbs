@@ -31,9 +31,9 @@
       <div class="body-cell">{{! filler }}</div>
       <div class="body-cell one-line">
         {{#nacPerm (nacConcat "UpdateUuid:" target.actorUuid)}}
-          <button data-action="smart-apply-{{target.tokenUuid}}" data-state="{{target.smartState}}" class="apply"><i class="fas fa-brain"></i></button>
-          <button data-action="force-apply-{{target.tokenUuid}}" data-state="{{target.state}}" class="apply"><i class="fas fa-check"></i></button>
-          <button data-action="undo-{{target.tokenUuid}}" data-state="{{target.state}}" class="undo"><i class="fas fa-undo"></i></button>
+          <button data-action="smart-apply-{{target.selectionId}}" data-state="{{target.smartState}}" class="apply"><i class="fas fa-brain"></i></button>
+          <button data-action="force-apply-{{target.selectionId}}" data-state="{{target.state}}" class="apply"><i class="fas fa-check"></i></button>
+          <button data-action="undo-{{target.selectionId}}" data-state="{{target.state}}" class="undo"><i class="fas fa-undo"></i></button>
         {{/nacPerm}}
       </div>
     {{/if}}

@@ -1,3 +1,4 @@
+import { closeSync } from "fs";
 import { IAfterDmlContext, IDmlContext, ITrigger} from "../lib/db/dml-trigger";
 import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
@@ -20,6 +21,7 @@ export interface AddedDamage {
 }
 
 interface TargetCache {
+  selectionId: string;
   targetUuid: string;
   smartState: State['state'];
   appliedState: State['state'];
@@ -61,7 +63,7 @@ function setTargetCache(cache: DamageCardData, targetCache: TargetCache): void {
     cache.calc$.targetCaches = [];
   }
   for (let i = 0; i < cache.calc$.targetCaches.length; i++) {
-    if (cache.calc$.targetCaches[i].targetUuid === targetCache.targetUuid) {
+    if (cache.calc$.targetCaches[i].selectionId === targetCache.selectionId) {
       cache.calc$.targetCaches[i] = targetCache;
       return;
     }
@@ -69,12 +71,12 @@ function setTargetCache(cache: DamageCardData, targetCache: TargetCache): void {
   cache.calc$.targetCaches.push(targetCache);
 }
 
-function getTargetCache(cache: DamageCardData, tokenUuid: string): TargetCache | null {
+function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache | null {
   if (!cache.calc$.targetCaches) {
     return null;
   }
   for (const targetCache of cache.calc$.targetCaches) {
-    if (targetCache.targetUuid === tokenUuid) {
+    if (targetCache.selectionId === selectionId) {
       return targetCache;
     }
   }
@@ -324,7 +326,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   //#region Targeting
   private async targetCallback(targetEvents: TargetCallbackData[]): Promise<void> {
-    const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.targetUuid));
+    const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.selected.tokenUuid));
     let tokenHpSnapshot = new Map<string, {hp: number; failedDeathSaves: number; maxHp: number; tempHp: number}>();
     for (const token of tokenDocuments.values()) {
       const actor: MyActor = token.getActor();
@@ -336,7 +338,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       });
     }
     for (const targetEvent of targetEvents) {
-      const snapshot = tokenHpSnapshot.get(targetEvent.targetUuid);
+      const snapshot = tokenHpSnapshot.get(targetEvent.selected.tokenUuid);
       const tokenHp = deepClone(snapshot);
       
       const attackCards: ModularCardPartData<AttackCardData>[] = targetEvent.messageCardParts
@@ -346,7 +348,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
       // Undo already applied damage
       for (const dmg of damagesCards) {
-        const cache = getTargetCache(dmg.data, targetEvent.targetUuid);
+        const cache = getTargetCache(dmg.data, targetEvent.selected.selectionId);
         if (!cache) {
           continue;
         }
@@ -363,13 +365,13 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
       // Calculate (new) damage
       for (const dmg of damagesCards) {
-        const cache = deepClone(getTargetCache(dmg.data, targetEvent.targetUuid));
+        const cache = deepClone(getTargetCache(dmg.data, targetEvent.selected.selectionId));
         let apply = false;
         cache.smartState = 'not-applied';
         switch (targetEvent.apply) {
           case 'smart-apply': {
             const allHit = attackCards.every(attack => {
-              const hitType = attack.data.calc$.targetCaches.find(target => target.targetUuid === targetEvent.targetUuid)?.resultType;
+              const hitType = attack.data.calc$.targetCaches.find(target => target.targetUuid === targetEvent.selected.tokenUuid)?.resultType;
               return hitType === 'hit' || hitType === 'critical-hit';
             });
             cache.smartState = 'applied';
@@ -413,7 +415,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           const failedDeathSavesDiff = tokenHp.failedDeathSaves - beforeApplyTokenHp.failedDeathSaves;
           setTargetCache(dmg.data, {
             ...cache,
-            targetUuid: targetEvent.targetUuid,
+            selectionId: targetEvent.selected.selectionId,
+            targetUuid: targetEvent.selected.tokenUuid,
             appliedState: 'applied',
             appliedHpChange: hpDiff,
             appliedTmpHpChange: tempHpDiff,
@@ -425,7 +428,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           tokenHp.hp = Math.min(snapshot.maxHp, tokenHp.hp);
           setTargetCache(dmg.data, {
             ...cache,
-            targetUuid: targetEvent.targetUuid,
+            selectionId: targetEvent.selected.selectionId,
+            targetUuid: targetEvent.selected.tokenUuid,
             appliedState: 'not-applied',
             appliedHpChange: tokenHp.hp - originalHp,
             appliedTmpHpChange: 0,
@@ -434,7 +438,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         }
       }
 
-      tokenHpSnapshot.set(targetEvent.targetUuid, tokenHp);
+      tokenHpSnapshot.set(targetEvent.selected.tokenUuid, tokenHp);
     }
 
     // Apply healing/damage/death saves to the token
@@ -461,8 +465,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   private getTargetState(context: StateContext): VisualState[] {
     const states = new Map<string, Omit<VisualState, 'columns'> & {hpDiff?: number}>();
-    for (const uuid of context.selectedTokenUuids) {
-      states.set(uuid, {tokenUuid: uuid, state: 'not-applied', smartState: 'not-applied'});
+    for (const selected of context.selected) {
+      states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, state: 'not-applied', smartState: 'not-applied'});
     }
     for (const part of context.allMessageParts) {
       if (!this.isThisPartType(part)) {
@@ -470,10 +474,10 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
 
       for (const targetCache of part.data.calc$.targetCaches) {
-        if (!states.has(targetCache.targetUuid)) {
-          states.set(targetCache.targetUuid, {tokenUuid: targetCache.targetUuid, state: 'not-applied', smartState: 'not-applied'});
+        if (!states.has(targetCache.selectionId)) {
+          states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, state: 'not-applied', smartState: 'not-applied'});
         }
-        const state = states.get(targetCache.targetUuid);
+        const state = states.get(targetCache.selectionId);
         if (state.hpDiff == null) {
           state.hpDiff = 0;
           state.state = targetCache.appliedState;
@@ -491,10 +495,12 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
     }
 
+    const contextSelectionIds = context.selected.map(s => s.selectionId);
     return Array.from(states.values())
-      .filter(state => state.state !== 'not-applied' || context.selectedTokenUuids.includes(state.tokenUuid))
+      .filter(state => state.state !== 'not-applied' || contextSelectionIds.includes(state.selectionId))
       .map(state => {
         const visualState: VisualState = {
+          selectionId: state.selectionId,
           tokenUuid: state.tokenUuid,
           columns: [],
         };
@@ -605,31 +611,31 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
   }
   
   private async calcTargetCache(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
-    const selectedTokensByMessageId = new Map<string, Set<string>>();
-    const newSelectedTokensByMessageId = new Map<string, Set<string>>();
+    const selectedByMessageId = new Map<string, TargetCardData['selected']>();
+    const newSelectedByMessageId = new Map<string, TargetCardData['selected']>();
     for (const {newRow, oldRow} of context.rows) {
       if (!this.isTargetTriggerType(newRow)) {
         continue;
       }
 
-      if (!newSelectedTokensByMessageId.has(newRow.messageId)) {
-        newSelectedTokensByMessageId.set(newRow.messageId, new Set());
+      if (!newSelectedByMessageId.has(newRow.messageId)) {
+        newSelectedByMessageId.set(newRow.messageId, []);
       }
-      if (!selectedTokensByMessageId.has(newRow.messageId)) {
-        selectedTokensByMessageId.set(newRow.messageId, new Set());
+      if (!selectedByMessageId.has(newRow.messageId)) {
+        selectedByMessageId.set(newRow.messageId, []);
       }
-      const newTokenUuids = newSelectedTokensByMessageId.get(newRow.messageId);
-      const tokenUuids = selectedTokensByMessageId.get(newRow.messageId);
-      const oldSelectedTokens = (oldRow as ModularCardTriggerData<TargetCardData>)?.data?.selectedTokenUuids ?? [];
-      for (const target of newRow.data.selectedTokenUuids) {
-        tokenUuids.add(target);
-        if (!oldSelectedTokens.includes(target)) {
-          newTokenUuids.add(target);
+      const newSelected = newSelectedByMessageId.get(newRow.messageId);
+      const allSelected = selectedByMessageId.get(newRow.messageId);
+      const oldSelectionIds = (oldRow as ModularCardTriggerData<TargetCardData>)?.data?.selected.map(s => s.selectionId) ?? [];
+      for (const target of newRow.data.selected) {
+        allSelected.push(target);
+        if (!oldSelectionIds.includes(target.selectionId)) {
+          newSelected.push(target);
         }
       }
     }
 
-    const recalcTokens: Array<{tokenUuid: string, data: DamageCardData}> = [];
+    const recalcTokens: Array<{selectionId: string, tokenUuid: string, data: DamageCardData}> = [];
     for (const {newRow, oldRow} of context.rows) {
       if (!this.isThisTriggerType(newRow) || !this.assumeThisType(oldRow)) {
         continue;
@@ -639,19 +645,19 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
         (newRow.data.calc$.roll?.evaluated !== oldRow?.data?.calc$?.roll?.evaluated) || 
         (newRow.data.calc$.roll?.evaluated && newRow.data.calc$.roll.formula !== oldRow?.data?.calc$?.roll?.formula)
       ) {
-        if (selectedTokensByMessageId.has(newRow.messageId)) {
-          for (const targetedUuid of selectedTokensByMessageId.get(newRow.messageId)) {
-            recalcTokens.push({data: newRow.data, tokenUuid: targetedUuid});
+        if (selectedByMessageId.has(newRow.messageId)) {
+          for (const selection of selectedByMessageId.get(newRow.messageId)) {
+            recalcTokens.push({data: newRow.data, tokenUuid: selection.tokenUuid, selectionId: selection.selectionId});
           }
         }
         continue;
       }
 
       // Calc new targets
-      if (newSelectedTokensByMessageId.has(newRow.messageId)) {
-        for (const targetedUuid of newSelectedTokensByMessageId.get(newRow.messageId)) {
+      if (newSelectedByMessageId.has(newRow.messageId)) {
+        for (const selection of newSelectedByMessageId.get(newRow.messageId)) {
           // Ignore what is already cached, always fetch when a new target has been selected
-          recalcTokens.push({data: newRow.data, tokenUuid: targetedUuid});
+          recalcTokens.push({data: newRow.data, tokenUuid: selection.tokenUuid, selectionId: selection.selectionId});
         }
       }
     }
@@ -667,9 +673,9 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
     const tokenDocuments = await UtilsDocument.tokenFromUuid(fetchTokenUuids);
     for (const recalcToken of recalcTokens) {
       const actor: MyActor = tokenDocuments.get(recalcToken.tokenUuid).getActor();
-      const currentCache = getTargetCache(recalcToken.data, recalcToken.tokenUuid);
+      const currentCache = getTargetCache(recalcToken.data, recalcToken.selectionId);
       const cache: TargetCache = {
-        ...currentCache ?? {targetUuid: recalcToken.tokenUuid, appliedState: 'not-applied', smartState: 'not-applied'},
+        ...currentCache ?? {targetUuid: recalcToken.tokenUuid, selectionId: recalcToken.selectionId, appliedState: 'not-applied', smartState: 'not-applied'},
         calcHpChange: 0,
         calcAddTmpHp: 0,
         calcFailedDeathSaved: 0,
