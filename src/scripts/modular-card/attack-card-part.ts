@@ -54,7 +54,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   public static readonly instance = new AttackCardPart();
   private constructor(){}
 
-  public create({item, actor}: {item: MyItem, actor?: MyActor}): AttackCardData {
+  public create({item, actor}: ModularCardCreateArgs): AttackCardData {
     if (!['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
       return null;
     }
@@ -101,7 +101,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       userBonus: "",
       calc$: {
         targetCaches: [],
-        elvenAccuracy: actor?.getFlag("dnd5e", "elvenAccuracy") === true,
+        elvenAccuracy: actor?.getFlag("dnd5e", "elvenAccuracy") === true && ["dex", "int", "wis", "cha"].includes(item.abilityMod),
         hasHalflingLucky: actor?.getFlag("dnd5e", "halflingLucky") === true,
         actorUuid: actor?.uuid,
         rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,

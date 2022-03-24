@@ -233,6 +233,7 @@ export type MyItemData = {
 export type MyItem = Item & BaseDocument<MyItemData> & {
   name: string;
   parent: MyActor;
+  readonly abilityMod: keyof MyActorData['data']['abilities']
   getChatData: () => any;
   roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
   displayCard({}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
