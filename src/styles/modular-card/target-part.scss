@@ -1,5 +1,14 @@
 @import '../global-variables.scss';
 
+body.key-shift #{$module-code}-target-part:hover .copy {
+  display: none;
+}
+
+body:not(.key-shift) #{$module-code}-target-part .delete,
+#{$module-code}-target-part:not(:hover) .delete {
+  display: none;
+}
+
 #{$module-code}-target-part {
   .target-table {
     display: grid;
@@ -19,9 +28,8 @@
       opacity: .5;
       color: red;
     }
-  
-    .apply,
-    .undo {
+
+    .icon-button {
       font-size: 10px;
       height: 2em;
       width: 2em;

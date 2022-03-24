@@ -10,6 +10,9 @@ class GlobalHtmlListener {
       document.addEventListener('click', GlobalHtmlListener.toggleRadioClick);
       // If a change event is fired immidatly after the click, cancel the delayed click toggle
       document.addEventListener('change', GlobalHtmlListener.toggleRadioChange);
+      
+      document.addEventListener('keyup', GlobalHtmlListener.onKeyPress);
+      document.addEventListener('keydown', GlobalHtmlListener.onKeyPress);
 
       // Create an observer instance linked to the callback function
       const observer = new MutationObserver((mutationsList, observer) => {
@@ -63,6 +66,18 @@ class GlobalHtmlListener {
     const timeout = GlobalHtmlListener.radioClickedTimeouts.get(event.target as any);
     clearTimeout(timeout);
     GlobalHtmlListener.radioClickedTimeouts.delete(event.target as any);
+  }
+
+  private static onKeyPress(event: KeyboardEvent): void {
+    if (event.shiftKey) {
+      if (!document.body.classList.contains('key-shift')) {
+        document.body.classList.add('key-shift');
+      }
+    } else {
+      if (document.body.classList.contains('key-shift')) {
+        document.body.classList.remove('key-shift');
+      }
+    }
   }
 }
 

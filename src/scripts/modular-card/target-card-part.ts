@@ -12,6 +12,7 @@ import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularC
 export interface TargetCardData {
   selected: Array<{selectionId: string, tokenUuid: string;}>;
   calc$: {
+    actorUuid?: string;
     expectedTargets?: number;
     tokenData: Array<{
       tokenUuid: string;
@@ -94,18 +95,16 @@ export function uuidsToSelected(uuids: string[]): TargetCardData['selected'] {
   return selected;
 }
 
-// TODO Allow the same tokens to be targeted multiple times
-//  Visualization: done
-//  Interaction: Add a + & - button in the target table to increase/decrease selecting the same target multipe times
 export class TargetCardPart implements ModularCardPart<TargetCardData> {
 
   public static readonly instance = new TargetCardPart();
   private constructor(){}
   
-  public create({item, token}: {item: MyItem, token?: TokenDocument}): TargetCardData {
+  public create({item, token, actor}: ModularCardCreateArgs): TargetCardData {
     const target: TargetCardData = {
       selected: [],
       calc$: {
+        actorUuid: actor?.uuid,
         tokenData: [],
       },
     };
@@ -377,8 +376,38 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
           return {documents: documents};
         }),
         execute: ({regexResult, data, messageId, allCardParts, userId}) => this.fireEvent(regexResult[1] as TargetCallbackData['apply'], [regexResult[2]], data, messageId, allCardParts, userId),
-      }
+      },
+      {
+        regex: /^copy-((?:[a-zA-Z0-9\.]+))$/,
+        permissionCheck: createPermissionCheck<TargetCardData>(({data}) => {
+          const documents: CreatePermissionCheckArgs['documents'] = [];
+          if (data.calc$.actorUuid) {
+            documents.push({uuid: data.calc$.actorUuid, permission: 'update', security: true});
+          }
+          return {documents: documents};
+        }),
+        execute: ({regexResult, data}) => this.copySelected(regexResult[1], data),
+      },
+      {
+        regex: /^delete-((?:[a-zA-Z0-9\.]+))$/,
+        permissionCheck: createPermissionCheck<TargetCardData>(({data}) => {
+          const documents: CreatePermissionCheckArgs['documents'] = [];
+          if (data.calc$.actorUuid) {
+            documents.push({uuid: data.calc$.actorUuid, permission: 'update', security: true});
+          }
+          return {documents: documents};
+        }),
+        execute: ({regexResult, data}) => this.deleteSelected(regexResult[1], data),
+      },
     ];
+  }
+
+  private async copySelected(requestTokenUuid: string, data: TargetCardData): Promise<void> {
+    data.selected = uuidsToSelected([...data.selected.map(s => s.tokenUuid), requestTokenUuid]);
+  }
+
+  private async deleteSelected(requestSelectionId: string, data: TargetCardData): Promise<void> {
+    data.selected = data.selected.filter(s => s.selectionId !== requestSelectionId);
   }
 
   private async fireEvent(type: TargetCallbackData['apply'], requestIds: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[], userId: string): Promise<void> {
