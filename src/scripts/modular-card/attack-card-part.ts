@@ -39,6 +39,7 @@ export interface AttackCardData {
   calc$: {
     actorUuid?: string;
     hasHalflingLucky: boolean;
+    elvenAccuracy: boolean;
     rollBonus?: string;
     requestRollFormula?: string;
     roll?: RollData;
@@ -100,6 +101,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       userBonus: "",
       calc$: {
         targetCaches: [],
+        elvenAccuracy: actor?.getFlag("dnd5e", "elvenAccuracy") === true,
         hasHalflingLucky: actor?.getFlag("dnd5e", "halflingLucky") === true,
         actorUuid: actor?.uuid,
         rollBonus: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
@@ -461,7 +463,11 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
       switch (newRow.data.mode) {
         case 'advantage': {
-          baseRoll.number = 2;
+          if (newRow.data.calc$.elvenAccuracy) {
+            baseRoll.number = 3;
+          } else {
+            baseRoll.number = 2;
+          }
           baseRoll.modifiers.push('kh');
           break;
         }
