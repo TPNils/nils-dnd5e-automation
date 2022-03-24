@@ -1,6 +1,6 @@
 import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { MyActor, MyItem } from "../types/fixed-types";
-import { ActionParam, ActionPermissionCheck } from "./card-part-element";
+import { ActionParam, ActionPermissionCheck, HtmlContext } from "./card-part-element";
 import { ModularCardPartData } from "./modular-card";
 
 export interface CreatePermissionCheckArgs {
@@ -70,13 +70,6 @@ export function createPermissionCheck<T>(args: CreatePermissionCheckArgs | (({}:
     }
     return successAction;
   }
-}
-
-export interface HtmlContext<T = any> {
-  messageId: string;
-  partId: string;
-  data: T;
-  allMessageParts: ModularCardPartData[];
 }
 
 export interface ModularCardCreateArgs {

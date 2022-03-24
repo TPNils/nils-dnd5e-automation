@@ -1,20 +1,47 @@
+import { RollD20Element } from "../elements/roll-d20-element";
+import { UtilsElement } from "../elements/utils-element";
 import { RunOnce } from "../lib/decorator/run-once";
-import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
-import { createElement, ICallbackAction } from "./card-part-element";
+import { RollJson } from "../utils/utils-chat-message";
+import { createElement, HtmlContext, ICallbackAction } from "./card-part-element";
 import { ModularCard } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
-interface CheckCardData {
+interface TargetCache {
+  selectionId: string;
+  targetUuid: string;
+  actorUuid: string;
+  
+  mode: 'normal' | 'advantage' | 'disadvantage';
+  phase: 'mode-select' | 'bonus-input' | 'result';
+  userBonus: string;
+  hasHalflingLucky: boolean;
+  reliableTalent: boolean;
+  roll?: RollJson;
+}
+
+export interface CheckCardData {
   ability: keyof MyActor['data']['data']['abilities'];
   dc: number;
   label?: string;
   skill?: string;
   iSave?: boolean;
   calc$: {
-    
+    targetCaches: TargetCache[];
   }
+}
+
+function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache | null {
+  if (!cache.calc$.targetCaches) {
+    return null;
+  }
+  for (const targetCache of cache.calc$.targetCaches) {
+    if (targetCache.selectionId === selectionId) {
+      return targetCache;
+    }
+  }
+  return null;
 }
 
 export class CheckCardPart implements ModularCardPart<CheckCardData> {
@@ -32,7 +59,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
       dc: item.data.data.save.dc,
       iSave: true,
       calc$: {
-        
+        targetCaches: []
       }
     };
   }
@@ -72,12 +99,26 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
     return `${staticValues.code}-check-part`;
   }
 
-  public getElementHtml(context: HtmlContext<CheckCardData>): string | Promise<string> {
-    return renderTemplate(
-      `modules/${staticValues.moduleName}/templates/modular-card/check-part.hbs`, {
-        data: context.data,
-      }
-    );
+  public getElementHtml({data, subType}: HtmlContext<CheckCardData>): string | Promise<string> {
+    const cache = getTargetCache(data, subType);
+    if (!cache) {
+      return '';
+    }
+    const attributes = {
+      ['data-roll']: cache.roll,
+      ['data-bonus-formula']: cache.userBonus,
+      ['data-show-bonus']: cache.phase === 'bonus-input',
+      ['data-compact']: true,
+      ['data-label']: 'DND5E.Attack',
+    };
+    if (cache.actorUuid) {
+      attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid}`
+    }
+    const attributeArray: string[] = [];
+    for (let [attr, value] of Object.entries(attributes)) {
+      attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
+    }
+    return `<${RollD20Element.selector()} ${attributeArray.join(' ')}></${RollD20Element.selector()}>`
   }
 
   public getCallbackActions(): ICallbackAction<CheckCardData>[] {
@@ -92,7 +133,10 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
       
     ]
   }
+  //#endregion
   
+
+  //#region Target
   //#endregion
 
 }

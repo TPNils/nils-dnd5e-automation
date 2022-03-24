@@ -1,9 +1,9 @@
 import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { MyItem } from "../types/fixed-types";
-import { createElement } from "./card-part-element";
+import { createElement, HtmlContext } from "./card-part-element";
 import { ModularCard } from "./modular-card";
-import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 interface PropertyCardData {
   calc$: {

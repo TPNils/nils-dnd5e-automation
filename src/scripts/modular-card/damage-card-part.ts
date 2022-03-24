@@ -9,10 +9,10 @@ import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
-import { ClickEvent, createElement, ICallbackAction, KeyEvent } from "./card-part-element";
+import { ClickEvent, createElement, HtmlContext, ICallbackAction, KeyEvent } from "./card-part-element";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 export interface AddedDamage {

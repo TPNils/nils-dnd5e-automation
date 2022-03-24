@@ -2,10 +2,9 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { ModularCard, ModularCardPartData } from "./modular-card";
 import { MyActor, SpellData } from "../types/fixed-types";
-import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { UtilsDocument } from "../lib/db/utils-document";
-import { createElement, ICallbackAction } from "./card-part-element";
-import { UtilsChatMessage } from "../utils/utils-chat-message";
+import { createElement, HtmlContext, ICallbackAction } from "./card-part-element";
 
 interface SpellLevelCardData {
   selectedLevel: number | 'pact';

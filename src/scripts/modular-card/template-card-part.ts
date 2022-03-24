@@ -4,11 +4,11 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import MyAbilityTemplate from "../pixi/ability-template";
 import { staticValues } from "../static-values";
-import { MyActor, MyItem, MyItemData } from "../types/fixed-types";
+import { MyItemData } from "../types/fixed-types";
 import { UtilsTemplate } from "../utils/utils-template";
-import { createElement, ICallbackAction } from "./card-part-element";
+import { createElement, HtmlContext, ICallbackAction } from "./card-part-element";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-part";
 
 interface TemplateCardData {
