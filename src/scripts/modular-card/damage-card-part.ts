@@ -23,6 +23,7 @@ export interface AddedDamage {
 interface TargetCache {
   selectionId: string;
   targetUuid: string;
+  // TODO store requested action => can and should be used to auto apply when there is no attack or check
   smartState: State['state'];
   appliedState: State['state'];
   // What has actually been applied, accounting the current hp at the time when applied

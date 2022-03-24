@@ -30,6 +30,8 @@ interface TargetCache {
   visibleToUsers: string[];
 }
 
+// TODO when expanding attack card, show the user bonus, which can be edited
+//  UI => can probably solve this with slots
 export interface AttackCardData {
   phase: RollPhase;
   mode: 'normal' | 'advantage' | 'disadvantage';
