@@ -43,7 +43,7 @@ export interface ICallbackAction<T> {
   execute: ActionPermissionExecute<T>;
 }
 
-export interface HtmlContext<T> {
+export interface HtmlContext<T = any> {
   messageId: string;
   partId: string;
   subType?: string;
