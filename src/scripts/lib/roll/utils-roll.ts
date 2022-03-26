@@ -215,6 +215,13 @@ export class UtilsRoll {
 
   public static createDamageRoll(roll: string | RollTerm[], options: DamageRollOptions = {}): Roll {
     const DamageRoll = CONFIG.Dice.rolls.find(a => a.name === 'DamageRoll') as typeof Roll;
+    // Whats the point of having this damage roll? If someone else adds custom crit rules I still need to implement them.
+    // You can use damageRoll, but that always rolls the dice which I can't use since it doesnt HAVE to be rolled
+    options = {
+      multiplyNumeric: game.settings.get("dnd5e", "criticalDamageModifiers") === true,
+      powerfulCritical: game.settings.get("dnd5e", "criticalDamageMaxDice") === true,
+      ...options
+    }
     let dmgRoll: Roll;
     if (Array.isArray(roll)) {
       dmgRoll = new DamageRoll('0', {}, options) as Roll & {configureDamage: () => void};
