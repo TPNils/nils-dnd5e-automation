@@ -378,28 +378,6 @@ export class UtilsRoll {
   }
 
   /**
-   * TODO Should use the standard dnd5e module for custom crit rules
-   */
-  public static getCriticalBonusRoll(normal: RollTerm[]): RollTerm[] {
-    const critTerms: RollTerm[] = [];
-    // new Roll(formula) will ensure we create a new instance
-    for (const normalTerm of normal) {
-      if (normalTerm instanceof NumericTerm) {
-        // Do not add numeric terms to the crit bonus
-        // also remove operators related to that numeric term
-        while (critTerms.length > 0 && critTerms[critTerms.length - 1] instanceof OperatorTerm) {
-          critTerms.pop();
-        }
-        continue;
-      } 
-      
-      critTerms.push(...new Roll(normalTerm.formula).terms);
-    }
-
-    return critTerms;
-  }
-
-  /**
    * roll1:  1d10 + 1d10 + 1d6
    * roll2:  1d10 + 1d10 + 1d8
    * result: 4d10 + 1d6 + 1d8
