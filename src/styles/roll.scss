@@ -1,5 +1,16 @@
 @import 'global-variables';
 
+.hide-flavor #{$module-code}-roll-result,
+#{$module-code}-roll-result.hide-flavor {
+  .term-flavor {
+    display: none;
+  }
+
+  .terms {
+    grid-template-columns: auto max-content;
+  }
+}
+
 #{$module-code}-roll-result {
   display: block;
   font-size: var(--font-size-14, 14px);
@@ -36,9 +47,11 @@
     gap: 0 5px;
     border-left: 1px solid var(--color-border-light-2, #999);
     border-right: 1px solid var(--color-border-light-2, #999);
+    border-radius: 3px;
 
     .term-results {
       display: flex;
+      flex-wrap: wrap;
       flex-grow: 1;
     }
 
@@ -124,7 +137,13 @@
       padding: 0 5px;
       background: rgba(0, 0, 0, 0.1);
       border-left: 1px solid var(--color-text-light, #999);
-      border-radius: 3px 3px 0 0;
+    }
+
+    .term-total:nth-child(3) {
+      border-top-left-radius: 3px;
+    }
+    .term-total:last-child {
+      border-bottom-left-radius: 3px;
     }
   }
 }
