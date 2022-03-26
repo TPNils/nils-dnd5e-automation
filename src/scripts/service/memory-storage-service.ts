@@ -1,3 +1,5 @@
+import { UtilsElement } from "../elements/utils-element";
+
 export class MemoryValue<T = any> {
   private nextListenerId = 0;
   private listeners = new Map<number, (value?: T) => void>();
@@ -57,7 +59,41 @@ export class MemoryStorageService {
     MemoryStorageService.getValue(`focusedElementSelector`).set(selector);
   }
 
-  public static getValue<T>(key: string): MemoryValue<T> {
+  public static getElementValue<T>(element: Element, subKey: string | string[] = []): MemoryValue<T> {
+    if (typeof subKey === 'string') {
+      subKey = [subKey];
+    }
+    const keyParts: string[] = [...subKey.reverse()];
+    let foundMessageId = false;
+    let foundPartId = false;
+    do {
+      {
+        const value = UtilsElement.readAttrString(element, 'data-memory-context');
+        if (value) {
+          keyParts.push(value);
+        }
+      }
+      if (!foundMessageId) {
+        const value = UtilsElement.readAttrString(element, 'data-message-id');
+        if (value) {
+          keyParts.push('message-', value);
+          foundMessageId = true;
+        }
+      }
+      if (!foundPartId) {
+        const value = UtilsElement.readAttrString(element, 'data-part-id');
+        if (value) {
+          keyParts.push('part-', value);
+          foundPartId = true;
+        }
+      }
+      element = element.parentElement;
+    } while (element != null)
+
+    return MemoryStorageService.getValue(keyParts.reverse().join(';'));
+  }
+
+  private static getValue<T>(key: string): MemoryValue<T> {
     if (!MemoryStorageService.properties.has(key)) {
       MemoryStorageService.properties.set(key, new MemoryValue())
     }

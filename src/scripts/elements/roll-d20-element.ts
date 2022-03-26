@@ -34,7 +34,6 @@ export class RollD20Element extends HTMLElement {
       'data-label',
       'data-override-formula',
       'data-override-max-roll',
-      'data-roll-id',
     ];
   }
 
@@ -72,7 +71,6 @@ export class RollD20Element extends HTMLElement {
         highlightTotalOnFirstTerm: UtilsElement.readAttrBoolean(this, 'data-highlight-total-on-firstTerm', true),
         interactionPermission: UtilsElement.readAttrString(this, 'data-interaction-permission'),
         overrideMaxRoll: UtilsElement.readAttrInteger(this, 'data-override-max-roll'),
-        rollId: UtilsElement.readAttrString(this, 'data-roll-id'),
       }
     );
   }

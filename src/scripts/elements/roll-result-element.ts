@@ -25,13 +25,14 @@ export class RollResultElement extends HTMLElement {
       'data-highlight-total-on-firstTerm',
       'data-override-formula',
       'data-override-max-roll',
-      'data-roll-id',
     ];
   }
 
+  private unregister: ReturnType<MemoryValue['listen']>;
   private elementsBySlotName: Map<string, Element[]> = new Map();
   public connectedCallback(): void {
     this.addEventListener('click', () => this.toggleOpen());
+    this.unregister = MemoryStorageService.getElementValue(this, 'roll-open').listen(value => this.setOpenState(!!value));
 
     const elementsBySlotName = new Map<string, Element[]>();
     this.querySelectorAll('[slot]').forEach(element => {
@@ -45,24 +46,8 @@ export class RollResultElement extends HTMLElement {
     this.calcInner();
   }
 
-  private unregister: ReturnType<MemoryValue['listen']>;
   @buffer()
   public attributeChangedCallback(args: Array<[string/* attributeName */, string/* oldValue */, string/* newValue */]>): void {
-    let addListener = false;
-    for (const [attributeName, oldValue, newValue] of args) {
-      if (attributeName === 'data-roll-id') {
-        addListener = true;
-        break;
-      }
-    }
-
-    if (addListener) {
-      if (this.unregister) {
-        this.unregister.unregister();
-      }
-      this.unregister = MemoryStorageService.getValue(UtilsElement.readAttrString(this, 'data-roll-id') + '-roll-open').listen(value => this.setOpenState(!!value));
-    }
-
     this.calcInner();
   }
 
@@ -103,26 +88,12 @@ export class RollResultElement extends HTMLElement {
     }
     this.textContent = '';
     this.append(...Array.from(root.childNodes));
-    const memoryStateKey = UtilsElement.readAttrString(this, 'data-roll-id');
-    if (memoryStateKey) {
-      this.setOpenState(!!MemoryStorageService.getValue<boolean>(memoryStateKey + '-roll-open').get())
-    }
+    this.setOpenState(!!MemoryStorageService.getElementValue(this, 'roll-open').get());
   }
 
   private toggleOpen(): void {
-    const memoryStateKey = UtilsElement.readAttrString(this, 'data-roll-id');
-    if (memoryStateKey) {
-      const value = MemoryStorageService.getValue(memoryStateKey + '-roll-open');
-      value.set(!value.get());
-      return;
-    }
-
-    const wrapper = this.querySelector(':scope > .wrapper');
-    if (!wrapper) {
-      return;
-    }
-    
-    this.setOpenState(!wrapper.classList.contains('open'));
+    const value = MemoryStorageService.getElementValue(this, 'roll-open');
+    value.set(!value.get());
   }
 
   private setOpenState(shouldBeOpen: boolean): void {

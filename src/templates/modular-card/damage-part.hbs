@@ -7,7 +7,6 @@
   <div class="{{@root.moduleName}}-roll-wrapper">
     {{#if @root.data.calc$.roll.evaluated}}
       <nac-roll-result 
-        data-roll-id="{{messageId}}.{{partId}}"
         data-roll="{{nacToJsonString @root.data.calc$.roll}}"
         data-override-formula="{{@root.data.calc$.displayFormula}}">
       </nac-roll-result>

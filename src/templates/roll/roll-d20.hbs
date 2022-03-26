@@ -17,7 +17,6 @@
 <div class="roll-wrapper">
   {{#if roll.evaluated }}
     <nac-roll-result 
-      {{#if @root.rollId}}data-roll-id="{{@root.rollId}}"{{/if}}
       data-roll="{{nacToJsonString roll}}"
       data-override-formula="{{overrideFormula}}"
       data-highlight-total-on-firstTerm="{{highlightTotalOnFirstTerm}}"
