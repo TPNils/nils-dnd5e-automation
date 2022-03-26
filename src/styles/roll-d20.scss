@@ -3,28 +3,7 @@
 /* default foundry css */
 #{$module-code}-roll-d20 {
   display: block;
-  
-  .overlay {
-    display: flex;
-    position: absolute;
-    left: 0px;
-    top: 0px;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    padding: 3px;
-
-    > .left,
-    > .right {
-      pointer-events: initial;
-      display: flex;
-      width: fit-content;
-    }
-
-    .middel {
-      flex-grow: 1;
-    }
-  }
+  font-size: var(--font-size-14, 14px);
   
   &:not(:hover) .roll-wrapper .overlay {
     display: none;
@@ -44,18 +23,28 @@
       z-index: 1;
     }
   }
+
+  #{$module-code}-roll-result {
+    font-size: 1em;
+  }
   
   .roll-wrapper {
     position: relative;
     
     .mode-minus,
     .mode-plus {
+      font-size: 1em;
       background: #f2f2e3;
       border: 1px solid #b5b3a4;
       line-height: 0px;
-      font-size: 10px;
-      height: 2em;
-      width: 2em;
+      height: calc(1.5em - 1px);
+      width: calc(1.5em - 1px);
+      margin: 0 1px;
+      padding: 0;
+
+      > i {
+        font-size: .7em;
+      }
     }
 
     .mode-plus[disabled],
