@@ -225,10 +225,12 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
   }
 
-  public getElementHtml({data}: HtmlContext<DamageCardData>): string | Promise<string> {
+  public getElementHtml({data, messageId, partId}: HtmlContext<DamageCardData>): string | Promise<string> {
     return renderTemplate(
       `modules/${staticValues.moduleName}/templates/modular-card/damage-part.hbs`, {
         data: data,
+        messageId: messageId,
+        partId: partId,
         moduleName: staticValues.moduleName
       }
     );

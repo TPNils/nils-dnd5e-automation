@@ -4,7 +4,6 @@
   label?=string
   showBonus?=boolean
   bonusFormula?=boolean
-  compact?=boolean
   overrideFormula?=string
   overrideMaxRoll?=number (example: 19 for Improved Critical)
   interactionPermission?=string
@@ -18,8 +17,8 @@
 <div class="roll-wrapper">
   {{#if roll.evaluated }}
     <nac-roll-result 
+      {{#if @root.rollId}}data-roll-id="{{@root.rollId}}"{{/if}}
       data-roll="{{nacToJsonString roll}}"
-      data-compact="{{compact}}"
       data-override-formula="{{overrideFormula}}"
       data-highlight-total-on-firstTerm="{{highlightTotalOnFirstTerm}}"
       data-override-max-roll="{{overrideMaxRoll}}">

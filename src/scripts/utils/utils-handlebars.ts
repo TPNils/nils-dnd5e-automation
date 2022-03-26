@@ -3,7 +3,7 @@ import { staticValues } from "../static-values";
 import { MyActorData, SpellData } from "../types/fixed-types";
 import { ItemCardItem } from "./utils-chat-message";
 import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
-import { RollData } from "../lib/roll/utils-roll";
+import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 
 interface InlineHelperOption {
   blockParams: any;
@@ -256,11 +256,14 @@ export class UtilsHandlebars {
     return new Roll(parts.join(' ')).roll({async: false}).total;
   }
 
-  public static isMaxRoll(...args: [RollData, Options]): any
-  public static isMaxRoll(...args: [RollData, boolean, Options]): any
-  public static isMaxRoll(...args: [RollData, boolean, number, Options]): any
+  public static isMaxRoll(...args: [RollData | Roll, Options]): any
+  public static isMaxRoll(...args: [void, boolean, Options]): any
+  public static isMaxRoll(...args: [RollData | Roll, boolean, number, Options]): any
   public static isMaxRoll(...args: any[]): any {
-    let roll: RollData = args[0];
+    let roll = args[0] as RollData | Roll;
+    if (!(roll instanceof Roll)) {
+      roll = UtilsRoll.fromRollData(roll);
+    }
     let options: Options = args[args.length - 1];
     let highlightTotalOnFirstTerm = false;
     let overrideMaxRoll: number;
@@ -274,8 +277,7 @@ export class UtilsHandlebars {
     let hasDie = false;
 
     for (const term of roll.terms) {
-      const termClass = UtilsHandlebars.getTermClass(term.class);
-      if (termClass === Die || termClass.prototype instanceof Die) {
+      if (term instanceof Die) {
         hasDie = true;
         for (const result of term.results) {
           if (result.active && result.result < (overrideMaxRoll ?? (term as DiceTerm.Data).faces)) {
@@ -302,11 +304,14 @@ export class UtilsHandlebars {
     }
   }
 
-  public static isMinRoll(...args: [RollData, Options]): any
-  public static isMinRoll(...args: [RollData, boolean, Options]): any
-  public static isMinRoll(...args: [RollData, boolean, number, Options]): any
+  public static isMinRoll(...args: [RollData | Roll, Options]): any
+  public static isMinRoll(...args: [RollData | Roll, boolean, Options]): any
+  public static isMinRoll(...args: [RollData | Roll, boolean, number, Options]): any
   public static isMinRoll(...args: any[]): any {
-    let roll: RollData = args[0];
+    let roll = args[0] as RollData | Roll;
+    if (!(roll instanceof Roll)) {
+      roll = UtilsRoll.fromRollData(roll);
+    }
     let options: Options = args[args.length - 1];
     let highlightTotalOnFirstTerm = false;
     let minRoll = 1;
@@ -320,8 +325,7 @@ export class UtilsHandlebars {
     let hasDie = false;
 
     for (const term of roll.terms) {
-      const termClass = UtilsHandlebars.getTermClass(term.class);
-      if (termClass === Die || termClass.prototype instanceof Die) {
+      if (term instanceof Die) {
         hasDie = true;
         for (const result of term.results) {
           if (result.active && result.result > minRoll) {
@@ -380,14 +384,4 @@ export class UtilsHandlebars {
     return typeof options.fn === 'function' && typeof options.inverse === 'function';
   }
 
-  /**
-   * It's weird but this is how foundy itself does it
-   */
-  private static getTermClass(className: string): any {
-    let cls = CONFIG.Dice.termTypes[className];
-    if (cls) {
-      return cls;
-    }
-    return Object.values(CONFIG.Dice.terms).find(c => c.name === className) || Die;
-  }
 }

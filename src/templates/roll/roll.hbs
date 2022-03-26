@@ -1,55 +1,27 @@
 {{!
+  moduleCode=string
   roll=object
-  flavor?=string
-  compact?=boolean
   overrideFormula?=string
   overrideMaxRoll?=number (example: 19 for Improved Critical)
   highlightTotalOnFirstTerm?=boolean
 }}
-{{#*inline "tooltip"}}
-<div class="dice-tooltip">
-  {{#each terms as |term|}}
-    {{#if this.results}}
-    <section class="tooltip-part">
-      <div class="dice">
-        <header class="part-header flexrow">
-          <span class="part-formula">{{this.expression}}</span>
-          {{#if this.flavor}}<span class="part-flavor">{{this.flavor}}</span>{{/if}}
-          <span class="part-total">{{this.total}}</span>
-        </header>
-        <ol class="dice-rolls">
-        {{#each this.results}}
-          <li class="roll die d{{term.faces}}{{#if this.success}} success{{/if}}{{#if this.failure}} failure{{/if}}{{#if this.rerolled}} rerolled{{/if}}{{#if this.exploded}} exploded{{/if}}{{#if this.discarded}} discarded{{/if}}{{#if (eq this.result term.faces)}} max{{/if}}{{#if (eq this.result 1)}} min{{/if}}">
-            <span class="result">{{this.result}}</span>
-          </li>
+<div class="wrapper">
+  <div class="roll-total boxed{{#if (nacIsMaxRoll roll highlightTotalOnFirstTerm overrideMaxRoll)}} success{{/if}}{{#if (nacIsMinRoll roll)}} failure{{/if}}">{{roll.total}}</div>
+  <div class="terms">
+    
+  {{#each roll.terms as |term|}}
+    {{#if term.results}}
+      <div class="term-results">
+        {{#each term.results as |res|}}
+          <div class="term-result die d{{res.faces}}{{#if res.success}} success{{/if}}{{#if res.failure}} failure{{/if}}{{#if res.rerolled}} rerolled{{/if}}{{#if res.exploded}} exploded{{/if}}{{#if res.discarded}} discarded{{/if}}{{#if (eq res.result term.faces)}} max{{/if}}{{#if (eq res.result 1)}} min{{/if}}">
+            <span class="term-value">{{res.result}}</span>
+          </div>
         {{/each}}
-        </ol>
       </div>
-    </section>
+      <div class="term-flavor">{{term.flavor}}</div>
+      <div class="term-total">{{term.total}}</div>
     {{/if}}
   {{/each}}
-</div>
-{{/inline}}
-
-<div class="dice-roll">
-  <div class="dice-result">
-    {{#if compact}}
-      <h4 class="dice-total compact">
-        {{roll.total}}
-        {{#each roll.terms as |term|}}
-          {{#each term.results as |result|}}
-            <span class="roll die d{{term.faces}}{{#if result.success}} success{{/if}}{{#if result.failure}} failure{{/if}}{{#if result.rerolled}} rerolled{{/if}}{{#if result.exploded}} exploded{{/if}}{{#if result.discarded}} discarded{{/if}}{{#if (eq result.result term.faces)}} max{{/if}}{{#if (eq result.result 1)}} min{{/if}}">
-              <span class="result">{{result.result}}</span>
-            </span>
-          {{/each}}
-        {{/each}}
-      </h4>
-    {{else}}
-      <div class="dice-formula">
-        {{#if overrideFormula}}{{overrideFormula}}{{else}}{{roll.formula}}{{/if}}
-      </div>
-      {{> tooltip terms=roll.terms}}
-      <h4 class="dice-total {{#if (nacIsMaxRoll roll highlightTotalOnFirstTerm overrideMaxRoll)}} success{{/if}}{{#if (nacIsMinRoll roll)}} failure{{/if}}">{{roll.total}}</h4>
-    {{/if}}
   </div>
+  <div class="roll-formula boxed">{{#if overrideFormula}}{{overrideFormula}}{{else}}{{roll.formula}}{{/if}}</div>
 </div>

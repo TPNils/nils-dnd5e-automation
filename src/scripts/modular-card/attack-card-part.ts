@@ -168,9 +168,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
   }
 
-  public getElementHtml({data}: HtmlContext<AttackCardData>): string | Promise<string> {
+  public getElementHtml({data, messageId, partId}: HtmlContext<AttackCardData>): string | Promise<string> {
     const attributes = {
       ['data-roll']: data.calc$.roll,
+      ['data-roll-id']: `${messageId}-${partId}`,
       ['data-bonus-formula']: data.userBonus,
       ['data-show-bonus']: data.phase === 'bonus-input',
       ['data-compact']: true,
