@@ -120,6 +120,11 @@
 
     .term-total {
       margin-left: auto;
+      font-weight: bold;
+      padding: 0 5px;
+      background: rgba(0, 0, 0, 0.1);
+      border-left: 1px solid var(--color-text-light, #999);
+      border-radius: 3px 3px 0 0;
     }
   }
 }
