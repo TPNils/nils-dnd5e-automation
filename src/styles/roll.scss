@@ -42,8 +42,8 @@
     //display: flex;
     display: grid;
     grid-template-columns: auto max-content max-content;
-    $module-code: 1.5em;
-    line-height: #{$module-code};
+    $line-height: 1.5em;
+    line-height: #{$line-height};
     gap: 0 5px;
     border-left: 1px solid var(--color-border-light-2, #999);
     border-right: 1px solid var(--color-border-light-2, #999);
@@ -56,8 +56,8 @@
     }
 
     .term-result {
-      width: #{$module-code};
-      height: #{$module-code};
+      width: #{$line-height};
+      height: #{$line-height};
       text-align: center;
       
       .term-value {
@@ -69,9 +69,9 @@
         display: block;
         position: absolute;
         background-image: url("/icons/svg/d20-grey.svg");
-        background-size: #{$module-code} #{$module-code};
-        width: #{$module-code};
-        height: #{$module-code};
+        background-size: #{$line-height} #{$line-height};
+        width: #{$line-height};
+        height: #{$line-height};
       }
       &.d4::before {
         background-image: url("/icons/svg/d4-grey.svg");
