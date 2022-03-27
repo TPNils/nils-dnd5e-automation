@@ -1,5 +1,12 @@
 @import 'global-variables';
 
+.hide-flavor #{$module-code}-roll-d20,
+#{$module-code}-roll-d20.hide-flavor {
+  .flavor {
+    display: none;
+  }
+}
+
 /* default foundry css */
 #{$module-code}-roll-d20 {
   display: block;

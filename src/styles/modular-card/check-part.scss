@@ -2,7 +2,9 @@
 
 #{$module-code}-target-part #{$module-code}-check-part {
   
-  font-size: 10px;
+  display: block;
+  font-size: 12px;
+  min-width: 5.5em;
 
   #{$module-code}-roll-d20 {
     font-size: 1em;

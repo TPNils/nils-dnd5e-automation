@@ -133,7 +133,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
     for (let [attr, value] of Object.entries(attributes)) {
       attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
     }
-    return `<${RollD20Element.selector()} ${attributeArray.join(' ')}></${RollD20Element.selector()}>`
+    return `<${RollD20Element.selector()} class="hide-flavor" ${attributeArray.join(' ')}></${RollD20Element.selector()}>`
   }
 
 
