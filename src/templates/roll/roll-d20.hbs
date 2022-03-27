@@ -24,11 +24,31 @@
     </nac-roll-result>
   {{else}}
     <div class="bonus-container">
-      <button data-action="roll" class="roll-buton" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}>
-        {{#if (eq mode 'normal')}}
-          {{#if label}}{{localize label}}{{else}}{{localize "DND5E.Roll"}}{{/if}}
+      <button data-action="roll" class="roll-button" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}>
+        {{#if label}}
+          {{! if label provided, show text}}
+          {{#if (eq mode 'normal')}}
+            {{ localize label }}
+          {{else}}
+            {{ localize (nacConcat "DND5E." (nacCapitalize mode)) }}
+          {{/if}}
         {{else}}
-          {{ localize (nacConcat "DND5E." (nacCapitalize mode)) }}
+          {{! if no label provided, show icons}}
+          {{#if (nacExpr mode '===' 'advantage')}}
+            <svg class="advantage-icon" >
+              <use class="d20" xlink:href="/modules/{{@root.moduleName}}/assets/icons/d20.svg#d20"/>
+              <use class="arrow-up" xlink:href="/modules/{{@root.moduleName}}/assets/icons/arrow-up.svg#arrow-up"  width=".9em" height=".9em"></use>
+            </svg>
+          {{else if (nacExpr mode '===' 'disadvantage')}}
+            <svg class="disadvantage-icon">
+              <use class="d20" xlink:href="/modules/{{@root.moduleName}}/assets/icons/d20.svg#d20"/>
+              <use class="arrow-down" xlink:href="/modules/{{@root.moduleName}}/assets/icons/arrow-up.svg#arrow-up"  width=".9em" height=".9em"></use>
+            </svg>
+          {{else}}
+            <svg class="normal-mode-icon">
+              <use class="d20" xlink:href="/modules/{{@root.moduleName}}/assets/icons/d20.svg#d20"/>
+            </svg>
+          {{/if}}
         {{/if}}
       </button>
       

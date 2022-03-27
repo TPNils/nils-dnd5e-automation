@@ -121,11 +121,6 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
       ['data-bonus-formula']: cache.userBonus,
       ['data-show-bonus']: cache.phase === 'bonus-input',
     };
-    if (data.iSave) {
-      attributes['data-label'] = `DND5E.Ability${data.ability}`;
-    } else {
-      attributes['data-label'] = `DND5E.Skill${data.skill}`;
-    }
     if (cache.actorUuid) {
       attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid}`
     }
@@ -133,7 +128,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
     for (let [attr, value] of Object.entries(attributes)) {
       attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
     }
-    return `<${RollD20Element.selector()} class="hide-flavor" ${attributeArray.join(' ')}></${RollD20Element.selector()}>`
+    return `<${RollD20Element.selector()} class="hide-flavor snug" ${attributeArray.join(' ')}></${RollD20Element.selector()}>`
   }
 
 

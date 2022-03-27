@@ -31,13 +31,14 @@
 .#{$module-name}-item-card {
   font-style: normal;
   font-size: var(--font-size-12, 12px);
+  --button-height: calc(2em - 2px);
 
   button {
     font-size: var(--font-size-14, 14px);
     background: rgb(190, 189, 178);
     border: 2px groove #eeede0;
-    height: calc(2em - 2px);
-    line-height: calc(2em - 8px);
+    height: var(--button-height);
+    line-height: calc(var(--button-height) - 4px);
   }
 
   .dice-roll .dice-flavor {

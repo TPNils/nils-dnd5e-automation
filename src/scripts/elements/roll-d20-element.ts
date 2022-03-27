@@ -28,7 +28,6 @@ export class RollD20Element extends HTMLElement {
       // Optional
       'data-bonus-formula',
       'data-show-bonus',
-      'data-compact',
       'data-highlight-total-on-firstTerm',
       'data-interaction-permission',
       'data-label',
@@ -67,10 +66,10 @@ export class RollD20Element extends HTMLElement {
         showBonus: UtilsElement.readAttrBoolean(this, 'data-show-bonus'),
         bonusFormula: UtilsElement.readAttrString(this, 'data-bonus-formula'),
         overrideFormula: UtilsElement.readAttrString(this, 'data-override-formula'),
-        compact: UtilsElement.readAttrBoolean(this, 'data-compact'),
         highlightTotalOnFirstTerm: UtilsElement.readAttrBoolean(this, 'data-highlight-total-on-firstTerm', true),
         interactionPermission: UtilsElement.readAttrString(this, 'data-interaction-permission'),
         overrideMaxRoll: UtilsElement.readAttrInteger(this, 'data-override-max-roll'),
+        moduleName: staticValues.moduleName,
       }
     );
   }

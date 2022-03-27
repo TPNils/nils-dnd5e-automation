@@ -34,9 +34,42 @@
   #{$module-code}-roll-result {
     font-size: 1em;
   }
+
+  &.snug {
+    --button-height: 1.5em;
+  }
   
   .roll-wrapper {
     position: relative;
+
+    .advantage-icon,
+    .normal-mode-icon,
+    .disadvantage-icon {
+      width: calc(var(--button-height) - 4px); // 2px border of the button on each side
+      height: calc(var(--button-height) - 4px);
+    } 
+
+    .advantage-icon {
+      .d20 {
+        color: green;
+      }
+
+      .arrow-up {
+        transform: translate(.15em, .15em);
+        color: black;
+      }
+    }
+
+    .disadvantage-icon {
+      .d20 {
+        color: #c81627;
+      }
+
+      .arrow-down {
+        transform: rotate(180deg) translate(-1.1em, -1.1em);
+        color: black;
+      }
+    }
     
     .mode-minus,
     .mode-plus {
