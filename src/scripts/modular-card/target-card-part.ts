@@ -354,6 +354,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
           tableHeader: htmlTableHeader,
           tableBody: htmlTableBody,
         },
+        actorUuid: context.data.calc$.actorUuid,
         moduleName: staticValues.moduleName
       }
     );
@@ -389,14 +390,18 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       },
       {
         regex: /^delete-((?:[a-zA-Z0-9\.]+))$/,
-        permissionCheck: createPermissionCheck<TargetCardData>(({data}) => {
+        permissionCheck: createPermissionCheck<TargetCardData>(({data, regexResult, messageId, allCardParts}) => {
           const documents: CreatePermissionCheckArgs['documents'] = [];
           if (data.calc$.actorUuid) {
             documents.push({uuid: data.calc$.actorUuid, permission: 'update', security: true});
           }
+          for (const selected of this.getSelected([regexResult[1]], data, messageId, allCardParts)) {
+            if (['applied', 'partial-applied'].includes(selected.state))
+            documents.push({uuid: selected.tokenUuid, permission: 'update', security: true});
+          }
           return {documents: documents};
         }),
-        execute: ({regexResult, data}) => this.deleteSelected(regexResult[1], data),
+        execute: ({regexResult, data, messageId, allCardParts, userId}) => this.deleteSelected(regexResult[1], data, messageId, allCardParts, userId),
       },
     ];
   }
@@ -405,8 +410,9 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     data.selected = uuidsToSelected([...data.selected.map(s => s.tokenUuid), requestTokenUuid]);
   }
 
-  private async deleteSelected(requestSelectionId: string, data: TargetCardData): Promise<void> {
+  private async deleteSelected(requestSelectionId: string, data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[], userId: string): Promise<void> {
     data.selected = data.selected.filter(s => s.selectionId !== requestSelectionId);
+    await this.fireEvent('undo', [requestSelectionId], data, messageId, allCardParts, userId);
   }
 
   private async fireEvent(type: TargetCallbackData['apply'], requestIds: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[], userId: string): Promise<void> {
@@ -439,11 +445,11 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     }
   }
 
-  private getSelected(requestSelectIds: (string | '*')[], data: TargetCardData, messageId: string, allMessageParts: ModularCardPartData[]): TargetCardData['selected'] {
-    const allSelected = new Map<string, TargetCardData['selected'][0]>();
+  private getSelected(requestSelectIds: (string | '*')[], data: TargetCardData, messageId: string, allMessageParts: ModularCardPartData[]): Array<TargetCardData['selected'][0] & {state: typeof visualStates[number]}> {
+    const allSelected = new Map<string, TargetCardData['selected'][0] & {state: typeof visualStates[number]}>();
     const stateContext: StateContext = {messageId: messageId, allMessageParts: allMessageParts, selected: data.selected};
     for (const selected of data.selected) {
-      allSelected.set(selected.selectionId, selected);
+      allSelected.set(selected.selectionId, {...selected, state: 'not-applied'});
     }
     for (const integration of this.callbacks) {
       if (!integration.getState) {
@@ -453,7 +459,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
         if (state.state === 'disabled') {
           continue;
         }
-        allSelected.set(state.selectionId, {selectionId: state.selectionId, tokenUuid: state.tokenUuid});
+        allSelected.set(state.selectionId, {selectionId: state.selectionId, tokenUuid: state.tokenUuid, state: state.state});
       }
     }
     

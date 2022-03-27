@@ -27,8 +27,8 @@
       <div class="body-cell placeholder">{{! apply buttons }}</div>
     {{else}}
       <div class="body-cell">
-        <button data-action="delete-{{target.selectionId}}" class="icon-button delete"><i class="fas fa-trash"></i></button>
-        <button data-action="copy-{{target.tokenUuid}}" class="icon-button copy"><i class="far fa-copy"></i></button>
+        <button {{#if (or (nacMisPerm (nacConcat 'OwnerUuid:' @root.actorUuid)) (and (or (nacExpr target.state '===' 'partial-applied') (nacExpr target.state '===' 'applied')) (nacMisPerm (nacConcat 'OwnerUuid:' target.actorUuid))))}}disabled{{/if}} data-action="delete-{{target.selectionId}}" class="icon-button delete"><i class="fas fa-trash"></i></button>
+        <button {{#if (nacMisPerm (nacConcat 'OwnerUuid:' @root.actorUuid))}}disabled{{/if}} data-action="copy-{{target.tokenUuid}}" class="icon-button copy"><i class="far fa-copy"></i></button>
       </div>
       <div class="body-cell" {{#if (or target.nameVisibleAnyone (nacPerm (nacConcat "ObserverUuid:" target.actorUuid)) )}}title="{{target.name}}"{{/if}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</div>
       {{#each target.row}}
