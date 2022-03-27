@@ -123,52 +123,6 @@ export class UtilsHandlebars {
     }
   }
   
-  public static spellLevels(options: Options): any {
-    const actor = UtilsDocument.actorFromUuid(options.hash.actorUuid, {sync: true});
-    let spellLevels: {type: 'pact' | 'spell', level: number, maxSlots: number; availableSlots: number;}[] = [];
-
-    for (const spellKey in actor.data.data.spells) {
-      const spellData: SpellData = actor.data.data.spells[spellKey];
-      if (spellData.max <= 0) {
-        continue;
-      }
-      if (spellKey.startsWith('spell')) {
-        spellLevels.push({
-          type: 'spell',
-          level: Number.parseInt(spellKey.substring(5)),
-          maxSlots: spellData.max,
-          availableSlots: spellData.value
-        });
-      } else if (spellKey === 'pact') {
-        spellLevels.push({
-          type: 'pact',
-          level: (spellData as MyActorData['data']['spells']['pact']).level,
-          maxSlots: spellData.max,
-          availableSlots: spellData.value
-        });
-      }
-    }
-
-    // Sort pact before spell levels
-    spellLevels = spellLevels.sort((a, b) => {
-      let diff = a.type.localeCompare(b.type);
-      if (diff) {
-        return diff;
-      }
-      return a.level - b.level;
-    });
-
-    if (options.hash.minLevel != null) {
-      spellLevels = spellLevels.filter(lvl => lvl.level >= options.hash.minLevel);
-    }
-
-    if (UtilsHandlebars.isBlockHelper(options)) {
-      return options.fn(spellLevels);
-    } else {
-      return spellLevels;
-    }
-  }
-  
   public static expression(v1: any, operator: string, v2: any, options: Options): any {
     const pass = UtilsHandlebars.expressionCheck(v1, operator, v2);
     
@@ -373,7 +327,6 @@ export class UtilsHandlebars {
       Handlebars.registerHelper(`${staticValues.code}TranslateUsage`, UtilsHandlebars.translateUsage);
       Handlebars.registerHelper(`${staticValues.code}Math`, UtilsHandlebars.math);
       Handlebars.registerHelper(`${staticValues.code}Capitalize`, UtilsHandlebars.capitalize);
-      Handlebars.registerHelper(`${staticValues.code}SpellLevels`, UtilsHandlebars.spellLevels);
       Handlebars.registerHelper(`${staticValues.code}IsMinRoll`, UtilsHandlebars.isMinRoll);
       Handlebars.registerHelper(`${staticValues.code}IsMaxRoll`, UtilsHandlebars.isMaxRoll);
       Handlebars.registerHelper(`${staticValues.code}ToJsonString`, UtilsHandlebars.toJsonString);
