@@ -1,0 +1,11 @@
+@import '../global-variables.scss';
+
+#{$module-code}-target-part #{$module-code}-check-part {
+  
+  font-size: 10px;
+
+  #{$module-code}-roll-d20 {
+    font-size: 1em;
+  }
+
+}

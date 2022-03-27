@@ -15,6 +15,7 @@ import { TargetCardPart } from "./modular-card/target-card-part";
 import { SpellLevelCardPart } from "./modular-card/spell-level-card-part";
 import { RollResultElement } from "./elements/roll-result-element";
 import { RollD20Element } from "./elements/roll-d20-element";
+import { CheckCardPart } from "./modular-card/check-card-part";
 
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
@@ -26,6 +27,7 @@ registerOverrideHooks()
 UtilsHandlebars.registerHooks();
 ModularCard.registerHooks();
 AttackCardPart.instance.registerHooks();
+CheckCardPart.instance.registerHooks();
 DamageCardPart.instance.registerHooks();
 DescriptionCardPart.instance.registerHooks();
 PropertyCardPart.instance.registerHooks();

@@ -6,6 +6,7 @@ import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { AttackCardPart } from "./attack-card-part";
+import { CheckCardPart } from "./check-card-part";
 import { DamageCardPart } from "./damage-card-part";
 import { DescriptionCardPart } from "./description-card-part";
 import { ModularCardPart } from "./modular-card-part";
@@ -202,6 +203,7 @@ export class ModularCard {
       AttackCardPart.instance,
       DamageCardPart.instance,
       TemplateCardPart.instance,
+      CheckCardPart.instance,
       TargetCardPart.instance,
       PropertyCardPart.instance,
     ];

@@ -1,4 +1,5 @@
 import EmbeddedCollection from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/embedded-collection.mjs";
+import { ActorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 
 interface BaseDocument<DATA> {
   id?: string;
@@ -24,6 +25,20 @@ export interface ActorAbility {
   proficient: number; // Proficiantie multiplier
   save: number; // The bonus on saving throws
   saveBonus: number; // Not sure what this is?
+}
+
+export interface ActorSkill {
+  value: number; // Proficiantie multiplier
+  ability: keyof MyActorData['data']['abilities'];
+  bonus: number;
+  mod: number;
+  prof: {
+    multiplier: number;
+    rounding: "down";
+  },
+  proficient: number;
+  total: number;
+  passive: number;
 }
 
 interface SpellData {
@@ -115,6 +130,26 @@ export type MyActorData = {
         lr: false;
         value: number | string;
       }
+    }
+    skills: {
+      acr: ActorSkill;
+      ani: ActorSkill;
+      arc: ActorSkill;
+      ath: ActorSkill;
+      dec: ActorSkill;
+      his: ActorSkill;
+      ins: ActorSkill;
+      itm: ActorSkill;
+      inv: ActorSkill;
+      med: ActorSkill;
+      nat: ActorSkill;
+      prc: ActorSkill;
+      prf: ActorSkill;
+      per: ActorSkill;
+      rel: ActorSkill;
+      slt: ActorSkill;
+      ste: ActorSkill;
+      sur: ActorSkill;
     }
     spells: {
       pact: SpellData & {
