@@ -13,7 +13,7 @@
     {{#if term.results}}
       <div class="term-results">
         {{#each term.results as |res|}}
-          <div class="term-result die d{{res.faces}}{{#if res.success}} success{{/if}}{{#if res.failure}} failure{{/if}}{{#if res.rerolled}} rerolled{{/if}}{{#if res.exploded}} exploded{{/if}}{{#if res.discarded}} discarded{{/if}}{{#if (eq res.result term.faces)}} max{{/if}}{{#if (eq res.result 1)}} min{{/if}}">
+          <div class="term-result die d{{term.faces}}{{#if res.success}} success{{/if}}{{#if res.failure}} failure{{/if}}{{#if res.rerolled}} rerolled{{/if}}{{#if res.exploded}} exploded{{/if}}{{#if res.discarded}} discarded{{/if}}{{#if (eq res.result term.faces)}} max{{/if}}{{#if (eq res.result 1)}} min{{/if}}">
             <span class="term-value">{{res.result}}</span>
           </div>
         {{/each}}
