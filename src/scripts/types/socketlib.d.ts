@@ -6,7 +6,7 @@ declare interface Socketlib {
 }
 
 declare interface SocketlibSocket {
-  register(name: string, handler: (...args: any) => void): void;
+  register(name: string, handler: (...args: any) => any): void;
   executeAsGM(handler: string, ...args: any): Promise<any>;
   executeAsUser(handler: string, userId: string, ...args: any): Promise<any>;
   executeForAllGMs(handler: string, ...args: any): Promise<any>;
