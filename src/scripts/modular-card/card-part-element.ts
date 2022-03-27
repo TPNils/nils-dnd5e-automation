@@ -73,7 +73,7 @@ export function createElement(config: CardPartElementConfig): (typeof HTMLElemen
   provider.getSocket().then(socket => {
     socket.register(`${config.selector}.onInteraction`, (params: Parameters<CardPartElement['onInteractionProcessor']>[0]) => {
       const query = [
-        `[data-message-id="${params.messageId}"][data-part-id="${params.partId}"]${config.selector}`,
+        `${config.selector}[data-message-id="${params.messageId}"][data-part-id="${params.partId}"]`,
         `[data-message-id="${params.messageId}"][data-part-id="${params.partId}"] ${config.selector}`,
         `[data-message-id="${params.messageId}"] [data-part-id="${params.partId}"] ${config.selector}`,
       ];
