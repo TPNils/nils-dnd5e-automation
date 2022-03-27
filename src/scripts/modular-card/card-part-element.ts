@@ -1,5 +1,6 @@
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { provider } from "../provider/provider";
+import { staticValues } from "../static-values";
 import { ModularCard, ModularCardPartData } from "./modular-card";
 
 export interface ClickEvent {
@@ -214,6 +215,10 @@ class CardPartElement extends HTMLElement {
       return;
     }
     if (event.target instanceof Node) {
+      if (event[staticValues.moduleName]?.capured) {
+        return;
+      }
+      event[staticValues.moduleName] = {capured: true}
       this.onInteraction({
         clickEvent: event,
         element: event.target as Node
@@ -223,6 +228,10 @@ class CardPartElement extends HTMLElement {
 
   private async onBlur(event: FocusEvent): Promise<void> {
     if (event.target instanceof HTMLInputElement) {
+      if (event[staticValues.moduleName]?.capured) {
+        return;
+      }
+      event[staticValues.moduleName] = {capured: true}
       // blur does not work very well with checkboxes => listen to click event
       const input = event.target as HTMLInputElement;
       if (input.type === 'checkbox') {
@@ -238,6 +247,10 @@ class CardPartElement extends HTMLElement {
 
   private async onKeyDown(event: KeyboardEvent): Promise<void> {
     if (event.target instanceof HTMLInputElement && ['Enter', 'Escape'].includes(event.key)) {
+      if (event[staticValues.moduleName]?.capured) {
+        return;
+      }
+      event[staticValues.moduleName] = {capured: true}
       this.onInteraction({
         element: event.target as Node,
         keyEvent: {
@@ -249,6 +262,10 @@ class CardPartElement extends HTMLElement {
 
   private async onChange(event: Event): Promise<void> {
     if (event.target instanceof Node) {
+      if (event[staticValues.moduleName]?.capured) {
+        return;
+      }
+      event[staticValues.moduleName] = {capured: true}
       this.onInteraction({
         element: event.target as Node
       });
@@ -272,7 +289,6 @@ class CardPartElement extends HTMLElement {
     let action: string;
     let currentElement = element;
     let inputValue: boolean | number | string;
-    let customData: any = {};
     while (currentElement != null) {
       if (currentElement instanceof HTMLElement) {
         if (currentElement.hasAttribute(`data-action`)) {
@@ -290,14 +306,6 @@ class CardPartElement extends HTMLElement {
             inputValue = currentElement.value;
           }
         }
-
-        if (this.config.hasSubType) {
-          for (const [dataKey, attribute] of Object.entries(this.config)) {
-            if (customData[dataKey] !== undefined && currentElement.hasAttribute(`data-${attribute}`)) {
-              customData[dataKey] = currentElement.getAttribute(`data-${attribute}`);;
-            }
-          }
-        }
       }
 
       if (currentElement === this) {
@@ -309,7 +317,7 @@ class CardPartElement extends HTMLElement {
     if (!action || !partId || !messageId) {
       return;
     }
-    if (this.config.hasSubType && ! subType) {
+    if (this.config.hasSubType && !subType) {
       return;
     }
     
@@ -330,13 +338,13 @@ class CardPartElement extends HTMLElement {
       return;
     }
 
-    const actions = await this.getActions(action, clickEvent, keyEvent, game.userId, messageId, customData, messageData, partData);
+    const actions = await this.getActions(action, clickEvent, keyEvent, game.userId, messageId, subType, messageData, partData);
     if (actions.some(a => a.permissionCheckResult === 'prevent-action')) {
       console.warn(`Pressed an action button for message part ${messageId}.${partId} with action ${action} for current user but permissions are missing.`, this);
       return;
     }
     if (actions.length === 0) {
-      console.info('no actions found');
+      console.info('no actions found', {action, clickEvent, keyEvent, messageId, messageData, partData, subType, element: element});
       return;
     }
 
