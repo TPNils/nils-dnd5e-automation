@@ -780,11 +780,11 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
   
   private onBonusChange(context: IDmlContext<ModularCardTriggerData>): void {
     for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId) {
+      if (changedByUserId !== game.userId || !this.isThisTriggerType(newRow)) {
         continue;
       }
-      if ((newRow.data as DamageCardData).phase === 'bonus-input' && (oldRow?.data as DamageCardData)?.phase !== 'bonus-input') {
-        MemoryStorageService.setFocusedElementSelector(`[data-message-id="${newRow.messageId}"] [data-${staticValues.moduleName}-card-part="${newRow.id}"] input.${staticValues.moduleName}-bonus`);
+      if (newRow.data.phase === 'bonus-input' && (oldRow?.data as DamageCardData)?.phase !== 'bonus-input') {
+        MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.id}"] input.user-bonus`);
         return;
       }
     }

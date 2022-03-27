@@ -27,7 +27,6 @@ class GlobalHtmlListener {
               if (queryNode instanceof HTMLElement) {
                 queryNode.focus();
                 // Only focus once
-                MemoryStorageService.setFocusedElementSelector(null);
                 return;
               }
             }
