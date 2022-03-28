@@ -1,9 +1,9 @@
 import { IUnregisterTrigger } from "../lib/db/dml-trigger";
-import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { provider } from "../provider/provider";
 
 interface DynamicElementConfig {
   selector: string;
+  inits: OnInit[];
   callbacks: DynamicElementCallback[];
 }
 
@@ -61,6 +61,9 @@ class DynamicElement extends HTMLElement {
   private unregisters: IUnregisterTrigger[] = [];
   public connectedCallback(): void {
     this.registerEventListeners();
+    for (const init of this.config.inits) {
+      init({element: this});
+    }
   }
 
   /**
@@ -189,7 +192,15 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
   }
 }
 
+export type OnInit = (args: {element: HTMLElement}) => void | Promise<void>;
+
 export class ElementBuilder {
+
+  private onInits: OnInit[] = [];
+  public init(onInit: OnInit): this {
+    this.onInits.push(onInit);
+    return this;
+  }
 
   private listenerBuilders: ElementCallbackBuilder[] = [];
   public addListener(): ElementCallbackBuilder {
@@ -202,6 +213,7 @@ export class ElementBuilder {
     // TODO validate
     const config: DynamicElementConfig = {
       selector: selector,
+      inits: this.onInits,
       callbacks: [],
     }
 
