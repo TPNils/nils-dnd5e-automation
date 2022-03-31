@@ -13,26 +13,31 @@ interface DynamicElementCallback {
   readonly eventName: string;
   readonly filterSelector?: string
   readonly serializers: Array<(event: Event) => any>;
+  readonly dataEnrichers: Array<(data: any) => any>;
   readonly permissionCheck?: (data: any) => Promise<PermissionCheckResult> | PermissionCheckResult;
   readonly execute: (data: any) => void;
 }
 
 type ExecuteResponse = {success: true;} | {success: false; errorMessage: string, stackTrace?: string[], errorType: 'warn' | 'error'}
-async function executeIfAllowed(callback: DynamicElementCallback, data: any): Promise<ExecuteResponse> {
+async function executeIfAllowed(callback: DynamicElementCallback, serializedData: any): Promise<ExecuteResponse> {
   try {
+    let enrichedData = deepClone(serializedData);
+    for (const enricher of callback.dataEnrichers) {
+      enrichedData = {...enrichedData, ...enricher(serializedData)};
+    }
     if (!callback.permissionCheck || game.user.isGM) {
-      callback.execute(data);
+      callback.execute(enrichedData);
       return {success: true};
     }
   
-    const permissionResponse = await callback.permissionCheck(data);
+    const permissionResponse = await callback.permissionCheck(enrichedData);
     if (permissionResponse === 'can-run-local') {
-      callback.execute(data);
+      callback.execute(enrichedData);
       return {success: true};
     } else if (permissionResponse === 'can-run-as-gm') {
-      return provider.getSocket().then(socket => socket.executeAsGM(callback.id, data));
+      return provider.getSocket().then(socket => socket.executeAsGM(callback.id, serializedData));
     } else {
-      return {success: false, errorType: 'warn', errorMessage: `Missing permission for action ${callback.id}. Data: ${JSON.stringify(data)}`};
+      return {success: false, errorType: 'warn', errorMessage: `Missing permission for action ${callback.id}. Data: ${JSON.stringify(enrichedData)}`};
     }
   } catch (err) {
     return {
@@ -119,16 +124,15 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
 
   private eventName: E;
   /**
+   * <b>Required</b>
+   * 
    * @param eventName the name of the event you wish to listen to
    * @returns this
    */
   public event<K extends keyof HTMLElementEventMap>(eventName: K): ElementCallbackBuilder<K, HTMLElementEventMap[K], S>;
   public event(eventName: E): ElementCallbackBuilder<string, Event, S> {
-    if (this.serializerFuncs) {
-      throw new Error(`Can't change the event name after the serializer has been set`);
-    }
-    if (this.executeFunc) {
-      throw new Error(`Can't change the event name after the execute has been set`);
+    if (this.eventName != null) {
+      throw new Error(`Once set, can't change the event name`);
     }
     this.eventName = eventName;
     return this;
@@ -136,15 +140,33 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
 
   private serializerFuncs: Array<(event: C) => any> = [];
   /**
-   * The serilizer should gather all the data of _this_ instance and transform it into
+   * <b>One serializer is required</b>
+   * The serializer should gather all the data of _this_ instance and transform it into
    * input data which can be processed in the _global_ context
-   * The return values of all serializers will be combined for the permission check and execute
+   * The return values of all serializers will be combined, passed to the enrichers and then passed to the permission check and execute.
+   * The serialized data should contain the minimum data and use lookups to records.
+   * 
+   * Also see enricher
    * 
    * @param serializerFunc function to transform the event to input data
    * @returns this
    */
   public serializer<T extends object>(serializerFunc: (event: C) => T): ElementCallbackBuilder<E, C, T & S> {
     this.serializerFuncs.push(serializerFunc);
+    return this as ElementCallbackBuilder<E, C, any>;
+  }
+
+  private enricherFuncs: Array<(serializedData: S) => any> = [];
+  /**
+   * <b>Optional</b>
+   * The serialized data cotnains the bare minimum.
+   * To help the permission check and execute,
+   * 
+   * @param enricher function which return data which should be extended to the serialized data
+   * @returns this
+   */
+  public enricher<T extends object>(enricher: (serializedData: S) => T): ElementCallbackBuilder<E, C, T & S> {
+    this.enricherFuncs.push(enricher);
     return this as ElementCallbackBuilder<E, C, any>;
   }
 
@@ -156,6 +178,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
 
   private permissionCheckFunc: (data: S) => Promise<PermissionCheckResult> | PermissionCheckResult;
   /**
+   * <b>Optional</b>
    * Validate if the user is allowed to execute this action
    * 
    * @param permissionCheckFunc function which will do the permission check
@@ -168,6 +191,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
 
   private executeFunc: (event: S) => void;
   /**
+   * <b>Required</b>
    * The global execution function
    * 
    * @param executeFunc the fucntion which will execute the serialized event
@@ -186,6 +210,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
     return {
       eventName: this.eventName,
       filterSelector: this.filterSelector,
+      dataEnrichers: this.enricherFuncs,
       serializers: this.serializerFuncs,
       permissionCheck: this.permissionCheckFunc,
       execute: this.executeFunc,
