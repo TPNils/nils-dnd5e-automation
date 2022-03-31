@@ -12,7 +12,7 @@ interface DynamicElementCallback {
   readonly id: string;
   readonly eventName: string;
   readonly filterSelector?: string
-  readonly serializer: (event: Event) => any;
+  readonly serializers: Array<(event: Event) => any>;
   readonly permissionCheck?: (data: any) => Promise<PermissionCheckResult> | PermissionCheckResult;
   readonly execute: (data: any) => void;
 }
@@ -82,7 +82,11 @@ class DynamicElement extends HTMLElement {
   private registerEventListeners() {
     for (const callback of this.config.callbacks) {
       const listener: EventListenerOrEventListenerObject = async event => {
-        const response = await executeIfAllowed(callback, callback.serializer(event));
+        let serializedData = callback.serializers[0](event);
+        for (let i = 1; i < callback.serializers.length; i++) {
+          serializedData = {...serializedData, ...callback.serializers[i](event)}
+        }
+        const response = await executeIfAllowed(callback, serializedData);
         if (response.success === false) {
           if (response.errorType === 'warn') {
             console.warn(response);
@@ -108,7 +112,7 @@ class DynamicElement extends HTMLElement {
 
 }
 
-export class ElementCallbackBuilder<E extends string = string, C extends Event = Event, S = any> {
+export class ElementCallbackBuilder<E extends string = string, C extends Event = Event, S = unknown> {
   constructor(
     private readonly eventBuilder: ElementBuilder,
   ){}
@@ -120,7 +124,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
    */
   public event<K extends keyof HTMLElementEventMap>(eventName: K): ElementCallbackBuilder<K, HTMLElementEventMap[K], S>;
   public event(eventName: E): ElementCallbackBuilder<string, Event, S> {
-    if (this.serializerFunc) {
+    if (this.serializerFuncs) {
       throw new Error(`Can't change the event name after the serializer has been set`);
     }
     if (this.executeFunc) {
@@ -130,21 +134,18 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
     return this;
   }
 
-  private serializerFunc: (event: Event) => S;
+  private serializerFuncs: Array<(event: C) => any>;
   /**
    * The serilizer should gather all the data of _this_ instance and transform it into
    * input data which can be processed in the _global_ context
+   * The return values of all serializers will be combined for the permission check and execute
    * 
    * @param serializerFunc function to transform the event to input data
    * @returns this
    */
-  public serializer<T>(serializerFunc: (event: C) => T): ElementCallbackBuilder<E, C, T> {
-    if (this.executeFunc) {
-      throw new Error(`Can't change the serializer after the execute has been set`);
-    }
-    const builder: ElementCallbackBuilder<E, C, any> = this;
-    builder.serializerFunc = serializerFunc;
-    return builder;
+  public serializer<T extends object>(serializerFunc: (event: C) => T): ElementCallbackBuilder<E, C, T & S> {
+    this.serializerFuncs.push(serializerFunc);
+    return this as ElementCallbackBuilder<E, C, any>;
   }
 
   private filterSelector: string;
@@ -185,7 +186,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
     return {
       eventName: this.eventName,
       filterSelector: this.filterSelector,
-      serializer: this.serializerFunc,
+      serializers: this.serializerFuncs,
       permissionCheck: this.permissionCheckFunc,
       execute: this.executeFunc,
     }
