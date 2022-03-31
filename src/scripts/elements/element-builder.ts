@@ -255,7 +255,7 @@ export type OnInit = (args: {element: HTMLElement}) => void | Promise<void>;
 export class ElementBuilder {
 
   private onInits: OnInit[] = [];
-  public init(onInit: OnInit): this {
+  public addInit(onInit: OnInit): this {
     this.onInits.push(onInit);
     return this;
   }
