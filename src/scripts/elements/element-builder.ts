@@ -158,8 +158,8 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
    * @param eventName the name of the event you wish to listen to
    * @returns this
    */
-  public event<K extends keyof HTMLElementEventMap>(eventName: K): ElementCallbackBuilder<K, HTMLElementEventMap[K], S>;
-  public event(eventName: E): ElementCallbackBuilder<string, Event, S> {
+  public setEvent<K extends keyof HTMLElementEventMap>(eventName: K): ElementCallbackBuilder<K, HTMLElementEventMap[K], S>;
+  public setEvent(eventName: E): ElementCallbackBuilder<string, Event, S> {
     if (this.eventName != null) {
       throw new Error(`Once set, can't change the event name`);
     }
@@ -180,7 +180,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
    * @param serializerFunc function to transform the event to input data
    * @returns this
    */
-  public serializer<T extends object>(serializerFunc: (event: C) => T): ElementCallbackBuilder<E, C, T & S> {
+  public addSerializer<T extends object>(serializerFunc: (event: C) => T): ElementCallbackBuilder<E, C, T & S> {
     this.serializerFuncs.push(serializerFunc);
     return this as ElementCallbackBuilder<E, C, any>;
   }
@@ -194,13 +194,13 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
    * @param enricher function which return data which should be extended to the serialized data
    * @returns this
    */
-  public enricher<T extends object>(enricher: (serializedData: S) => T | Promise<T>): ElementCallbackBuilder<E, C, T & S> {
+  public addEnricher<T extends object>(enricher: (serializedData: S) => T | Promise<T>): ElementCallbackBuilder<E, C, T & S> {
     this.enricherFuncs.push(enricher);
     return this as ElementCallbackBuilder<E, C, any>;
   }
 
   private filterSelector: string;
-  public filter(selector: string): this {
+  public setFilter(selector: string): this {
     if (selector && !selector.toLowerCase().startsWith(':scope')) {
       selector = ':scope ' + selector;
     }
@@ -216,7 +216,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
    * @param permissionCheckFunc function which will do the permission check
    * @returns this
    */
-  public permissionCheck(permissionCheckFunc: (data: S) => Promise<PermissionCheckResult> | PermissionCheckResult): this {
+  public setPermissionCheck(permissionCheckFunc: (data: S) => Promise<PermissionCheckResult> | PermissionCheckResult): this {
     this.permissionCheckFunc = permissionCheckFunc;
     return this;
   }
@@ -229,7 +229,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
    * @param executeFunc the fucntion which will execute the serialized event
    * @returns this
    */
-  public execute(executeFunc: (event: S) => void): this {
+  public setExecute(executeFunc: (event: S) => void): this {
     this.executeFunc = executeFunc;
     return this;
   }
