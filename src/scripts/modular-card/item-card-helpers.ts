@@ -1,9 +1,15 @@
 import { DamageType } from "../types/fixed-types";
+import { ModularCard, ModularCardPartData } from "./modular-card";
 
 export interface ChatPartIdData {
   readonly partId: string;
   readonly messageId: string;
   readonly subType: string | null;
+}
+
+export interface ChatPartEnriched<T> {
+  allCardParts: ModularCardPartData<any>[];
+  data: ModularCardPartData<T>;
 }
 
 export interface UserIdData {
@@ -72,6 +78,27 @@ export class ItemCardHelpers {
         keyEvent: {
           key: event.key
         }
+      }
+    }
+  }
+
+  public static getChatPartEnricher<T>(): (data: ChatPartIdData) => ChatPartEnriched<T> {
+    return data => {
+      const message = game.messages.get(data.messageId);
+      const originalAllCardParts = ModularCard.getCardPartDatas(message);
+
+      let allCardParts = deepClone(originalAllCardParts);
+      const messagePartData = ModularCard.getCardPartDatas(message).find(part => part.id === data.partId);
+      if (messagePartData == null) {
+        throw {
+          success: false,
+          errorType: 'warn',
+          errorMessage: `Pressed an action button for message part ${data.messageId}.${data.partId} but no data was found`,
+        };
+      }
+      return {
+        allCardParts,
+        data: messagePartData,
       }
     }
   }
