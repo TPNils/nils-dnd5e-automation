@@ -51,6 +51,7 @@ export class ItemCardHelpers {
 
   public static getChatPartIdSerializer(): (event: Event) => ChatPartIdData {
     return event => {
+      // TODO validate when values are missing
       return {
         messageId: (event.target as HTMLElement).closest('[data-message-id]')?.getAttribute('data-message-id'),
         partId: (event.target as HTMLElement).closest('[data-part-id]')?.getAttribute('data-part-id'),
