@@ -23,7 +23,7 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
   try {
     let enrichedData = deepClone(serializedData);
     for (const enricher of callback.dataEnrichers) {
-      enrichedData = {...enrichedData, ...enricher(serializedData)};
+      enrichedData = {...enrichedData, ...await enricher(serializedData)};
     }
     if (!callback.permissionCheck || game.user.isGM) {
       callback.execute(enrichedData);
@@ -165,7 +165,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
    * @param enricher function which return data which should be extended to the serialized data
    * @returns this
    */
-  public enricher<T extends object>(enricher: (serializedData: S) => T): ElementCallbackBuilder<E, C, T & S> {
+  public enricher<T extends object>(enricher: (serializedData: S) => T | Promise<T>): ElementCallbackBuilder<E, C, T & S> {
     this.enricherFuncs.push(enricher);
     return this as ElementCallbackBuilder<E, C, any>;
   }
