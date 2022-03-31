@@ -110,6 +110,12 @@ class DynamicElement extends HTMLElement {
   private registerEventListeners() {
     for (const callback of this.config.callbacks) {
       const listener: EventListenerOrEventListenerObject = async event => {
+        if (callback.filterSelector && event.target instanceof HTMLElement) {
+          const items = Array.from(this.querySelectorAll(callback.filterSelector));
+          if (!items.includes(event.target)) {
+            return;
+          }
+        }
         let serializedData = callback.serializers[0](event);
         for (let i = 1; i < callback.serializers.length; i++) {
           serializedData = {...serializedData, ...callback.serializers[i](event)}
@@ -195,6 +201,9 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
 
   private filterSelector: string;
   public filter(selector: string): this {
+    if (selector && !selector.toLowerCase().startsWith(':scope')) {
+      selector = ':scope ' + selector;
+    }
     this.filterSelector = selector;
     return this;
   }
