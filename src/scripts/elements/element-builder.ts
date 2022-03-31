@@ -1,9 +1,13 @@
 import { IUnregisterTrigger } from "../lib/db/dml-trigger";
+import { buffer } from "../lib/decorator/buffer";
 import { provider } from "../provider/provider";
+import { UtilsElement } from "./utils-element";
 
 interface DynamicElementConfig {
   selector: string;
   inits: OnInit[];
+  watchingAttributes: {[key: string]: keyof AttributeTypes};
+  onAttributeChanges: OnAttributeChange<any>[];
   callbacks: DynamicElementCallback[];
 }
 
@@ -75,11 +79,80 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
 class DynamicElement extends HTMLElement {
   protected config: DynamicElementConfig;
 
+  private mapAttribute(type: keyof AttributeTypes, value: string): any {
+    if (value == null) {
+      if (type === 'boolean') {
+        return false;
+      }
+      return value;
+    }
+    switch (type) {
+      case 'boolean':  {
+        if (value === '') {
+          return true;
+        }
+        if (value.toLowerCase() === 'false') {
+          return false;
+        }
+        return Boolean(value);
+      }
+      case 'number':  {
+        if (/^[0-9]+$/.test(value)) {
+          return Number(value);
+        }
+        return null;
+      }
+      case 'string': {
+        if (value === '') {
+          return null;
+        }
+        return value;
+      }
+      case 'json': {
+        if (value === '') {
+          return null;
+        }
+        return JSON.parse(value);
+      }
+    }
+    return value;
+  }
+
   /**
    * Invoked each time one of the custom element's attributes is added, removed, or changed. Which attributes to notice change for is specified in a static get 
    */
-  public attributeChangedCallback(name: string, oldValue: string, newValue: string): void {
-    // TODO data binding
+  @buffer()
+  public attributeChangedCallback(args: Array<[string, string, string]>): void {
+    const changes: AttributeChange<any> = {};
+    for (const attribute of Object.keys(this.config.watchingAttributes)) {
+      const value = this.mapAttribute(this.config.watchingAttributes[attribute], this.getAttribute(attribute));
+      changes[attribute] = {
+        changed: false,
+        currentValue: value,
+        oldValue: value,
+      }
+    }
+    const processedNames = new Set<string>();
+    for (const [name, oldValue, newValue] of args) {
+      if (processedNames.has(name)) {
+        continue;
+      }
+      changes[name].oldValue = this.mapAttribute(this.config.watchingAttributes[name], oldValue);
+      processedNames.add(name);
+    }
+    let anyChanged = false;
+    for (const attribute of Object.keys(this.config.watchingAttributes)) {
+      changes[attribute].changed = changes[attribute].oldValue !== changes[attribute].currentValue;
+      if (changes[attribute].changed) {
+        anyChanged = true;
+      }
+    }
+    if (!anyChanged) {
+      return;
+    }
+    for (const onAttributeChange of this.config.onAttributeChanges) {
+      onAttributeChange({element: this, attributes: changes});
+    }
   }
 
   /**
@@ -147,11 +220,10 @@ class DynamicElement extends HTMLElement {
 }
 
 export class ElementCallbackBuilder<E extends string = string, C extends Event = Event, S = unknown> {
-  constructor(
-    private readonly eventBuilder: ElementBuilder,
-  ){}
 
   private eventName: E;
+  constructor(
+  ){}
   /**
    * <b>Required</b>
    * 
@@ -234,10 +306,6 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
     return this;
   }
 
-  public finish(): ElementBuilder {
-    return this.eventBuilder;
-  }
-
   public toConfig(): Omit<DynamicElementCallback, 'id'> {
     return {
       eventName: this.eventName,
@@ -250,21 +318,49 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
   }
 }
 
-export type OnInit = (args: {element: HTMLElement}) => void | Promise<void>;
+export type OnInit = (args: {element: HTMLElement}) => unknown | Promise<unknown>;
 
-export class ElementBuilder {
+
+type AttributeChange<T> = {
+  [P in keyof T]: {
+    changed: boolean;
+    currentValue?: T[P];
+    oldValue?: T[P];
+  };
+};
+export type OnAttributeChange<T> = (args: {element: HTMLElement, attributes: AttributeChange<T>}) => unknown | Promise<unknown>;
+
+interface AttributeTypes {
+  string: string;
+  number: number;
+  boolean: boolean;
+  json: any;
+}
+
+export class ElementBuilder<INPUT extends object = {}> {
 
   private onInits: OnInit[] = [];
-  public addInit(onInit: OnInit): this {
+  public addOnInit(onInit: OnInit): this {
     this.onInits.push(onInit);
     return this;
   }
 
+  private onAttributeChanges: OnAttributeChange<INPUT>[] = [];
+  public addOnAttributeChange(onAttributeChange: OnAttributeChange<INPUT>): this {
+    this.onAttributeChanges.push(onAttributeChange);
+    return this;
+  }
+
   private listenerBuilders: ElementCallbackBuilder[] = [];
-  public addListener(): ElementCallbackBuilder {
-    const listenerBuilder = new ElementCallbackBuilder(this);
+  public addListener(listenerBuilder: ElementCallbackBuilder): this {
     this.listenerBuilders.push(listenerBuilder);
-    return listenerBuilder;
+    return this;
+  }
+
+  private attributes: {[key: string]: keyof AttributeTypes} = {};
+  public listenForAttribute<K extends string, T extends keyof AttributeTypes>(name: K, type: T): ElementBuilder<INPUT & {[k in K]: AttributeTypes[T]}> {
+    this.attributes[name] = type;
+    return this as ElementBuilder<any>;
   }
 
   public build(selector: string): typeof HTMLElement {
@@ -272,6 +368,8 @@ export class ElementBuilder {
     const config: DynamicElementConfig = {
       selector: selector,
       inits: this.onInits,
+      watchingAttributes: this.attributes,
+      onAttributeChanges: this.onAttributeChanges,
       callbacks: [],
     }
 
@@ -282,12 +380,18 @@ export class ElementBuilder {
         id: `${config.selector}.${callbackId++}`,
       });
     }
+
     const element = class extends DynamicElement {
       constructor() {
         super()
         this.config = config;
       }
+      
+      public static get observedAttributes() {
+        return Object.keys(config.watchingAttributes);
+      }
     };
+
     customElements.define(config.selector, element);
     provider.getSocket().then(socket => {
       for (let i = 0; i < config.callbacks.length; i++) {
