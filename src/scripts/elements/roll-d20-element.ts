@@ -1,7 +1,7 @@
-import { buffer } from "../lib/decorator/buffer";
 import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { RollJson } from "../utils/utils-chat-message";
+import { ElementBuilder } from "./element-builder";
 import { UtilsElement } from "./utils-element";
 
 export interface RollD20Data {
@@ -10,7 +10,7 @@ export interface RollD20Data {
   overrideMaxRoll?: number;
 }
 
-export class RollD20Element extends HTMLElement {
+export class RollD20Element {
 
   public static selector(): string {
     return `${staticValues.code}-roll-d20`;
@@ -18,37 +18,23 @@ export class RollD20Element extends HTMLElement {
 
   @RunOnce()
   public static registerHooks(): void {
-    customElements.define(RollD20Element.selector(), RollD20Element);
-  }
-  
-  public static get observedAttributes() {
-    return [
-      // Required
-      'data-roll',
-      // Optional
-      'data-bonus-formula',
-      'data-show-bonus',
-      'data-highlight-total-on-firstTerm',
-      'data-interaction-permission',
-      'data-label',
-      'data-override-formula',
-      'data-override-max-roll',
-    ];
+    new ElementBuilder()
+      .addOnAttributeChange(RollD20Element.doRender)
+      .listenForAttribute('data-roll', 'json')
+      .listenForAttribute('data-bonus-formula', 'json')
+      .listenForAttribute('data-show-bonus', 'boolean')
+      .listenForAttribute('data-highlight-total-on-firstTerm', 'boolean')
+      .listenForAttribute('data-interaction-permission', 'string')
+      .listenForAttribute('data-label', 'string')
+      .listenForAttribute('data-override-formula', 'string')
+      .listenForAttribute('data-override-max-roll', 'number')
+      .build(`${staticValues.code}-roll-d20`)
   }
 
-  public connectedCallback(): void {
-    this.calcInner();
-  }
-
-  @buffer({bufferTime: 0})
-  public attributeChangedCallback(): void {
-    this.calcInner();
-  }
-
-  private async calcInner(): Promise<void> {
-    const rollJson: RollJson = UtilsElement.readAttrJson(this, 'data-roll');
+  private static doRender = async ({element}: {element: HTMLElement}) => {
+    const rollJson: RollJson = UtilsElement.readAttrJson(element, 'data-roll');
     if (!rollJson) {
-      this.textContent = '';
+      element.textContent = '';
       return;
     }
     let mode: RollD20Data['mode'] = 'normal';
@@ -58,17 +44,17 @@ export class RollD20Element extends HTMLElement {
     } else if (firstTerm.modifiers?.includes('kl')) {
       mode = 'disadvantage';
     }
-    this.innerHTML = await renderTemplate(
+    element.innerHTML = await renderTemplate(
       `modules/${staticValues.moduleName}/templates/roll/roll-d20.hbs`, {
         roll: rollJson,
         mode: mode,
-        label: UtilsElement.readAttrString(this, 'data-label'),
-        showBonus: UtilsElement.readAttrBoolean(this, 'data-show-bonus'),
-        bonusFormula: UtilsElement.readAttrString(this, 'data-bonus-formula'),
-        overrideFormula: UtilsElement.readAttrString(this, 'data-override-formula'),
-        highlightTotalOnFirstTerm: UtilsElement.readAttrBoolean(this, 'data-highlight-total-on-firstTerm', true),
-        interactionPermission: UtilsElement.readAttrString(this, 'data-interaction-permission'),
-        overrideMaxRoll: UtilsElement.readAttrInteger(this, 'data-override-max-roll'),
+        label: UtilsElement.readAttrString(element, 'data-label'),
+        showBonus: UtilsElement.readAttrBoolean(element, 'data-show-bonus'),
+        bonusFormula: UtilsElement.readAttrString(element, 'data-bonus-formula'),
+        overrideFormula: UtilsElement.readAttrString(element, 'data-override-formula'),
+        highlightTotalOnFirstTerm: UtilsElement.readAttrBoolean(element, 'data-highlight-total-on-firstTerm', true),
+        interactionPermission: UtilsElement.readAttrString(element, 'data-interaction-permission'),
+        overrideMaxRoll: UtilsElement.readAttrInteger(element, 'data-override-max-roll'),
         moduleName: staticValues.moduleName,
       }
     );
