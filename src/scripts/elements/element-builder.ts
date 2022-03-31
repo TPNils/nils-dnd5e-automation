@@ -19,6 +19,19 @@ interface DynamicElementCallback {
 }
 
 type ExecuteResponse = {success: true;} | {success: false; errorMessage: string, stackTrace?: string[], errorType: 'warn' | 'error'}
+function isExecuteResponse(value: any): value is ExecuteResponse {
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  if (value.success === true) {
+    return true;
+  }
+  if (value.errorType === 'error' || value.errorType === 'warn') {
+    return true;
+  }
+  return false;
+}
 async function executeIfAllowed(callback: DynamicElementCallback, serializedData: any): Promise<ExecuteResponse> {
   try {
     let enrichedData = deepClone(serializedData);
@@ -40,11 +53,21 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
       return {success: false, errorType: 'warn', errorMessage: `Missing permission for action ${callback.id}. Data: ${JSON.stringify(enrichedData)}`};
     }
   } catch (err) {
-    return {
-      success: false,
-      errorMessage: err instanceof Error ? err.message : String(err),
-      stackTrace: err instanceof Error ? err.stack.split('\n') : undefined,
-      errorType: 'error'
+    if (err instanceof Error) {
+      return {
+        success: false,
+        errorMessage: err.message,
+        stackTrace: err.stack.split('\n'),
+        errorType: 'error'
+      }
+    } else if (isExecuteResponse(err)) {
+      return err;
+    } else {
+      return {
+        success: false,
+        errorMessage: String(err),
+        errorType: 'error'
+      }
     }
   }
 }
