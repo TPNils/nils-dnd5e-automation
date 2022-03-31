@@ -134,7 +134,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
     return this;
   }
 
-  private serializerFuncs: Array<(event: C) => any>;
+  private serializerFuncs: Array<(event: C) => any> = [];
   /**
    * The serilizer should gather all the data of _this_ instance and transform it into
    * input data which can be processed in the _global_ context
