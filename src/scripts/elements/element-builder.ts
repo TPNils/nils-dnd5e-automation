@@ -4,7 +4,7 @@ import { provider } from "../provider/provider";
 
 interface DynamicElementConfig {
   selector: string;
-  inits: OnInit[];
+  inits: OnInit<object>[];
   watchingAttributes: {[key: string]: ((value: string) => any)};
   onAttributeChanges: OnAttributeChange<any>[];
   callbacks: DynamicElementCallback[];
@@ -78,11 +78,12 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
 class DynamicElement extends HTMLElement {
   protected config: DynamicElementConfig;
   
-  private readonly baseCallbackContext: BaseCallbackContext;
+  private readonly baseCallbackContext: BaseCallbackContext<object>;
   constructor() {
     super();
     this.baseCallbackContext = {
       element: this,
+      attributes: {},
       addStoppable: (...stoppables: Stoppable[]) => this.unregisters.push(...stoppables),
     }
   }
@@ -94,20 +95,15 @@ class DynamicElement extends HTMLElement {
   public attributeChangedCallback(args: Array<[string, string, string]>): void {
     const changes: AttributeChange<any> = {};
     for (const attribute of Object.keys(this.config.watchingAttributes)) {
-      let value = this.config.watchingAttributes[attribute](this.getAttribute(attribute));
       changes[attribute] = {
         changed: false,
-        currentValue: value,
-        oldValue: value,
+        currentValue: this.attributes[attribute],
+        oldValue: this.attributes[attribute],
       }
     }
-    const processedNames = new Set<string>();
     for (const [name, oldValue, newValue] of args) {
-      if (processedNames.has(name)) {
-        continue;
-      }
-      changes[name].oldValue = this.config.watchingAttributes[name](oldValue);
-      processedNames.add(name);
+      this.baseCallbackContext.attributes[name] = this.config.watchingAttributes[name](newValue);
+      changes[name].currentValue = this.baseCallbackContext.attributes[name];
     }
     let anyChanged = false;
     for (const attribute of Object.keys(this.config.watchingAttributes)) {
@@ -287,8 +283,6 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
   }
 }
 
-
-
 type AttributeChange<T> = {
   [P in keyof T]: {
     changed: boolean;
@@ -296,12 +290,13 @@ type AttributeChange<T> = {
     oldValue?: T[P];
   };
 };
-export interface BaseCallbackContext {
+export interface BaseCallbackContext<T> {
   readonly element: HTMLElement;
+  readonly attributes: Readonly<Partial<T>>;
   addStoppable(...stoppables: Stoppable[]): void;
 }
-export type OnInit = (context: BaseCallbackContext) => unknown | Promise<unknown>;
-export type OnAttributeChange<T> = (context: BaseCallbackContext & {attributes: AttributeChange<T>}) => unknown | Promise<unknown>;
+export type OnInit<T> = (context: BaseCallbackContext<T>) => unknown | Promise<unknown>;
+export type OnAttributeChange<T> = (context: BaseCallbackContext<T> & {attributes: AttributeChange<T>}) => unknown | Promise<unknown>;
 
 const defaultAttributeTypes = {
   string: (value: string) => {
@@ -337,8 +332,8 @@ type AttributeTypes = typeof defaultAttributeTypes;
 
 export class ElementBuilder<INPUT extends object = {}> {
 
-  private onInits: OnInit[] = [];
-  public addOnInit(onInit: OnInit): this {
+  private onInits: OnInit<INPUT>[] = [];
+  public addOnInit(onInit: OnInit<INPUT>): this {
     this.onInits.push(onInit);
     return this;
   }
