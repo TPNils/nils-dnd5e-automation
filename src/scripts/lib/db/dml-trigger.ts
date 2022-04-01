@@ -229,44 +229,44 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     const unregisterTriggers: Stoppable[] = [];
     // before
     if (typeof trigger.beforeCreate === 'function') {
-      this.beforeCallbackGroups.get('preCreate').register(trigger.beforeCreate.bind(trigger));
+      unregisterTriggers.push(this.beforeCallbackGroups.get('preCreate').register(trigger.beforeCreate.bind(trigger)));
     }
     if (typeof trigger.beforeUpdate === 'function') {
-      this.beforeCallbackGroups.get('preUpdate').register(trigger.beforeUpdate.bind(trigger));
+      unregisterTriggers.push(this.beforeCallbackGroups.get('preUpdate').register(trigger.beforeUpdate.bind(trigger)));
     }
     if (typeof trigger.beforeUpsert === 'function') {
-      this.beforeCallbackGroups.get('preCreate').register(trigger.beforeUpsert.bind(trigger));
-      this.beforeCallbackGroups.get('preUpdate').register(trigger.beforeUpsert.bind(trigger));
+      unregisterTriggers.push(this.beforeCallbackGroups.get('preCreate').register(trigger.beforeUpsert.bind(trigger)));
+      unregisterTriggers.push(this.beforeCallbackGroups.get('preUpdate').register(trigger.beforeUpsert.bind(trigger)));
     }
     if (typeof trigger.beforeDelete === 'function') {
-      this.beforeCallbackGroups.get('preDelete').register(trigger.beforeDelete.bind(trigger));
+      unregisterTriggers.push(this.beforeCallbackGroups.get('preDelete').register(trigger.beforeDelete.bind(trigger)));
     }
   
     // after
     if (typeof trigger.afterCreate === 'function') {
-      this.afterCallbackGroups.get('create').register(trigger.afterCreate.bind(trigger));
+      unregisterTriggers.push(this.afterCallbackGroups.get('create').register(trigger.afterCreate.bind(trigger)));
     }
     if (typeof trigger.afterUpdate === 'function') {
-      this.afterCallbackGroups.get('update').register(trigger.afterUpdate.bind(trigger));
+      unregisterTriggers.push(this.afterCallbackGroups.get('update').register(trigger.afterUpdate.bind(trigger)));
     }
     if (typeof trigger.afterUpsert === 'function') {
-      this.afterCallbackGroups.get('create').register(trigger.afterUpsert.bind(trigger));
-      this.afterCallbackGroups.get('update').register(trigger.afterUpsert.bind(trigger));
+      unregisterTriggers.push(this.afterCallbackGroups.get('create').register(trigger.afterUpsert.bind(trigger)));
+      unregisterTriggers.push(this.afterCallbackGroups.get('update').register(trigger.afterUpsert.bind(trigger)));
     }
     if (typeof trigger.afterDelete === 'function') {
-      this.afterCallbackGroups.get('delete').register(trigger.afterDelete.bind(trigger));
+      unregisterTriggers.push(this.afterCallbackGroups.get('delete').register(trigger.afterDelete.bind(trigger)));
     }
 
     // after but you can update
     if (typeof trigger.create === 'function') {
-      this.afterCallbackGroups.get('create').registerDml(trigger.create.bind(trigger));
+      unregisterTriggers.push(this.afterCallbackGroups.get('create').registerDml(trigger.create.bind(trigger)));
     }
     if (typeof trigger.update === 'function') {
-      this.afterCallbackGroups.get('update').registerDml(trigger.update.bind(trigger));
+      unregisterTriggers.push(this.afterCallbackGroups.get('update').registerDml(trigger.update.bind(trigger)));
     }
     if (typeof trigger.upsert === 'function') {
-      this.afterCallbackGroups.get('create').registerDml(trigger.upsert.bind(trigger));
-      this.afterCallbackGroups.get('update').registerDml(trigger.upsert.bind(trigger));
+      unregisterTriggers.push(this.afterCallbackGroups.get('create').registerDml(trigger.upsert.bind(trigger)));
+      unregisterTriggers.push(this.afterCallbackGroups.get('update').registerDml(trigger.upsert.bind(trigger)));
     }
 
     return {
