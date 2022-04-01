@@ -116,7 +116,7 @@ class DynamicElement extends HTMLElement {
       return;
     }
     for (const onAttributeChange of this.config.onAttributeChanges) {
-      await onAttributeChange({...this.baseCallbackContext, attributes: changes});
+      await onAttributeChange({...this.baseCallbackContext, changes: changes});
     }
   }
 
@@ -300,7 +300,7 @@ export interface BaseCallbackContext<T> {
   addStoppable(...stoppables: Stoppable[]): void;
 }
 export type OnInit<T> = (context: BaseCallbackContext<T>) => unknown | Promise<unknown>;
-export type OnAttributeChange<T> = (context: BaseCallbackContext<T> & {attributes: AttributeChange<T>}) => unknown | Promise<unknown>;
+export type OnAttributeChange<T> = (context: BaseCallbackContext<T> & {changes: AttributeChange<T>}) => unknown | Promise<unknown>;
 
 const defaultAttributeTypes = {
   string: (value: string) => {
