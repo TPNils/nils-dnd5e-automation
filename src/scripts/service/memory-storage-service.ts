@@ -1,4 +1,5 @@
 import { UtilsElement } from "../elements/utils-element";
+import { Stoppable } from "../lib/utils/stoppable";
 
 export class MemoryValue<T = any> {
   private nextListenerId = 0;
@@ -18,14 +19,14 @@ export class MemoryValue<T = any> {
     return this.value;
   }
 
-  public listen(callback: (value?: T) => void): {unregister(): void;} {
+  public listen(callback: (value?: T) => void): Stoppable {
     const id = this.nextListenerId++;
     this.listeners.set(id, callback);
     if (this.hasSetValue) {
       callback(this.value);
     }
     return {
-      unregister: () => {
+      stop: () => {
         this.listeners.delete(id);
       }
     }
