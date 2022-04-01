@@ -92,7 +92,7 @@ class DynamicElement extends HTMLElement {
    * Invoked each time one of the custom element's attributes is added, removed, or changed. Which attributes to notice change for is specified in a static get 
    */
   @buffer()
-  public attributeChangedCallback(args: Array<[string, string, string]>): void {
+  public async attributeChangedCallback(args: Array<[string, string, string]>): Promise<void> {
     const changes: AttributeChange<any> = {};
     for (const attribute of Object.keys(this.config.watchingAttributes)) {
       changes[attribute] = {
@@ -102,7 +102,7 @@ class DynamicElement extends HTMLElement {
       }
     }
     for (const [name, oldValue, newValue] of args) {
-      this.baseCallbackContext.attributes[name] = this.config.watchingAttributes[name](newValue);
+      this.baseCallbackContext.attributes[name] = await this.config.watchingAttributes[name](newValue);
       changes[name].currentValue = this.baseCallbackContext.attributes[name];
     }
     let anyChanged = false;
@@ -116,7 +116,7 @@ class DynamicElement extends HTMLElement {
       return;
     }
     for (const onAttributeChange of this.config.onAttributeChanges) {
-      onAttributeChange({...this.baseCallbackContext, attributes: changes});
+      await onAttributeChange({...this.baseCallbackContext, attributes: changes});
     }
   }
 
@@ -125,10 +125,14 @@ class DynamicElement extends HTMLElement {
    * This will happen each time the node is moved, and may happen before the element's contents have been fully parsed. 
    */
   private unregisters: Stoppable[] = [];
-  public connectedCallback(): void {
+  public async connectedCallback(): Promise<void> {
+    // Since attributeChangedCallback is async, ensure the most up-to-date values are available
+    for (const attribute of Object.keys(this.config.watchingAttributes)) {
+      this.baseCallbackContext.attributes[attribute] = await this.config.watchingAttributes[attribute](this.getAttribute(attribute));
+    }
     this.registerEventListeners();
     for (const init of this.config.inits) {
-      init(this.baseCallbackContext);
+      await init(this.baseCallbackContext);
     }
   }
 
