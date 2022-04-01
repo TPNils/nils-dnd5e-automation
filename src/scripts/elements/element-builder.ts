@@ -5,7 +5,7 @@ import { provider } from "../provider/provider";
 interface DynamicElementConfig {
   selector: string;
   inits: OnInit[];
-  watchingAttributes: {[key: string]: keyof AttributeTypes};
+  watchingAttributes: {[key: string]: ((value: string) => any)};
   onAttributeChanges: OnAttributeChange<any>[];
   callbacks: DynamicElementCallback[];
 }
@@ -78,45 +78,6 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
 class DynamicElement extends HTMLElement {
   protected config: DynamicElementConfig;
 
-  private mapAttribute(type: keyof AttributeTypes, value: string): any {
-    if (value == null) {
-      if (type === 'boolean') {
-        return false;
-      }
-      return value;
-    }
-    switch (type) {
-      case 'boolean':  {
-        if (value === '') {
-          return true;
-        }
-        if (value.toLowerCase() === 'false') {
-          return false;
-        }
-        return Boolean(value);
-      }
-      case 'number':  {
-        if (/^[0-9]+$/.test(value)) {
-          return Number(value);
-        }
-        return null;
-      }
-      case 'string': {
-        if (value === '') {
-          return null;
-        }
-        return value;
-      }
-      case 'json': {
-        if (value === '') {
-          return null;
-        }
-        return JSON.parse(value);
-      }
-    }
-    return value;
-  }
-
   /**
    * Invoked each time one of the custom element's attributes is added, removed, or changed. Which attributes to notice change for is specified in a static get 
    */
@@ -124,7 +85,7 @@ class DynamicElement extends HTMLElement {
   public attributeChangedCallback(args: Array<[string, string, string]>): void {
     const changes: AttributeChange<any> = {};
     for (const attribute of Object.keys(this.config.watchingAttributes)) {
-      const value = this.mapAttribute(this.config.watchingAttributes[attribute], this.getAttribute(attribute));
+      let value = this.config.watchingAttributes[attribute](this.getAttribute(attribute));
       changes[attribute] = {
         changed: false,
         currentValue: value,
@@ -136,7 +97,7 @@ class DynamicElement extends HTMLElement {
       if (processedNames.has(name)) {
         continue;
       }
-      changes[name].oldValue = this.mapAttribute(this.config.watchingAttributes[name], oldValue);
+      changes[name].oldValue = this.config.watchingAttributes[name](oldValue);
       processedNames.add(name);
     }
     let anyChanged = false;
@@ -329,12 +290,37 @@ type AttributeChange<T> = {
 };
 export type OnAttributeChange<T> = (args: {element: HTMLElement, attributes: AttributeChange<T>}) => unknown | Promise<unknown>;
 
-interface AttributeTypes {
-  string: string;
-  number: number;
-  boolean: boolean;
-  json: any;
+const defaultAttributeTypes = {
+  string: (value: string) => {
+    if (value === '') {
+      return null;
+    }
+    return value;
+  },
+  number: (value: string) => {
+    if (/^[0-9]+$/.test(value)) {
+      return Number(value);
+    }
+    return null;
+  },
+  boolean: (value: string) => {
+    if (value === '') {
+      return true;
+    }
+    if (value.toLowerCase() === 'false') {
+      return false;
+    }
+    return Boolean(value);
+  },
+  json: (value: string) => {
+    if (value === '') {
+      return null;
+    }
+    return JSON.parse(value);
+  },
 }
+
+type AttributeTypes = typeof defaultAttributeTypes;
 
 export class ElementBuilder<INPUT extends object = {}> {
 
@@ -356,9 +342,15 @@ export class ElementBuilder<INPUT extends object = {}> {
     return this;
   }
 
-  private attributes: {[key: string]: keyof AttributeTypes} = {};
-  public listenForAttribute<K extends string, T extends keyof AttributeTypes>(name: K, type: T): ElementBuilder<INPUT & {[k in K]: AttributeTypes[T]}> {
-    this.attributes[name] = type;
+  private attributes: {[key: string]: (value: string) => any} = {};
+  public listenForAttribute<K extends string, T extends keyof AttributeTypes>(name: K, type: T): ElementBuilder<INPUT & {[k in K]: ReturnType<AttributeTypes[T]>}>
+  public listenForAttribute<K extends string, R>(name: K, transformer: ((value: string) => R | Promise<R>)): ElementBuilder<INPUT & {[k in K]: R}>
+  public listenForAttribute<K extends string, T extends keyof AttributeTypes, R>(name: K, type: T | ((value: string) => R | Promise<R>)): ElementBuilder<INPUT & {[k in K]: (ReturnType<AttributeTypes[T]> | R)}> {
+    if (typeof type === 'string') {
+      this.attributes[name] = defaultAttributeTypes[type];
+    } else {
+      this.attributes[name] = type;
+    }
     return this as ElementBuilder<any>;
   }
 
