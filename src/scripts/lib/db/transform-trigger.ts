@@ -1,4 +1,5 @@
-import { IDmlContext, ITrigger, IAfterDmlContext, IDmlContextRow, IUnregisterTrigger } from "./dml-trigger";
+import { Stoppable } from "../utils/stoppable";
+import { IDmlContext, ITrigger, IAfterDmlContext, IDmlContextRow } from "./dml-trigger";
 
 interface TransformResult<T extends IDmlContext<D>, D> {
   create: T;
@@ -14,12 +15,12 @@ export class TransformTrigger<FROM, TO> implements ITrigger<FROM> {
   private nextTriggerId = 0;
   private triggers = new Map<number, ITrigger<TO>>();
 
-  public register(trigger: ITrigger<TO>): IUnregisterTrigger {
+  public register(trigger: ITrigger<TO>): Stoppable {
     const id = this.nextTriggerId++;
     this.triggers.set(id, trigger);
 
     return {
-      unregister: () => {
+      stop: () => {
         this.triggers.delete(id);
       }
     }

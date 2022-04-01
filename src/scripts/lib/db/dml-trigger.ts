@@ -1,5 +1,6 @@
 import { staticValues } from "../../static-values";
 import { buffer } from "../decorator/buffer";
+import { Stoppable } from "../utils/stoppable";
 import { UtilsCompare } from "../utils/utils-compare";
 
 
@@ -134,14 +135,11 @@ class AfterDmlContext<T> implements IAfterDmlContext<T> {
   }
 }
 
-export interface IUnregisterTrigger {
-  unregister(): void;
-}
 
 export class DmlTrigger {
   private static wrappersByHook = new Map<string, Wrapper<any>>();
 
-  public static registerTrigger<T extends foundry.abstract.Document<any, any>>(trigger: IDmlTrigger<T>): IUnregisterTrigger {
+  public static registerTrigger<T extends foundry.abstract.Document<any, any>>(trigger: IDmlTrigger<T>): Stoppable {
     if (!this.wrappersByHook.has(trigger.type.documentName)) {
       this.wrappersByHook.set(trigger.type.documentName, new Wrapper<T>(trigger.type.documentName));
     }
@@ -155,14 +153,14 @@ class CallbackGroup<T extends foundry.abstract.Document<any, any>, R> {
   private callbacks = new Map<number, (context: IDmlContext<T>) => R>();
   private dmlCallbacks = new Map<number, (context: IDmlContext<T>) => R>();
   
-  public register(callback: (context: IDmlContext<T>) => R): IUnregisterTrigger {
+  public register(callback: (context: IDmlContext<T>) => R): Stoppable {
     const id = this.nextId++;
     this.callbacks.set(id, callback);
 
     return this.getIUnregisterTrigger(id);
   }
 
-  public registerDml(callback: (context: IDmlContext<T>) => R): IUnregisterTrigger {
+  public registerDml(callback: (context: IDmlContext<T>) => R): Stoppable {
     const id = this.nextId++;
     this.dmlCallbacks.set(id, callback);
 
@@ -191,9 +189,9 @@ class CallbackGroup<T extends foundry.abstract.Document<any, any>, R> {
     return this.callbacks.size === 0 && this.dmlCallbacks.size === 0;
   }
   
-  protected getIUnregisterTrigger(id: number): IUnregisterTrigger {
+  protected getIUnregisterTrigger(id: number): Stoppable {
     return {
-      unregister: () => {
+      stop: () => {
         this.callbacks.delete(id);
         this.dmlCallbacks.delete(id);
       }
@@ -219,7 +217,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     private readonly documentName: string,
   ) {}
 
-  public register(trigger: IDmlTrigger<T>): IUnregisterTrigger {
+  public register(trigger: IDmlTrigger<T>): Stoppable {
     if (this.documentName !== trigger.type.documentName) {
       throw new Error(`Incompatible document types. Expected ${this.documentName} but got ${trigger.type.documentName}`)
     }
@@ -228,7 +226,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       this.init();
     }
 
-    const unregisterTriggers: IUnregisterTrigger[] = [];
+    const unregisterTriggers: Stoppable[] = [];
     // before
     if (typeof trigger.beforeCreate === 'function') {
       this.beforeCallbackGroups.get('preCreate').register(trigger.beforeCreate.bind(trigger));
@@ -272,9 +270,9 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }
 
     return {
-      unregister: () => {
+      stop: () => {
         for (const unregisterTrigger of unregisterTriggers) {
-          unregisterTrigger.unregister();
+          unregisterTrigger.stop();
         }
         let empty = true;
         for (const value of [...Array.from(this.beforeCallbackGroups.values()), ...Array.from(this.afterCallbackGroups.values())]) {

@@ -1,7 +1,6 @@
-import { IUnregisterTrigger } from "../lib/db/dml-trigger";
 import { buffer } from "../lib/decorator/buffer";
+import { Stoppable } from "../lib/utils/stoppable";
 import { provider } from "../provider/provider";
-import { UtilsElement } from "./utils-element";
 
 interface DynamicElementConfig {
   selector: string;
@@ -159,7 +158,7 @@ class DynamicElement extends HTMLElement {
    * Invoked each time the custom element is appended into a document-connected element.
    * This will happen each time the node is moved, and may happen before the element's contents have been fully parsed. 
    */
-  private unregisters: IUnregisterTrigger[] = [];
+  private unregisters: Stoppable[] = [];
   public connectedCallback(): void {
     this.registerEventListeners();
     for (const init of this.config.inits) {
@@ -206,13 +205,13 @@ class DynamicElement extends HTMLElement {
         }
       }
       this.addEventListener(callback.eventName, listener);
-      this.unregisters.push({unregister: () => this.removeEventListener(callback.eventName, listener)});
+      this.unregisters.push({stop: () => this.removeEventListener(callback.eventName, listener)});
     }
   }
 
   private unregisterEventListeners() {
     for (const unregister of this.unregisters) {
-      unregister.unregister();
+      unregister.stop();
     }
     this.unregisters = [];
   }
