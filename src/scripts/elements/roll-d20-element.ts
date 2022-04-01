@@ -28,7 +28,7 @@ export class RollD20Element {
       .listenForAttribute('data-label', 'string')
       .listenForAttribute('data-override-formula', 'string')
       .listenForAttribute('data-override-max-roll', 'number')
-      .build(`${staticValues.code}-roll-d20`)
+      .build(RollD20Element.selector())
   }
 
   private static doRender = async ({element}: {element: HTMLElement}) => {
