@@ -316,6 +316,9 @@ const defaultAttributeTypes = {
     return null;
   },
   boolean: (value: string) => {
+    if (value == null) {
+      return false;
+    }
     if (value === '') {
       return true;
     }
