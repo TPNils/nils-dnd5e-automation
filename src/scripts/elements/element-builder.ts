@@ -77,6 +77,15 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
 
 class DynamicElement extends HTMLElement {
   protected config: DynamicElementConfig;
+  
+  private readonly baseCallbackContext: BaseCallbackContext;
+  constructor() {
+    super();
+    this.baseCallbackContext = {
+      element: this,
+      addStoppable: (...stoppables: Stoppable[]) => this.unregisters.push(...stoppables),
+    }
+  }
 
   /**
    * Invoked each time one of the custom element's attributes is added, removed, or changed. Which attributes to notice change for is specified in a static get 
@@ -111,7 +120,7 @@ class DynamicElement extends HTMLElement {
       return;
     }
     for (const onAttributeChange of this.config.onAttributeChanges) {
-      onAttributeChange({element: this, attributes: changes});
+      onAttributeChange({...this.baseCallbackContext, attributes: changes});
     }
   }
 
@@ -123,7 +132,7 @@ class DynamicElement extends HTMLElement {
   public connectedCallback(): void {
     this.registerEventListeners();
     for (const init of this.config.inits) {
-      init({element: this});
+      init(this.baseCallbackContext);
     }
   }
 
@@ -278,7 +287,6 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
   }
 }
 
-export type OnInit = (args: {element: HTMLElement}) => unknown | Promise<unknown>;
 
 
 type AttributeChange<T> = {
@@ -288,7 +296,12 @@ type AttributeChange<T> = {
     oldValue?: T[P];
   };
 };
-export type OnAttributeChange<T> = (args: {element: HTMLElement, attributes: AttributeChange<T>}) => unknown | Promise<unknown>;
+export interface BaseCallbackContext {
+  readonly element: HTMLElement;
+  addStoppable(...stoppables: Stoppable[]): void;
+}
+export type OnInit = (context: BaseCallbackContext) => unknown | Promise<unknown>;
+export type OnAttributeChange<T> = (context: BaseCallbackContext & {attributes: AttributeChange<T>}) => unknown | Promise<unknown>;
 
 const defaultAttributeTypes = {
   string: (value: string) => {
