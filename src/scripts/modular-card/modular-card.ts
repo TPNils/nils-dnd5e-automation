@@ -1,7 +1,8 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
-import { DmlTrigger, IDmlContext, IDmlTrigger, ITrigger, IUnregisterTrigger } from "../lib/db/dml-trigger";
+import { DmlTrigger, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { TransformTrigger } from "../lib/db/transform-trigger";
 import { RunOnce } from "../lib/decorator/run-once";
+import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
@@ -184,7 +185,7 @@ export class ModularCard {
     ModularCard.typeToModule.set(part.getType(), moduleName);
   }
   
-  public static registerModularCardTrigger(trigger: ITrigger<ModularCardTriggerData>): IUnregisterTrigger {
+  public static registerModularCardTrigger(trigger: ITrigger<ModularCardTriggerData>): Stoppable {
     return chatMessageTransformer.register(trigger);
   }
 
