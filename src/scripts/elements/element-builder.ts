@@ -160,7 +160,14 @@ class DynamicElement extends HTMLElement {
       const listener: EventListenerOrEventListenerObject = async event => {
         if (callback.filterSelector && event.target instanceof HTMLElement) {
           const items = Array.from(this.querySelectorAll(callback.filterSelector));
-          if (!items.includes(event.target)) {
+          let element = event.target;
+          let matches = false;
+          do {
+            matches = items.includes(element);
+            element = element.parentElement;
+          } while(!matches && element != null)
+
+          if (!matches) {
             return;
           }
         }
