@@ -57,6 +57,7 @@ export class RollResultElement {
       .build(RollResultElement.selector())
   }
 
+  // TODO either don't support slots (dont use it anyway) or solve it in element builder => can't find a simple solution there
   private static extractInputSlots({element}: {element: HTMLElement}): void {
     const elementsBySlotName = new Map<string, Element[]>();
     element.querySelectorAll('[slot]').forEach(element => {
