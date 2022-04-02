@@ -99,7 +99,7 @@ export class ItemCardHelpers {
       }
       return {
         allCardParts,
-        data: messagePartData,
+        part: messagePartData,
       }
     }
   }
