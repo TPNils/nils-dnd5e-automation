@@ -1,3 +1,4 @@
+import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
 import { RollD20Element } from "../elements/roll-d20-element";
 import { UtilsElement } from "../elements/utils-element";
 import { IAfterDmlContext, IDmlContext, ITrigger } from "../lib/db/dml-trigger";
@@ -10,8 +11,9 @@ import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
 import { ClickEvent, createElement, HtmlContext, ICallbackAction, KeyEvent } from "./card-part-element";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
+import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
@@ -142,11 +144,143 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    createElement({
-      selector: this.getSelector(),
-      getHtml: context => this.getElementHtml(context),
-      getCallbackActions: () => this.getCallbackActions(),
-    });
+    const permissionCheck = createPermissionCheck2<{part: {data: AttackCardData}}>(({part}) => {
+      const documents: CreatePermissionCheckArgs['documents'] = [];
+      if (part.data.calc$.actorUuid) {
+        documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER'});
+      }
+      return {documents: documents};
+    })
+    // TODO rerender 'flickers', probably due to the delay
+    new ElementBuilder()
+      .listenForAttribute('data-part-id', 'string')
+      .listenForAttribute('data-message-id', 'string')
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('click')
+        .setFilter('[data-action="roll"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, part, click, allCardParts}) => {
+          if (part.data.phase === 'result') {
+            return;
+          }
+      
+          const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
+          if (click.shiftKey) {
+            part.data.phase = orderedPhases[orderedPhases.length - 1];
+          } else {
+            part.data.phase = orderedPhases[orderedPhases.indexOf(part.data.phase) + 1];
+          }
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('focusout')
+        .setFilter('input[data-action="user-bonus"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, allCardParts, part}) => {
+          part.data.phase = 'mode-select';
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('keypress')
+        .setFilter('input[data-action="user-bonus"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(ItemCardHelpers.getKeyEventSerializer())
+        .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, allCardParts, part, keyEvent, inputValue}) => {
+          if (inputValue) {
+            part.data.userBonus = inputValue;
+          } else {
+            part.data.userBonus = "";
+          }
+      
+          if (part.data.userBonus && !Roll.validate(part.data.userBonus)) {
+            // Only show error on key press
+            throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+          }
+      
+          if (keyEvent?.key === 'Enter') {
+            part.data.phase = 'result';
+            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+          } else if (keyEvent?.key === 'Escape' && part.data.phase === 'bonus-input') {
+            part.data.phase = 'mode-select';
+            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+          }
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('click')
+        .setFilter('[data-action="mode-minus"], [data-action="mode-plus"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+        .addSerializer(context => {
+          // TODO maybe want a bit more of an elegant solution so closesed is not required
+          return {modName: (context.event.target as HTMLElement).closest('[data-action]').getAttribute('data-action').replace(/^mode-/i, '')}
+        })
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, allCardParts, part, click, modName}) => {
+          let modifier = modName === 'plus' ? 1 : -1;
+          if (click.shiftKey && modifier > 0) {
+            modifier++;
+          } else if (click.shiftKey && modifier < 0) {
+            modifier--;
+          }
+          
+          const order: Array<AttackCardData['mode']> = ['disadvantage', 'normal', 'advantage'];
+          const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(part.data.mode) + modifier));
+          if (part.data.mode === order[newIndex]) {
+            return;
+          }
+          part.data.mode = order[newIndex];
+
+          if (click.shiftKey) {
+            part.data.phase = 'result';
+          }
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addOnAttributeChange(async ({element, attributes}) => {
+        const allParts = ModularCard.getCardPartDatas(game.messages.get(attributes['data-message-id']));
+        if (allParts == null) {
+          element.innerText = '';
+          return;
+        }
+        const data: AttackCardData = allParts.find(p => p.id === attributes['data-part-id'] && p.type === this.getType())?.data;
+        if (data == null) {
+          element.innerText = '';
+          return;
+        }
+        const d20attributes = {
+          ['data-roll']: data.calc$.roll,
+          ['data-bonus-formula']: data.userBonus,
+          ['data-show-bonus']: data.phase === 'bonus-input',
+          ['data-compact']: true,
+          ['data-label']: 'DND5E.Attack',
+          ['data-override-max-roll']: data.calc$.critTreshold,
+        };
+        if (data.calc$.actorUuid) {
+          d20attributes['data-interaction-permission'] = `OwnerUuid:${data.calc$.actorUuid}`
+        }
+        const attributeArray: string[] = [];
+        for (let [attr, value] of Object.entries(d20attributes)) {
+          attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
+        }
+        element.innerHTML = `<${RollD20Element.selector()} ${attributeArray.join(' ')}></${RollD20Element.selector()}>`;
+      })
+      .build(this.getSelector())
     
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(new AttackCardTrigger());
@@ -167,105 +301,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   public getHtml(data: HtmlContext): string {
     // TODO technically, you would roll an attack for each target
     return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
-  }
-
-  public getElementHtml({data}: HtmlContext<AttackCardData>): string | Promise<string> {
-    const attributes = {
-      ['data-roll']: data.calc$.roll,
-      ['data-bonus-formula']: data.userBonus,
-      ['data-show-bonus']: data.phase === 'bonus-input',
-      ['data-compact']: true,
-      ['data-label']: 'DND5E.Attack',
-      ['data-override-max-roll']: data.calc$.critTreshold,
-    };
-    if (data.calc$.actorUuid) {
-      attributes['data-interaction-permission'] = `OwnerUuid:${data.calc$.actorUuid}`
-    }
-    const attributeArray: string[] = [];
-    for (let [attr, value] of Object.entries(attributes)) {
-      attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
-    }
-    return `<${RollD20Element.selector()} ${attributeArray.join(' ')}></${RollD20Element.selector()}>`
-  }
-
-  public getCallbackActions(): ICallbackAction<AttackCardData>[] {
-    const permissionCheck = createPermissionCheck<AttackCardData>(({data}) => {
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (data.calc$.actorUuid) {
-        documents.push({uuid: data.calc$.actorUuid, permission: 'OWNER'});
-      }
-      return {documents: documents};
-    })
-
-    return [
-      {
-        regex: /^roll$/,
-        permissionCheck: permissionCheck,
-        execute: ({data, clickEvent}) => this.processItemAttack(data, clickEvent),
-      },
-      {
-        regex: /^user-bonus$/,
-        permissionCheck: permissionCheck,
-        execute: ({data, keyEvent, inputValue}) => this.processItemAttackBonus(data, keyEvent, inputValue as string),
-      },
-      {
-        regex: /^mode-(minus|plus)$/,
-        permissionCheck: permissionCheck,
-        execute: ({data, clickEvent, regexResult}) => this.processItemAttackMode(data, clickEvent, regexResult[1] as ('plus' | 'minus')),
-      },
-    ]
-  }
-
-  private processItemAttack(data: AttackCardData, clickEvent: ClickEvent | null): void {
-    if (data.phase === 'result') {
-      return;
-    }
-
-    const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
-    if (clickEvent?.shiftKey) {
-      data.phase = orderedPhases[orderedPhases.length - 1];
-    } else {
-      data.phase = orderedPhases[orderedPhases.indexOf(data.phase) + 1];
-    }
-  }
-  
-  private processItemAttackBonus(data: AttackCardData, keyEvent: KeyEvent | null, attackBonus: string): void {
-    if (attackBonus) {
-      data.userBonus = attackBonus;
-    } else {
-      data.userBonus = "";
-    }
-
-    if (data.userBonus && !Roll.validate(data.userBonus) && keyEvent) {
-      // Only show error on key press
-      throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-    }
-
-    if (keyEvent?.key === 'Enter') {
-      data.phase = 'result';
-    } else if (keyEvent?.key === 'Escape' && data.phase === 'bonus-input') {
-      data.phase = 'mode-select';
-    }
-  }
-
-  private async processItemAttackMode(data: AttackCardData, event: ClickEvent | null, modName: 'plus' | 'minus'): Promise<void> {
-    let modifier = modName === 'plus' ? 1 : -1;
-    if (event?.shiftKey && modifier > 0) {
-      modifier++;
-    } else if (event?.shiftKey && modifier < 0) {
-      modifier--;
-    }
-    
-    const order: Array<AttackCardData['mode']> = ['disadvantage', 'normal', 'advantage'];
-    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(data.mode) + modifier));
-    if (data.mode === order[newIndex]) {
-      return;
-    }
-    data.mode = order[newIndex];
-
-    if (event?.shiftKey) {
-      data.phase = 'result';
-    }
   }
   //#endregion
 
