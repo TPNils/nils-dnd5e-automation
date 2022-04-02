@@ -89,7 +89,7 @@ export class ItemCardHelpers {
       const originalAllCardParts = ModularCard.getCardPartDatas(message);
 
       let allCardParts = deepClone(originalAllCardParts);
-      const messagePartData = ModularCard.getCardPartDatas(message).find(part => part.id === data.partId);
+      const messagePartData = allCardParts.find(part => part.id === data.partId);
       if (messagePartData == null) {
         throw {
           success: false,
