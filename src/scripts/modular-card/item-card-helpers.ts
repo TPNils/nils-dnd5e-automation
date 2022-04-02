@@ -9,7 +9,7 @@ export interface ChatPartIdData {
 
 export interface ChatPartEnriched<T> {
   allCardParts: ModularCardPartData<any>[];
-  data: ModularCardPartData<T>;
+  part: ModularCardPartData<T>;
 }
 
 export interface UserIdData {
@@ -41,16 +41,16 @@ export class ItemCardHelpers {
     return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
   }
 
-  public static getUserIdSerializer(): (event: Event) => UserIdData {
-    return event => {
+  public static getUserIdSerializer(): () => UserIdData {
+    return () => {
       return {
         userId: game.userId,
       }
     }
   }
 
-  public static getChatPartIdSerializer(): (event: Event) => ChatPartIdData {
-    return event => {
+  public static getChatPartIdSerializer(): ({event}: {event: Event}) => ChatPartIdData {
+    return ({event}) => {
       // TODO validate when values are missing
       return {
         messageId: (event.target as HTMLElement).closest('[data-message-id]')?.getAttribute('data-message-id'),
@@ -60,8 +60,8 @@ export class ItemCardHelpers {
     }
   }
 
-  public static getMouseEventSerializer(): (event: MouseEvent) => ClickData {
-    return event => {
+  public static getMouseEventSerializer(): ({event}: {event: MouseEvent}) => ClickData {
+    return ({event}) => {
       return {
         click: {
           altKey: event.altKey === true,
@@ -73,8 +73,8 @@ export class ItemCardHelpers {
     }
   }
 
-  public static getKeyEventSerializer(): (event: KeyboardEvent) => KeyData {
-    return event => {
+  public static getKeyEventSerializer(): ({event}: {event: KeyboardEvent}) => KeyData {
+    return ({event}) => {
       return {
         keyEvent: {
           key: event.key
