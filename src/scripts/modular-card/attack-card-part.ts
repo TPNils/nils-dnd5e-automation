@@ -151,7 +151,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       }
       return {documents: documents};
     })
-    // TODO rerender 'flickers', probably due to the delay
     new ElementBuilder()
       .listenForAttribute('data-part-id', 'string')
       .listenForAttribute('data-message-id', 'string')

@@ -1,5 +1,6 @@
 import { buffer } from "../lib/decorator/buffer";
 import { Stoppable } from "../lib/utils/stoppable";
+import { UtilsCompare } from "../lib/utils/utils-compare";
 import { provider } from "../provider/provider";
 
 interface DynamicElementConfig {
@@ -103,8 +104,8 @@ class DynamicElement extends HTMLElement {
     for (const attribute of Object.keys(this.config.watchingAttributes)) {
       changes[attribute] = {
         changed: false,
-        currentValue: this.attributes[attribute],
-        oldValue: this.attributes[attribute],
+        currentValue: this.baseCallbackContext.attributes[attribute],
+        oldValue: this.baseCallbackContext.attributes[attribute],
       }
     }
     for (const [name, oldValue, newValue] of args) {
@@ -133,12 +134,25 @@ class DynamicElement extends HTMLElement {
   private unregisters: Stoppable[] = [];
   public async connectedCallback(): Promise<void> {
     // Since attributeChangedCallback is async, ensure the most up-to-date values are available
+    const changes: AttributeChange<any> = {};
     for (const attribute of Object.keys(this.config.watchingAttributes)) {
-      this.baseCallbackContext.attributes[attribute] = await this.config.watchingAttributes[attribute](this.getAttribute(attribute));
+      const value = await this.config.watchingAttributes[attribute](this.getAttribute(attribute));
+      changes[attribute] = {
+        changed: false,
+        currentValue: value,
+        oldValue: this.baseCallbackContext.attributes[attribute],
+      }
+      this.baseCallbackContext.attributes[attribute] = value;
     }
     this.registerEventListeners();
     for (const init of this.config.inits) {
       await init(this.baseCallbackContext);
+    }
+    for (const attribute of Object.keys(changes)) {
+      changes[attribute].changed = UtilsCompare.deepEquals(changes[attribute].currentValue, changes[attribute].oldValue);
+    }
+    for (const onAttributeChange of this.config.onAttributeChanges) {
+      await onAttributeChange({...this.baseCallbackContext, changes: changes});
     }
   }
 
