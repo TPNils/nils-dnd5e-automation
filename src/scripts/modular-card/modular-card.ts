@@ -3,6 +3,7 @@ import { DmlTrigger, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-tr
 import { TransformTrigger } from "../lib/db/transform-trigger";
 import { RunOnce } from "../lib/decorator/run-once";
 import { Stoppable } from "../lib/utils/stoppable";
+import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
