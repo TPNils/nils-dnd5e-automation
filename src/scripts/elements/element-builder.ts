@@ -2,6 +2,7 @@ import { buffer } from "../lib/decorator/buffer";
 import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { provider } from "../provider/provider";
+import { staticValues } from "../static-values";
 
 interface DynamicElementConfig {
   selector: string;
@@ -82,6 +83,7 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
   }
 }
 
+const eventCaputedSymbol = Symbol(`event was already captures by an element from ${staticValues.moduleName}`);
 class DynamicElement extends HTMLElement {
   protected config: DynamicElementConfig;
   
@@ -172,6 +174,11 @@ class DynamicElement extends HTMLElement {
   private registerEventListeners() {
     for (const callback of this.config.callbacks) {
       const listener: EventListenerOrEventListenerObject = async event => {
+        if (event[eventCaputedSymbol] === true) {
+          // Should not listen to events from an other custom element, only itself
+          return;
+        }
+        event[eventCaputedSymbol] = true;
         if (callback.filterSelector && event.target instanceof HTMLElement) {
           const items = Array.from(this.querySelectorAll(callback.filterSelector));
           let element = event.target;
