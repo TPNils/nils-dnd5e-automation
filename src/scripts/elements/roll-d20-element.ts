@@ -21,7 +21,7 @@ export class RollD20Element {
     new ElementBuilder()
       .addOnAttributeChange(RollD20Element.doRender)
       .listenForAttribute('data-roll', 'json')
-      .listenForAttribute('data-bonus-formula', 'json')
+      .listenForAttribute('data-bonus-formula', 'string')
       .listenForAttribute('data-show-bonus', 'boolean')
       .listenForAttribute('data-highlight-total-on-firstTerm', 'boolean')
       .listenForAttribute('data-interaction-permission', 'string')
