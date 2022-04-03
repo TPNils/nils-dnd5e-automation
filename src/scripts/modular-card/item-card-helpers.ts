@@ -8,8 +8,8 @@ export interface ChatPartIdData {
 }
 
 export interface ChatPartEnriched<T> {
-  allCardParts: ModularCardPartData<any>[];
-  part: ModularCardPartData<T>;
+  readonly allCardParts: ModularCardPartData<any>[];
+  readonly part: ModularCardPartData<T>;
 }
 
 export interface UserIdData {
@@ -29,6 +29,10 @@ export interface KeyData {
   readonly keyEvent: {
     readonly key: string;
   }
+}
+
+export interface ActionData {
+  readonly action: string;
 }
 
 export class ItemCardHelpers {
@@ -70,6 +74,12 @@ export class ItemCardHelpers {
           shiftKey: event.shiftKey === true,
         }
       }
+    }
+  }
+
+  public static getActionSrializer(): ({event}: {event: Event}) => ActionData {
+    return ({event}) => {
+      return {action: (event.target as HTMLElement).closest('[data-action]').getAttribute('data-action')}
     }
   }
 

@@ -224,14 +224,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addSerializer(context => {
-          // TODO maybe want a bit more of an elegant solution so closesed is not required
-          return {modName: (context.event.target as HTMLElement).closest('[data-action]').getAttribute('data-action').replace(/^mode-/i, '')}
-        })
+        .addSerializer(ItemCardHelpers.getActionSrializer())
         .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
         .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, part, click, modName}) => {
-          let modifier = modName === 'plus' ? 1 : -1;
+        .setExecute(({messageId, allCardParts, part, click, action}) => {
+          let modifier = action === 'mode-plus' ? 1 : -1;
           if (click.shiftKey && modifier > 0) {
             modifier++;
           } else if (click.shiftKey && modifier < 0) {
