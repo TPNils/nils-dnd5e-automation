@@ -1,3 +1,4 @@
+import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
 import { RollD20Element } from "../elements/roll-d20-element";
 import { UtilsElement } from "../elements/utils-element";
 import { IAfterDmlContext, IDmlContext, ITrigger } from "../lib/db/dml-trigger";
@@ -8,10 +9,10 @@ import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { MyActor, MyActorData } from "../types/fixed-types";
-import { RollJson } from "../utils/utils-chat-message";
-import { ClickEvent, createElement, HtmlContext, ICallbackAction, KeyEvent } from "./card-part-element";
+import { ClickEvent, HtmlContext, ICallbackAction, KeyEvent } from "./card-part-element";
+import { ChatPartEnriched, ChatPartIdData, ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 interface TargetCache {
@@ -89,12 +90,151 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    createElement({
-      selector: this.getSelector(),
-      hasSubType: true,
-      getHtml: context => this.getElementHtml(context),
-      getCallbackActions: () => this.getCallbackActions(),
-    });
+    const permissionCheck = createPermissionCheck2<{part: {data: CheckCardData}}>(({part, subType}) => {
+      const cache = getTargetCache(part.data, subType);
+      if (!cache?.actorUuid) {
+        return {mustBeGm: true};
+      }
+      const documents: CreatePermissionCheckArgs['documents'] = [];
+      documents.push({uuid: cache.actorUuid, permission: 'OWNER'});
+      return {documents: documents};
+    })
+    
+    new ElementBuilder()
+      .listenForAttribute('data-part-id', 'string')
+      .listenForAttribute('data-message-id', 'string')
+      .listenForAttribute('data-sub-type', 'string')
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('click')
+        .setFilter('[data-action="roll"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
+        .addEnricher(this.getTargetCacheEnricher)
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, targetCache, click, allCardParts}) => {
+          if (targetCache.phase === 'result') {
+            return;
+          }
+      
+          const orderedPhases: TargetCache['phase'][] = ['mode-select', 'bonus-input', 'result'];
+          if (click?.shiftKey) {
+            targetCache.phase = orderedPhases[orderedPhases.length - 1];
+          } else {
+            targetCache.phase = orderedPhases[orderedPhases.indexOf(targetCache.phase) + 1];
+          }
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('focusout')
+        .setFilter('input[data-action="user-bonus"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
+        .addEnricher(this.getTargetCacheEnricher)
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, allCardParts, targetCache, inputValue}) => {
+          if (inputValue && !Roll.validate(inputValue)) {
+            // Only show error on key press
+            throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+          }
+          targetCache.phase = 'mode-select';
+          targetCache.userBonus = inputValue ?? '';
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('keypress')
+        .setFilter('input[data-action="user-bonus"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(ItemCardHelpers.getKeyEventSerializer())
+        .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
+        .addEnricher(this.getTargetCacheEnricher)
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, allCardParts, targetCache, keyEvent, inputValue}) => {
+          if (keyEvent.key === 'Enter') {
+            const userBonus = inputValue == null ? '' : inputValue;
+            if (userBonus && !Roll.validate(userBonus)) {
+              // Only show error on key press
+              throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+            }
+            targetCache.phase = 'result';
+            targetCache.userBonus = userBonus;
+            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+          } else if (keyEvent.key === 'Escape' && targetCache.phase === 'bonus-input') {
+            targetCache.phase = 'mode-select';
+            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+          }
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('click')
+        .setFilter('[data-action="mode-minus"], [data-action="mode-plus"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+        .addSerializer(ItemCardHelpers.getActionSrializer())
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
+        .addEnricher(this.getTargetCacheEnricher)
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, allCardParts, targetCache, click, action}) => {
+          console.log(action)
+          let modifier = action === 'mode-plus' ? 1 : -1;
+          if (click.shiftKey && modifier > 0) {
+            modifier++;
+          } else if (click.shiftKey && modifier < 0) {
+            modifier--;
+          }
+          
+          const order: Array<TargetCache['mode']> = ['disadvantage', 'normal', 'advantage'];
+          const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(targetCache.mode) + modifier));
+          if (targetCache.mode === order[newIndex]) {
+            return;
+          }
+          targetCache.mode = order[newIndex];
+
+          if (click.shiftKey) {
+            targetCache.phase = 'result';
+          }
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addOnAttributeChange(async ({element, attributes}) => {
+        const allParts = ModularCard.getCardPartDatas(game.messages.get(attributes['data-message-id']));
+        if (allParts == null) {
+          element.innerText = '';
+          return;
+        }
+        const data: CheckCardData = allParts.find(p => p.id === attributes['data-part-id'] && p.type === this.getType())?.data;
+        if (data == null) {
+          element.innerText = '';
+          return;
+        }
+        const cache = getTargetCache(data, attributes['data-sub-type']);
+        if (!cache) {
+          return '';
+        }
+        const d20attributes = {
+          ['data-roll']: cache.roll,
+          ['data-bonus-formula']: cache.userBonus,
+          ['data-show-bonus']: cache.phase === 'bonus-input',
+        };
+        if (cache.actorUuid) {
+          d20attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid}`
+        }
+        const attributeArray: string[] = [];
+        for (let [attr, value] of Object.entries(d20attributes)) {
+          attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
+        }
+        element.innerHTML = `<${RollD20Element.selector()} class="hide-flavor snug" ${attributeArray.join(' ')}></${RollD20Element.selector()}>`;
+      })
+      .build(this.getSelector())
+
     TargetCardPart.instance.registerIntegration({
       getVisualState: context => this.getTargetState(context),
     });
@@ -111,116 +251,16 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
     return `${staticValues.code}-check-part`;
   }
 
-  public getElementHtml({data, subType}: HtmlContext<CheckCardData>): string | Promise<string> {
-    const cache = getTargetCache(data, subType);
+  private getTargetCacheEnricher(data: ChatPartIdData & ChatPartEnriched<CheckCardData>): {targetCache: TargetCache} {
+    const cache = getTargetCache(data.part.data, data.subType);
     if (!cache) {
-      return '';
+      throw {
+        success: false,
+        errorType: 'warn',
+        errorMessage: `Pressed an action button for message part ${data.messageId}.${data.partId} but no data was found for subtype: ${data.subType}`,
+      };
     }
-    const attributes = {
-      ['data-roll']: cache.roll,
-      ['data-bonus-formula']: cache.userBonus,
-      ['data-show-bonus']: cache.phase === 'bonus-input',
-    };
-    if (cache.actorUuid) {
-      attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid}`
-    }
-    const attributeArray: string[] = [];
-    for (let [attr, value] of Object.entries(attributes)) {
-      attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
-    }
-    return `<${RollD20Element.selector()} class="hide-flavor snug" ${attributeArray.join(' ')}></${RollD20Element.selector()}>`
-  }
-
-
-  public getCallbackActions(): ICallbackAction<CheckCardData>[] {
-    const permissionCheck = createPermissionCheck<CheckCardData>(({data, subType}) => {
-      const cache = getTargetCache(data, subType);
-      if (!cache?.actorUuid) {
-        return {mustBeGm: true};
-      }
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      documents.push({uuid: cache.actorUuid, permission: 'OWNER'});
-      return {documents: documents};
-    })
-
-    return [
-      {
-        regex: /^roll$/,
-        permissionCheck: permissionCheck,
-        execute: ({data, subType, clickEvent}) => this.doRoll(data, subType, clickEvent),
-      },
-      {
-        regex: /^user-bonus$/,
-        permissionCheck: permissionCheck,
-        execute: ({data, subType, keyEvent, inputValue}) => this.onBonus(data, subType, keyEvent, inputValue as string),
-      },
-      {
-        regex: /^mode-(minus|plus)$/,
-        permissionCheck: permissionCheck,
-        execute: ({data, subType, clickEvent, regexResult}) => this.changeMode(data, subType, clickEvent, regexResult[1] as ('plus' | 'minus')),
-      },
-    ]
-  }
-
-  private doRoll(data: CheckCardData, selectionId: string, clickEvent: ClickEvent | null): void {
-    const cache = getTargetCache(data, selectionId);
-    if (!cache || cache.phase === 'result') {
-      return;
-    }
-
-    const orderedPhases: TargetCache['phase'][] = ['mode-select', 'bonus-input', 'result'];
-    if (clickEvent?.shiftKey) {
-      cache.phase = orderedPhases[orderedPhases.length - 1];
-    } else {
-      cache.phase = orderedPhases[orderedPhases.indexOf(cache.phase) + 1];
-    }
-  }
-  
-  private onBonus(data: CheckCardData, selectionId: string, keyEvent: KeyEvent | null, bonusFormula: string): void {
-    const cache = getTargetCache(data, selectionId);
-    if (!cache) {
-      return;
-    }
-
-    if (bonusFormula && !Roll.validate(bonusFormula) && keyEvent) {
-      // Only show error on key press
-      throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-    }
-    if (bonusFormula) {
-      cache.userBonus = bonusFormula;
-    } else {
-      cache.userBonus = "";
-    }
-
-    if (keyEvent?.key === 'Enter') {
-      cache.phase = 'result';
-    } else if (keyEvent?.key === 'Escape' && cache.phase === 'bonus-input') {
-      cache.phase = 'mode-select';
-    }
-  }
-
-  private async changeMode(data: CheckCardData, selectionId: string, event: ClickEvent | null, modName: 'plus' | 'minus'): Promise<void> {
-    const cache = getTargetCache(data, selectionId);
-    if (!cache) {
-      return;
-    }
-    let modifier = modName === 'plus' ? 1 : -1;
-    if (event?.shiftKey && modifier > 0) {
-      modifier++;
-    } else if (event?.shiftKey && modifier < 0) {
-      modifier--;
-    }
-    
-    const order: Array<TargetCache['mode']> = ['disadvantage', 'normal', 'advantage'];
-    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(cache.mode) + modifier));
-    if (cache.mode === order[newIndex]) {
-      return;
-    }
-    cache.mode = order[newIndex];
-
-    if (event?.shiftKey) {
-      cache.phase = 'result';
-    }
+    return {targetCache: cache};
   }
   //#endregion
   
