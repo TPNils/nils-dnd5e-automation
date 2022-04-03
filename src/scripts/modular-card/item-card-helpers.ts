@@ -53,13 +53,13 @@ export class ItemCardHelpers {
     }
   }
 
-  public static getChatPartIdSerializer(): ({event}: {event: Event}) => ChatPartIdData {
-    return ({event}) => {
+  public static getChatPartIdSerializer(): ({element}: {element: HTMLElement}) => ChatPartIdData {
+    return ({element}) => {
       // TODO validate when values are missing
       return {
-        messageId: (event.target as HTMLElement).closest('[data-message-id]')?.getAttribute('data-message-id'),
-        partId: (event.target as HTMLElement).closest('[data-part-id]')?.getAttribute('data-part-id'),
-        subType: (event.target as HTMLElement).getAttribute('data-sub-type'),
+        messageId: element.closest('[data-message-id]')?.getAttribute('data-message-id'),
+        partId: element.closest('[data-part-id]')?.getAttribute('data-part-id'),
+        subType: element.getAttribute('data-sub-type'),
       }
     }
   }
