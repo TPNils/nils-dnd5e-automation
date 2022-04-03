@@ -181,10 +181,16 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         .setFilter('input[data-action="user-bonus"]')
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
         .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
         .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, part}) => {
+        .setExecute(({messageId, allCardParts, part, inputValue}) => {
+          if (inputValue && !Roll.validate(inputValue)) {
+            // Only show error on key press
+            throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+          }
           part.data.phase = 'mode-select';
+          part.data.userBonus = inputValue ?? '';
           return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
         })
       )
@@ -198,21 +204,16 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
         .setPermissionCheck(permissionCheck)
         .setExecute(({messageId, allCardParts, part, keyEvent, inputValue}) => {
-          if (inputValue) {
-            part.data.userBonus = inputValue;
-          } else {
-            part.data.userBonus = "";
-          }
-      
-          if (part.data.userBonus && !Roll.validate(part.data.userBonus)) {
-            // Only show error on key press
-            throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-          }
-      
-          if (keyEvent?.key === 'Enter') {
+          if (keyEvent.key === 'Enter') {
+            const userBonus = inputValue == null ? '' : inputValue;
+            if (userBonus && !Roll.validate(userBonus)) {
+              // Only show error on key press
+              throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+            }
             part.data.phase = 'result';
+            part.data.userBonus = userBonus;
             return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-          } else if (keyEvent?.key === 'Escape' && part.data.phase === 'bonus-input') {
+          } else if (keyEvent.key === 'Escape' && part.data.phase === 'bonus-input') {
             part.data.phase = 'mode-select';
             return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
           }
