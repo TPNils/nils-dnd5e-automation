@@ -266,7 +266,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           ['data-roll']: data.calc$.roll,
           ['data-bonus-formula']: data.userBonus,
           ['data-show-bonus']: data.phase === 'bonus-input',
-          ['data-compact']: true,
           ['data-label']: 'DND5E.Attack',
           ['data-override-max-roll']: data.calc$.critTreshold,
         };
