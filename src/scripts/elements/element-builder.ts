@@ -45,7 +45,7 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
   try {
     let enrichedData = deepClone(serializedData);
     for (const enricher of callback.dataEnrichers) {
-      enrichedData = {...enrichedData, ...await enricher(serializedData)};
+      enrichedData = {...enrichedData, ...await enricher(enrichedData)};
     }
     if (!callback.permissionCheck || game.user.isGM) {
       callback.execute(enrichedData);
