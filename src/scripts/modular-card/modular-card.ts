@@ -314,7 +314,11 @@ export class ModularCard {
         cardsObj[i] = data[i];
       }
     }
-    UtilsObject.injectDeleteForDml(message.getFlag(staticValues.moduleName, 'modularCardData'), cardsObj);
+    const originalCards = message.getFlag(staticValues.moduleName, 'modularCardData');
+    if (UtilsCompare.deepEquals(originalCards, cardsObj)) {
+      return Promise.resolve(message);
+    }
+    UtilsObject.injectDeleteForDml(originalCards, cardsObj);
     
     return message.update({
       [`flags.${staticValues.moduleName}.modularCardData`]: cardsObj
