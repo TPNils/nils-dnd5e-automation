@@ -127,7 +127,6 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(ItemCardHelpers.getInputSerializer())
         .addEnricher(ItemCardHelpers.getChatPartEnricher<SpellLevelCardData>())
-        .addEnricher(args => {console.log('change', args); return {}})
         .setPermissionCheck(permissionCheck)
         .setExecute(async ({messageId, part, allCardParts, inputValue}) => {
           if (inputValue === 'pact') {
@@ -175,7 +174,6 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
           // TODO should also be able to 'add' new types
           //  Idea: have item templates which need to be registered
           //  They contain all the types which should be used and in what order they are
-          console.log(await Promise.all(responses))
           return ModularCard.setCardPartDatas(game.messages.get(messageId), await Promise.all(responses));
         })
       )
