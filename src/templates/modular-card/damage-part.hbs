@@ -21,14 +21,14 @@
         </button>
         
         {{#if (and (eq @root.data.phase "bonus-input") (nacPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)) )}}
-          <input class="{{@root.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{@root.data.userBonus.formula}}" data-action="item-damage-bonus" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
+          <input class="{{@root.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{@root.data.userBonus}}" data-action="item-damage-bonus" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
         {{/if}}
       </div>
     {{/if}}
     {{#nacPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}
       <div class="overlay">
         <div class="left">
-          <button data-action="item-damage-mode-minus" class="{{@root.moduleName}}-mode-minus" {{#if (eq @root.data.mode 'normal')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
+          <button data-action="mode-minus" class="{{@root.moduleName}}-mode-minus" {{#if (eq @root.data.mode 'normal')}}disabled{{/if}}><i class="fas fa-minus"></i></button>
         </div>
         <div class="middel"></div>
         <div class="right">
@@ -38,7 +38,7 @@
               <i class="fas fa-hand-holding hand-2" data-fa-transform="rotate-90"></i>
             </button>
           {{/if}}
-          <button data-action="item-damage-mode-plus" class="{{@root.moduleName}}-mode-plus" {{#if (eq @root.data.mode 'critical')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
+          <button data-action="mode-plus" class="{{@root.moduleName}}-mode-plus" {{#if (eq @root.data.mode 'critical')}}disabled{{/if}}><i class="fas fa-plus"></i></button>
         </div>
       </div>
     {{/nacPerm}}

@@ -1,4 +1,5 @@
 import { closeSync } from "fs";
+import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
 import { IAfterDmlContext, IDmlContext, ITrigger} from "../lib/db/dml-trigger";
 import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
@@ -12,7 +13,7 @@ import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { ClickEvent, createElement, HtmlContext, ICallbackAction, KeyEvent } from "./card-part-element";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 export interface AddedDamage {
@@ -40,7 +41,7 @@ export interface DamageCardData {
   phase: 'mode-select' | 'bonus-input' | 'result';
   mode: 'normal' | 'critical';
   source: 'normal' | 'versatile';
-  userBonus?: RollData;
+  userBonus?: string;
   calc$: {
     actorUuid?: string;
     label: string;
@@ -198,11 +199,141 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    createElement({
-      selector: this.getSelector(),
-      getHtml: context => this.getElementHtml(context),
-      getCallbackActions: () => this.getCallbackActions(),
-    });
+    const permissionCheck = createPermissionCheck2<{part: {data: DamageCardData}}>(({part}) => {
+      const documents: CreatePermissionCheckArgs['documents'] = [];
+      if (part.data.calc$.actorUuid) {
+        documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
+      }
+      return {documents: documents};
+    })
+    new ElementBuilder()
+      .listenForAttribute('data-part-id', 'string')
+      .listenForAttribute('data-message-id', 'string')
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('click')
+        .setFilter('[data-action="item-damage"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, part, click, allCardParts}) => {
+          if (part.data.phase === 'result') {
+            return;
+          }
+      
+          const orderedPhases: DamageCardData['phase'][] = ['mode-select', 'bonus-input', 'result'];
+          if (click.shiftKey) {
+            part.data.phase = orderedPhases[orderedPhases.length - 1];
+          } else {
+            part.data.phase = orderedPhases[orderedPhases.indexOf(part.data.phase) + 1];
+          }
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('click')
+        .setFilter('[data-action="item-damage-source-toggle"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, part, allCardParts}) => {
+          // TODO (Shift for quick roll)
+          if (part.data.source === 'normal' && part.data.calc$.versatileBaseRoll != null) {
+            part.data.source = 'versatile';
+          } else {
+            part.data.source = 'normal';
+          }
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('focusout')
+        .setFilter('input[data-action="item-damage-bonus"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, allCardParts, part, inputValue}) => {
+          if (inputValue && !Roll.validate(inputValue)) {
+            // Only show error on key press
+            throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+          }
+          part.data.phase = 'mode-select';
+          part.data.userBonus = inputValue ?? '';
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('keypress')
+        .setFilter('input[data-action="item-damage-bonus"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(ItemCardHelpers.getKeyEventSerializer())
+        .addSerializer(ItemCardHelpers.getInputSerializer())
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, allCardParts, part, keyEvent, inputValue}) => {
+          if (keyEvent.key === 'Enter') {
+            const userBonus = inputValue == null ? '' : inputValue;
+            if (userBonus && !Roll.validate(userBonus)) {
+              // Only show error on key press
+              throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+            }
+            part.data.phase = 'result';
+            part.data.userBonus = userBonus;
+            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+          } else if (keyEvent.key === 'Escape' && part.data.phase === 'bonus-input') {
+            part.data.phase = 'mode-select';
+            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+          }
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('click')
+        .setFilter('[data-action="mode-minus"], [data-action="mode-plus"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+        .addSerializer(ItemCardHelpers.getActionSrializer())
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, allCardParts, part, click, action}) => {
+          let modifier = action === 'mode-plus' ? 1 : -1;
+          if (click.shiftKey && modifier > 0) {
+            modifier++;
+          } else if (click.shiftKey && modifier < 0) {
+            modifier--;
+          }
+          
+          const order: Array<DamageCardData['mode']> = ['normal', 'critical'];
+          const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(part.data.mode) + modifier));
+          if (part.data.mode === order[newIndex]) {
+            return;
+          }
+          part.data.mode = order[newIndex];
+
+          if (click.shiftKey) {
+            part.data.phase = 'result';
+          }
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addOnAttributeChange(async ({element, attributes}) => {
+        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
+          element.innerHTML = await renderTemplate(
+            `modules/${staticValues.moduleName}/templates/modular-card/damage-part.hbs`, {
+              data: part.data,
+              moduleName: staticValues.moduleName
+            }
+          );
+        }});
+      })
+      .build(this.getSelector())
+
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(new DamageCardTrigger());
     TargetCardPart.instance.registerIntegration({
@@ -223,107 +354,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   public getHtml(data: HtmlContext): string {
     return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
-  }
-
-  public getElementHtml({data, messageId, partId}: HtmlContext<DamageCardData>): string | Promise<string> {
-    return renderTemplate(
-      `modules/${staticValues.moduleName}/templates/modular-card/damage-part.hbs`, {
-        data: data,
-        messageId: messageId,
-        partId: partId,
-        moduleName: staticValues.moduleName
-      }
-    );
-  }
-
-  public getCallbackActions(): ICallbackAction<DamageCardData>[] {
-    const permissionCheck = createPermissionCheck<DamageCardData>(({data}) => {
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (data.calc$.actorUuid) {
-        documents.push({uuid: data.calc$.actorUuid, permission: 'OWNER', security: true});
-      }
-      return {documents: documents};
-    })
-
-    return [
-      {
-        regex: /^item-damage$/,
-        permissionCheck: permissionCheck,
-        execute: ({data, clickEvent}) => this.processNextPhase(data, clickEvent),
-      },
-      {
-        regex: /^item-damage-source-toggle$/,
-        permissionCheck: permissionCheck,
-        execute: ({data}) => this.procesToggleSource(data),
-      },
-      {
-        regex: /^item-damage-bonus$/,
-        permissionCheck: permissionCheck,
-        execute: ({data, keyEvent, inputValue}) => this.processDamageBonus(data, keyEvent, inputValue as string),
-      },
-      {
-        regex: /^item-damage-mode-(minus|plus)$/,
-        permissionCheck: permissionCheck,
-        execute: ({data, clickEvent, regexResult}) => this.processDamageMode(data, clickEvent, regexResult[1] as ('plus' | 'minus')),
-      },
-    ]
-  }
-
-  private async procesToggleSource(data: DamageCardData): Promise<void> {
-    if (data.source === 'normal' && data.calc$.versatileBaseRoll != null) {
-      data.source = 'versatile';
-    } else {
-      data.source = 'normal';
-    }
-  }
-
-  private async processNextPhase(data: DamageCardData,event: ClickEvent | null): Promise<void> {
-    if (data.phase === 'result') {
-      return;
-    }
-
-    const orderedPhases: DamageCardData['phase'][] = ['mode-select', 'bonus-input', 'result'];
-    if (event?.shiftKey) {
-      data.phase = orderedPhases[orderedPhases.length - 1];
-    } else {
-      data.phase = orderedPhases[orderedPhases.indexOf(data.phase) + 1];
-    }
-  }
-
-  private async processDamageMode(data: DamageCardData, event: ClickEvent, modName: 'plus' | 'minus'): Promise<void> {
-    let modifier = modName === 'plus' ? 1 : -1;
-    
-    const order: Array<DamageCardData['mode']> = ['normal', 'critical'];
-    const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(data.mode) + modifier));
-    if (data.mode === order[newIndex]) {
-      return;
-    }
-    data.mode = order[newIndex];
-
-    if (event.shiftKey) {
-      data.phase = 'result';
-    }
-  }
-  
-  private async processDamageBonus(data: DamageCardData, keyEvent: KeyEvent | null, damageBonus: string): Promise<void> {
-    if (keyEvent?.key === 'Escape') {
-      data.phase = 'mode-select';
-      return;
-    }
-
-    if (damageBonus) {
-      if (!Roll.validate(damageBonus) && keyEvent) {
-        // Only show error on key press
-        throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-      }
-      data.userBonus = UtilsRoll.toRollData(new Roll(damageBonus));
-    } else {
-      delete data.userBonus;
-    }
-
-    if (keyEvent?.key === 'Enter') {
-      data.phase = 'result';
-    } 
   }
   //#endregion
 
@@ -739,7 +769,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
         if (newRollTerms.length > 0) {
           newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermData);
         }
-        newRollTerms.push(...newRow.data.userBonus.terms);
+        newRollTerms.push(...new Roll(newRow.data.userBonus).terms.map(t => t.toJSON() as TermData));
       }
       if (newRollTerms.length === 0) {
         newRollTerms.push(new NumericTerm({number: 0}).toJSON() as TermData);
