@@ -61,7 +61,7 @@ export class ItemCardHelpers {
   public static getInputSerializer(): ({event}: {event: Event}) => ElementInputData {
     return ({event}) => {
       return {
-        inputValue: event.target instanceof HTMLInputElement ? event.target.value : undefined,
+        inputValue: (event.target as any)?.value,
       }
     }
   }
