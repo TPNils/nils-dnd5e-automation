@@ -1,0 +1,7 @@
+@import '../global-variables.scss';
+
+#{$module-code}-description-part {
+  .description:not(.open) {
+    display: none;
+  }
+}

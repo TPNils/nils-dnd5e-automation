@@ -3,13 +3,11 @@
   <h3 class="{{@root.moduleName}}-item-name">{{data.calc$.name}}</h3>
 </div>
 
-{{#unless (nacCardCollapse @root.messageId)}}
-  <div class="{{@root.moduleName}}-section">
-    {{#if data.calc$.description}}
-      {{{data.calc$.description}}}
-    {{/if}}
-    {{#if data.calc$.materials}}
-      <p><strong>{{ localize "DND5E.RequiredMaterials" }}.</strong> {{data.calc$.materials}}</p>
-    {{/if}}
-  </div>
-{{/unless}}
+<div class="{{@root.moduleName}}-section description">
+  {{#if data.calc$.description}}
+    {{{data.calc$.description}}}
+  {{/if}}
+  {{#if data.calc$.materials}}
+    <p><strong>{{ localize "DND5E.RequiredMaterials" }}.</strong> {{data.calc$.materials}}</p>
+  {{/if}}
+</div>

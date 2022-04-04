@@ -153,10 +153,6 @@ export class UtilsHandlebars {
     }
   }
 
-  public static isCardCollapse(messageId: string): boolean {
-    return MemoryStorageService.isCardCollapsed(messageId);
-  }
-
   public static translateUsage(usage: ItemCardItem['consumeResources'][number]): string {
     const uuidParts = usage.calc$.uuid.split('.');
     const pathParts = usage.calc$.path.split('.');
@@ -323,7 +319,6 @@ export class UtilsHandlebars {
       Handlebars.registerHelper(`${staticValues.code}Perm`, UtilsHandlebars.hasPermission);
       Handlebars.registerHelper(`${staticValues.code}MisPerm`, UtilsHandlebars.missingPermission);
       Handlebars.registerHelper(`${staticValues.code}Expr`, UtilsHandlebars.expression);
-      Handlebars.registerHelper(`${staticValues.code}CardCollapse`, UtilsHandlebars.isCardCollapse);
       Handlebars.registerHelper(`${staticValues.code}TranslateUsage`, UtilsHandlebars.translateUsage);
       Handlebars.registerHelper(`${staticValues.code}Math`, UtilsHandlebars.math);
       Handlebars.registerHelper(`${staticValues.code}Capitalize`, UtilsHandlebars.capitalize);

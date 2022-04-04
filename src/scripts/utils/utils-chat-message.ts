@@ -184,11 +184,6 @@ export class UtilsChatMessage {
 
   private static readonly actionMatches: Array<{regex: RegExp, permissionCheck: ActionPermissionCheck, execute: ActionPermissionExecute}> = [
     {
-      regex: /^toggle-collapse$/,
-      permissionCheck: () => {return {onlyRunLocal: true}},
-      execute: ({messageId}) => UtilsChatMessage.toggleCollapse(messageId),
-    },
-    {
       regex: /^item-([0-9]+)-upcastlevel$/,
       permissionCheck: ({messageData}) => {return {actorUuid: messageData.actor?.uuid}},
       execute: ({regexResult, inputValue, messageData}) => UtilsChatMessage.upcastlevelChange(Number(regexResult[1]), inputValue as string, messageData),
@@ -1166,13 +1161,6 @@ export class UtilsChatMessage {
     if (changed) {
       return messageData;
     }
-  }
-  //#endregion
-
-  //#region misc
-  private static async toggleCollapse(messageId: string): Promise<ItemCard | void> {
-    MemoryStorageService.setCardCollapse(messageId, !MemoryStorageService.isCardCollapsed(messageId));
-    ui.chat.updateMessage(game.messages.get(messageId));
   }
   //#endregion
 

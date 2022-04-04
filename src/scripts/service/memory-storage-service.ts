@@ -33,24 +33,10 @@ export class MemoryValue<T = any> {
   }
 }
 
+
 export class MemoryStorageService {
 
   private static properties = new Map<string, MemoryValue>();
-
-  // Store this locally so you do not need to save it on the message => less DMLs and it isn't all that important anyway
-  // Dont make it persistant since messages can be deleted and I don't want to write cleanup code (:
-  public static isCardCollapsed(messageId: string): boolean {
-    const messagePerference = MemoryStorageService.getValue<boolean>(`cardCollapse${messageId}`).get();
-    if (messagePerference != null) {
-      return messagePerference;
-    }
-
-    return !!game.settings.get('dnd5e', 'autoCollapseItemCards');
-  }
-  
-  public static setCardCollapse(messageId: string, value: boolean): void {
-    MemoryStorageService.getValue(`cardCollapse.${messageId}`).set(value);
-  }
 
   public static getFocusedElementSelector(): string | null {
     return MemoryStorageService.getValue<string>(`focusedElementSelector`).get();
@@ -60,7 +46,7 @@ export class MemoryStorageService {
     MemoryStorageService.getValue(`focusedElementSelector`).set(selector);
   }
 
-  public static getElementValue<T>(element: Element, subKey: string | string[] = []): MemoryValue<T> {
+  public static getElementValue<T>(element: Element, subKey: string | string[] = [], defaultValue?: T | (() => T)): MemoryValue<T> {
     if (typeof subKey === 'string') {
       subKey = [subKey];
     }
@@ -91,7 +77,16 @@ export class MemoryStorageService {
       element = element.parentElement;
     } while (element != null)
 
-    return MemoryStorageService.getValue(keyParts.reverse().join(';'));
+    const memoryValue = MemoryStorageService.getValue<T>(keyParts.reverse().join(';'));
+    if (defaultValue != null && memoryValue.get() == null) {
+      if (typeof defaultValue === `function`) {
+        // @ts-ignore
+        memoryValue.set(defaultValue());
+      } else {
+        memoryValue.set(defaultValue);
+      }
+    }
+    return memoryValue;
   }
 
   private static getValue<T>(key: string): MemoryValue<T> {
