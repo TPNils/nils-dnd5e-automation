@@ -152,7 +152,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(ItemCardHelpers.getKeyEventSerializer())
-        .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
+        .addSerializer(ItemCardHelpers.getInputSerializer())
         .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
         .addEnricher(this.getTargetCacheEnricher)
         .setPermissionCheck(permissionCheck)

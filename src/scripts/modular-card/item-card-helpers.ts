@@ -26,6 +26,10 @@ export interface ClickData {
   };
 }
 
+export interface ElementInputData {
+  readonly inputValue: string;
+}
+
 export interface KeyData {
   readonly keyEvent: {
     readonly key: string;
@@ -50,6 +54,14 @@ export class ItemCardHelpers {
     return () => {
       return {
         userId: game.userId,
+      }
+    }
+  }
+
+  public static getInputSerializer(): ({event}: {event: Event}) => ElementInputData {
+    return ({event}) => {
+      return {
+        inputValue: event.target instanceof HTMLInputElement ? event.target.value : undefined,
       }
     }
   }
