@@ -50,7 +50,6 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
         //.setFilter('[data-action="toggle-collapse"]')
         .setExecute(({element}) => {
           const collapsed$ = MemoryStorageService.getElementValue<boolean>(element, `cardCollapse`, getDefaultCardCollpased);
-          console.log('set', !collapsed$.get())
           collapsed$.set(!collapsed$.get());
         })
       )
@@ -95,7 +94,6 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
     }
     
     const isCurrentlyCollapsed = !wrapper.classList.contains('open');
-    console.log(isCurrentlyCollapsed, '!==', shouldBeCollapsed)
     if (isCurrentlyCollapsed !== shouldBeCollapsed) {
       if (shouldBeCollapsed) {
         wrapper.classList.remove('open');
