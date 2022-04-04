@@ -1,7 +1,6 @@
-import { closeSync } from "fs";
 import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
 import { IAfterDmlContext, IDmlContext, ITrigger} from "../lib/db/dml-trigger";
-import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
+import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { RollData, TermData, UtilsRoll } from "../lib/roll/utils-roll";
@@ -10,10 +9,10 @@ import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
-import { ClickEvent, createElement, HtmlContext, ICallbackAction, KeyEvent } from "./card-part-element";
+import { HtmlContext } from "./card-part-element";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 export interface AddedDamage {
