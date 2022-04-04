@@ -58,26 +58,17 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
         const collapsed$ = MemoryStorageService.getElementValue<boolean>(element, `cardCollapse`, getDefaultCardCollpased);
         collapsed$.listen(value => DescriptionCardPart.setCollpasedState(element, !!value));
       })
-      .addOnAttributeChange(async ({element, attributes}) => {
-        const allParts = ModularCard.getCardPartDatas(game.messages.get(attributes['data-message-id']));
-        if (allParts == null) {
-          element.innerText = '';
-          return;
-        }
-        const data: DescriptionCardData = allParts.find(p => p.id === attributes['data-part-id'] && p.type === this.getType())?.data;
-        if (data == null) {
-          element.innerText = '';
-          return;
-        }
-        
-        element.innerHTML = await renderTemplate(
-          `modules/${staticValues.moduleName}/templates/modular-card/description-part.hbs`, {
-            data: data,
-            messageId: attributes['data-message-id'],
-            moduleName: staticValues.moduleName
-          }
-        );
-        DescriptionCardPart.setCollpasedState(element, !!MemoryStorageService.getElementValue<boolean>(element, `cardCollapse`, getDefaultCardCollpased).get());
+      .addOnAttributeChange(({element, attributes}) => {
+        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
+          element.innerHTML = await renderTemplate(
+            `modules/${staticValues.moduleName}/templates/modular-card/description-part.hbs`, {
+              data: part.data,
+              messageId: attributes['data-message-id'],
+              moduleName: staticValues.moduleName
+            }
+          );
+          DescriptionCardPart.setCollpasedState(element, !!MemoryStorageService.getElementValue<boolean>(element, `cardCollapse`, getDefaultCardCollpased).get());
+        }});
       })
       .build(this.getSelector())
     

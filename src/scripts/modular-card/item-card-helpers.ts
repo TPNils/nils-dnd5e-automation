@@ -1,5 +1,6 @@
 import { DamageType } from "../types/fixed-types";
 import { ModularCard, ModularCardPartData } from "./modular-card";
+import { ModularCardPart } from "./modular-card-part";
 
 export interface ChatPartIdData {
   readonly partId: string;
@@ -112,6 +113,26 @@ export class ItemCardHelpers {
         part: messagePartData,
       }
     }
+  }
+
+  public static ifAttrData<T>(args: {
+    attr: Partial<{readonly ['data-message-id']: string, readonly ['data-part-id']: string}>,
+    element: HTMLElement,
+    type: ModularCardPart<T>,
+    callback: (args: {allParts: ModularCardPartData<any>[], part: ModularCardPartData<T>}) => any
+  }): any {
+    const allParts = ModularCard.getCardPartDatas(game.messages.get(args.attr['data-message-id']));
+    if (allParts == null) {
+      args.element.innerText = '';
+      return;
+    }
+    const data: ModularCardPartData<T> = allParts.find(p => p.id === args.attr['data-part-id'] && p.type === args.type.getType());
+    if (data == null) {
+      args.element.innerText = '';
+      return;
+    }
+
+    return args.callback({allParts: allParts, part: data});
   }
   
 }

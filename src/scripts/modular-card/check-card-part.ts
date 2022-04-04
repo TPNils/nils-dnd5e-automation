@@ -205,33 +205,26 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
         })
       )
       .addOnAttributeChange(async ({element, attributes}) => {
-        const allParts = ModularCard.getCardPartDatas(game.messages.get(attributes['data-message-id']));
-        if (allParts == null) {
-          element.innerText = '';
-          return;
-        }
-        const data: CheckCardData = allParts.find(p => p.id === attributes['data-part-id'] && p.type === this.getType())?.data;
-        if (data == null) {
-          element.innerText = '';
-          return;
-        }
-        const cache = getTargetCache(data, attributes['data-sub-type']);
-        if (!cache) {
-          return '';
-        }
-        const d20attributes = {
-          ['data-roll']: cache.roll,
-          ['data-bonus-formula']: cache.userBonus,
-          ['data-show-bonus']: cache.phase === 'bonus-input',
-        };
-        if (cache.actorUuid) {
-          d20attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid}`
-        }
-        const attributeArray: string[] = [];
-        for (let [attr, value] of Object.entries(d20attributes)) {
-          attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
-        }
-        element.innerHTML = `<${RollD20Element.selector()} class="hide-flavor snug" ${attributeArray.join(' ')}></${RollD20Element.selector()}>`;
+        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
+          const cache = getTargetCache(part.data, attributes['data-sub-type']);
+          if (!cache) {
+            return '';
+          }
+          const d20attributes = {
+            ['data-roll']: cache.roll,
+            ['data-bonus-formula']: cache.userBonus,
+            ['data-show-bonus']: cache.phase === 'bonus-input',
+          };
+          if (cache.actorUuid) {
+            d20attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid}`
+          }
+          const attributeArray: string[] = [];
+          for (let [attr, value] of Object.entries(d20attributes)) {
+            attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
+          }
+          element.innerHTML = `<${RollD20Element.selector()} class="hide-flavor snug" ${attributeArray.join(' ')}></${RollD20Element.selector()}>`;
+        }});
+        
       })
       .build(this.getSelector())
 
