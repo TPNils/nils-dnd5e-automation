@@ -1,3 +1,4 @@
+import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
 import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
@@ -6,9 +7,10 @@ import MyAbilityTemplate from "../pixi/ability-template";
 import { staticValues } from "../static-values";
 import { MyItemData } from "../types/fixed-types";
 import { UtilsTemplate } from "../utils/utils-template";
-import { createElement, HtmlContext, ICallbackAction } from "./card-part-element";
+import { HtmlContext } from "./card-part-element";
+import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-part";
 
 interface TemplateCardData {
@@ -56,11 +58,47 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    createElement({
-      selector: this.getSelector(),
-      getHtml: context => this.getElementHtml(context),
-      getCallbackActions: () => this.getCallbackActions(),
-    });
+    const permissionCheck = createPermissionCheck2<{part: {data: TemplateCardData}}>(({part}) => {
+      const documents: CreatePermissionCheckArgs['documents'] = [];
+      if (part.data.calc$.actorUuid) {
+        documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
+      }
+      return {documents: documents, updatesMessage: false};
+    })
+
+    new ElementBuilder()
+      .listenForAttribute('data-part-id', 'string')
+      .listenForAttribute('data-message-id', 'string')
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('click')
+        .setFilter('[data-action="item-template"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<TemplateCardData>())
+        .setPermissionCheck(permissionCheck)
+        .setExecute(({messageId, partId, part}) => {
+          const template = MyAbilityTemplate.fromItem({
+            target: part.data.calc$.target,
+            flags: {
+              [staticValues.moduleName]: {
+                dmlCallbackMessageId: messageId,
+                dmlCallbackPartId: partId,
+              }
+            }
+          });
+          template.drawPreview();
+        })
+      )
+      .addOnAttributeChange(({element, attributes}) => {
+        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
+          element.innerHTML = await renderTemplate(
+            `modules/${staticValues.moduleName}/templates/modular-card/template-part.hbs`, {
+              data: part.data,
+              moduleName: staticValues.moduleName
+          });
+        }});
+      })
+      .build(this.getSelector())
     
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(new TemplateCardTrigger());
@@ -78,46 +116,6 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
 
   public getHtml(data: HtmlContext): string {
     return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
-  }
-
-  public getElementHtml(context: HtmlContext<TemplateCardData>): string | Promise<string> {
-    return renderTemplate(
-      `modules/${staticValues.moduleName}/templates/modular-card/template-part.hbs`, {
-        data: context.data,
-        moduleName: staticValues.moduleName
-      }
-    );
-  }
-
-  public getCallbackActions(): ICallbackAction<TemplateCardData>[] {
-    const permissionCheck = createPermissionCheck<TemplateCardData>(({data}) => {
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (data.calc$.actorUuid) {
-        documents.push({uuid: data.calc$.actorUuid, permission: 'OWNER', security: true});
-      }
-      return {documents: documents, updatesMessage: false};
-    })
-
-    return [
-      {
-        regex: /^item-template$/,
-        permissionCheck: permissionCheck,
-        execute: ({data, messageId, partId}) => this.processItemTemplate(data, messageId, partId),
-      }
-    ]
-  }
-  
-  private async processItemTemplate(data: TemplateCardData, messageId: string, partId: string): Promise<void> {
-    const template = MyAbilityTemplate.fromItem({
-      target: data.calc$.target,
-      flags: {
-        [staticValues.moduleName]: {
-          dmlCallbackMessageId: messageId,
-          dmlCallbackPartId: partId,
-        }
-      }
-    });
-    template.drawPreview();
   }
   //#endregion
 
