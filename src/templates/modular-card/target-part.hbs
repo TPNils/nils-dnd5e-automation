@@ -8,9 +8,9 @@
   <div class="header-cell">{{! filler }}</div>
   <div class="header-cell one-line">
     {{#nacExpr data.tableBody.length '>' 1}}
-      <button data-action="smart-apply-*" data-state="{{data.tableHeader.smartState}}" class="icon-button apply"><i class="fas fa-brain"></i></button>
-      <button data-action="force-apply-*" data-state="{{data.tableHeader.state}}" class="icon-button apply"><i class="fas fa-check"></i></button>
-      <button data-action="undo-*" data-state="{{data.tableHeader.state}}" class="icon-button undo"><i class="fas fa-undo"></i></button>
+      <button data-action="smart-apply" data-target-uuid="*" data-state="{{data.tableHeader.smartState}}" class="icon-button apply"><i class="fas fa-brain"></i></button>
+      <button data-action="force-apply" data-target-uuid="*" data-state="{{data.tableHeader.state}}" class="icon-button apply"><i class="fas fa-check"></i></button>
+      <button data-action="undo" data-target-uuid="*" data-state="{{data.tableHeader.state}}" class="icon-button undo"><i class="fas fa-undo"></i></button>
     {{/nacExpr}}
   </div>
   {{!body}}
@@ -27,8 +27,8 @@
       <div class="body-cell placeholder">{{! apply buttons }}</div>
     {{else}}
       <div class="body-cell">
-        <button {{#if (or (nacMisPerm (nacConcat 'OwnerUuid:' @root.actorUuid)) (and (or (nacExpr target.state '===' 'partial-applied') (nacExpr target.state '===' 'applied')) (nacMisPerm (nacConcat 'OwnerUuid:' target.actorUuid))))}}disabled{{/if}} data-action="delete-{{target.selectionId}}" class="icon-button delete"><i class="fas fa-trash"></i></button>
-        <button {{#if (nacMisPerm (nacConcat 'OwnerUuid:' @root.actorUuid))}}disabled{{/if}} data-action="copy-{{target.tokenUuid}}" class="icon-button copy"><i class="far fa-copy"></i></button>
+        <button {{#if (or (nacMisPerm (nacConcat 'OwnerUuid:' @root.actorUuid)) (and (or (nacExpr target.state '===' 'partial-applied') (nacExpr target.state '===' 'applied')) (nacMisPerm (nacConcat 'OwnerUuid:' target.actorUuid))))}}disabled{{/if}} data-action="delete" data-delete-uuid="{{target.selectionId}}" class="icon-button delete"><i class="fas fa-trash"></i></button>
+        <button {{#if (nacMisPerm (nacConcat 'OwnerUuid:' @root.actorUuid))}}disabled{{/if}} data-action="copy" data-copy-uuid="{{target.tokenUuid}}" class="icon-button copy"><i class="far fa-copy"></i></button>
       </div>
       <div class="body-cell" {{#if (or target.nameVisibleAnyone (nacPerm (nacConcat "ObserverUuid:" target.actorUuid)) )}}title="{{target.name}}"{{/if}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</div>
       {{#each target.row}}
@@ -37,9 +37,9 @@
       <div class="body-cell">{{! filler }}</div>
       <div class="body-cell one-line">
         {{#nacPerm (nacConcat "UpdateUuid:" target.actorUuid)}}
-          <button data-action="smart-apply-{{target.selectionId}}" data-state="{{target.smartState}}" class="icon-button apply"><i class="fas fa-brain"></i></button>
-          <button data-action="force-apply-{{target.selectionId}}" data-state="{{target.state}}" class="icon-button apply"><i class="fas fa-check"></i></button>
-          <button data-action="undo-{{target.selectionId}}" data-state="{{target.state}}" class="icon-button undo"><i class="fas fa-undo"></i></button>
+          <button data-action="smart-apply" data-target-uuid="{{target.selectionId}}" data-state="{{target.smartState}}" class="icon-button apply"><i class="fas fa-brain"></i></button>
+          <button data-action="force-apply" data-target-uuid="{{target.selectionId}}" data-state="{{target.state}}" class="icon-button apply"><i class="fas fa-check"></i></button>
+          <button data-action="undo" data-target-uuid="{{target.selectionId}}" data-state="{{target.state}}" class="icon-button undo"><i class="fas fa-undo"></i></button>
         {{/nacPerm}}
       </div>
     {{/if}}
