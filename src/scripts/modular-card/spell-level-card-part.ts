@@ -2,9 +2,8 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { ModularCard, ModularCardPartData } from "./modular-card";
 import { MyActor, SpellData } from "../types/fixed-types";
-import { createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { UtilsDocument } from "../lib/db/utils-document";
-import { HtmlContext } from "./card-part-element";
 import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
 import { ItemCardHelpers } from "./item-card-helpers";
 
@@ -109,7 +108,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck2<{part: {data: SpellLevelCardData}}>(({part}) => {
+    const permissionCheck = createPermissionCheck<{part: {data: SpellLevelCardData}}>(({part}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (part.data.calc$.actorUuid) {
         documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});

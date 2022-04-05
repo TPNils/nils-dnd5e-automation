@@ -9,10 +9,9 @@ import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { MyActor, MyActorData } from "../types/fixed-types";
-import { ClickEvent, HtmlContext, ICallbackAction, KeyEvent } from "./card-part-element";
 import { ChatPartEnriched, ChatPartIdData, ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 interface TargetCache {
@@ -90,7 +89,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck2<{part: {data: CheckCardData}}>(({part, subType}) => {
+    const permissionCheck = createPermissionCheck<{part: {data: CheckCardData}}>(({part, subType}) => {
       const cache = getTargetCache(part.data, subType);
       if (!cache?.actorUuid) {
         return {mustBeGm: true};

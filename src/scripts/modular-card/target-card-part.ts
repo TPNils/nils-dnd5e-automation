@@ -5,10 +5,9 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
-import { HtmlContext } from "./card-part-element";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 export interface TargetCardData {
   selected: Array<{selectionId: string, tokenUuid: string;}>;
@@ -156,7 +155,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
           return {copyUuid: (context.event.target as HTMLElement).closest('[data-copy-uuid]').getAttribute('data-copy-uuid')};
         })
         .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
-        .setPermissionCheck(createPermissionCheck2<{part: {data: TargetCardData}}>(({part}) => {
+        .setPermissionCheck(createPermissionCheck<{part: {data: TargetCardData}}>(({part}) => {
           const documents: CreatePermissionCheckArgs['documents'] = [];
           if (part.data.calc$.actorUuid) {
             documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
@@ -177,7 +176,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
           return {deleteUuid: (context.event.target as HTMLElement).closest('[data-delete-uuid]').getAttribute('data-delete-uuid')};
         })
         .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
-        .setPermissionCheck(createPermissionCheck2<{part: {data: TargetCardData}}>(({part}) => {
+        .setPermissionCheck(createPermissionCheck<{part: {data: TargetCardData}}>(({part}) => {
           const documents: CreatePermissionCheckArgs['documents'] = [];
           if (part.data.calc$.actorUuid) {
             documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
@@ -202,7 +201,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
           };
         })
         .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
-        .setPermissionCheck(createPermissionCheck2<{part: {data: TargetCardData}}>(({part}) => {
+        .setPermissionCheck(createPermissionCheck<{part: {data: TargetCardData}}>(({part}) => {
           const documents: CreatePermissionCheckArgs['documents'] = [];
           if (part.data.calc$.actorUuid) {
             documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});

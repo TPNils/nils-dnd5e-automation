@@ -7,10 +7,9 @@ import MyAbilityTemplate from "../pixi/ability-template";
 import { staticValues } from "../static-values";
 import { MyItemData } from "../types/fixed-types";
 import { UtilsTemplate } from "../utils/utils-template";
-import { HtmlContext } from "./card-part-element";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-part";
 
 interface TemplateCardData {
@@ -58,7 +57,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck2<{part: {data: TemplateCardData}}>(({part}) => {
+    const permissionCheck = createPermissionCheck<{part: {data: TemplateCardData}}>(({part}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (part.data.calc$.actorUuid) {
         documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});

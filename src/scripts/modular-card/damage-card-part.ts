@@ -9,10 +9,9 @@ import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
 import { DamageType, MyActor, MyItem } from "../types/fixed-types";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
-import { HtmlContext } from "./card-part-element";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck2, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 export interface AddedDamage {
@@ -198,7 +197,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck2<{part: {data: DamageCardData}}>(({part}) => {
+    const permissionCheck = createPermissionCheck<{part: {data: DamageCardData}}>(({part}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (part.data.calc$.actorUuid) {
         documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
