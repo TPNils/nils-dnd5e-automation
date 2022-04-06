@@ -280,6 +280,7 @@ function buildWatch() {
       // Initial build
       //console.log(buildTS().eventNames())
       // finish, close, end
+      await clean();
       await Promise.all([
         new Promise((resolve) => buildTS().once('end', () => resolve())),
         new Promise((resolve) => buildLess().once('end', () => resolve())),
