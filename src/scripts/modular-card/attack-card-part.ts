@@ -194,7 +194,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         })
       )
       .addListener(new ElementCallbackBuilder()
-        .setEvent('keypress')
+        .setEvent('keyup')
         .addSelectorFilter('input[data-action="user-bonus"]')
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())

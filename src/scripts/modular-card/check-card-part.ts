@@ -153,7 +153,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
         })
       )
       .addListener(new ElementCallbackBuilder()
-        .setEvent('keypress')
+        .setEvent('keyup')
         .addSelectorFilter('input[data-action="user-bonus"]')
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
