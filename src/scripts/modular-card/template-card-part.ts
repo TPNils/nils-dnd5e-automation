@@ -1,6 +1,6 @@
 import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
 import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
-import { UtilsDocument } from "../lib/db/utils-document";
+import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import MyAbilityTemplate from "../pixi/ability-template";
@@ -153,6 +153,32 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData> {
   }
   //#endregion
   
+  //#region afterDelete
+  public async afterDelete(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+    await this.deleteTemplates(context);
+  }
+
+  private async deleteTemplates(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+    const templateUuids = new Set<string>();
+    for (const {oldRow} of context.rows) {
+      if (!this.isThisTriggerType(oldRow)) {
+        continue;
+      }
+
+      templateUuids.add(oldRow.data.calc$.createdTemplateUuid)
+    }
+    templateUuids.delete(null);
+    templateUuids.delete(undefined);
+
+    if (templateUuids.size === 0) {
+      return;
+    }
+
+    const templates = await UtilsDocument.templateFromUuid(templateUuids);
+    await UtilsDocument.bulkDelete(Array.from(templates.values()).map(doc => {return {document: doc}}))
+  }
+  //#endregion
+
   //#region helpers
   private isThisTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<TemplateCardData> {
     return row.typeHandler instanceof TemplateCardPart;
