@@ -171,6 +171,13 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       .addListener(new ElementCallbackBuilder()
         .setEvent('focusout')
         .addSelectorFilter('input[data-action="user-bonus"]')
+        .addFilter(({event}) => {
+          if (event.relatedTarget instanceof HTMLElement) {
+            // Do not fire this if roll is pressed (focusout triggers first)
+            return event.relatedTarget.closest(`[data-action="roll"]`) != null;
+          }
+          return false;
+        })
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
