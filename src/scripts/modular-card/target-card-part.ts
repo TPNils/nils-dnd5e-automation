@@ -148,7 +148,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       .listenForAttribute('data-message-id', 'string')
       .addListener(new ElementCallbackBuilder()
         .setEvent('click')
-        .setFilter('[data-action="copy"][data-copy-uuid]')
+        .addSelectorFilter('[data-action="copy"][data-copy-uuid]')
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(context => {
@@ -169,7 +169,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       )
       .addListener(new ElementCallbackBuilder()
         .setEvent('click')
-        .setFilter('[data-action="delete"][data-delete-uuid]')
+        .addSelectorFilter('[data-action="delete"][data-delete-uuid]')
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(context => {
@@ -191,7 +191,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       )
       .addListener(new ElementCallbackBuilder()
         .setEvent('click')
-        .setFilter('[data-action="force-apply"][data-target-uuid],[data-action="smart-apply"][data-target-uuid],[data-action="undo"][data-target-uuid]')
+        .addSelectorFilter('[data-action="force-apply"][data-target-uuid],[data-action="smart-apply"][data-target-uuid],[data-action="undo"][data-target-uuid]')
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(context => {

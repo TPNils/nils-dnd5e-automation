@@ -70,7 +70,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
       .listenForAttribute('data-message-id', 'string')
       .addListener(new ElementCallbackBuilder()
         .setEvent('click')
-        .setFilter('[data-action="item-template"]')
+        .addSelectorFilter('[data-action="item-template"]')
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addEnricher(ItemCardHelpers.getChatPartEnricher<TemplateCardData>())

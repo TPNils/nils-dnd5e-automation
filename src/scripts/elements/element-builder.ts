@@ -2,7 +2,6 @@ import { buffer } from "../lib/decorator/buffer";
 import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { provider } from "../provider/provider";
-import { staticValues } from "../static-values";
 
 interface DynamicElementConfig {
   selector: string;
@@ -16,7 +15,7 @@ type PermissionCheckResult = 'can-run-local' | 'can-run-as-gm' | 'prevent-action
 interface DynamicElementCallback {
   readonly id: string;
   readonly eventName: string;
-  readonly filterSelector?: string
+  readonly filters: Array<(args: {element: HTMLElement, event: Event}) => boolean | Promise<boolean>>
   readonly serializers: Array<(event: SerializerArgs<Event>) => any>;
   readonly dataEnrichers: Array<(data: any) => any>;
   readonly permissionCheck?: (data: any) => Promise<PermissionCheckResult> | PermissionCheckResult;
@@ -173,16 +172,14 @@ class DynamicElement extends HTMLElement {
   private registerEventListeners() {
     for (const callback of this.config.callbacks) {
       const listener: EventListenerOrEventListenerObject = async event => {
-        if (callback.filterSelector && event.target instanceof HTMLElement) {
-          const items = Array.from(this.querySelectorAll(callback.filterSelector));
-          let element = event.target;
-          let matches = false;
-          do {
-            matches = items.includes(element);
-            element = element.parentElement;
-          } while(!matches && element != null)
-
-          if (!matches) {
+        // console.log(callback.eventName, callback, event);
+        for (const filter of callback.filters) {
+          const result = filter({element: this, event: event});
+          if (result instanceof Promise) {
+            if ((await result) === true) {
+              return;
+            }
+          } else if (result === true) {
             return;
           }
         }
@@ -277,12 +274,26 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
     return this as ElementCallbackBuilder<E, C, any>;
   }
 
-  private filterSelector: string;
-  public setFilter(selector: string): this {
-    if (selector && !selector.toLowerCase().startsWith(':scope')) {
-      selector = ':scope ' + selector;
-    }
-    this.filterSelector = selector;
+  private filters: Array<(args: {element: HTMLElement, event: C}) => boolean | Promise<boolean>> = [];
+  public addFilter(filter: (args: {element: HTMLElement, event: C}) => boolean | Promise<boolean>): this {
+    this.filters.push(filter);
+    return this;
+  }
+
+  public addSelectorFilter(selector: string): this {
+    this.filters.push(({element, event}) => {
+      const items = Array.from(element.querySelectorAll(selector));
+      let loopElement = event.target as Element;
+      do {
+        if (items.includes(loopElement)) {
+          return false;
+        }
+        loopElement = loopElement.parentElement;
+      } while(loopElement != null)
+
+      return true;
+    });
+
     return this;
   }
 
@@ -315,7 +326,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
   public toConfig(): Omit<DynamicElementCallback, 'id'> {
     return {
       eventName: this.eventName,
-      filterSelector: this.filterSelector,
+      filters: this.filters,
       dataEnrichers: this.enricherFuncs,
       serializers: this.serializerFuncs,
       permissionCheck: this.permissionCheckFunc,

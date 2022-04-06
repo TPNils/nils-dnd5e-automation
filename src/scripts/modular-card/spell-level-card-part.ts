@@ -121,7 +121,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       .listenForAttribute('data-message-id', 'string')
       .addListener(new ElementCallbackBuilder()
         .setEvent('change')
-        .setFilter('[data-action="spell-level-change"]')
+        .addSelectorFilter('[data-action="spell-level-change"]')
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(ItemCardHelpers.getInputSerializer())
