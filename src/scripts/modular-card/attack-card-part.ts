@@ -139,7 +139,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     const permissionCheck = createPermissionCheck<{part: {data: AttackCardData}}>(({part}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (part.data.calc$.actorUuid) {
-        documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER'});
+        documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
       }
       return {documents: documents};
     })

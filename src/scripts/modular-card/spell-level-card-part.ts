@@ -113,7 +113,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       if (part.data.calc$.actorUuid) {
         documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
       }
-      return {documents: documents, updatesMessage: false};
+      return {documents: documents};
     })
 
     new ElementBuilder()

@@ -95,7 +95,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
         return {mustBeGm: true};
       }
       const documents: CreatePermissionCheckArgs['documents'] = [];
-      documents.push({uuid: cache.actorUuid, permission: 'OWNER'});
+      documents.push({uuid: cache.actorUuid, permission: 'OWNER', security: true});
       return {documents: documents};
     })
     
