@@ -224,7 +224,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addSerializer(ItemCardHelpers.getActionSrializer())
+        .addSerializer(ItemCardHelpers.getActionSerializer())
         .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
         .setPermissionCheck(permissionCheck)
         .setExecute(({messageId, allCardParts, part, click, action}) => {
