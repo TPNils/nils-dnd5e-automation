@@ -1,4 +1,4 @@
-import { DamageType } from "../types/fixed-types";
+import { DamageType, MyItemData } from "../types/fixed-types";
 import { ModularCard, ModularCardPartData } from "./modular-card";
 import { ModularCardPart } from "./modular-card-part";
 
@@ -48,6 +48,10 @@ export class ItemCardHelpers {
   
   public static get healingDamageTypes(): DamageType[] {
     return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
+  }
+  
+  public static get spellUpcastModes(): Array<MyItemData['data']['preparation']['mode']> {
+    return (CONFIG as any).DND5E.spellUpcastModes;
   }
 
   public static getUserIdSerializer(): () => UserIdData {

@@ -29,7 +29,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
   private constructor(){}
   
   public async create({item, actor, token}: ModularCardCreateArgs): Promise<SpellLevelCardData> {
-    if (item.data.data.level <= 0 || item.data.data.level == null || !actor) {
+    if (item.data.data.level <= 0 || item.data.data.level == null || !actor || !ItemCardHelpers.spellUpcastModes.includes(item.data.data.preparation.mode)) {
       return null;
     }
 
