@@ -296,7 +296,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addSerializer(ItemCardHelpers.getActionSrializer())
+        .addSerializer(ItemCardHelpers.getActionSerializer())
         .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
         .setPermissionCheck(permissionCheck)
         .setExecute(({messageId, allCardParts, part, click, action}) => {

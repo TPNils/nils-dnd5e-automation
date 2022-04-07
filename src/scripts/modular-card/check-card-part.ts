@@ -184,7 +184,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addSerializer(ItemCardHelpers.getActionSrializer())
+        .addSerializer(ItemCardHelpers.getActionSerializer())
         .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
         .addEnricher(this.getTargetCacheEnricher)
         .setPermissionCheck(permissionCheck)

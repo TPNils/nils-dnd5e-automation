@@ -94,7 +94,7 @@ export class ItemCardHelpers {
     }
   }
 
-  public static getActionSrializer(): ({event}: {event: Event}) => ActionData {
+  public static getActionSerializer(): ({event}: {event: Event}) => ActionData {
     return ({event}) => {
       return {action: (event.target as HTMLElement).closest('[data-action]').getAttribute('data-action')}
     }
