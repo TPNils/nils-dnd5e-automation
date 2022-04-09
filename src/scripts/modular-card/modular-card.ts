@@ -11,6 +11,7 @@ import { AttackCardPart } from "./attack-card-part";
 import { CheckCardPart } from "./check-card-part";
 import { DamageCardPart } from "./damage-card-part";
 import { DescriptionCardPart } from "./description-card-part";
+import { LayOnHandsCardPart } from "./features/lay-on-hards-card-part";
 import { ModularCardPart } from "./modular-card-part";
 import { PropertyCardPart } from "./property-card-part";
 import { ResourceCardPart } from "./resources-card-part";
@@ -211,6 +212,10 @@ export class ModularCard {
       TargetCardPart.instance,
       PropertyCardPart.instance,
     ];
+
+    if (data.item.name === 'Lay on Hands') {
+      cardParts[cardParts.indexOf(DamageCardPart.instance)] = LayOnHandsCardPart.instance;
+    }
     
     for (const cardPart of cardParts) {
       const response = cardPart.create(data);

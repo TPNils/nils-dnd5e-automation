@@ -11,7 +11,7 @@ import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modu
 import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { TemplateCardData, TemplateCardPart } from "./template-card-part";
 
-type AutoConsumeAfter = 'init' | 'attack' | 'damage' | 'check' | 'template-placed';
+type AutoConsumeAfter = 'never' | 'init' | 'attack' | 'damage' | 'check' | 'template-placed';
 
 export interface ResourceCardData {
   consumeResources: {

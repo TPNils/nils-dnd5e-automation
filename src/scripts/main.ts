@@ -17,6 +17,7 @@ import { RollResultElement } from "./elements/roll-result-element";
 import { RollD20Element } from "./elements/roll-d20-element";
 import { CheckCardPart } from "./modular-card/check-card-part";
 import { ResourceCardPart } from "./modular-card/resources-card-part";
+import { LayOnHandsCardPart } from "./modular-card/features/lay-on-hards-card-part";
 
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
@@ -36,6 +37,7 @@ SpellLevelCardPart.instance.registerHooks();
 TargetCardPart.instance.registerHooks();
 TemplateCardPart.instance.registerHooks();
 ResourceCardPart.instance.registerHooks();
+LayOnHandsCardPart.instance.registerHooks();
 
 Hooks.on('init', () => {
   const hbsFiles: string[] = [];
