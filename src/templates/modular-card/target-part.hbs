@@ -1,3 +1,4 @@
+{{#if data.tableBody.length}}
 <div class="table target-table" style="grid-template-columns: max-content 25px {{#if data.tableHeader.row.length}}repeat({{data.tableHeader.row.length}}, min-content){{/if}} auto max-content;">
   {{!header}}
   <div class="header-cell">{{! copy/delete }}</div>
@@ -45,3 +46,4 @@
     {{/if}}
   {{/each}}
 </div>
+{{/if}}

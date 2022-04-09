@@ -13,6 +13,7 @@ import { DamageCardPart } from "./damage-card-part";
 import { DescriptionCardPart } from "./description-card-part";
 import { ModularCardPart } from "./modular-card-part";
 import { PropertyCardPart } from "./property-card-part";
+import { ResourceCardPart } from "./resources-card-part";
 import { SpellLevelCardPart } from "./spell-level-card-part";
 import { TargetCardPart } from "./target-card-part";
 import { TemplateCardPart } from "./template-card-part";
@@ -205,6 +206,7 @@ export class ModularCard {
       AttackCardPart.instance,
       DamageCardPart.instance,
       TemplateCardPart.instance,
+      ResourceCardPart.instance,
       CheckCardPart.instance,
       TargetCardPart.instance,
       PropertyCardPart.instance,
@@ -267,6 +269,10 @@ export class ModularCard {
     } else {
       return new ChatMessage(chatMessageData);
     }
+  }
+
+  public static isType<T>(modularCardPart: ModularCardPart<T>, data: ModularCardPartData): data is ModularCardPartData<T> {
+    return ModularCard.getTypeHandler(data.type) instanceof modularCardPart.constructor;
   }
   
   @RunOnce()

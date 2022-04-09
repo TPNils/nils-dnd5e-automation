@@ -12,7 +12,7 @@ import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modu
 import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-part";
 
-interface TemplateCardData {
+export interface TemplateCardData {
   calc$: {
     actorUuid: string;
     createdTemplateUuid?: string;
