@@ -7,17 +7,12 @@ import { RollData, TermData, UtilsRoll } from "../lib/roll/utils-roll";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
-import { DamageType, MyActor, MyItem } from "../types/fixed-types";
+import { DamageType, MyActor } from "../types/fixed-types";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { ItemCardHelpers } from "./item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
-
-export interface AddedDamage {
-  normalRoll: TermData[];
-  additionalCriticalRoll?: TermData[];
-}
 
 interface TargetCache {
   selectionId: string;
