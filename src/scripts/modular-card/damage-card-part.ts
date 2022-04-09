@@ -86,9 +86,9 @@ function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache
 export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   public static readonly instance = new DamageCardPart();
-  private constructor(){}
+  protected constructor(){}
 
-  public async create({item, actor}: {item: MyItem, actor?: MyActor}): Promise<DamageCardData> {
+  public async create({item, actor}: ModularCardCreateArgs): Promise<DamageCardData> {
     // TODO what about other interactions like hunters mark (automatic, but only to a specific target)
     const rollData: {[key: string]: any} = item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
@@ -373,9 +373,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       const tokenHp = deepClone(snapshot);
       
       const attackCards: ModularCardPartData<AttackCardData>[] = targetEvent.messageCardParts
-        .filter(part => ModularCard.getTypeHandler(part.type) instanceof AttackCardPart)
+        .filter(part => ModularCard.isType<AttackCardData>(AttackCardPart.instance, part));
       const damagesCards: ModularCardPartData<DamageCardData>[] = targetEvent.messageCardParts
-        .filter(part => part.type === this.getType() && ModularCard.getTypeHandler(part.type) instanceof DamageCardPart)
+        .filter(part => ModularCard.isType<DamageCardData>(DamageCardPart.instance, part));
 
       // Undo already applied damage
       for (const dmg of damagesCards) {
@@ -500,7 +500,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, state: 'not-applied', smartState: 'not-applied'});
     }
     for (const part of context.allMessageParts) {
-      if (!this.isThisPartType(part)) {
+      if (!ModularCard.isType<DamageCardData>(this, part)) {
         continue;
       }
 
@@ -563,10 +563,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         return visualState;
       }
     );
-  }
-
-  private isThisPartType(row: ModularCardPartData): row is ModularCardPartData<DamageCardData> {
-    return row.type === this.getType() && ModularCard.getTypeHandler(row.type) instanceof DamageCardPart;
   }
   //#endregion
 
