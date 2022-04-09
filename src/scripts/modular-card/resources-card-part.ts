@@ -13,7 +13,7 @@ import { TemplateCardData, TemplateCardPart } from "./template-card-part";
 
 type AutoConsumeAfter = 'init' | 'attack' | 'damage' | 'check' | 'template-placed';
 
-interface ResourceCardData {
+export interface ResourceCardData {
   consumeResources: {
     consumeResourcesAction: 'undo' | 'manual-apply' | 'auto';
     calc$: {
@@ -383,10 +383,15 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
         })
       )
       .addOnAttributeChange(({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
+        return ItemCardHelpers.ifAttrData<ResourceCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
           element.innerHTML = await renderTemplate(
             `modules/${staticValues.moduleName}/templates/modular-card/resource-part.hbs`, {
-              data: part.data,
+              data: {
+                ...part.data,
+                consumeResources: part.data.consumeResources.filter(resource => {
+                  return resource.calc$.calcChange !== 0 || resource.calc$.appliedChange !== 0
+                })
+              },
               moduleName: staticValues.moduleName
             });
           
@@ -421,7 +426,6 @@ class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
   
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ChatMessage>): boolean | void {
-    this.calcRemoveInvalid(context);
     this.calcAutoApply(context);
     this.calcAllApplied(context);
   }
@@ -457,25 +461,6 @@ class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
               }
             }
           }
-        }
-      }
-    }
-  }
-
-  private calcRemoveInvalid(context: IDmlContext<ChatMessage>): void {
-    for (const {newRow} of context.rows) {
-      const allParts = ModularCard.getCardPartDatas(newRow);
-      if (!allParts) {
-        continue;
-      }
-
-      for (const part of allParts) {
-        if (ModularCard.isType<ResourceCardData>(ResourceCardPart.instance, part)) {
-          // Remove consumeResources which have not been applied and should not apply
-          // This can happen after a refresh
-          part.data.consumeResources = part.data.consumeResources.filter(resource => {
-            return resource.calc$.calcChange !== 0 || resource.calc$.appliedChange !== 0;
-          });
         }
       }
     }
