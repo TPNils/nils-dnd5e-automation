@@ -17,7 +17,7 @@ import { RollResultElement } from "./elements/roll-result-element";
 import { RollD20Element } from "./elements/roll-d20-element";
 import { CheckCardPart } from "./modular-card/check-card-part";
 import { ResourceCardPart } from "./modular-card/resources-card-part";
-import { LayOnHandsCardPart } from "./modular-card/features/lay-on-hards-card-part";
+import { LayOnHandsCardPart } from "./modular-card/features/lay-on-hands-card-part";
 
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
