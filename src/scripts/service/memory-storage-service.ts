@@ -53,6 +53,7 @@ export class MemoryStorageService {
     const keyParts: string[] = [...subKey.reverse()];
     let foundMessageId = false;
     let foundPartId = false;
+    let foundSubtypeId = false;
     do {
       {
         const value = UtilsElement.readAttrString(element, 'data-memory-context');
@@ -72,6 +73,13 @@ export class MemoryStorageService {
         if (value) {
           keyParts.push('part-', value);
           foundPartId = true;
+        }
+      }
+      if (!foundSubtypeId) {
+        const value = UtilsElement.readAttrString(element, 'data-sub-type');
+        if (value) {
+          keyParts.push('subtype-', value);
+          foundSubtypeId = true;
         }
       }
       element = element.parentElement;
