@@ -1,7 +1,9 @@
 import { staticValues } from "../../static-values";
 import { buffer } from "../decorator/buffer";
+import { RunOnce } from "../decorator/run-once";
 import { Stoppable } from "../utils/stoppable";
 import { UtilsCompare } from "../utils/utils-compare";
+import { FoundryDocument } from "./utils-document";
 
 
 export interface ITrigger<T> {
@@ -222,6 +224,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       throw new Error(`Incompatible document types. Expected ${this.documentName} but got ${trigger.type.documentName}`)
     }
     
+    Wrapper.initOldValueInjector();
     if (!this.isInit) {
       this.init();
     }
@@ -329,6 +332,28 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     this.isInit = false;
   }
 
+  private static oldDocumentSymbol = Symbol('old document');
+  @RunOnce()
+  private static initOldValueInjector(): void {
+    // @ts-ignore
+    const originalFunction: Function = ClientDatabaseBackend.prototype._postUpdateDocumentCallbacks;
+    // @ts-ignore
+    ClientDatabaseBackend.prototype._postUpdateDocumentCallbacks = function (...args: any[]): void {
+      const collection = args[0];
+      const results: any[] = args[1];
+      const options: any = args[2].options;
+
+      const oldDocuments: {[uuid: string]: FoundryDocument} = {};
+      for (const result of results) {
+        const currentDocument = collection.get(result._id);
+        oldDocuments[currentDocument.uuid] = new currentDocument.constructor(currentDocument.toObject(), {parent: currentDocument.parent, pack: currentDocument.pack});
+      }
+      
+      options[Wrapper.oldDocumentSymbol] = oldDocuments;
+      return originalFunction.call(this, ...args);
+    }
+  }
+
   //#region Before
   private onFoundryBeforeCreate(document: T & {constructor: new (...args: any[]) => T}, data: any, options: DmlOptions, userId: string): void | boolean {
     const context: IDmlContext<T> = {
@@ -347,7 +372,6 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   }
   
   private onFoundryBeforeUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: DmlOptions, userId: string): void | boolean {
-    this.injectOldValue(document, options);
     const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     const context: IDmlContext<T> = {
@@ -396,17 +420,6 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       if (response === false) {
         return false;
       }
-    }
-  }
-
-  private injectOldValue(document: T, options: DmlOptions): void {
-    if (!options[staticValues.moduleName]) {
-      options[staticValues.moduleName] = {};
-    }
-    if (!options[staticValues.moduleName].oldData) {
-      options[staticValues.moduleName].oldData = deepClone(document.data);
-      options[staticValues.moduleName].oldParentUuid = document.parent?.uuid;
-      options[staticValues.moduleName].oldPack = document.pack;
     }
   }
   //#endregion
@@ -462,7 +475,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     let documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
-    const oldDocument = await this.extractOldValue(document.constructor, options);
+    const oldDocument = this.extractOldValue(document as any, options);
+    console.log({oldDocument})
     let context = new AfterDmlContext<T>(
       [{
         newRow: documentSnapshot,
@@ -540,21 +554,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }
   }
   
-  private async extractOldValue(document: new (...args: any[]) => T, options: DmlOptions): Promise<T | null> {
-    // TODO the problem is that document is updated before the event is called
-    //      Now the old document gets serialized and send to everyone
-    //      Better solution
-    //        => override ClientDatabaseBackend._handleUpdateDocuments
-    //           which still has the old value and clone that one, then just add an id to the dml option (could be a symbol I think) to link it back
-    if (options[staticValues.moduleName]?.oldData) {
-      const oldParentUuid = options[staticValues.moduleName]?.oldParentUuid;
-      return new document(deepClone(options[staticValues.moduleName]?.oldData), {
-        parent: oldParentUuid == null ? null : await fromUuid(oldParentUuid),
-        pack: options[staticValues.moduleName]?.oldPack
-      });
-    }
-
-    return null;
+  private extractOldValue(document: {uuid: string}, options: any): T {
+    return options[Wrapper.oldDocumentSymbol]?.[document.uuid];
   }
   //#endregion
 
