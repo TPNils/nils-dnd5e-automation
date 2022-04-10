@@ -541,6 +541,11 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   }
   
   private async extractOldValue(document: new (...args: any[]) => T, options: DmlOptions): Promise<T | null> {
+    // TODO the problem is that document is updated before the event is called
+    //      Now the old document gets serialized and send to everyone
+    //      Better solution
+    //        => override ClientDatabaseBackend._handleUpdateDocuments
+    //           which still has the old value and clone that one, then just add an id to the dml option (could be a symbol I think) to link it back
     if (options[staticValues.moduleName]?.oldData) {
       const oldParentUuid = options[staticValues.moduleName]?.oldParentUuid;
       return new document(deepClone(options[staticValues.moduleName]?.oldData), {
