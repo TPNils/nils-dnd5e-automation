@@ -57,10 +57,24 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
         collapsed$.listen(value => DescriptionCardPart.setCollpasedState(element, !!value));
       })
       .addOnAttributeChange(({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
+        return ItemCardHelpers.ifAttrData<DescriptionCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
+          let description = part.data.calc$.description;
+          if (description) {
+            const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {};
+            if (game.user.isGM) {
+              enrichOptions.secrets = true;
+            }
+            description = TextEditor.enrichHTML(description, enrichOptions as any);
+          }
           element.innerHTML = await renderTemplate(
             `modules/${staticValues.moduleName}/templates/modular-card/description-part.hbs`, {
-              data: part.data,
+              data: {
+                ...part.data,
+                calc$: {
+                  ...part.data.calc$,
+                  description: description,
+                }
+              },
               messageId: attributes['data-message-id'],
               moduleName: staticValues.moduleName
             }

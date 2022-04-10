@@ -361,7 +361,6 @@ export class ModularCard {
 
     const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {};
     if (game.user.isGM) {
-      // TODO needs to happen in the html element now
       enrichOptions.secrets = true;
     }
     const htmlParts: string[] = [];
