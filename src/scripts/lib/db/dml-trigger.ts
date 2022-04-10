@@ -476,7 +476,6 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     let documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
     const oldDocument = this.extractOldValue(document as any, options);
-    console.log({oldDocument})
     let context = new AfterDmlContext<T>(
       [{
         newRow: documentSnapshot,
@@ -510,7 +509,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
       if (diff.changed) {
         if (outputDiff) {
-          console.log('trigger diff', {
+          console.debug('trigger diff', {
             documentName: document.collectionName,
             uuid: (document as any).uuid,
             diff: diff,
