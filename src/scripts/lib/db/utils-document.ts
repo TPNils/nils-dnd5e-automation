@@ -32,6 +32,19 @@ class MaybePromise<T> {
   }
 }
 
+export type PermissionCheckHandler = ({}: {user: User; document: FoundryDocument;}) => boolean;
+const defaultPermissionChecks: {[key: string]: PermissionCheckHandler} = {};
+for (const perm of Object.keys(foundry.CONST.ENTITY_PERMISSIONS)) {
+  defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
+    return document.testUserPermission(user, perm as EntityPermission);
+  }
+}
+for (const perm of (['create', 'update', 'delete'] as const)) {
+  defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
+    return document.canUserModify(user, perm);
+  }
+}
+
 export class UtilsDocument {
 
   //#region query
@@ -425,6 +438,15 @@ export class UtilsDocument {
   //#endregion
 
   //#region permission
+  private static permissionChecks: {[key: string]: PermissionCheckHandler} = {...defaultPermissionChecks};
+  public static registerCustomPermission(permissionName: string, handler: PermissionCheckHandler): void {
+    permissionName = permissionName.toUpperCase();
+    if (UtilsDocument.permissionChecks[permissionName]) {
+      throw new Error('Permission already registered: ' + permissionName);
+    }
+    UtilsDocument.permissionChecks[permissionName] = handler;
+  }
+
   public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<PermissionResponse<T>[]>
   public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync: true}): PermissionResponse<T>[]
   public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): PermissionResponse<T>[] | Promise<PermissionResponse<T>[]> {
@@ -462,17 +484,14 @@ export class UtilsDocument {
     return new MaybePromise(UtilsDocument.fromUuidInternal(permissionChecksByUuid.keys(), options as any)).then(documents => {
       for (let [uuid, document] of documents.entries()) {
         for (const permissionCheck of permissionChecksByUuid.get(uuid)) {
-          if (permissionCheck.permission.toUpperCase() in foundry.CONST.ENTITY_PERMISSIONS) {
-            response.push({
-              requestedCheck: permissionCheck,
-              result: document.testUserPermission(permissionCheck.user, permissionCheck.permission.toUpperCase() as EntityPermission)
-            });
-          } else {
-            response.push({
-              requestedCheck: permissionCheck,
-              result: document.canUserModify(permissionCheck.user, permissionCheck.permission.toLowerCase() as ModifyPermission)
-            });
+          const handler = UtilsDocument.permissionChecks[permissionCheck.permission.toUpperCase()];
+          if (!handler) {
+            throw new Error(`Unknown permission: ${permissionCheck.permission.toUpperCase()}`);
           }
+          response.push({
+            requestedCheck: permissionCheck,
+            result: handler({user: permissionCheck.user, document: document}),
+          });
         }
       }
       return response;
