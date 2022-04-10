@@ -2,6 +2,7 @@ export interface ShowRollRequest {
   roll: Roll;
   user?: User;
   rollMode?: ClientSettings.Values['core.rollMode'];
+  showUserIds?: string[];
 }
 
 export class UtilsDiceSoNice {
@@ -9,7 +10,7 @@ export class UtilsDiceSoNice {
   /**
   * @returns {Promise<boolean>} when resolved true if the animation was displayed, false if not.
    */
-  public static async showRoll({roll, user, rollMode}: ShowRollRequest): Promise<boolean> {
+  public static async showRoll({roll, user, rollMode, showUserIds}: ShowRollRequest): Promise<boolean> {
     if (!(game as any).dice3d) {
       return false;
     }
@@ -21,14 +22,22 @@ export class UtilsDiceSoNice {
     }
 
     const synchronize = rollMode === 'roll';
-    const blind = rollMode === 'blindroll';
+    let blind = rollMode === 'blindroll';
     let whispers: string[] = null;
-    if (rollMode === 'gmroll' || rollMode === 'blindroll') {
-      whispers = [];
-      for (const gameUser of Array.from(game.users.values())) {
-        if (gameUser.isGM) {
-          whispers.push(gameUser.id);
+    if (showUserIds == null) {
+      if (rollMode === 'gmroll' || rollMode === 'blindroll') {
+        whispers = [];
+        for (const gameUser of Array.from(game.users.values())) {
+          if (gameUser.isGM) {
+            whispers.push(gameUser.id);
+          }
         }
+      }
+    } else {
+      whispers = showUserIds;
+      // You have to explicitly mention your own user when listing all who can see
+      if (!showUserIds.includes(game.userId)) {
+        blind = true;
       }
     }
 
