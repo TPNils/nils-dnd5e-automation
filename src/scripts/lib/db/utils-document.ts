@@ -151,7 +151,13 @@ export class UtilsDocument {
   private static fromUuidInternal(uuids: Iterable<string>, options: {sync: true}): Map<string, FoundryDocument>
   private static fromUuidInternal(uuids: Iterable<string>, options: {sync?: boolean} = {}): Promise<Map<string, FoundryDocument>> | Map<string, FoundryDocument> {
     // Fixes map keyset iterators, maybe you can only iterate them onces? not sure why it breaks without converting
-    uuids = Array.from(new Set<string>(uuids));
+    {
+      const uuidSet = new Set<string>(uuids);
+      uuidSet.delete(null);
+      uuidSet.delete(undefined);
+      uuidSet.delete('');
+      uuids = Array.from(uuidSet);
+    }
     const getIdsPerPack = new Map<string, Array<string[]>>();
     const documentsByUuid = new Map<string, FoundryDocument>();
     for (const uuid of uuids) {
