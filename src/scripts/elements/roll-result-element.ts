@@ -18,6 +18,7 @@ export class RollResultElement {
       .listenForAttribute('data-roll', 'json')
       .listenForAttribute('data-highlight-total-on-firstTerm', 'boolean')
       .listenForAttribute('data-override-formula', 'string')
+      .listenForAttribute('data-display-type', 'string')
       .listenForAttribute('data-override-max-roll', 'number')
       .addOnInit(RollResultElement.extractInputSlots)
       .addOnInit((context) => {
@@ -34,6 +35,7 @@ export class RollResultElement {
             roll: UtilsRoll.fromRollData(rollJson),
             overrideFormula: attributes['data-override-formula'],
             highlightTotalOnFirstTerm: attributes['data-highlight-total-on-firstTerm'],
+            displayType: attributes['data-display-type'],
             overrideMaxRoll: attributes['data-override-max-roll'],
           }
         );

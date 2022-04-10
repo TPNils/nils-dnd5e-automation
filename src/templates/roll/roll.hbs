@@ -1,11 +1,12 @@
 {{!
   moduleCode=string
   roll=object
+  displayType='rolled' | 'total' | 'result' (default)
   overrideFormula?=string
   overrideMaxRoll?=number (example: 19 for Improved Critical)
   highlightTotalOnFirstTerm?=boolean
 }}
-<div class="wrapper">
+{{#*inline "result"}}
   <div class="roll-total boxed{{#if (nacIsMaxRoll roll highlightTotalOnFirstTerm overrideMaxRoll)}} success{{/if}}{{#if (nacIsMinRoll roll)}} failure{{/if}}">{{roll.total}}</div>
   <div class="terms">
     
@@ -24,4 +25,22 @@
   {{/each}}
   </div>
   <div class="roll-formula boxed">{{#if overrideFormula}}{{overrideFormula}}{{else}}{{roll.formula}}{{/if}}</div>
+{{/inline}}
+
+{{#*inline "total"}}
+  <div class="roll-total boxed">{{roll.total}}</div>
+{{/inline}}
+
+{{#*inline "rolled"}}
+  <div class="boxed">&lt;{{localize 'Hidden'}}&gt;</div>
+{{/inline}}
+
+<div class="wrapper">
+  {{#nacExpr displayType '===' 'rolled'}}
+    {{> rolled}}
+  {{else nacExpr displayType '===' 'total'}}
+    {{> total}}
+  {{else}}
+    {{> result}}
+  {{/nacExpr}}
 </div>
