@@ -236,6 +236,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
 
   private setElementHtml(context: Parameters<OnAttributeChange<{['data-message-id']: string; ['data-part-id']: string;}>>[0]): Promise<void> {
     return ItemCardHelpers.ifAttrData({attr: context.attributes, element: context.element, type: this, callback: async ({allParts, part}) => {
+      // TODO check if token is invisible
       const stateContext: StateContext = {
         messageId: context.attributes['data-message-id'],
         selected: part.data.selected,
