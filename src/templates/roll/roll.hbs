@@ -1,6 +1,6 @@
 {{!
   roll=object
-  displayType='rolled' | 'total' | 'result' (default)
+  displayType='hidden' | 'total' | 'result' (default)
   overrideFormula?=string
   overrideMaxRoll?=number (example: 19 for Improved Critical)
   highlightTotalOnFirstTerm?=boolean
@@ -30,13 +30,13 @@
   <div class="roll-total boxed">{{roll.total}}</div>
 {{/inline}}
 
-{{#*inline "rolled"}}
+{{#*inline "hidden"}}
   <div class="boxed">&lt;{{localize 'Hidden'}}&gt;</div>
 {{/inline}}
 
 <div class="wrapper">
-  {{#nacExpr displayType '===' 'rolled'}}
-    {{> rolled}}
+  {{#nacExpr displayType '===' 'hidden'}}
+    {{> hidden}}
   {{else nacExpr displayType '===' 'total'}}
     {{> total}}
   {{else}}
