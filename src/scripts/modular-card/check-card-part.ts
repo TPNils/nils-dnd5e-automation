@@ -82,9 +82,25 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
       return newData;
     }
 
-    const result = deepClone(oldData);
-    result.calc$ = newData.calc$;
-    return result;
+    const newTargetCaches = new Map<string, TargetCache>();
+    for (const cache of newData.calc$.targetCaches) {
+      newTargetCaches.set(cache.selectionId, cache);
+    }
+    const oldTargetCaches = new Map<string, TargetCache>();
+    for (const cache of oldData.calc$.targetCaches) {
+      if (!newTargetCaches.has(cache.selectionId)) {
+        newTargetCaches.set(cache.selectionId, cache);
+      } else {
+        const newCache = newTargetCaches.get(cache.selectionId);
+        newCache.mode = cache.mode;
+        newCache.phase = cache.phase;
+        newCache.userBonus = cache.userBonus;
+        newCache.roll = cache.roll;
+        newCache.visibleToUsers = cache.visibleToUsers;
+      }
+    }
+    newData.calc$.targetCaches = Array.from(newTargetCaches.values());
+    return newData;
   }
 
   @RunOnce()
