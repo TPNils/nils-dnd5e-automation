@@ -550,7 +550,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
         }
 
         // Execute initial roll
-        if ((target.phase === 'result') !== target.roll?.evaluated) {
+        if ((target.phase === 'result') && target.roll?.evaluated !== true) {
           const roll = UtilsRoll.fromRollData(target.roll);
           target.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
           UtilsDiceSoNice.showRoll({roll: roll});

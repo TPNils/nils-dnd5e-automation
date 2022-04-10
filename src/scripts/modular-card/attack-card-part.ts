@@ -538,7 +538,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
 
       // Execute initial roll
-      if ((newRow.data.phase === 'result') !== newRow.data.calc$.roll?.evaluated) {
+      if ((newRow.data.phase === 'result') && newRow.data.calc$.roll?.evaluated !== true) {
         const roll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
         newRow.data.calc$.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
         UtilsDiceSoNice.showRoll({roll: roll});
