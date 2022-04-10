@@ -1,4 +1,5 @@
-  
+{{! TODO observer is added to have available spell slots => better sollution }}
+{{#nacPerm (nacConcat "ObserverUuid:" @root.data.calc$.actorUuid)}}
   <select class="form-fields" {{#if (or (nacExpr data.calc$.spellSlots.length '<=' 1) (nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)) )}}disabled{{/if}} data-action="spell-level-change">
     {{#each data.calc$.spellSlots as |spellSlot|}}
       {{#nacExpr spellSlot.type '===' 'spell'}}
@@ -8,3 +9,4 @@
       {{/nacExpr}}
     {{/each}}
   </select>
+{{/nacMisPerm}}
