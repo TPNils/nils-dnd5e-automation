@@ -2,7 +2,7 @@ import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-buil
 import { RollD20Element } from "../elements/roll-d20-element";
 import { UtilsElement } from "../elements/utils-element";
 import { IAfterDmlContext, IDmlContext, ITrigger } from "../lib/db/dml-trigger";
-import { UtilsDocument } from "../lib/db/utils-document";
+import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
@@ -19,9 +19,9 @@ type RollPhase = 'mode-select' | 'bonus-input' | 'result';
 
 interface TargetCache {
   targetUuid: string;
+  actorUuid: string;
   ac: number;
   resultType?: 'hit' | 'critical-hit' | 'mis' | 'critical-mis';
-  visibleToUsers: string[];
 }
 
 // TODO when expanding attack card, show the user bonus, which can be edited
@@ -258,7 +258,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             ['data-override-max-roll']: part.data.calc$.critTreshold,
           };
           if (part.data.calc$.actorUuid) {
-            d20attributes['data-interaction-permission'] = `OwnerUuid:${part.data.calc$.actorUuid}`
+            d20attributes['data-interaction-permission'] = `OwnerUuid:${part.data.calc$.actorUuid}`;
+            d20attributes['data-read-permission'] = `${staticValues.code}ReadAttackUuid:${part.data.calc$.actorUuid}`;
+            d20attributes['data-read-hidden-display-type'] = game.settings.get(staticValues.moduleName, 'attackHiddenRoll');
           }
           const attributeArray: string[] = [];
           for (let [attr, value] of Object.entries(d20attributes)) {
@@ -307,15 +309,41 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       //      or permissions should be configured via the columns
       for (const selected of context.selected) {
         let rowValue: string;
-        if (!attack.data.calc$.roll?.evaluated || !cache.has(selected.tokenUuid) || !cache.get(selected.tokenUuid).visibleToUsers.includes(game.userId)) {
+        const canReadAttack = UtilsDocument.hasPermissions([{
+          uuid: attack.data.calc$.actorUuid,
+          user: game.user,
+          permission: `${staticValues.code}ReadAttack`,
+        }], {sync: true}).every(permission => permission.result);
+        let canSeeAc: boolean;
+        if (cache.has(selected.tokenUuid)) {
+          canSeeAc = UtilsDocument.hasPermissions([{
+            uuid: cache.get(selected.tokenUuid).actorUuid,
+            user: game.user,
+            permission: `Observer`,
+          }], {sync: true}).every(permission => permission.result);
+        } else {
+          canSeeAc = false;
+        }
+        const canSeeTotal = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') === 'total';
+        if (!attack.data.calc$.roll?.evaluated || !canSeeAc) {
           if (attack.data.calc$.roll?.evaluated) {
             rowValue = '';
           } else {
             rowValue = '';
           }
+        } else if (!canReadAttack && !canSeeTotal) {
+          rowValue = '';
         } else {
           const styles = ['text-align: center'];
-          switch (cache.get(selected.tokenUuid).resultType) {
+          let resultType = cache.get(selected.tokenUuid).resultType;
+          if (!canReadAttack && canSeeTotal) {
+            if (resultType === 'critical-hit') {
+              resultType = 'hit';
+            } else if (resultType === 'critical-mis') {
+              resultType = 'mis';
+            }
+          }
+          switch (resultType) {
             case 'critical-hit': {
               styles.push('color: green');
               rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.CriticalHit')}!">✓</div>`;
@@ -518,6 +546,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
   }
 
   private async rollAttack(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+    const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
       if (!this.isThisType(newRow) || !this.assumeThisType(oldRow)) {
         continue;
@@ -532,7 +561,16 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
           newRow.data.calc$.roll = UtilsRoll.toRollData(result.result);
           if (result.rollToDisplay) {
             // Auto rolls if original roll was already evaluated
-            UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
+            for (const user of game.users.values()) {
+              if (user.active) {
+                showRolls.push({
+                  uuid: newRow.data.calc$.actorUuid,
+                  permission: `${staticValues.code}ReadCheck`,
+                  user: user,
+                  meta: result.rollToDisplay
+                });
+              }
+            }
           }
         }
       }
@@ -541,9 +579,36 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
       if ((newRow.data.phase === 'result') && newRow.data.calc$.roll?.evaluated !== true) {
         const roll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
         newRow.data.calc$.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
-        UtilsDiceSoNice.showRoll({roll: roll});
+        for (const user of game.users.values()) {
+          if (user.active) {
+            showRolls.push({
+              uuid: newRow.data.calc$.actorUuid,
+              permission: `${staticValues.code}ReadCheck`,
+              user: user,
+              meta: roll,
+            });
+          }
+        }
       }
     }
+
+    UtilsDocument.hasPermissions(showRolls).then(responses => {
+      const rollsPerUser = new Map<string, Roll[]>()
+      for (const response of responses) {
+        if (response.result) {
+          if (!rollsPerUser.has(response.requestedCheck.user.id)) {
+            rollsPerUser.set(response.requestedCheck.user.id, []);
+          }
+          rollsPerUser.get(response.requestedCheck.user.id).push(response.requestedCheck.meta);
+        }
+      }
+
+      const rollPromises: Promise<any>[] = [];
+      for (const [userId, rolls] of rollsPerUser.entries()) {
+        rollPromises.push(UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...rolls), showUserIds: [userId]}));
+      }
+      return rollPromises;
+    });
   }
   
   private async addTargetCache(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
@@ -608,8 +673,8 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
               const actor = (tokens.get(expectedUuid).getActor() as MyActor);
               row.data.calc$.targetCaches.push({
                 targetUuid: expectedUuid,
+                actorUuid: actor.uuid,
                 ac: actor.data.data.attributes.ac.value,
-                visibleToUsers: Array.from(game.users.values()).filter(user => actor.testUserPermission(user, 'OWNER')).map(user => user.id),
               });
               cachedTargetUuids.add(expectedUuid);
             }

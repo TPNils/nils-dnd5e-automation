@@ -1,6 +1,6 @@
 import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
 import { IAfterDmlContext, IDmlContext, ITrigger} from "../lib/db/dml-trigger";
-import { UtilsDocument } from "../lib/db/utils-document";
+import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { RollData, TermData, UtilsRoll } from "../lib/roll/utils-roll";
@@ -17,6 +17,7 @@ import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart
 interface TargetCache {
   selectionId: string;
   targetUuid: string;
+  actorUuid: string;
   // TODO store requested action => can and should be used to auto apply when there is no attack or check
   smartState: State['state'];
   appliedState: State['state'];
@@ -490,9 +491,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   private getTargetState(context: StateContext): VisualState[] {
-    const states = new Map<string, Omit<VisualState, 'columns'> & {hpDiff?: number}>();
+    const states = new Map<string, Omit<VisualState, 'columns'> & {hpDiff?: number, hidden: boolean}>();
     for (const selected of context.selected) {
-      states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, state: 'not-applied', smartState: 'not-applied'});
+      states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, state: 'not-applied', smartState: 'not-applied', hidden: false});
     }
     for (const part of context.allMessageParts) {
       if (!ModularCard.isType<DamageCardData>(this, part)) {
@@ -501,7 +502,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
       for (const targetCache of part.data.calc$.targetCaches) {
         if (!states.has(targetCache.selectionId)) {
-          states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, state: 'not-applied', smartState: 'not-applied'});
+          states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, state: 'not-applied', smartState: 'not-applied', hidden: false});
         }
         const state = states.get(targetCache.selectionId);
         if (state.hpDiff == null) {
@@ -516,8 +517,34 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         if (state.smartState !== targetCache.smartState) {
           state.smartState === 'partial-applied';
         }
-        state.hpDiff += (targetCache.calcHpChange ?? 0);
-        state.hpDiff += (targetCache.calcAddTmpHp ?? 0);
+
+        // TODO this is weird right now, if damage is hidden you cant see it
+        //      but you can apply it to yourself, this should be improved
+        let canSeeDamage: boolean;
+        if (part.data.calc$.actorUuid) {
+          canSeeDamage = game.settings.get(staticValues.moduleName, 'damageHiddenRoll') === 'total';
+          if (!canSeeDamage) {
+            UtilsDocument.hasPermissions([{
+              uuid: part.data.calc$.actorUuid,
+              permission: `${staticValues.code}ReadDamage`,
+              user: game.user,
+            }], {sync: true}).every(result => result.result)
+          }
+        } else {
+          canSeeDamage = game.user.isGM;
+        }
+        const canSeeTarget = UtilsDocument.hasPermissions([{
+          uuid: targetCache.actorUuid,
+          permission: `Observer`,
+          user: game.user,
+        }], {sync: true}).every(result => result.result)
+        if (canSeeDamage && canSeeTarget) {
+          state.hpDiff += (targetCache.calcHpChange ?? 0);
+          state.hpDiff += (targetCache.calcAddTmpHp ?? 0);
+        } else {
+          state.hpDiff = null;
+          state.hidden = true;
+        }
       }
     }
 
@@ -546,7 +573,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           label: `<i class="fas fa-heart" title="${game.i18n.localize('DND5E.Damage')}"></i>`,
           rowValue: '',
         };
-        if (state.hpDiff === 0) {
+        if (state.hidden) {
+          column.rowValue = '?';
+        } else if (state.hpDiff === 0) {
           column.rowValue = '0';
         } else if (state.hpDiff > 0) /* heal */ {
           column.rowValue = `<span style="color: green">+${state.hpDiff}</span>`;
@@ -698,6 +727,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
       const currentCache = getTargetCache(recalcToken.data, recalcToken.selectionId);
       const cache: TargetCache = {
         ...currentCache ?? {targetUuid: recalcToken.tokenUuid, selectionId: recalcToken.selectionId, appliedState: 'not-applied', smartState: 'not-applied'},
+        actorUuid: actor.uuid,
         calcHpChange: 0,
         calcAddTmpHp: 0,
         calcFailedDeathSaved: 0,
@@ -742,6 +772,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
   }
   
   private async calcDamageFormulas(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+    const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
       if (!this.isThisTriggerType(newRow) || !this.assumeThisType(oldRow)) {
         continue;
@@ -777,7 +808,16 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
           newRow.data.calc$.roll = UtilsRoll.toRollData(result.result);
           if (result.rollToDisplay) {
             // Auto rolls if original roll was already evaluated
-            UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
+            for (const user of game.users.values()) {
+              if (user.active) {
+                showRolls.push({
+                  uuid: newRow.data.calc$.actorUuid,
+                  permission: `${staticValues.code}ReadDamage`,
+                  user: user,
+                  meta: result.rollToDisplay
+                });
+              }
+            }
           }
         }
       }
@@ -786,9 +826,36 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
       if ((newRow.data.phase === 'result') !== newRow.data.calc$.roll?.evaluated) {
         const roll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
         newRow.data.calc$.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
-        UtilsDiceSoNice.showRoll({roll: roll});
+        for (const user of game.users.values()) {
+          if (user.active) {
+            showRolls.push({
+              uuid: newRow.data.calc$.actorUuid,
+              permission: `${staticValues.code}ReadDamage`,
+              user: user,
+              meta: roll,
+            });
+          }
+        }
       }
     }
+    
+    UtilsDocument.hasPermissions(showRolls).then(responses => {
+      const rollsPerUser = new Map<string, Roll[]>()
+      for (const response of responses) {
+        if (response.result) {
+          if (!rollsPerUser.has(response.requestedCheck.user.id)) {
+            rollsPerUser.set(response.requestedCheck.user.id, []);
+          }
+          rollsPerUser.get(response.requestedCheck.user.id).push(response.requestedCheck.meta);
+        }
+      }
+
+      const rollPromises: Promise<any>[] = [];
+      for (const [userId, rolls] of rollsPerUser.entries()) {
+        rollPromises.push(UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...rolls), showUserIds: [userId]}));
+      }
+      return rollPromises;
+    });
   }
   //#endregion
 

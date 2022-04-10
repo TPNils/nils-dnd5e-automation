@@ -20,6 +20,7 @@
       data-roll="{{nacToJsonString roll}}"
       data-override-formula="{{overrideFormula}}"
       data-highlight-total-on-firstTerm="{{highlightTotalOnFirstTerm}}"
+      {{#nacMisPerm readPermission}}data-display-type="{{readHiddenDisplayType}}"{{/nacMisPerm}}
       data-override-max-roll="{{overrideMaxRoll}}">
     </nac-roll-result>
   {{else}}

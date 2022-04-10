@@ -3,10 +3,9 @@ import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 export type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
 
 type EntityPermission = keyof typeof foundry.CONST.ENTITY_PERMISSIONS;
-type ModifyPermission = Parameters<foundry.abstract.Document<any, any>['canUserModify']>[1];
 export interface PermissionCheck<T = any> {
   uuid: string;
-  permission: EntityPermission | ModifyPermission;
+  permission: string;
   user: User;
   meta?: T;
 }
@@ -445,6 +444,10 @@ export class UtilsDocument {
       throw new Error('Permission already registered: ' + permissionName);
     }
     UtilsDocument.permissionChecks[permissionName] = handler;
+  }
+
+  public static getPermissionHandler(permissionName: string): PermissionCheckHandler {
+    return UtilsDocument.permissionChecks[permissionName.toUpperCase()];
   }
 
   public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<PermissionResponse<T>[]>

@@ -2,7 +2,7 @@ import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-buil
 import { RollD20Element } from "../elements/roll-d20-element";
 import { UtilsElement } from "../elements/utils-element";
 import { IAfterDmlContext, IDmlContext, ITrigger } from "../lib/db/dml-trigger";
-import { UtilsDocument } from "../lib/db/utils-document";
+import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
@@ -238,7 +238,9 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
             ['data-show-bonus']: cache.phase === 'bonus-input',
           };
           if (cache.actorUuid) {
-            d20attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid}`
+            d20attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid}`;
+            d20attributes['data-read-permission'] = `${staticValues.code}ReadCheckUuid:${cache.actorUuid}`;
+            d20attributes['data-read-hidden-display-type'] = game.settings.get(staticValues.moduleName, 'checkHiddenRoll');
           }
           const attributeArray: string[] = [];
           for (let [attr, value] of Object.entries(d20attributes)) {
@@ -537,6 +539,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
   }
 
   private async rollTargetRoll(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+    const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
       if (!this.isThisType(newRow) || !this.assumeThisType(oldRow)) {
         continue;
@@ -560,7 +563,16 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
             target.roll = UtilsRoll.toRollData(result.result);
             if (result.rollToDisplay) {
               // Auto rolls if original roll was already evaluated
-              UtilsDiceSoNice.showRoll({roll: result.rollToDisplay});
+              for (const user of game.users.values()) {
+                if (user.active) {
+                  showRolls.push({
+                    uuid: target.actorUuid ?? target.targetUuid, // Players don't seem to have owner permission of their own token
+                    permission: `${staticValues.code}ReadCheck`,
+                    user: user,
+                    meta: result.rollToDisplay,
+                  });
+                }
+              }
             }
           }
         }
@@ -569,10 +581,37 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
         if ((target.phase === 'result') && target.roll?.evaluated !== true) {
           const roll = UtilsRoll.fromRollData(target.roll);
           target.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
-          UtilsDiceSoNice.showRoll({roll: roll});
+          for (const user of game.users.values()) {
+            if (user.active) {
+              showRolls.push({
+                uuid: target.actorUuid ?? target.targetUuid, // Players don't seem to have owner permission of their own token
+                permission: `${staticValues.code}ReadCheck`,
+                user: user,
+                meta: roll,
+              });
+            }
+          }
         }
       }
     }
+    
+    UtilsDocument.hasPermissions(showRolls).then(responses => {
+      const rollsPerUser = new Map<string, Roll[]>()
+      for (const response of responses) {
+        if (response.result) {
+          if (!rollsPerUser.has(response.requestedCheck.user.id)) {
+            rollsPerUser.set(response.requestedCheck.user.id, []);
+          }
+          rollsPerUser.get(response.requestedCheck.user.id).push(response.requestedCheck.meta);
+        }
+      }
+
+      const rollPromises: Promise<any>[] = [];
+      for (const [userId, rolls] of rollsPerUser.entries()) {
+        rollPromises.push(UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...rolls), showUserIds: [userId]}));
+      }
+      return rollPromises;
+    });
   }
   //#endregion
 

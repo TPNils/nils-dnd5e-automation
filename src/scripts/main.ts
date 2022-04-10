@@ -18,6 +18,7 @@ import { RollD20Element } from "./elements/roll-d20-element";
 import { CheckCardPart } from "./modular-card/check-card-part";
 import { ResourceCardPart } from "./modular-card/resources-card-part";
 import { LayOnHandsCardPart } from "./modular-card/features/lay-on-hands-card-part";
+import { ModuleSettings } from "./module-settings";
 
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
@@ -38,6 +39,7 @@ TargetCardPart.instance.registerHooks();
 TemplateCardPart.instance.registerHooks();
 ResourceCardPart.instance.registerHooks();
 LayOnHandsCardPart.instance.registerHooks();
+ModuleSettings.registerHooks();
 
 Hooks.on('init', () => {
   const hbsFiles: string[] = [];

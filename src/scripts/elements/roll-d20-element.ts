@@ -25,6 +25,8 @@ export class RollD20Element {
       .listenForAttribute('data-show-bonus', 'boolean')
       .listenForAttribute('data-highlight-total-on-firstTerm', 'boolean')
       .listenForAttribute('data-interaction-permission', 'string')
+      .listenForAttribute('data-read-permission', 'string')
+      .listenForAttribute('data-read-hidden-display-type', 'string')
       .listenForAttribute('data-label', 'string')
       .listenForAttribute('data-override-formula', 'string')
       .listenForAttribute('data-override-max-roll', 'number')
@@ -54,6 +56,8 @@ export class RollD20Element {
         overrideFormula: UtilsElement.readAttrString(element, 'data-override-formula'),
         highlightTotalOnFirstTerm: UtilsElement.readAttrBoolean(element, 'data-highlight-total-on-firstTerm', true),
         interactionPermission: UtilsElement.readAttrString(element, 'data-interaction-permission'),
+        readPermission: UtilsElement.readAttrString(element, 'data-read-permission'),
+        readHiddenDisplayType: UtilsElement.readAttrString(element, 'data-read-hidden-display-type'),
         overrideMaxRoll: UtilsElement.readAttrInteger(element, 'data-override-max-roll'),
         moduleName: staticValues.moduleName,
       }

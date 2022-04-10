@@ -30,7 +30,7 @@ export class UtilsHandlebars {
     return args.join('');
   }
 
-  private static documentPermission = /(owner|observer|limited|none|create|update|delete)(uuid|actorid):(.*)/i;
+  private static documentPermission = /^(.+?)(uuid|actorid):(.*)/i;
   private static hasPermissionCheck(secretFilters: string[]): boolean {
     // no filters = always visible
     if (secretFilters.length === 0) {
@@ -70,7 +70,7 @@ export class UtilsHandlebars {
         }
         
         permissionChecks.push({
-          permission: documentMatch[1] as PermissionCheck['permission'],
+          permission: documentMatch[1],
           uuid: uuid,
           user: game.user,
         });
@@ -309,6 +309,10 @@ export class UtilsHandlebars {
     return value.toLocaleLowerCase().capitalize();
   }
 
+  public static getSetting(settingName: string): any {
+    return game.settings.get(staticValues.moduleName, settingName);
+  }
+
   public static toJsonString(value: any): string {
     return JSON.stringify(value);
   }
@@ -322,6 +326,7 @@ export class UtilsHandlebars {
       Handlebars.registerHelper(`${staticValues.code}TranslateUsage`, UtilsHandlebars.translateUsage);
       Handlebars.registerHelper(`${staticValues.code}Math`, UtilsHandlebars.math);
       Handlebars.registerHelper(`${staticValues.code}Capitalize`, UtilsHandlebars.capitalize);
+      Handlebars.registerHelper(`${staticValues.code}Setting`, UtilsHandlebars.getSetting);
       Handlebars.registerHelper(`${staticValues.code}IsMinRoll`, UtilsHandlebars.isMinRoll);
       Handlebars.registerHelper(`${staticValues.code}IsMaxRoll`, UtilsHandlebars.isMaxRoll);
       Handlebars.registerHelper(`${staticValues.code}ToJsonString`, UtilsHandlebars.toJsonString);
