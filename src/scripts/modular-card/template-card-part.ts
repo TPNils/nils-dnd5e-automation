@@ -160,8 +160,8 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData> {
 
   private async deleteTemplates(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
     const templateUuids = new Set<string>();
-    for (const {oldRow} of context.rows) {
-      if (!this.isThisTriggerType(oldRow)) {
+    for (const {oldRow, changedByUserId} of context.rows) {
+      if (!this.isThisTriggerType(oldRow) || game.userId !== changedByUserId) {
         continue;
       }
 
