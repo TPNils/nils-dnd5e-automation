@@ -1,5 +1,5 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
-import { DmlTrigger, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
+import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { TransformTrigger } from "../lib/db/transform-trigger";
 import { RunOnce } from "../lib/decorator/run-once";
 import { Stoppable } from "../lib/utils/stoppable";
@@ -73,6 +73,25 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
       if (Array.isArray(ModularCard.getCardPartDatas(newRow))) {
         newRow.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
       }
+    }
+  }
+  
+  public beforeUpdate(context: IDmlContext<ChatMessage>): boolean | void {
+    const log = document.querySelector("#chat-log");
+    const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
+    if (isAtBottom) {
+      for (const row of context.rows) {
+        row.options['chatIsAtBottom'] = true;
+      }
+    }
+  }
+
+  public afterUpdate(context: IAfterDmlContext<ChatMessage>): void {
+    const isAtBottom = context.rows.some(row => row.options['chatIsAtBottom'] === true);
+    if (isAtBottom) {
+      setTimeout(() => {
+        (ui.chat as any).scrollBottom();
+      }, 0);
     }
   }
 }
