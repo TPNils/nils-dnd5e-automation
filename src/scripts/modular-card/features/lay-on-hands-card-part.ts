@@ -1,5 +1,6 @@
 import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
 import { IDmlContext, ITrigger } from "../../lib/db/dml-trigger";
+import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { UtilsRoll } from "../../lib/roll/utils-roll";
 import { staticValues } from "../../static-values";
@@ -88,10 +89,15 @@ export class LayOnHandsCardPart extends DamageCardPart {
       .addOnAttributeChange(async ({element, attributes}) => {
         return ItemCardHelpers.ifAttrData<LayOnHandsCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
           let currentUsage = Number((part.data.calc$.roll?.terms?.[0] as {number: number})?.number ?? 0);
+          const hasPermission = await UtilsDocument.hasPermissions([{
+            uuid: part.data.calc$.actorUuid,
+            permission: 'OWNER',
+            user: game.user,
+          }]);
           element.innerHTML = `
             <label style="display: flex; align-items: center;">
               ${game.i18n.localize('DND5E.Healing')}:
-              <input style="margin-left: 3px;" name="heal-amount" type="number" min="0" max="${part.data.maxUsage}" value="${currentUsage}">
+              <input style="margin-left: 3px;" name="heal-amount" type="number" min="0" max="${part.data.maxUsage}" value="${currentUsage}" ${hasPermission[0].result ? '' : 'disabled'}>
             </label>`;
           /*element.innerHTML = await renderTemplate(
             `modules/${staticValues.moduleName}/templates/modular-card/lay-on-hands-part.hbs`, {
