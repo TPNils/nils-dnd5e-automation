@@ -174,8 +174,7 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData> {
       return;
     }
 
-    const templates = await UtilsDocument.templateFromUuid(templateUuids);
-    await UtilsDocument.bulkDelete(Array.from(templates.values()).map(doc => {return {document: doc}}))
+    await UtilsDocument.bulkDelete(templateUuids);
   }
   //#endregion
 

@@ -1313,7 +1313,7 @@ class DmlTriggerChatMessage implements IDmlTrigger<ChatMessage> {
       deleteTemplateUuids.delete(undefined);
   
       if (deleteTemplateUuids.size > 0) {
-        UtilsDocument.bulkDelete(Array.from(((await UtilsDocument.templateFromUuid(deleteTemplateUuids)).values())).map(doc => {return {document: doc}}))
+        UtilsDocument.bulkDelete(deleteTemplateUuids);
       }
     }
   }

@@ -2,6 +2,14 @@ import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 
 export type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
 
+interface DocumentsByContext<T extends foundry.abstract.Document<any, FoundryDocument>> {
+  contextKey: string;
+  documentClass: typeof foundry.abstract.Document;
+  parent?: FoundryDocument;
+  pack?: string;
+  documents: Array<T>
+}
+
 type EntityPermission = keyof typeof foundry.CONST.ENTITY_PERMISSIONS;
 export interface PermissionCheck<T = any> {
   uuid: string;
@@ -148,11 +156,11 @@ export class UtilsDocument {
   }
   
   
-  public static fromUuid(inputUuid: string): Promise<foundry.abstract.Document<any, any>>
-  public static fromUuid(inputUuid: Iterable<string>, options?: {sync?: false}): Promise<Map<string, foundry.abstract.Document<any, any>>>
-  public static fromUuid(inputUuid: string, options: {sync: true}): foundry.abstract.Document<any, any>
-  public static fromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, foundry.abstract.Document<any, any>>
-  public static fromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): foundry.abstract.Document<any, any> | Map<string, foundry.abstract.Document<any, any>> | Promise<foundry.abstract.Document<any, any>> | Promise<Map<string, foundry.abstract.Document<any, any>>> {
+  public static fromUuid(inputUuid: string): Promise<FoundryDocument>
+  public static fromUuid(inputUuid: Iterable<string>, options?: {sync?: false}): Promise<Map<string, FoundryDocument>>
+  public static fromUuid(inputUuid: string, options: {sync: true}): FoundryDocument
+  public static fromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, FoundryDocument>
+  public static fromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): FoundryDocument | Map<string, FoundryDocument> | Promise<FoundryDocument> | Promise<Map<string, FoundryDocument>> {
     let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
     return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
       return typeof inputUuid === 'string' ? response.get(inputUuid) : response;
@@ -316,44 +324,36 @@ export class UtilsDocument {
     return Promise.all(promises).then();
   }
 
-  public static async bulkDelete(inputDocuments: Array<{document: FoundryDocument}>): Promise<void> {
-    const documentsByUuid = new Map<string, {document: FoundryDocument}>();
-    for (const document of inputDocuments) {
-      documentsByUuid.set(document.document.uuid, document);
+  public static async bulkDelete(inputs: Iterable<string | FoundryDocument>): Promise<void> {
+    // TODO use 'DocumentClass'.deleteDocuments([id], {context: {pack & parent}})
+    const uuids: string[] = [];
+    const documentsByUuid = new Map<string, FoundryDocument>();
+    for (const input of inputs) {
+      if (typeof input === 'string') {
+        uuids.push(input);
+      } else {
+        documentsByUuid.set(input.uuid, input);
+      }
     }
 
-    const deletesPerDocumentName = UtilsDocument.groupDocumentsForDml(inputDocuments);
+    if (uuids.length > 0) {
+      for (const document of (await UtilsDocument.fromUuid(uuids)).values()) {
+        documentsByUuid.set(document.uuid, document);
+      }
+    }
+
+    const deletesPerContext = UtilsDocument.groupDocumentsByContext(Array.from(documentsByUuid.values()));
 
     const promises: Promise<any>[] = [];
-    for (const documentName of deletesPerDocumentName.keys()) {
-      const deletesByUuid = deletesPerDocumentName.get(documentName);
-      const documentClass: {deleteDocuments: (ids: string[], options?: any) => Promise<any>} = CONFIG[documentName].documentClass;
-      const rootRows: FoundryDocument[] = [];
-
-      for (const bulkEntry of deletesByUuid.values()) {
-        if (bulkEntry.data != null) {
-          rootRows.push(bulkEntry.data);
+    for (const documentContext of deletesPerContext) {
+      promises.push(documentContext.documentClass.deleteDocuments.call(
+        documentContext.documentClass,
+        documentContext.documents.map(doc => doc.id),
+        {
+          parent: documentContext.parent,
+          pack: documentContext.pack,
         }
-
-        const embededIdsByDocumentName = new Map<string, string[]>();
-        for (const embeded of bulkEntry.embededDocuments) {
-          if (!embededIdsByDocumentName.has(embeded.document.documentName)) {
-            embededIdsByDocumentName.set(embeded.document.documentName, []);
-          }
-          embededIdsByDocumentName.get(embeded.document.documentName).push(embeded.document.id);
-        }
-        for (const embededDocumentName of embededIdsByDocumentName.keys()) {
-          let parentDocument: foundry.abstract.Document<any, any> | Promise<foundry.abstract.Document<any, any>> = documentsByUuid.get(bulkEntry.uuid)?.document;
-          if (parentDocument == null) {
-            parentDocument = fromUuid(bulkEntry.uuid);
-          }
-          promises.push(Promise.resolve(parentDocument).then(doc => doc.deleteEmbeddedDocuments(embededDocumentName, embededIdsByDocumentName.get(embededDocumentName))));
-        }
-      }
-
-      if (rootRows.length > 0) {
-        promises.push(documentClass.deleteDocuments(rootRows.map(row => row.id)));
-      }
+      ));
     }
 
     return Promise.all(promises).then();
@@ -383,6 +383,26 @@ export class UtilsDocument {
       user.updateTokenTargets(targetCanvasIds);
       user.broadcastActivity({targets: targetCanvasIds});
     }
+  }
+  
+  private static groupDocumentsByContext<T extends foundry.abstract.Document<any, FoundryDocument>>(documents: Array<T>): Array<DocumentsByContext<T>> {
+    const responsesByKey = new Map<string, DocumentsByContext<T>>();
+
+    for (const document of documents) {
+      const contextKey = `${document.documentName}/${document.parent?.uuid}/${document.pack}`;
+      if (!responsesByKey.has(contextKey)) {
+        responsesByKey.set(contextKey, {
+          contextKey: contextKey,
+          documentClass: CONFIG[document.documentName].documentClass,
+          parent: document.parent,
+          pack: document.pack,
+          documents: [],
+        });
+        responsesByKey.get(contextKey).documents.push(document);
+      }
+    }
+
+    return Array.from(responsesByKey.values());
   }
   
   private static groupDocumentsForDml(inputDocuments: Array<{document: FoundryDocument, data?: any}>): Map<string, Map<string, BulkEntry>> {
