@@ -235,7 +235,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   }
 
   private setElementHtml(context: Parameters<OnAttributeChange<{['data-message-id']: string; ['data-part-id']: string;}>>[0]): Promise<void> {
-    return ItemCardHelpers.ifAttrData({attr: context.attributes, element: context.element, type: this, callback: async ({allParts, part}) => {
+    return ItemCardHelpers.ifAttrData<TargetCardData>({attr: context.attributes, element: context.element, type: this, callback: async ({allParts, part}) => {
       // TODO check if token is invisible
       const stateContext: StateContext = {
         messageId: context.attributes['data-message-id'],
@@ -362,8 +362,14 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
         .map(([key]) => key);
       const allStates = new Set<VisualState['state']>();
       const allSmartStates = new Set<VisualState['state']>();
+      const hardSelectionIds = part.data.selected.map(sel => sel.selectionId);
+      const notAppliedValues = [null, undefined, 'not-applied'];
       for (const selectionId of sortedSelectionIds) {
         const data = tokenData.get(selectionId);
+        if (notAppliedValues.includes(data.state) && notAppliedValues.includes(data.smartState) && !hardSelectionIds.includes(selectionId)) {
+          // Only show non selected tokens which have something applied to them (to show undo button)
+          continue;
+        }
         const tokenCache = tokenCacheByUuid.get(data.uuid);
         const row: string[] = [];
         for (const key of columnKeyOrder) {
