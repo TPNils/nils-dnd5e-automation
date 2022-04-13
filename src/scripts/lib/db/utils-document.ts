@@ -345,7 +345,9 @@ export class UtilsDocument {
     const deletesPerContext = UtilsDocument.groupDocumentsByContext(Array.from(documentsByUuid.values()));
 
     const promises: Promise<any>[] = [];
+    console.log('documentsByUuid', documentsByUuid, inputs)
     for (const documentContext of deletesPerContext) {
+      console.log('delete', documentContext)
       promises.push(documentContext.documentClass.deleteDocuments.call(
         documentContext.documentClass,
         documentContext.documents.map(doc => doc.id),
@@ -398,8 +400,8 @@ export class UtilsDocument {
           pack: document.pack,
           documents: [],
         });
-        responsesByKey.get(contextKey).documents.push(document);
       }
+      responsesByKey.get(contextKey).documents.push(document);
     }
 
     return Array.from(responsesByKey.values());
