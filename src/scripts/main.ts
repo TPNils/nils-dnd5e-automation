@@ -19,6 +19,7 @@ import { CheckCardPart } from "./modular-card/check-card-part";
 import { ResourceCardPart } from "./modular-card/resources-card-part";
 import { LayOnHandsCardPart } from "./modular-card/features/lay-on-hands-card-part";
 import { ModuleSettings } from "./module-settings";
+import { ActiveEffectCardPart } from "./modular-card/active-effect-card-part";
 
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
@@ -38,6 +39,7 @@ SpellLevelCardPart.instance.registerHooks();
 TargetCardPart.instance.registerHooks();
 TemplateCardPart.instance.registerHooks();
 ResourceCardPart.instance.registerHooks();
+ActiveEffectCardPart.instance.registerHooks();
 LayOnHandsCardPart.instance.registerHooks();
 ModuleSettings.registerHooks();
 

@@ -7,6 +7,7 @@ import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
+import { ActiveEffectCardPart } from "./active-effect-card-part";
 import { AttackCardPart } from "./attack-card-part";
 import { CheckCardPart } from "./check-card-part";
 import { DamageCardPart } from "./damage-card-part";
@@ -229,6 +230,7 @@ export class ModularCard {
       ResourceCardPart.instance,
       CheckCardPart.instance,
       TargetCardPart.instance,
+      ActiveEffectCardPart.instance,
       PropertyCardPart.instance,
     ];
 
