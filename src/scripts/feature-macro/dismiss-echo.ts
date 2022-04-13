@@ -1,3 +1,4 @@
+/* TODO convert to modular card
 import { AllPermissions } from "../custom-permissions";
 import { IMacro } from "../macro";
 import { MacroContext } from "../macro-context";
@@ -57,3 +58,4 @@ export class DismissEcho implements IMacro {
   }
 
 }
+*/

@@ -1,9 +1,7 @@
-import { MemoryStorageService } from "../service/memory-storage-service";
 import { staticValues } from "../static-values";
-import { MyActorData, SpellData } from "../types/fixed-types";
-import { ItemCardItem } from "./utils-chat-message";
 import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
+import { ResourceCardData } from '../modular-card/resources-card-part';
 
 interface InlineHelperOption {
   blockParams: any;
@@ -153,7 +151,7 @@ export class UtilsHandlebars {
     }
   }
 
-  public static translateUsage(usage: ItemCardItem['consumeResources'][number]): string {
+  public static translateUsage(usage: ResourceCardData['consumeResources'][number]): string {
     const uuidParts = usage.calc$.uuid.split('.');
     const pathParts = usage.calc$.path.split('.');
 

@@ -1,4 +1,3 @@
-import { registerHooks as registerGlobalApiHooks } from "./global-api";
 import { registerHooks as registerHtmlHooks } from "./global-html-listener";
 import { registerHooks as registerOverrideHooks } from "./override/index.js";
 import { provider } from "./provider/provider";
@@ -24,7 +23,6 @@ import { ActiveEffectCardPart } from "./modular-card/active-effect-card-part";
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
 MutableDiceTerm.registerHooks();
-registerGlobalApiHooks();
 registerHtmlHooks();
 provider.registerHooks();
 registerOverrideHooks()

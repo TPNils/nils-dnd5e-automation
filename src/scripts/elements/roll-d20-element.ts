@@ -1,11 +1,11 @@
 import { RunOnce } from "../lib/decorator/run-once";
+import { RollData } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
-import { RollJson } from "../utils/utils-chat-message";
 import { ElementBuilder } from "./element-builder";
 import { UtilsElement } from "./utils-element";
 
 export interface RollD20Data {
-  roll: RollJson;
+  roll: RollData;
   mode: 'advantage' | 'normal' | 'disadvantage';
   overrideMaxRoll?: number;
 }
@@ -34,7 +34,7 @@ export class RollD20Element {
   }
 
   private static doRender = async ({element}: {element: HTMLElement}) => {
-    const rollJson: RollJson = UtilsElement.readAttrJson(element, 'data-roll');
+    const rollJson: RollData = UtilsElement.readAttrJson(element, 'data-roll');
     if (!rollJson) {
       element.textContent = '';
       return;
