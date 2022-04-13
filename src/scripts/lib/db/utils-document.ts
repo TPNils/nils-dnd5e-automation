@@ -325,7 +325,7 @@ export class UtilsDocument {
   }
 
   public static async bulkDelete(inputs: Iterable<string | FoundryDocument>): Promise<void> {
-    // TODO use 'DocumentClass'.deleteDocuments([id], {context: {pack & parent}})
+    // TODO parent.parent updates are still not fixed
     const uuids: string[] = [];
     const documentsByUuid = new Map<string, FoundryDocument>();
     for (const input of inputs) {
