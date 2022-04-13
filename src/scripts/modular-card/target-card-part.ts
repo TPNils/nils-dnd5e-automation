@@ -478,7 +478,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
         continue;
       }
       for (const state of integration.getState(stateContext)) {
-        if (state.state === 'disabled') {
+        if (state.state === 'disabled' || state.state === 'not-applied') {
           continue;
         }
         allSelected.set(state.selectionId, {selectionId: state.selectionId, tokenUuid: state.tokenUuid, state: state.state});
