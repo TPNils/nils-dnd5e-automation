@@ -346,8 +346,20 @@ class ActiveEffectCardTrigger implements ITrigger<ModularCardTriggerData> {
       fetchTokenUuids.add(recalcToken.tokenUuid);
     }
     const tokenDocuments = await UtilsDocument.tokenFromUuid(fetchTokenUuids);
+    const tokenUuidsByActorUuid = new Map<string, string[]>();
+    for (const token of tokenDocuments.values()) {
+      const actor: MyActor = token.getActor();
+      if (!tokenUuidsByActorUuid.has(actor.uuid)) {
+        tokenUuidsByActorUuid.set(actor.uuid, []);
+      }
+      tokenUuidsByActorUuid.get(actor.uuid).push(token.uuid);
+    }
+    const recalcedActorUuids = new Set<string>();
     for (const recalcToken of recalcTokens) {
       const actor: MyActor = tokenDocuments.get(recalcToken.tokenUuid).getActor();
+      if (recalcedActorUuids.has(actor.uuid)) {
+        continue;
+      }
       const currentCache = getTargetCache(recalcToken.data, actor.uuid);
       const cache: TargetCache = {
         actorUuid: actor.uuid,
@@ -356,13 +368,16 @@ class ActiveEffectCardTrigger implements ITrigger<ModularCardTriggerData> {
       };
 
       for (const selected of selectedByMessageId.get(recalcToken.messageId) ?? []) {
-        cache.selections.push({
-          selectionId: selected.selectionId,
-          tokenUuid: selected.tokenUuid,
-        });
+        if (tokenUuidsByActorUuid.get(actor.uuid).includes(selected.tokenUuid)) {
+          cache.selections.push({
+            selectionId: selected.selectionId,
+            tokenUuid: selected.tokenUuid,
+          });
+        }
       }
 
       setTargetCache(recalcToken.data, cache);
+      recalcedActorUuids.add(actor.uuid);
     }
   }
   
