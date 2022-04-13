@@ -120,7 +120,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
 
 
     const processedActorUuids = new Set<string>();
-    const createActiveEffectsByActorUuid = new Map<string, ActiveEffectData[]>();
+    const createActiveEffects: ActiveEffect[] = [];
     const deleteActiveEffectUuids = new Set<string>();
     for (const targetEvent of targetEvents) {
       const actor = tokenDocuments.get(targetEvent.selected.tokenUuid)?.getActor() as MyActor;
@@ -163,26 +163,9 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
             partId: activeEffectCard.id,
             activeEffectIndex: i,
           };
-          if (!createActiveEffectsByActorUuid.has(cache.actorUuid)) {
-            createActiveEffectsByActorUuid.set(cache.actorUuid, []);
-          }
-          createActiveEffectsByActorUuid.get(cache.actorUuid).push(activeEffectData);
+          delete activeEffectData._id;
+          createActiveEffects.push(new ActiveEffect(activeEffectData, {parent: actor}));
         }
-      }
-    }
-
-    const createdEffectsPromises: Array<ActiveEffect[] | Promise<ActiveEffect[]>> = [];
-    for (const [actorUuid, effectDatas] of createActiveEffectsByActorUuid.entries()) {
-      if (effectDatas.length === 0) {
-        return;
-      }
-      const actor = actorsByTokenUuid.get(actorUuid);
-      if (actor.parent == null) {
-        createdEffectsPromises.push(actor.createEmbeddedDocuments('ActiveEffect', effectDatas));
-      } else {
-        // Await per dml, otherwise there is a bug where it doesn't always come through
-        // I would guess this would be caused since it would update the same parent document
-        createdEffectsPromises.push(await actor.createEmbeddedDocuments('ActiveEffect', effectDatas));
       }
     }
 
@@ -190,7 +173,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
     if (deleteActiveEffectUuids.size > 0) {
       await UtilsDocument.bulkDelete(deleteActiveEffectUuids)
     }
-    for (const effectDocument of (await Promise.all(createdEffectsPromises)).deepFlatten()) {
+    for (const effectDocument of await UtilsDocument.bulkCreate(createActiveEffects)) {
       const origin = (effectDocument.data.flags[staticValues.moduleName] as any).origin;
       createdUuidsByOriginKey.set(`${origin.messageId}/${origin.partId}/${effectDocument.parent.uuid}/${origin.activeEffectIndex}`, effectDocument.uuid);
     }

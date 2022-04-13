@@ -280,6 +280,30 @@ export class UtilsDocument {
   //#endregion
 
   //#region dml
+  public static async bulkCreate(inputs: Iterable<FoundryDocument>): Promise<FoundryDocument[]> {
+    const createsPerContext = UtilsDocument.groupDocumentsByContext(Array.from(inputs));
+
+    const promises: Promise<FoundryDocument[]>[] = [];
+    for (const documentContext of createsPerContext) {
+      const promise = documentContext.documentClass.createDocuments.call(
+        documentContext.documentClass,
+        documentContext.documents.map(doc => doc.data),
+        {
+          parent: documentContext.parent,
+          pack: documentContext.pack,
+        }
+      );
+      promises.push(promise);
+      if (documentContext.parent != null) {
+        // Await per dml, otherwise there is a bug where it doesn't always come through to the server (it looks fine for the client)
+        // I would guess this would be caused since it would update the same parent document
+        await promise;
+      }
+    }
+
+    return Promise.all(promises).then(values => values.deepFlatten());
+  }
+
   public static async bulkUpdate(inputDocuments: Array<{document: FoundryDocument, data: any}>): Promise<void> {
     const documentsByUuid = new Map<string, {document: FoundryDocument, data: any}>();
     for (const document of inputDocuments) {
