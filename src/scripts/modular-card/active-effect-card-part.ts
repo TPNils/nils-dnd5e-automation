@@ -171,12 +171,19 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       }
     }
 
-    const createdEffectsPromises: Array<Promise<ActiveEffect[]>> = [];
+    const createdEffectsPromises: Array<ActiveEffect[] | Promise<ActiveEffect[]>> = [];
     for (const [actorUuid, effectDatas] of createActiveEffectsByActorUuid.entries()) {
       if (effectDatas.length === 0) {
         return;
       }
-      createdEffectsPromises.push(actorsByTokenUuid.get(actorUuid).createEmbeddedDocuments('ActiveEffect', effectDatas));
+      const actor = actorsByTokenUuid.get(actorUuid);
+      if (actor.parent == null) {
+        createdEffectsPromises.push(actor.createEmbeddedDocuments('ActiveEffect', effectDatas));
+      } else {
+        // Await per dml, otherwise there is a bug where it doesn't always come through
+        // I would guess this would be caused since it would update the same parent document
+        createdEffectsPromises.push(await actor.createEmbeddedDocuments('ActiveEffect', effectDatas));
+      }
     }
 
     const createdUuidsByOriginKey = new Map<string, string>();

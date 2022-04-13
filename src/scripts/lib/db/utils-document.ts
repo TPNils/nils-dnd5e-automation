@@ -346,14 +346,21 @@ export class UtilsDocument {
 
     const promises: Promise<any>[] = [];
     for (const documentContext of deletesPerContext) {
-      promises.push(documentContext.documentClass.deleteDocuments.call(
+      const promise = documentContext.documentClass.deleteDocuments.call(
         documentContext.documentClass,
         documentContext.documents.map(doc => doc.id),
         {
           parent: documentContext.parent,
           pack: documentContext.pack,
         }
-      ));
+      );
+      if (documentContext.parent == null) {
+        promises.push(promise);
+      } else {
+        // Await per dml, otherwise there is a bug where it doesn't always come through to the server (it looks fine for the client)
+        // I would guess this would be caused since it would update the same parent document
+        await promise;
+      }
     }
 
     return Promise.all(promises).then();
