@@ -149,7 +149,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
         }
 
         for (let i = 0; i < activeEffectCard.data.activeEffects.length; i++) {
-          if (appliedActiveEffectIndexes.includes(i)) {
+          if (appliedActiveEffectIndexes.includes(i) || !expectedActiveEffectIndexes.includes(i)) {
             continue;
           }
           const effect = activeEffectCard.data.activeEffects[i];
@@ -186,7 +186,6 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       const origin = (effectDocument.data.flags[staticValues.moduleName] as any).origin;
       createdUuidsByOriginKey.set(`${origin.messageId}/${origin.partId}/${effectDocument.parent.uuid}/${origin.activeEffectIndex}`, effectDocument.uuid);
     }
-    console.log(createdUuidsByOriginKey);
     
     for (const targetEvent of targetEvents) {
       const actor = tokenDocuments.get(targetEvent.selected.tokenUuid)?.getActor() as MyActor;
@@ -246,7 +245,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
             appliedStates.add(applied);
             visualState.columns.push({
               key: ActiveEffectCardPart.instance.getType() + '-' + i,
-              label: `<img width="20px" height="20px" src="${activeEffect.icon}">`, // TODO
+              label: `<img width="20px" height="20px" src="${activeEffect.icon}">`,
               rowValue: applied ? `<span style="color: green">✓</span>` : `<span style="color: red">✗</span>`
             });
           }
@@ -258,8 +257,6 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
           states.push(visualState);
         }
       }
-
-      console.log('12', deepClone(states))
       
       for (const selected of context.selected) {
         if (addedTargetIds.has(selected.selectionId)) {
@@ -275,14 +272,13 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
           const activeEffect = part.activeEffects[i];
           visualState.columns.push({
             key: ActiveEffectCardPart.instance.getType() + '-' + i,
-            label: `<img width="20px" height="20px" src="${activeEffect.icon}">`, // TODO
+            label: `<img width="20px" height="20px" src="${activeEffect.icon}">`,
             rowValue: `<span style="color: red">✗</span>`,
           });
         }
         states.push(visualState);
       }
     }
-    console.log('-12', deepClone(states))
 
     return states;
   }
