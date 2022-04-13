@@ -131,6 +131,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       const activeEffectCards: ModularCardPartData<ActiveEffectCardData>[] = targetEvent.messageCardParts.filter(part => ModularCard.isType<ActiveEffectCardData>(ActiveEffectCardPart.instance, part));
       for (const activeEffectCard of activeEffectCards) {
         const expectedActiveEffectIndexes: number[] = [];
+        // TODO smart apply
         if (targetEvent.apply !== 'undo') {
           for (let i = 0; i < activeEffectCard.data.activeEffects.length; i++) {
             expectedActiveEffectIndexes.push(i);
@@ -245,7 +246,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
             appliedStates.add(applied);
             visualState.columns.push({
               key: ActiveEffectCardPart.instance.getType() + '-' + i,
-              label: `<img width="20px" height="20px" src="${activeEffect.icon}">`,
+              label: `<img style="min-width: 16px;width: 16px;min-height: 16px;height: 16px;" src="${activeEffect.icon}">`,
               rowValue: applied ? `<span style="color: green">✓</span>` : `<span style="color: red">✗</span>`
             });
           }
@@ -272,7 +273,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
           const activeEffect = part.activeEffects[i];
           visualState.columns.push({
             key: ActiveEffectCardPart.instance.getType() + '-' + i,
-            label: `<img width="20px" height="20px" src="${activeEffect.icon}">`,
+            label: `<img style="min-width: 16px;width: 16px;min-height: 16px;height: 16px;" src="${activeEffect.icon}">`,
             rowValue: `<span style="color: red">✗</span>`,
           });
         }
