@@ -538,7 +538,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         }
         const canSeeTarget = UtilsDocument.hasPermissions([{
           uuid: targetCache.actorUuid,
-          permission: `${staticValues.code}ReadDamage`,
+          permission: `Observer`,
           user: game.user,
         }, {
           uuid: targetCache.actorUuid,
