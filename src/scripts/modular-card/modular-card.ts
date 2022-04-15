@@ -209,6 +209,7 @@ export class ModularCard {
   }
   
   public static registerModularCardTrigger(trigger: ITrigger<ModularCardTriggerData>): Stoppable {
+    // TODO this should only trigger for a specific part type => should be more effecient as more parts get added
     return chatMessageTransformer.register(trigger);
   }
 
