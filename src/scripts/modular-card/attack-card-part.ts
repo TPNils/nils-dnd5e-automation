@@ -305,8 +305,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     const cache = this.getTargetCache(rolledAttacks.map(attack => attack.data));
     for (let i = 0; i < rolledAttacks.length; i++) {
       const attack = rolledAttacks[i];
-      // TODO either this should be a (mini) template to use permission check 
-      //      or permissions should be configured via the columns
       for (const selected of context.selected) {
         let rowValue: string;
         const canReadAttack = UtilsDocument.hasPermissions([{

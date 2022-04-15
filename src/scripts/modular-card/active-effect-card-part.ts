@@ -356,7 +356,6 @@ class ActiveEffectCardTrigger implements ITrigger<ModularCardTriggerData> {
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
     await this.calcTargetCache(context);
-    // TODO auto apply healing, but it needs to be sync?
   }
   
   private async calcTargetCache(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
