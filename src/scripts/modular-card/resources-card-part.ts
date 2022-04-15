@@ -495,7 +495,6 @@ class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
     for (const {newRow, changedByUserId} of context.rows) {
       if (changedByUserId !== game.userId) {
         // Only one user needs to do this operation
-        // TODO should happen before when async is possible
         continue;
       }
       const allParts = ModularCard.getCardPartDatas(newRow);
@@ -513,7 +512,6 @@ class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
         let addedResource = false;
         for (const resource of resources) {
           for (const consumeResource of resource.consumeResources) {
-            // TODO should this also trigger for non auto?
             if (consumeResource.consumeResourcesAction === 'auto') {
               addedResource = true;
               applyRequest.resources.push({

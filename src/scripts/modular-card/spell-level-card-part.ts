@@ -22,7 +22,6 @@ interface SpellLevelCardData {
   }
 }
 
-// TODO consume the spell slot
 export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
 
   public static readonly instance = new SpellLevelCardPart();

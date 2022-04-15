@@ -105,18 +105,6 @@ class TriggerMessagePart implements ITrigger<ModularCardPartData> {
     }
     return true;
   }
-
-  public beforeDelete(context: IDmlContext<ModularCardPartData>): boolean | void {
-    /*
-    TODO Does this even matter?
-     CardParts in this foundry module should be build in a way to support this.
-     But can I expect other modules who might want to integratie to also 
-    for (const {oldRow} of context.rows) {
-      console.error(`Can't delete message parts.`)
-      return false;
-    }
-    */
-  }
   
   private finalFields(context: IDmlContext<ModularCardPartData>): boolean {
     for (const {newRow, oldRow} of context.rows) {

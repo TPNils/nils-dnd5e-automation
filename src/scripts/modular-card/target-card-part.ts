@@ -2,6 +2,7 @@ import { ElementBuilder, ElementCallbackBuilder, OnAttributeChange } from "../el
 import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
+import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
@@ -135,10 +136,14 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     return data; // There is nothing to refresh
   }
 
-  private callbacks: TargetIntegrationCallback[] = [];
-  public registerIntegration(integration: TargetIntegrationCallback): void {
-    this.callbacks.push(integration);
-    // TODO unregister
+  private nextCallbackId = 0;
+  private callbacks = new Map<number, TargetIntegrationCallback>();
+  public registerIntegration(integration: TargetIntegrationCallback): Stoppable {
+    const id = this.nextCallbackId++;
+    this.callbacks.set(id, integration);
+    return {
+      stop: () => this.callbacks.delete(id),
+    }
   }
 
   @RunOnce()
@@ -243,7 +248,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
         allMessageParts: allParts,
       };
       const fetchedVisualStates: Promise<VisualState[]>[] = [];
-      for (const integration of this.callbacks) {
+      for (const integration of this.callbacks.values()) {
         if (!integration.getVisualState) {
           continue;
         }
@@ -457,7 +462,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       apply: type,
     }));
 
-    for (const integration of this.callbacks) {
+    for (const integration of this.callbacks.values()) {
       if (integration.onChange) {
         const response = integration.onChange(callbackData);
         if (response instanceof Promise) {
@@ -473,7 +478,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     for (const selected of data.selected) {
       allSelected.set(selected.selectionId, {...selected, state: 'not-applied'});
     }
-    for (const integration of this.callbacks) {
+    for (const integration of this.callbacks.values()) {
       if (!integration.getState) {
         continue;
       }

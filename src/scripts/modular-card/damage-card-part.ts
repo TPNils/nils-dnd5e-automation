@@ -233,12 +233,14 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         .addSerializer(ItemCardHelpers.getMouseEventSerializer())
         .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
         .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, part, allCardParts}) => {
-          // TODO (Shift for quick roll)
+        .setExecute(({messageId, part, allCardParts, click}) => {
           if (part.data.source === 'normal' && part.data.calc$.versatileBaseRoll != null) {
             part.data.source = 'versatile';
           } else {
             part.data.source = 'normal';
+          }
+          if (click.shiftKey) {
+            part.data.phase = 'result';
           }
           return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
         })
@@ -758,7 +760,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
           } else /* damage */ {
             cache.calcHpChange -= amount;
 
-            // TODO calculate seath saves.
+            // TODO calculate death saves.
             //  RAW: Crit = 2 fails
             //  RAW: magic missile = 1 damage source => 1 failed save
             //  RAW: Scorching Ray = multiple damage sources => multiple failed saves
