@@ -78,6 +78,10 @@ export class ModuleSettings {
       ...partialHidingRollSetting,
       name: 'Hidden damage roll behaviour',
     });
+    game.settings.register(staticValues.moduleName, 'immunityVisibility', {
+      ...partialVisibilitySetting,
+      name: 'Show immunity, resistance & vulnerabilities',
+    });
     game.settings.register(staticValues.moduleName, 'checkVisibility', {
       ...partialVisibilitySetting,
       name: 'Show skill check and saving throw roll',
@@ -103,6 +107,7 @@ export class ModuleSettings {
     for (const permission of [
       {permissionName: `${staticValues.code}ReadAttack`, setting: 'attackVisibility'},
       {permissionName: `${staticValues.code}ReadDamage`, setting: 'damageVisibility'},
+      {permissionName: `${staticValues.code}ReadImmunity`, setting: 'immunityVisibility'},
       {permissionName: `${staticValues.code}ReadCheck`, setting: 'checkVisibility'},
       {permissionName: `${staticValues.code}ReadCheckDc`, setting: 'checkDcVisibility'},
     ]) {

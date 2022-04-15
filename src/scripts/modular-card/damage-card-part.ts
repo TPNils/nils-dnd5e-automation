@@ -493,9 +493,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   private getTargetState(context: StateContext): VisualState[] {
-    const states = new Map<string, Omit<VisualState, 'columns'> & {hpDiff?: number, hidden: boolean}>();
+    const states = new Map<string, Omit<VisualState, 'columns'> & {hpDiff: number, hidden: boolean}>();
     for (const selected of context.selected) {
-      states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, state: 'not-applied', smartState: 'not-applied', hidden: false});
+      states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, hpDiff: 0, hidden: false});
     }
     for (const part of context.allMessageParts) {
       if (!ModularCard.isType<DamageCardData>(this, part)) {
@@ -504,13 +504,14 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
       for (const targetCache of part.data.calc$.targetCaches) {
         if (!states.has(targetCache.selectionId)) {
-          states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, state: 'not-applied', smartState: 'not-applied', hidden: false});
+          states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, hpDiff: 0, state: 'not-applied', smartState: 'not-applied', hidden: false});
         }
         const state = states.get(targetCache.selectionId);
-        if (state.hpDiff == null) {
-          state.hpDiff = 0;
+        if (state.state == null) {
           state.state = targetCache.appliedState;
-          state.smartState = targetCache.smartState;
+        }
+        if (state.smartState == null) {
+          state.state = targetCache.smartState;
         }
         
         if (state.state !== targetCache.appliedState) {
@@ -537,9 +538,13 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         }
         const canSeeTarget = UtilsDocument.hasPermissions([{
           uuid: targetCache.actorUuid,
-          permission: `Observer`,
+          permission: `${staticValues.code}ReadDamage`,
           user: game.user,
-        }], {sync: true}).every(result => result.result)
+        }, {
+          uuid: targetCache.actorUuid,
+          permission: `${staticValues.code}ReadImmunity`,
+          user: game.user,
+        }], {sync: true}).every(result => result.result);
         if (canSeeDamage && canSeeTarget) {
           state.hpDiff += (targetCache.calcHpChange ?? 0);
           state.hpDiff += (targetCache.calcAddTmpHp ?? 0);
@@ -564,10 +569,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         }
         if (state.smartState != null) {
           visualState.smartState = state.smartState;
-        }
-      
-        if (state.hpDiff == null) {
-          return visualState;
         }
 
         const column: VisualState['columns'][0] = {
