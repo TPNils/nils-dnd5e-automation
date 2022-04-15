@@ -21,6 +21,7 @@ interface TargetCache {
   
   mode: 'normal' | 'advantage' | 'disadvantage';
   phase: 'mode-select' | 'bonus-input' | 'result';
+  resultType?: 'pass' | 'fail'; // There is no critical pass/fail for ability|skill checks or saving throws (RAW) // TODO maybe this needs to be a setting
   actorBonus: string;
   userBonus: string;
   hasHalflingLucky: boolean;
@@ -327,31 +328,24 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
   }
 
   private calcResultCache(context: IDmlContext<ModularCardTriggerData>): void {
-    /*for (const {newRow} of context.rows) {
+    for (const {newRow} of context.rows) {
       if (!this.isThisType(newRow) || !this.assumeThisType(newRow)) {
         continue;
       }
 
       for (const targetCache of newRow.data.calc$.targetCaches) {
-        if (newRow.data.calc$.roll?.evaluated) {
-          const firstRoll = newRow.data.calc$.roll.terms[0].results.find(r => r.active);
-          if (firstRoll.result === 20 || targetCache.ac <= newRow.data.calc$.roll.total) {
-            // 20 always hits, lower crit treshold does not
-            if (firstRoll.result >= newRow.data.calc$.critTreshold) {
-              targetCache.resultType = 'critical-hit';
-            } else {
-              targetCache.resultType = 'hit';
-            }
-          } else if (firstRoll.result === 1) {
-            targetCache.resultType = 'critical-mis';
+        if (targetCache.roll?.evaluated) {
+          // Checks & saves are a success on a match
+          if (targetCache.roll.total >= newRow.data.dc) {
+            targetCache.resultType = 'pass';
           } else {
-            targetCache.resultType = 'mis';
+            targetCache.resultType = 'fail';
           }
         } else if (targetCache.resultType) {
           delete targetCache.resultType;
         }
       }
-    }*/
+    }
   }
   //#endregion
 
