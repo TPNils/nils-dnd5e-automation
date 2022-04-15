@@ -4,6 +4,8 @@ import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
+import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { CheckCardData, CheckCardPart } from "./check-card-part";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
@@ -97,12 +99,78 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
   }
 
   //#region Targeting
+  private smartApplyActors(messages: Array<ModularCardPartData[]>): Set<string> {
+    const shouldApplyToActors = new Map<string, boolean>();
+    const processedMessages = [];
+    for (const message of messages) {
+      if (processedMessages.includes(message)) {
+        // Deduplicate
+        continue;
+      }
+      processedMessages.push(message);
+
+      const activeEffects: ActiveEffectCardData[] = [];
+      const attacks: AttackCardData[] = [];
+      const checks: CheckCardData[] = [];
+      for (const part of message) {
+        if (ModularCard.isType<ActiveEffectCardData>(ActiveEffectCardPart.instance, part)) {
+          activeEffects.push(part.data);
+        } else if (ModularCard.isType<AttackCardData>(AttackCardPart.instance, part)) {
+          attacks.push(part.data);
+        } else if (ModularCard.isType<CheckCardData>(CheckCardPart.instance, part)) {
+          checks.push(part.data);
+        }
+      }
+
+      if (activeEffects.length === 0) {
+        continue;
+      }
+
+      const actorsByTokenUuid = new Map<string, string>();
+      for (const effect of activeEffects) {
+        for (const cache of effect.calc$.targetCaches) {
+          if (!shouldApplyToActors.has(cache.actorUuid)) {
+            shouldApplyToActors.set(cache.actorUuid, true);
+          }
+          for (const selection of cache.selections) {
+            actorsByTokenUuid.set(selection.tokenUuid, cache.actorUuid);
+          }
+        }
+      }
+
+      for (const attack of attacks) {
+        for (const cache of attack.calc$.targetCaches) {
+          if (cache.resultType == null || cache.resultType === 'critical-mis' || cache.resultType === 'mis') {
+            shouldApplyToActors.set(cache.actorUuid, false);
+          }
+        }
+      }
+      
+      for (const check of checks) {
+        for (const cache of check.calc$.targetCaches) {
+          if (cache.resultType === 'pass') {
+            shouldApplyToActors.set(cache.actorUuid, false);
+          }
+        }
+      }
+    }
+
+    const applyToUuids = new Set<string>();
+    for (const [uuid, shouldApply] of shouldApplyToActors.entries()) {
+      if (shouldApply) {
+        applyToUuids.add(uuid);
+      }
+    }
+    return applyToUuids;
+  }
+
   private async targetCallback(targetEvents: TargetCallbackData[]): Promise<void> {
     const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.selected.tokenUuid));
     let actorsByTokenUuid = new Map<string, MyActor>();
+    let applySmartStateByActor = this.smartApplyActors(targetEvents.map(event => event.messageCardParts));
     for (const token of tokenDocuments.values()) {
       const actor = token.getActor() as MyActor;
-      actorsByTokenUuid.set(actor.uuid, actor);
+      actorsByTokenUuid.set(token.uuid, actor);
     }
     const allRelevantActiveEffectUuids = new Set<string>();
     for (const targetEvent of targetEvents) {
@@ -118,7 +186,6 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
     }
     const activeEffectsMap = await UtilsDocument.activeEffectFromUuid(allRelevantActiveEffectUuids);
 
-
     const processedActorUuids = new Set<string>();
     const createActiveEffects: ActiveEffect[] = [];
     const deleteActiveEffectUuids = new Set<string>();
@@ -131,14 +198,13 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       const activeEffectCards: ModularCardPartData<ActiveEffectCardData>[] = targetEvent.messageCardParts.filter(part => ModularCard.isType<ActiveEffectCardData>(ActiveEffectCardPart.instance, part));
       for (const activeEffectCard of activeEffectCards) {
         const expectedActiveEffectIndexes: number[] = [];
-        // TODO smart apply
-        if (targetEvent.apply !== 'undo') {
+        const appliedActiveEffectIndexes: number[] = [];
+        const cache = getTargetCache(activeEffectCard.data, actor.uuid);
+        if (targetEvent.apply === 'force-apply' || (targetEvent.apply === 'smart-apply' && applySmartStateByActor.has(cache.actorUuid))) {
           for (let i = 0; i < activeEffectCard.data.activeEffects.length; i++) {
             expectedActiveEffectIndexes.push(i);
           }
         }
-        const appliedActiveEffectIndexes: number[] = [];
-        const cache = getTargetCache(activeEffectCard.data, actor.uuid);
         for (const applied of cache.appliedEffects) {
           if (expectedActiveEffectIndexes.includes(applied.originalIndex)) {
             if (activeEffectsMap.has(applied.createdUuid)) {
