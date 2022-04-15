@@ -297,10 +297,17 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
               columns: [],
             })
           }
+          
+          const cache = part.data.calc$.targetCaches.find(cache => cache.targetUuid === selected.tokenUuid);
+          const canReadCheck = cache?.actorUuid != null && UtilsDocument.hasPermissions([{
+            uuid: cache.actorUuid,
+            user: game.user,
+            permission: `${staticValues.code}ReadCheckDc`,
+          }], {sync: true}).every(permission => permission.result);
           const visualState = visualStatesBySelectionId.get(selected.selectionId);
           visualState.columns.push({
             key: `${this.getType()}-check-${partNr}`,
-            label: `Save`, // TODO label
+            label: game.i18n.format('DND5E.SaveDC', {dc: canReadCheck ? part.data.dc : '?', ability: ''}),
             rowValue: `<${this.getSelector()} data-part-id="${part.id}" data-message-id="${context.messageId}" data-sub-type="${selected.selectionId}"></${this.getSelector()}>`
           });
         }

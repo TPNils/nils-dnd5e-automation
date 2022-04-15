@@ -86,6 +86,16 @@ export class ModuleSettings {
       ...partialHidingRollSetting,
       name: 'Hidden skill check and saving throw roll behaviour',
     });
+    game.settings.register(staticValues.moduleName, 'checkDcVisibility', {
+      ...partialVisibilitySetting,
+      name: 'Show skill check DC',
+      hint: `
+        *All details*: Nothing is hidden, all is visible to everyone.
+        *Permission*: Require the observer permission of the item.
+        *Player*: You can only see the DC of other players, regardless of permissions.
+        *Player or permission*: Match 'Permission' or 'Player'.
+      `,
+    });
   }
 
   @RunOnce()
@@ -94,6 +104,7 @@ export class ModuleSettings {
       {permissionName: `${staticValues.code}ReadAttack`, setting: 'attackVisibility'},
       {permissionName: `${staticValues.code}ReadDamage`, setting: 'damageVisibility'},
       {permissionName: `${staticValues.code}ReadCheck`, setting: 'checkVisibility'},
+      {permissionName: `${staticValues.code}ReadCheckDc`, setting: 'checkDcVisibility'},
     ]) {
       UtilsDocument.registerCustomPermission(permission.permissionName, args => {
         const setting = game.settings.get(staticValues.moduleName, permission.setting) as keyof (typeof partialVisibilitySetting)['choices'];
