@@ -270,6 +270,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
   private getTargetState(context: StateContext): VisualState[] {
     const activeEffectParts: ActiveEffectCardData[] = [];
     const selectionIdToActorUuid = new Map<string, string>();
+    let applySmartStateByActor = this.smartApplyActors([context.allMessageParts]);
     for (const part of context.allMessageParts) {
       if (!ModularCard.isType<ActiveEffectCardData>(this, part)) {
         continue;
@@ -310,6 +311,13 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
             visualState.state = 'partial-applied';
           } else if (appliedStates.size === 1 && appliedStates.has(true)) {
             visualState.state = 'applied';
+          }
+          if (visualState.state === 'applied' && applySmartStateByActor.has(targetCache.actorUuid)) {
+            visualState.smartState = 'applied';
+          } else if (visualState.state === 'not-applied' && !applySmartStateByActor.has(targetCache.actorUuid)) {
+            visualState.smartState = 'applied';
+          } else {
+            visualState.smartState = 'not-applied';
           }
           states.push(visualState);
         }
