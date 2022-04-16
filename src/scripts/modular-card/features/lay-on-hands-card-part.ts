@@ -12,6 +12,8 @@ import { ResourceCardData, ResourceCardPart } from "../resources-card-part";
 import { TargetCardData, TargetCardPart } from "../target-card-part";
 
 export interface LayOnHandsCardData extends DamageCardData {
+  heal: number;
+  cure: number;
   maxUsage: number;
 }
 
@@ -34,6 +36,8 @@ export class LayOnHandsCardPart extends DamageCardPart {
     const data = await super.create(this.injectCreateHealing(args)) as Partial<LayOnHandsCardData>;
     data.phase = 'result';
     data.maxUsage = Number(args.item.getRollData().item.uses?.max) ?? 0;
+    data.heal = 0;
+    data.cure = 0;
     return data as LayOnHandsCardData;
   }
 
@@ -50,25 +54,10 @@ export class LayOnHandsCardPart extends DamageCardPart {
       }
       return {documents: documents};
     })
-    new ElementBuilder()
+    const elementBuilder = new ElementBuilder()
       .listenForAttribute('data-part-id', 'string')
       .listenForAttribute('data-message-id', 'string')
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('focusout')
-        .addSelectorFilter('input[name="heal-amount"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getInputSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<LayOnHandsCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(async ({messageId, part, allCardParts, inputValue}) => {
-          const newValue = Math.min(part.data.maxUsage, Number.isNaN(Number(inputValue)) ? 0 : Number(inputValue));
-          const terms = UtilsRoll.fromRollTermData(part.data.calc$.normalBaseRoll).terms;
-          terms[0] = new NumericTerm({number: newValue, options: {flavor: 'healing'}});
-          part.data.calc$.normalBaseRoll = UtilsRoll.toRollData(new Roll(Roll.getFormula(terms))).terms;
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
+      
       .addListener(new ElementCallbackBuilder()
         .setEvent('keypress')
         .addSelectorFilter('input[name="heal-amount"]')
@@ -80,34 +69,65 @@ export class LayOnHandsCardPart extends DamageCardPart {
         .setPermissionCheck(permissionCheck)
         .setExecute(async ({messageId, part, allCardParts, inputValue}) => {
           const newValue = Math.min(part.data.maxUsage, Number.isNaN(Number(inputValue)) ? 0 : Number(inputValue));
-          const terms = UtilsRoll.fromRollTermData(part.data.calc$.normalBaseRoll).terms;
-          terms[0] = new NumericTerm({number: newValue, options: {flavor: 'healing'}});
-          part.data.calc$.normalBaseRoll = UtilsRoll.toRollData(new Roll(Roll.getFormula(terms))).terms;
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+          if (part.data.heal !== newValue) {
+            part.data.heal = newValue;
+            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+          }
         })
       )
       .addOnAttributeChange(async ({element, attributes}) => {
         return ItemCardHelpers.ifAttrData<LayOnHandsCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
-          let currentUsage = Number((part.data.calc$.roll?.terms?.[0] as {number: number})?.number ?? 0);
           const hasPermission = await UtilsDocument.hasPermissions([{
             uuid: part.data.calc$.actorUuid,
             permission: 'OWNER',
             user: game.user,
           }]);
-          element.innerHTML = `
-            <label style="display: flex; align-items: center;">
-              ${game.i18n.localize('DND5E.Healing')}:
-              <input style="margin-left: 3px;" name="heal-amount" type="number" min="0" max="${part.data.maxUsage}" value="${currentUsage}" ${hasPermission[0].result ? '' : 'disabled'}>
-            </label>`;
-          /*element.innerHTML = await renderTemplate(
-            `modules/${staticValues.moduleName}/templates/modular-card/lay-on-hands-part.hbs`, {
-              data: part.data,
-              moduleName: staticValues.moduleName
-            }
-          );*/
+          // TODO translate cure
+          element.innerHTML = /*html*/`
+          <div style="display:grid; grid-template-columns:max-content auto;">
+            <label style="display: flex; align-items: center;">${game.i18n.localize('DND5E.Healing')}:</label>
+            <input style="margin-left: 3px;" name="heal-amount" type="number" min="0" max="${part.data.maxUsage}" value="${part.data.heal}" ${hasPermission[0].result ? '' : 'disabled'}>
+            <label style="display: flex; align-items: center;">Cure:</label>
+            <input style="margin-left: 3px;" name="cure-amount" type="number" min="0" max="${Math.floor(part.data.maxUsage / 5)}" value="${part.data.cure}" ${hasPermission[0].result ? '' : 'disabled'}>
+          </div>`;
         }});
-      })
-      .build(this.getSelector())
+      });
+
+    for (const eventName of ['focusout', 'keypress']) {
+      elementBuilder.addListener(new ElementCallbackBuilder()
+      .setEvent(eventName)
+      .addSelectorFilter('input[name="heal-amount"]')
+      .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+      .addSerializer(ItemCardHelpers.getUserIdSerializer())
+      .addSerializer(ItemCardHelpers.getInputSerializer())
+      .addEnricher(ItemCardHelpers.getChatPartEnricher<LayOnHandsCardData>())
+      .setPermissionCheck(permissionCheck)
+      .setExecute(async ({messageId, part, allCardParts, inputValue}) => {
+        const newValue = Math.min(part.data.maxUsage, Number.isNaN(Number(inputValue)) ? 0 : Number(inputValue));
+        if (part.data.heal !== newValue) {
+          part.data.heal = newValue;
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        }
+      }))
+    }
+    for (const eventName of ['focusout', 'keypress']) {
+      elementBuilder.addListener(new ElementCallbackBuilder()
+      .setEvent(eventName)
+      .addSelectorFilter('input[name="cure-amount"]')
+      .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+      .addSerializer(ItemCardHelpers.getUserIdSerializer())
+      .addSerializer(ItemCardHelpers.getInputSerializer())
+      .addEnricher(ItemCardHelpers.getChatPartEnricher<LayOnHandsCardData>())
+      .setPermissionCheck(permissionCheck)
+      .setExecute(async ({messageId, part, allCardParts, inputValue}) => {
+        const newValue = Math.min(part.data.maxUsage, Number.isNaN(Number(inputValue)) ? 0 : Number(inputValue));
+        if (part.data.cure !== newValue) {
+          part.data.cure = newValue;
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        }
+      }))
+    }
+    elementBuilder.build(this.getSelector());
 
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(new LayOnHandsCardTrigger());
@@ -125,13 +145,27 @@ export class LayOnHandsCardPart extends DamageCardPart {
 class LayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData> {
   
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {
+    this.calcRoll(context);
     this.calcResource(context);
+  }
+
+  private calcRoll(context: IDmlContext<ModularCardTriggerData<any>>): void {
+    for (const {newRow, oldRow} of context.rows) {
+      if (!ModularCard.isType<LayOnHandsCardData>(LayOnHandsCardPart.instance, newRow)) {
+        continue;
+      }
+      if (newRow.data.heal !== oldRow?.data.heal) {
+        const terms = UtilsRoll.fromRollTermData(newRow.data.calc$.normalBaseRoll).terms;
+        terms[0] = new NumericTerm({number: newRow.data.heal, options: {flavor: 'healing'}});
+        newRow.data.calc$.normalBaseRoll = UtilsRoll.toRollData(new Roll(Roll.getFormula(terms))).terms;
+      }
+    }
   }
 
   private calcResource(context: IDmlContext<ModularCardTriggerData<any>>): void {
     const resourcesByMessageId = new Map<string, ResourceCardData[]>();
     const targetsByMessageId = new Map<string, TargetCardData[]>();
-    const layOfHandsByMessageId = new Map<string, DamageCardData[]>();
+    const layOfHandsByMessageId = new Map<string, LayOnHandsCardData[]>();
 
     for (const {newRow} of context.rows) {
       if (!resourcesByMessageId.has(newRow.messageId)) {
@@ -149,7 +183,7 @@ class LayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData> {
       if (ModularCard.isType<TargetCardData>(TargetCardPart.instance, newRow)) {
         targetsByMessageId.get(newRow.messageId).push(newRow.data);
       }
-      if (ModularCard.isType<DamageCardData>(LayOnHandsCardPart.instance, newRow)) {
+      if (ModularCard.isType<LayOnHandsCardData>(LayOnHandsCardPart.instance, newRow)) {
         layOfHandsByMessageId.get(newRow.messageId).push(newRow.data);
       }
     }
@@ -169,7 +203,8 @@ class LayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData> {
 
       let healAmount = 0;
       for (const layOfHand of layOfHands) {
-        healAmount += (layOfHand.calc$.normalBaseRoll[0] as {number: number}).number;
+        healAmount += layOfHand.heal;
+        healAmount += (layOfHand.cure * 5);
       }
       const resourceAmount = healAmount * amountOfTargets;
       for (const resource of resources.map(r => r.consumeResources).deepFlatten()) {
