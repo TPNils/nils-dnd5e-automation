@@ -428,6 +428,8 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
           htmlTableHeader.smartState = 'partial-applied';
         }
       }
+
+      htmlTableHeader.currentTargets = htmlTableBody.filter(row => !row.isPlaceholder).length;
   
       context.element.innerHTML = await renderTemplate(
         `modules/${staticValues.moduleName}/templates/modular-card/target-part.hbs`, {
