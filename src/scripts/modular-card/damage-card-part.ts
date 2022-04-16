@@ -538,10 +538,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         }
         const canSeeTarget = UtilsDocument.hasPermissions([{
           uuid: targetCache.actorUuid,
-          permission: `Observer`,
-          user: game.user,
-        }, {
-          uuid: targetCache.actorUuid,
           permission: `${staticValues.code}ReadImmunity`,
           user: game.user,
         }], {sync: true}).every(result => result.result);
