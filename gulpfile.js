@@ -23,7 +23,6 @@ import yargs from 'yargs';
 
 const sass = gulpSass(sassCompiler);
 const exec = child_process.exec;
-const argv = yargs.argv;
 
 class Meta {
 
@@ -317,9 +316,27 @@ class BuildActions {
     }
   }
 
- /**
-  * Watch for changes for each build step
-  */
+  static #startFoundry() {
+    if (!fs.existsSync('foundryconfig.json')) {
+      console.warn('Could not start foundry: foundryconfig.json not found in project root');
+      return;
+    }
+    const config = Meta.getConfig();
+    if (!config.dataPath) {
+      console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
+    }
+    if (!config.foundryPath) {
+      console.warn('Could not start foundry: foundryconfig.json is missing the property "foundryPath"');
+    }
+  
+    const cmd = `node "${path.join(config.foundryPath, 'resources', 'app', 'main.js')}" --dataPath="${config.dataPath}"`;
+    console.log('starting foundry: ', cmd)
+    exec(cmd);
+  }
+
+  /**
+   * Watch for changes for each build step
+   */
   static createWatch() {
    const config = Meta.getConfig();
    const manifest = Meta.getManifest();
@@ -352,7 +369,7 @@ class BuildActions {
        await Meta.createBuildManifest(destPath)();
  
        // Only start foundry when the manifest is build
-       startFoundry();
+       BuildActions.#startFoundry();
      },
      function watch() {
        // Do not watch to build the manifest since it only gets loaded on server start
@@ -382,228 +399,232 @@ class BuildActions {
     }
   }
 
+  /**
+   * Package the module into a zip
+   * @param {string} inputDir the directory which should be zipped
+   */
+  static createBuildPackage(inputDir) {
+    return async function buildPackage() {
+      const manifest = Meta.getManifest();
+      inputDir = path.normalize(inputDir);
+      if (!inputDir.endsWith(path.sep)) {
+        inputDir += path.sep;
+      }
+    
+      return new Promise((resolve, reject) => {
+        try {
+          // Ensure there is a directory to hold all the packaged versions
+          fs.ensureDirSync('package');
+    
+          // Initialize the zip file
+          const zipName = `module.zip`;
+          const zipFile = fs.createWriteStream(path.join('package', zipName));
+          const zip = archiver('zip', { zlib: { level: 9 } });
+    
+          zipFile.on('close', () => {
+            console.log(chalk.green(zip.pointer() + ' total bytes'));
+            console.log(
+              chalk.green(`Zip file ${zipName} has been written`)
+            );
+            return resolve();
+          });
+    
+          zip.on('error', (err) => {
+            throw err;
+          });
+    
+          zip.pipe(zipFile);
+    
+          // Add the directory with the final code
+          zip.directory(inputDir, manifest.file.name);
+    
+          zip.finalize();
+        } catch (err) {
+          return reject(err);
+        }
+      });
+    }
+  }
+
+  /**
+   * Copy packs from foundry to source
+   */
+  static createUpdateSrcPacks() {
+    return function updateSrcPacks() {
+      const config = Meta.getConfig();
+      if (!config.dataPath) {
+        console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
+      }
+      const manifest = Meta.getManifest();
+      return BuildActions.createCopyFiles([{from: [config.dataPath, 'Data', 'modules', manifest.file.name, 'packs'], to: ['src','packs']}])();
+    }
+  }
+
 }
 
+class Args {
+  /** @type {{u?: string; update?: string;}} */
+  static #args = yargs.argv;
  
- /*********************/
- /*    PACKAGE     */
- /*********************/
- 
- /**
-  * Package build
-  */
- async function packageBuild() {
-   const manifest = Meta.getManifest();
- 
-   return new Promise((resolve, reject) => {
-     try {
-       // Ensure there is a directory to hold all the packaged versions
-       fs.ensureDirSync('package');
- 
-       // Initialize the zip file
-       const zipName = `module.zip`;
-       const zipFile = fs.createWriteStream(path.join('package', zipName));
-       const zip = archiver('zip', { zlib: { level: 9 } });
- 
-       zipFile.on('close', () => {
-         console.log(chalk.green(zip.pointer() + ' total bytes'));
-         console.log(
-           chalk.green(`Zip file ${zipName} has been written`)
-         );
-         return resolve();
-       });
- 
-       zip.on('error', (err) => {
-         throw err;
-       });
- 
-       zip.pipe(zipFile);
- 
-       // Add the directory with the final code
-       zip.directory('dist/', manifest.file.name);
- 
-       zip.finalize();
-     } catch (err) {
-       return reject(err);
-     }
-   });
- }
- 
- /**
-  * @param {string} currentVersion
-  * @returns {string} version name
-  */
- function getVersionFromArgs(currentVersion) {
-   const version = argv.update || argv.u;
-   if (!version) {
-     throw new Error('Missing version number. Use -u <version> (or --update) to specify a version.');
-   }
- 
-   const versionMatch = /^v?(\d{1,}).(\d{1,}).(\d{1,})(-.+)?$/;
-   let targetVersion = null;
- 
-   if (versionMatch.test(version)) {
-     targetVersion = version;
-   } else {
-     targetVersion = currentVersion.replace(
-       versionMatch,
-       (substring, major, minor, patch, addon) => {
-         let target = null;
-         if (version.toLowerCase() === 'major') {
-           target = `${Number(major) + 1}.0.0`;
-         } else if (version.toLowerCase() === 'minor') {
-           target = `${major}.${Number(minor) + 1}.0`;
-         } else if (version.toLowerCase() === 'patch') {
-           target = `${major}.${minor}.${Number(patch) + 1}`;
-         }
- 
-         if (addon) {
-           target += addon;
-         }
- 
-         return target;
-       }
-     );
-   }
- 
-   if (targetVersion == null) {
-     throw new Error(chalk.red('Error: Incorrect version arguments. Accepts the following:\n- major\n- minor\n- patch\n- the following patterns: 1.0.0 | 1.0.0-beta'));
-   }
-   return targetVersion;
- }
- 
- /**
-  * Update version and URLs in the manifest JSON
-  */
- function updateGithubManifest(cb) {
-   console.log('updateGithubManifest')
-   const packageJson = fs.readJSONSync('package.json');
-   const config = Meta.getConfig();
-   const manifest = Meta.getManifest();
- 
-   if (!config) {
-     return cb(Error(chalk.red('foundryconfig.json not found in the ./ (root) folder')));
-   }
-   if (!manifest) {
-     return cb(Error(chalk.red('Manifest JSON not found in the ./src folder')));
-   }
-   if (!config.githubRepository) {
-     return cb(Error(chalk.red('Missing "githubRepository" property in ./foundryconfig.json. Epxected format: <githubUsername>/<githubRepo>')));
-   }
- 
-   try {
-     const currentVersion = manifest.file.version;
-     let targetVersion = getVersionFromArgs(currentVersion)
- 
-     if (targetVersion.startsWith('v')) {
-       targetVersion = targetVersion.substring(1);
-     }
-     
-     // Don't allow the same version for explicit verions (not 'latest')
-     if (targetVersion === currentVersion) {
-       return cb(Error(chalk.red('Error: Target version is identical to current version.')));
-     }
- 
-     console.log(`Updating version number to '${targetVersion}'`);
- 
-     packageJson.version = targetVersion;
- 
-     manifest.file.version = targetVersion;
-     manifest.file.url = `https://github.com/${config.githubRepository}`;
-     manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.json`;
-     manifest.file.download = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.zip`;
- 
-     fs.writeFileSync(
-       'package.json',
-       stringify(packageJson, {indent: '  '}),
-       'utf8'
-     );
-     fs.writeFileSync(
-       path.join(manifest.root, manifest.name),
-       stringify(manifest.file, {indent: '  '}),
-       'utf8'
-     );
- 
-     return cb();
-   } catch (err) {
-     return cb(err);
-   }
- }
- 
- function validateCleanRepo(cb) {
-   return git.status({args: '--porcelain'}, function (err, stdout) {
-     if (typeof stdout === 'string' && stdout.length > 0) {
-       err = new Error("You must first commit your pending changes");
-     }
-     if (err) {
-       cb(Error(err));
-       throw Error(err);
-     }
-     cb();
-   });
- }
- 
- function gitCommit() {
-   let newVersion = 'v' + Meta.getManifest().file.version;
-   return gulp.src('.').pipe(git.commit(`Updated to ${newVersion}`));
- }
- 
- function gitTag() {
-   let newVersion = 'v' + Meta.getManifest().file.version;
-   return git.tag(
-     `${newVersion}`,
-     `Updated to ${newVersion}`,
-     (err) => {
-       if (err) {
-         throw err;
-       }
-     }
-   );
- }
- 
- function gitPush(cb) {
-   git.push('origin', (err) => {
-     if (err) {
-       cb(err);
-       throw err;
-     }
-     cb();
-   });
- }
- 
- function gitPushTag(cb) {
-   let newVersion = 'v' + Meta.getManifest().file.version;
-   git.push('origin', newVersion, (err) => {
-     if (err) {
-       cb(err);
-       throw err;
-     }
-     cb();
-   });
- }
- 
- const execGit = gulp.series(gitCommit, gitTag, gitPush, gitPushTag);
- 
- function startFoundry() {
-   if (!fs.existsSync('foundryconfig.json')) {
-     console.warn('Could not start foundry: foundryconfig.json not found in project root');
-     return;
-   }
-   const config = Meta.getConfig();
-   if (!config.dataPath) {
-     console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
-   }
-   if (!config.foundryPath) {
-     console.warn('Could not start foundry: foundryconfig.json is missing the property "foundryPath"');
-   }
- 
-   const cmd = `node "${path.join(config.foundryPath, 'resources', 'app', 'main.js')}" --dataPath="${config.dataPath}"`;
-   console.log('starting foundry: ', cmd)
-   exec(cmd);
- }
- 
- 
- export const build = gulp.series(
+  /**
+   * @param {string} currentVersion
+   * @returns {string} version name
+   */
+  static getVersion(currentVersion) {
+    const version = Args.#args.update || Args.#args.u;
+    if (!version) {
+      throw new Error('Missing version number. Use -u <version> (or --update) to specify a version.');
+    }
+  
+    const versionMatch = /^v?(\d{1,}).(\d{1,}).(\d{1,})(-.+)?$/;
+    let targetVersion = null;
+  
+    if (versionMatch.test(version)) {
+      targetVersion = version;
+    } else {
+      targetVersion = currentVersion.replace(
+        versionMatch,
+        (substring, major, minor, patch, addon) => {
+          let target = null;
+          if (version.toLowerCase() === 'major') {
+            target = `${Number(major) + 1}.0.0`;
+          } else if (version.toLowerCase() === 'minor') {
+            target = `${major}.${Number(minor) + 1}.0`;
+          } else if (version.toLowerCase() === 'patch') {
+            target = `${major}.${minor}.${Number(patch) + 1}`;
+          }
+  
+          if (addon) {
+            target += addon;
+          }
+  
+          return target;
+        }
+      );
+    }
+  
+    if (targetVersion == null) {
+      throw new Error(chalk.red('Error: Incorrect version arguments. Accepts the following:\n- major\n- minor\n- patch\n- the following patterns: 1.0.0 | 1.0.0-beta'));
+    }
+    return targetVersion;
+  }
+}
+
+class Git {
+
+  /**
+   * Update version and URLs in the manifest JSON
+   */
+  static updateManifestForGithub(cb) {
+    const packageJson = fs.readJSONSync('package.json');
+    const config = Meta.getConfig();
+    const manifest = Meta.getManifest();
+
+    if (!config) {
+      return cb(Error(chalk.red('foundryconfig.json not found in the ./ (root) folder')));
+    }
+    if (!manifest) {
+      return cb(Error(chalk.red('Manifest JSON not found in the ./src folder')));
+    }
+    if (!config.githubRepository) {
+      return cb(Error(chalk.red('Missing "githubRepository" property in ./foundryconfig.json. Epxected format: <githubUsername>/<githubRepo>')));
+    }
+
+    try {
+      const currentVersion = manifest.file.version;
+      let targetVersion = Args.getVersion(currentVersion)
+
+      if (targetVersion.startsWith('v')) {
+        targetVersion = targetVersion.substring(1);
+      }
+      
+      // Don't allow the same version for explicit verions (not 'latest')
+      if (targetVersion === currentVersion) {
+        return cb(Error(chalk.red('Error: Target version is identical to current version.')));
+      }
+
+      console.log(`Updating version number to '${targetVersion}'`);
+
+      packageJson.version = targetVersion;
+
+      manifest.file.version = targetVersion;
+      manifest.file.url = `https://github.com/${config.githubRepository}`;
+      manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.json`;
+      manifest.file.download = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.zip`;
+
+      fs.writeFileSync(
+        'package.json',
+        stringify(packageJson, {indent: '  '}),
+        'utf8'
+      );
+      fs.writeFileSync(
+        path.join(manifest.root, manifest.name),
+        stringify(manifest.file, {indent: '  '}),
+        'utf8'
+      );
+
+      return cb();
+    } catch (err) {
+      return cb(err);
+    }
+  }
+
+  static validateCleanRepo(cb) {
+    return git.status({args: '--porcelain'}, (err, stdout) => {
+      if (typeof stdout === 'string' && stdout.length > 0) {
+        err = new Error("You must first commit your pending changes");
+      }
+      if (err) {
+        cb(Error(err));
+        throw Error(err);
+      }
+      cb();
+    });
+  }
+
+  static gitCommit() {
+    let newVersion = 'v' + Meta.getManifest().file.version;
+    return gulp.src('.').pipe(git.commit(`Updated to ${newVersion}`));
+  }
+
+  static gitTag() {
+    let newVersion = 'v' + Meta.getManifest().file.version;
+    return git.tag(
+      `${newVersion}`,
+      `Updated to ${newVersion}`,
+      (err) => {
+        if (err) {
+          throw err;
+        }
+      }
+    );
+  }
+
+  static gitPush(cb) {
+    git.push('origin', (err) => {
+      if (err) {
+        cb(err);
+        throw err;
+      }
+      cb();
+    });
+  }
+
+  static gitPushTag(cb) {
+    let newVersion = 'v' + Meta.getManifest().file.version;
+    git.push('origin', newVersion, (err) => {
+      if (err) {
+        cb(err);
+        throw err;
+      }
+      cb();
+    });
+  }
+
+}
+
+
+export const build = gulp.series(
    BuildActions.createClean('dist'),
    gulp.parallel(
      BuildActions.createBuildTS('dist'),
@@ -617,19 +638,19 @@ class BuildActions {
        }),
      ])),
    Meta.createBuildManifest('dist'),
- );
- const config = Meta.getConfig();
- if (!config.dataPath) {
-   console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
- }
- const manifest = Meta.getManifest();
- export const updateSrcPacks =  gulp.parallel(BuildActions.createCopyFiles([{from: [config.dataPath, 'Data', 'modules', manifest.file.name, 'packs'], to: ['src','packs']}]));
- export const watch = BuildActions.createWatch();
- export const buildZip = packageBuild;
- export const updateManifest = updateGithubManifest;
- export const test = gitPushTag;
- export const publish = gulp.series(
-   validateCleanRepo,
-   updateGithubManifest,
-   execGit
- );
+);
+export const updateSrcPacks = gulp.series(BuildActions.createUpdateSrcPacks());
+export const watch = BuildActions.createWatch();
+export const buildZip = gulp.series(
+  build,
+  BuildActions.createBuildPackage('dist')
+);
+export const test = Git.gitPushTag;
+export const publish = gulp.series(
+  Git.validateCleanRepo,
+  Git.updateManifestForGithub,
+  Git.gitCommit, 
+  Git.gitTag,
+  Git.gitPush,
+  Git.gitPushTag
+);
