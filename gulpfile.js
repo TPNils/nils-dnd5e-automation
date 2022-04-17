@@ -17,8 +17,8 @@ import sassCompiler from 'sass';
 import gulpSass from 'gulp-sass';
 import git from 'gulp-git';
 import sourcemaps from 'gulp-sourcemaps';
-import minify from 'gulp-minify';
-
+import minifyJs from 'gulp-minify';
+import minifyCss from 'gulp-clean-css';
 
 import child_process from 'child_process';
 import yargs from 'yargs';
@@ -270,7 +270,7 @@ class BuildActions {
       return gulp.src('src/**/*.ts')
         .pipe(sourcemaps.init())
         .pipe(BuildActions.#getTsConfig()())
-        .pipe(minify({
+        .pipe(minifyJs({
           ext: { min: '.js' },
           mangle: false,
           noSource: true,
@@ -299,7 +299,10 @@ class BuildActions {
    */
   static createBuildLess(target) {
     return function buildLess() {
-      return gulp.src('src/**/*.less').pipe(less()).pipe(gulp.dest(target));
+      return gulp.src('src/**/*.less')
+        .pipe(less())
+        .pipe(minifyCss())
+        .pipe(gulp.dest(target));
     }
   }
   
@@ -311,6 +314,7 @@ class BuildActions {
       return gulp
         .src('src/**/*.scss')
         .pipe(sass().on('error', sass.logError))
+        .pipe(minifyCss())
         .pipe(gulp.dest(target));
     }
   }
