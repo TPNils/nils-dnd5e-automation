@@ -157,11 +157,14 @@ class Meta {
       fs.writeFileSync(path.join(dest, manifest.name), JSON.stringify(manifest.file, null, 2));
     }
   }
-  
- /**
-  * TypeScript transformers
-  * @returns {typescript.TransformerFactory<typescript.SourceFile>}
-  */
+
+}
+
+class BuildActions {
+  /**
+   * TypeScript transformers
+   * @returns {typescript.TransformerFactory<typescript.SourceFile>}
+   */
   static #createTransformer() {
     /**
      * @param {typescript.Node} node
@@ -233,7 +236,7 @@ class Meta {
   /**
    * @returns {ts.Project}
    */
-  static getTsConfig() {
+  static #getTsConfig() {
     if (Meta.#tsConfig == null) {
       Meta.#tsConfig = ts.createProject('tsconfig.json', {
         getCustomTransformers: (_program) => ({
@@ -244,10 +247,6 @@ class Meta {
     return Meta.#tsConfig;
   }
 
-}
-
-class BuildActions {
-
   /**
    * @param {string} target the destination directory
    */
@@ -255,7 +254,7 @@ class BuildActions {
     return function buildTS() {
       return gulp.src('src/**/*.ts')
         .pipe(sourcemaps.init())
-        .pipe(Meta.getTsConfig()())
+        .pipe(BuildActions.getTsConfig()())
         .pipe(sourcemaps.write())
         .pipe(gulp.dest(target));
     }
