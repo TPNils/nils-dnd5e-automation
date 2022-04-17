@@ -248,14 +248,37 @@ class BuildActions {
   }
 
   /**
+   * @param {string} target Ensure the folder exists
+   */
+  static createFolder(target) {
+    return function createFolder(cb) {
+      if (!fs.existsSync(target)) {
+        fs.mkdirSync(target);
+      }
+      cb();
+    }
+  }
+
+  /**
    * @param {string} target the destination directory
    */
   static createBuildTS(target) {
     return function buildTS() {
+      const manifest = Meta.getManifest();
       return gulp.src('src/**/*.ts')
         .pipe(sourcemaps.init())
         .pipe(BuildActions.#getTsConfig()())
-        .pipe(sourcemaps.write())
+        .pipe(sourcemaps.mapSources(function(sourcePath, file) {
+          const filePathParts = path.normalize(sourcePath).split(path.sep);
+          return filePathParts[filePathParts.length - 1];
+        }))
+        .pipe(sourcemaps.write('./', {
+          //includeContent: false,
+          sourceMappingURL: (file) => {
+            const filePathParts = file.relative.split(path.sep);
+            return '/' + [(manifest.file.type === 'system' ? 'systems' : 'modules'), manifest.file.name, ...filePathParts].join('/') + '.map';
+          }
+        }))
         .pipe(gulp.dest(target));
     }
   }
@@ -624,19 +647,20 @@ class Git {
 
 
 export const build = gulp.series(
-   BuildActions.createClean('dist'),
-   gulp.parallel(
-     BuildActions.createBuildTS('dist'),
-     BuildActions.createBuildLess('dist'),
-     BuildActions.createBuildSASS('dist'),
-     BuildActions.createCopyFiles([
-      {from: ['src','packs'], to: ['dist','packs']},
-       ...BuildActions.getStaticCopyFiles().map(copy => {
-         copy.to = ['dist', ...copy.to];
-         return copy;
-       }),
-     ])),
-   Meta.createBuildManifest('dist'),
+  BuildActions.createFolder('dist'),
+  BuildActions.createClean('dist'),
+  gulp.parallel(
+    BuildActions.createBuildTS('dist'),
+    BuildActions.createBuildLess('dist'),
+    BuildActions.createBuildSASS('dist'),
+    BuildActions.createCopyFiles([
+     {from: ['src','packs'], to: ['dist','packs']},
+      ...BuildActions.getStaticCopyFiles().map(copy => {
+        copy.to = ['dist', ...copy.to];
+        return copy;
+      }),
+    ])),
+  Meta.createBuildManifest('dist'),
 );
 export const updateSrcPacks = gulp.series(BuildActions.createUpdateSrcPacks());
 export const watch = BuildActions.createWatch();
