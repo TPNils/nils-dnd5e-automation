@@ -237,14 +237,14 @@ class BuildActions {
    * @returns {ts.Project}
    */
   static #getTsConfig() {
-    if (Meta.#tsConfig == null) {
-      Meta.#tsConfig = ts.createProject('tsconfig.json', {
+    if (BuildActions.#tsConfig == null) {
+      BuildActions.#tsConfig = ts.createProject('tsconfig.json', {
         getCustomTransformers: (_program) => ({
-          after: [Meta.#createTransformer()],
+          after: [BuildActions.#createTransformer()],
         }),
       });
     }
-    return Meta.#tsConfig;
+    return BuildActions.#tsConfig;
   }
 
   /**
@@ -254,7 +254,7 @@ class BuildActions {
     return function buildTS() {
       return gulp.src('src/**/*.ts')
         .pipe(sourcemaps.init())
-        .pipe(BuildActions.getTsConfig()())
+        .pipe(BuildActions.#getTsConfig()())
         .pipe(sourcemaps.write())
         .pipe(gulp.dest(target));
     }
