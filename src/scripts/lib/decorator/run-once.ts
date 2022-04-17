@@ -6,6 +6,7 @@ function runOnceInternal<T>(originalFunction: (args: Array<Array<T>>) => any): (
     if (hasRan) {
       return response;
     }
+    hasRan = true;
     response = originalFunction.call(this, ...args);
   }
 }
