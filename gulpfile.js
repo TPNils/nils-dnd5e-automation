@@ -38,6 +38,14 @@ function getConfig() {
 
   if (fs.existsSync(configPath)) {
     config = fs.readJSONSync(configPath);
+    if (config.dataPath) {
+      { // Validate correct path
+        const files = fs.readdirSync(config.dataPath);
+        if (!files.includes('Data') || !files.includes('Config') || !files.includes('Logs')) {
+          throw new Error('dataPath in foundryconfig.json is not recognised as a foundry folder. The folder should include 3 other folders: Data, Config & Logs');
+        }
+      }
+    }
     return config;
   } else {
     return;
@@ -211,46 +219,56 @@ function buildManifest() {
  /*    BUILD    */
  /********************/
  
- /**
-  * Build TypeScript
-  */
- function buildTS() {
-   return gulp.src('src/**/*.ts')
-     .pipe(sourcemaps.init())
-     .pipe(tsConfig())
-     .pipe(sourcemaps.write())
-     .pipe(gulp.dest('dist'));
- }
+/**
+ * Build TypeScript
+ * @param {string} target the destination directory
+ */
+function buildTS(target) {
+   return function buildTS() {
+    return gulp.src('src/**/*.ts')
+    .pipe(sourcemaps.init())
+    .pipe(tsConfig())
+    .pipe(sourcemaps.write())
+    .pipe(gulp.dest(target));
+   }
+}
  
- /**
-  * Build Less
-  */
- function buildLess() {
-   return gulp.src('src/**/*.less').pipe(less()).pipe(gulp.dest('dist/styles'));
- }
+/**
+ * Build Less
+ * @param {string} target the destination directory
+ */
+function buildLess(target) {
+  return function buildLess() {
+    return gulp.src('src/**/*.less').pipe(less()).pipe(gulp.dest(target));
+  }
+}
  
- /**
-  * Build SASS
-  */
- function buildSASS() {
+/**
+ * Build SASS
+ * @param {string} target the destination directory
+ */
+function buildSASS(target) {
+  return function buildSASS() {
    return gulp
      .src('src/**/*.scss')
      .pipe(sass().on('error', sass.logError))
-     .pipe(gulp.dest('dist'));
- }
+     .pipe(gulp.dest(target));
+  }
+}
  
  const staticCopyFiles = [
-   {from: ['src','lang'], to: ['dist','lang']},
-   {from: ['src','fonts'], to: ['dist','fonts']},
-   {from: ['src','assets'], to: ['dist','assets']},
-   {from: ['src','templates'], to: ['dist','templates']},
-   {from: ['src','module.json'], to: ['dist','module.json']},
-   {from: ['src','system.json'], to: ['dist','system.json']},
-   {from: ['src','template.json'], to: ['dist','template.json']},
+   {from: ['src','lang'], to: ['lang']},
+   {from: ['src','fonts'], to: ['fonts']},
+   {from: ['src','assets'], to: ['assets']},
+   {from: ['src','templates'], to: ['templates']},
+   {from: ['src','module.json'], to: ['module.json']},
+   {from: ['src','system.json'], to: ['system.json']},
+   {from: ['src','template.json'], to: ['template.json']},
  ];
  
  /**
   * Copy static files
+  * @param {Array<{from: string, to: string, options?: any}>} copyFilesArg How files should be copied
   */
  function createCopyFiles(copyFilesArg) {
    return async function copyFiles() {
@@ -272,7 +290,19 @@ function buildManifest() {
  * Watch for changes for each build step
  */
 function buildWatch() {
-  const copyFiles = [...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs'], options: {override: false}}];
+  const config = getConfig();
+  const manifest = getManifest();
+  if (config?.dataPath == null) {
+    throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
+  }
+  const destPath = path.join(config.dataPath, 'Data', 'modules', manifest.file.name);
+  if (!fs.existsSync(destPath)) {
+    fs.mkdirSync(destPath);
+  }
+  const copyFiles = [...staticCopyFiles, {from: ['src','packs'], to: ['packs'], options: {override: false}}];
+  for (let i = 0; i < copyFiles.length; i++) {
+    copyFiles[i].to = [destPath, ...copyFiles[i].to];
+  }
   const copyFilesFunc = createCopyFiles(copyFiles);
   
   return gulp.series(
@@ -282,9 +312,9 @@ function buildWatch() {
       // finish, close, end
       await clean();
       await Promise.all([
-        new Promise((resolve) => buildTS().once('end', () => resolve())),
-        new Promise((resolve) => buildLess().once('end', () => resolve())),
-        new Promise((resolve) => buildSASS().once('end', () => resolve())),
+        new Promise((resolve) => buildTS(destPath)().once('end', () => resolve())),
+        new Promise((resolve) => buildLess(destPath)().once('end', () => resolve())),
+        new Promise((resolve) => buildSASS(destPath)().once('end', () => resolve())),
         copyFilesFunc(),
       ]);
       // Only build manifest once all hbs & css files are generated
@@ -295,17 +325,17 @@ function buildWatch() {
     },
     function watch() {
       // Do not watch to build the manifest since it only gets loaded on server start
-      gulp.watch('src/**/*.ts', { ignoreInitial: true }, buildTS);
-      gulp.watch('src/**/*.less', { ignoreInitial: true }, buildLess);
-      gulp.watch('src/**/*.scss', { ignoreInitial: true }, buildSASS);
+      gulp.watch('src/**/*.ts', { ignoreInitial: true }, buildTS(destPath));
+      gulp.watch('src/**/*.less', { ignoreInitial: true }, buildLess(destPath));
+      gulp.watch('src/**/*.scss', { ignoreInitial: true }, buildSASS(destPath));
       gulp.watch(
         [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
         { ignoreInitial: true },
         copyFilesFunc
       )
     }
-  )
- }
+  );
+}
  
  /********************/
  /*    CLEAN    */
@@ -313,74 +343,17 @@ function buildWatch() {
  
 /**
  * Remove built files from `dist` folder
- * while ignoring source files
+ * @param {string} target the destination directory
  */
-async function clean() {
-  const promises = [];
-  for (const file of await fs.readdir('dist')) {
-    promises.push(fs.rm(path.join('dist', file), {recursive: true}));
+function clean(target) {
+  return async function clean() {
+    const promises = [];
+    for (const file of await fs.readdir('dist')) {
+      promises.push(fs.rm(path.join('dist', file), {recursive: true}));
+    }
+    return Promise.all(promises).then();
   }
-  return Promise.all(promises).then();
 }
- 
- /********************/
- /*    LINK    */
- /********************/
- 
- /**
-  * Link build to User Data folder
-  */
- async function linkUserData() {
-   const name = path.basename(path.resolve('.'));
-   const config = fs.readJSONSync('foundryconfig.json');
- 
-   let destDir;
-   try {
-     if (
-       fs.existsSync(path.resolve('.', 'dist', 'module.json')) ||
-       fs.existsSync(path.resolve('.', 'src', 'module.json'))
-     ) {
-       destDir = 'modules';
-     } else if (
-       fs.existsSync(path.resolve('.', 'dist', 'system.json')) ||
-       fs.existsSync(path.resolve('.', 'src', 'system.json'))
-     ) {
-       destDir = 'systems';
-     } else {
-       throw Error(
-         `Could not find ${chalk.blueBright(
-           'module.json'
-         )} or ${chalk.blueBright('system.json')}`
-       );
-     }
- 
-     let linkDir;
-     if (config.dataPath) {
-       if (!fs.existsSync(path.join(config.dataPath, 'Data')))
-         throw Error('User Data path invalid, no Data directory found');
- 
-       linkDir = path.join(config.dataPath, 'Data', destDir, name);
-     } else {
-       throw Error('No User Data path defined in foundryconfig.json');
-     }
- 
-     if (argv.clean || argv.c) {
-       console.log(
-         chalk.yellow(`Removing build in ${chalk.blueBright(linkDir)}`)
-       );
- 
-       await fs.remove(linkDir);
-     } else if (!fs.existsSync(linkDir)) {
-       console.log(
-         chalk.green(`Copying build to ${chalk.blueBright(linkDir)}`)
-       );
-       await fs.symlink(path.resolve('./dist'), linkDir);
-     }
-     return Promise.resolve();
-   } catch (err) {
-     Promise.reject(err);
-   }
- }
  
  /*********************/
  /*    PACKAGE     */
@@ -581,14 +554,14 @@ async function clean() {
  
  const execGit = gulp.series(gitCommit, gitTag, gitPush, gitPushTag);
  
- const execBuild = gulp.parallel(buildTS, buildLess, buildSASS, createCopyFiles([...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs']}]));
+ const execBuild = gulp.parallel(buildTS('dist'), buildLess('dist'), buildSASS('dist'), createCopyFiles([...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs']}]));
  
  function startFoundry() {
    if (!fs.existsSync('foundryconfig.json')) {
      console.warn('Could not start foundry: foundryconfig.json not found in project root');
      return;
    }
-   const config = fs.readJSONSync('foundryconfig.json');
+   const config = getConfig();
    if (!config.dataPath) {
      console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
    }
@@ -603,10 +576,14 @@ async function clean() {
  
  
  export const build = gulp.series(clean, execBuild, buildManifest);
- export const updateSrcPacks = gulp.parallel(createCopyFiles([{from: ['dist','packs'], to: ['src','packs']}]));
+ const config = getConfig();
+ if (!config.dataPath) {
+   console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
+ }
+ const manifest = getManifest();
+ export const updateSrcPacks =  gulp.parallel(createCopyFiles([{from: [config.dataPath, 'Data', 'modules', manifest.file.name, 'packs'], to: ['src','packs']}]));
  export const watch = buildWatch();
  export {clean};
- export const link = linkUserData;
  export const buildZip = packageBuild;
  export const updateManifest = updateGithubManifest;
  export const test = gitPushTag;

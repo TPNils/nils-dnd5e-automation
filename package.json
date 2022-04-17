@@ -6,7 +6,6 @@
   "scripts": {
     "build": "gulp build",
     "package": "gulp buildZip",
-    "foundry": "gulp link",
     "dev": "gulp watch",
     "patch": "gulp publish -u patch",
     "minor": "gulp publish -u minor",
