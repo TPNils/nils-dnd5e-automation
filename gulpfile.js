@@ -311,49 +311,17 @@ function buildWatch() {
  /*    CLEAN    */
  /********************/
  
- /**
-  * Remove built files from `dist` folder
-  * while ignoring source files
-  */
- async function clean() {
-   const name = path.basename(path.resolve('.'));
-   const files = [];
- 
-   // If the project uses TypeScript
-   if (fs.existsSync(path.join('src', `${name}.ts`))) {
-     files.push(
-       'lang',
-       'templates',
-       'assets',
-       'module',
-       `${name}.js`,
-       'module.json',
-       'system.json',
-       'template.json'
-     );
-   }
- 
-   // If the project uses Less or SASS
-   if (
-     fs.existsSync(path.join('src', `${name}.less`)) ||
-     fs.existsSync(path.join('src', `${name}.scss`))
-   ) {
-     files.push('fonts', `${name}.css`);
-   }
- 
-   console.log(' ', chalk.yellow('Files to clean:'));
-   console.log('   ', chalk.blueBright(files.join('\n    ')));
- 
-   // Attempt to remove the files
-   try {
-     for (const filePath of files) {
-       await fs.remove(path.join('dist', filePath));
-     }
-     return Promise.resolve();
-   } catch (err) {
-     Promise.reject(err);
-   }
- }
+/**
+ * Remove built files from `dist` folder
+ * while ignoring source files
+ */
+async function clean() {
+  const promises = [];
+  for (const file of await fs.readdir('dist')) {
+    promises.push(fs.rm(path.join('dist', file), {recursive: true}));
+  }
+  return Promise.all(promises).then();
+}
  
  /********************/
  /*    LINK    */
