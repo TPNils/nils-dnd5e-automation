@@ -393,7 +393,7 @@ class BuildActions {
   * Package build
   */
  async function packageBuild() {
-   const manifest = getManifest();
+   const manifest = Meta.getManifest();
  
    return new Promise((resolve, reject) => {
      try {
@@ -478,8 +478,8 @@ class BuildActions {
  function updateGithubManifest(cb) {
    console.log('updateGithubManifest')
    const packageJson = fs.readJSONSync('package.json');
-   const config = getConfig();
-   const manifest = getManifest();
+   const config = Meta.getConfig();
+   const manifest = Meta.getManifest();
  
    if (!config) {
      return cb(Error(chalk.red('foundryconfig.json not found in the ./ (root) folder')));
@@ -544,12 +544,12 @@ class BuildActions {
  }
  
  function gitCommit() {
-   let newVersion = 'v' + getManifest().file.version;
+   let newVersion = 'v' + Meta.getManifest().file.version;
    return gulp.src('.').pipe(git.commit(`Updated to ${newVersion}`));
  }
  
  function gitTag() {
-   let newVersion = 'v' + getManifest().file.version;
+   let newVersion = 'v' + Meta.getManifest().file.version;
    return git.tag(
      `${newVersion}`,
      `Updated to ${newVersion}`,
@@ -572,7 +572,7 @@ class BuildActions {
  }
  
  function gitPushTag(cb) {
-   let newVersion = 'v' + getManifest().file.version;
+   let newVersion = 'v' + Meta.getManifest().file.version;
    git.push('origin', newVersion, (err) => {
      if (err) {
        cb(err);
