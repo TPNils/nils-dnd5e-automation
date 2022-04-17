@@ -4,12 +4,10 @@ import { UtilsDocument } from "../../../lib/db/utils-document";
 import { RunOnce } from "../../../lib/decorator/run-once";
 import { UtilsRoll } from "../../../lib/roll/utils-roll";
 import { staticValues } from "../../../static-values";
-import { DamageCardData, DamageCardPart } from "../../damage-card-part";
+import { DamageCardData, DamageCardPart, ResourceCardData, ResourceCardPart, TargetCardData, TargetCardPart } from "../../base/index";
 import { ItemCardHelpers } from "../../item-card-helpers";
 import { ModularCard, ModularCardTriggerData } from "../../modular-card";
 import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs } from "../../modular-card-part";
-import { ResourceCardData, ResourceCardPart } from "../../resources-card-part";
-import { TargetCardData, TargetCardPart } from "../../target-card-part";
 
 export interface LayOnHandsCardData extends DamageCardData {
   heal: number;

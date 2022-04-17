@@ -1,17 +1,18 @@
-import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
-import { IAfterDmlContext, IDmlContext, ITrigger} from "../lib/db/dml-trigger";
-import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
-import { RunOnce } from "../lib/decorator/run-once";
-import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
-import { RollData, TermData, UtilsRoll } from "../lib/roll/utils-roll";
-import { UtilsObject } from "../lib/utils/utils-object";
-import { MemoryStorageService } from "../service/memory-storage-service";
-import { staticValues } from "../static-values";
-import { DamageType, MyActor } from "../types/fixed-types";
+
+import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
+import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
+import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
+import { RunOnce } from "../../lib/decorator/run-once";
+import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
+import { TermData, RollData, UtilsRoll } from "../../lib/roll/utils-roll";
+import { UtilsObject } from "../../lib/utils/utils-object";
+import { MemoryStorageService } from "../../service/memory-storage-service";
+import { staticValues } from "../../static-values";
+import { MyActor, DamageType } from "../../types/fixed-types";
+import { ItemCardHelpers } from "../item-card-helpers";
+import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
-import { ItemCardHelpers } from "./item-card-helpers";
-import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 interface TargetCache {

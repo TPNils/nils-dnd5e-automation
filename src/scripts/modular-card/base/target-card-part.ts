@@ -1,14 +1,14 @@
-import { ElementBuilder, ElementCallbackBuilder, OnAttributeChange } from "../elements/element-builder";
-import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
-import { UtilsDocument } from "../lib/db/utils-document";
-import { RunOnce } from "../lib/decorator/run-once";
-import { Stoppable } from "../lib/utils/stoppable";
-import { UtilsCompare } from "../lib/utils/utils-compare";
-import { staticValues } from "../static-values";
-import { MyActor } from "../types/fixed-types";
-import { ItemCardHelpers } from "./item-card-helpers";
-import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { ElementBuilder, ElementCallbackBuilder, OnAttributeChange } from "../../elements/element-builder";
+import { DmlTrigger, ITrigger, IAfterDmlContext, IDmlTrigger, IDmlContext } from "../../lib/db/dml-trigger";
+import { UtilsDocument } from "../../lib/db/utils-document";
+import { RunOnce } from "../../lib/decorator/run-once";
+import { Stoppable } from "../../lib/utils/stoppable";
+import { UtilsCompare } from "../../lib/utils/utils-compare";
+import { staticValues } from "../../static-values";
+import { MyActor } from "../../types/fixed-types";
+import { ItemCardHelpers } from "../item-card-helpers";
+import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
 
 export interface TargetCardData {
   selected: Array<{selectionId: string, tokenUuid: string;}>;

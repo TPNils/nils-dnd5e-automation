@@ -1,13 +1,13 @@
 import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
-import { IAfterDmlContext, IDmlContext, ITrigger } from "../lib/db/dml-trigger";
-import { UtilsDocument } from "../lib/db/utils-document";
-import { RunOnce } from "../lib/decorator/run-once";
-import { staticValues } from "../static-values";
-import { MyActor } from "../types/fixed-types";
+import { IAfterDmlContext, IDmlContext, ITrigger } from "../../lib/db/dml-trigger";
+import { UtilsDocument } from "../../lib/db/utils-document";
+import { RunOnce } from "../../lib/decorator/run-once";
+import { staticValues } from "../../static-values";
+import { MyActor } from "../../types/fixed-types";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { CheckCardData, CheckCardPart } from "./check-card-part";
-import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
+import { ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 import { StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 interface TargetCache {

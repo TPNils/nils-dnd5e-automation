@@ -3,22 +3,13 @@ import { registerHooks as registerOverrideHooks } from "./override/index.js";
 import { provider } from "./provider/provider";
 import { UtilsHandlebars } from "./utils/utils-handlebars";
 import { ModularCard } from "./modular-card/modular-card";
-import { AttackCardPart } from "./modular-card/attack-card-part";
-import { DamageCardPart } from "./modular-card/damage-card-part";
 import { staticValues } from "./static-values";
-import { DescriptionCardPart } from "./modular-card/description-card-part";
-import { PropertyCardPart } from "./modular-card/property-card-part";
-import { TemplateCardPart } from "./modular-card/template-card-part";
 import { MutableDiceTerm } from "./lib/roll/mutable-dice-term";
-import { TargetCardPart } from "./modular-card/target-card-part";
-import { SpellLevelCardPart } from "./modular-card/spell-level-card-part";
 import { RollResultElement } from "./elements/roll-result-element";
 import { RollD20Element } from "./elements/roll-d20-element";
-import { CheckCardPart } from "./modular-card/check-card-part";
-import { ResourceCardPart } from "./modular-card/resources-card-part";
-import { LayOnHandsCardPart } from "./modular-card/srd/features/lay-on-hands-card-part";
 import { ModuleSettings } from "./module-settings";
-import { ActiveEffectCardPart } from "./modular-card/active-effect-card-part";
+import { registerHooks as registerModularCardBaseHooks } from "./modular-card/base/index";
+import { registerHooks as registerModularCardSrdHooks } from "./modular-card/srd/index";
 
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
@@ -28,18 +19,9 @@ provider.registerHooks();
 registerOverrideHooks()
 UtilsHandlebars.registerHooks();
 ModularCard.registerHooks();
-AttackCardPart.instance.registerHooks();
-CheckCardPart.instance.registerHooks();
-DamageCardPart.instance.registerHooks();
-DescriptionCardPart.instance.registerHooks();
-PropertyCardPart.instance.registerHooks();
-SpellLevelCardPart.instance.registerHooks();
-TargetCardPart.instance.registerHooks();
-TemplateCardPart.instance.registerHooks();
-ResourceCardPart.instance.registerHooks();
-ActiveEffectCardPart.instance.registerHooks();
-LayOnHandsCardPart.instance.registerHooks();
 ModuleSettings.registerHooks();
+registerModularCardBaseHooks();
+registerModularCardSrdHooks();
 
 Hooks.on('init', () => {
   const hbsFiles: string[] = [];

@@ -1,11 +1,11 @@
-import { RunOnce } from "../lib/decorator/run-once";
-import { staticValues } from "../static-values";
-import { ModularCard, ModularCardPartData } from "./modular-card";
-import { MyActor, SpellData } from "../types/fixed-types";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
-import { UtilsDocument } from "../lib/db/utils-document";
-import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
-import { ItemCardHelpers } from "./item-card-helpers";
+import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
+import { UtilsDocument } from "../../lib/db/utils-document";
+import { RunOnce } from "../../lib/decorator/run-once";
+import { staticValues } from "../../static-values";
+import { SpellData, MyActor } from "../../types/fixed-types";
+import { ItemCardHelpers } from "../item-card-helpers";
+import { ModularCardPartData, ModularCard } from "../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
 
 interface SpellLevelCardData {
   selectedLevel: number | 'pact';

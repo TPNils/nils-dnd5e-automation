@@ -1,17 +1,17 @@
-import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
-import { RollD20Element } from "../elements/roll-d20-element";
-import { UtilsElement } from "../elements/utils-element";
-import { IAfterDmlContext, IDmlContext, ITrigger } from "../lib/db/dml-trigger";
-import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
-import { RunOnce } from "../lib/decorator/run-once";
-import { UtilsDiceSoNice } from "../lib/roll/utils-dice-so-nice";
-import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
-import { MemoryStorageService } from "../service/memory-storage-service";
-import { staticValues } from "../static-values";
-import { MyActor, MyActorData } from "../types/fixed-types";
-import { ChatPartEnriched, ChatPartIdData, ItemCardHelpers } from "./item-card-helpers";
-import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
+import { RollD20Element } from "../../elements/roll-d20-element";
+import { UtilsElement } from "../../elements/utils-element";
+import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
+import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
+import { RunOnce } from "../../lib/decorator/run-once";
+import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
+import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
+import { MemoryStorageService } from "../../service/memory-storage-service";
+import { staticValues } from "../../static-values";
+import { MyActor, MyActorData } from "../../types/fixed-types";
+import { ItemCardHelpers, ChatPartIdData, ChatPartEnriched } from "../item-card-helpers";
+import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs } from "../modular-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 interface TargetCache {

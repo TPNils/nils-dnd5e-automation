@@ -1,10 +1,10 @@
-import { ElementBuilder } from "../elements/element-builder";
-import { RunOnce } from "../lib/decorator/run-once";
-import { staticValues } from "../static-values";
-import { MyItem } from "../types/fixed-types";
-import { ItemCardHelpers } from "./item-card-helpers";
-import { ModularCard } from "./modular-card";
-import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { ElementBuilder } from "../../elements/element-builder";
+import { RunOnce } from "../../lib/decorator/run-once";
+import { staticValues } from "../../static-values";
+import { MyItem } from "../../types/fixed-types";
+import { ItemCardHelpers } from "../item-card-helpers";
+import { ModularCard } from "../modular-card";
+import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 
 interface PropertyCardData {
   calc$: {

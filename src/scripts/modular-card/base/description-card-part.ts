@@ -1,10 +1,10 @@
-import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
-import { RunOnce } from "../lib/decorator/run-once";
-import { MemoryStorageService } from "../service/memory-storage-service";
-import { staticValues } from "../static-values";
-import { ItemCardHelpers } from "./item-card-helpers";
-import { ModularCard } from "./modular-card";
-import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
+import { RunOnce } from "../../lib/decorator/run-once";
+import { MemoryStorageService } from "../../service/memory-storage-service";
+import { staticValues } from "../../static-values";
+import { ItemCardHelpers } from "../item-card-helpers";
+import { ModularCard } from "../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
 
 interface DescriptionCardData {
   calc$: {

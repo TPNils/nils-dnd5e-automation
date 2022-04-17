@@ -1,14 +1,14 @@
-import { ElementBuilder, ElementCallbackBuilder } from "../elements/element-builder";
-import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
-import { UtilsDocument } from "../lib/db/utils-document";
-import { RunOnce } from "../lib/decorator/run-once";
-import { staticValues } from "../static-values";
+import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
+import { DmlTrigger, IDmlTrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
+import { UtilsDocument } from "../../lib/db/utils-document";
+import { RunOnce } from "../../lib/decorator/run-once";
+import { staticValues } from "../../static-values";
+import { ItemCardHelpers } from "../item-card-helpers";
+import { ModularCardPartData, ModularCard } from "../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { CheckCardData, CheckCardPart } from "./check-card-part";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
-import { ItemCardHelpers } from "./item-card-helpers";
-import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "./modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { TemplateCardData, TemplateCardPart } from "./template-card-part";
 
 type AutoConsumeAfter = 'never' | 'init' | 'attack' | 'damage' | 'check' | 'template-placed';

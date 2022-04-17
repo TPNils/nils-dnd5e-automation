@@ -7,18 +7,9 @@ import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
-import { ActiveEffectCardPart } from "./active-effect-card-part";
-import { AttackCardPart } from "./attack-card-part";
-import { CheckCardPart } from "./check-card-part";
-import { DamageCardPart } from "./damage-card-part";
-import { DescriptionCardPart } from "./description-card-part";
-import { LayOnHandsCardPart } from "./srd/features/lay-on-hands-card-part";
+import { ActiveEffectCardPart, AttackCardPart, CheckCardPart, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardPart, SpellLevelCardPart, TargetCardPart, TemplateCardPart } from "./base/index";
 import { ModularCardPart } from "./modular-card-part";
-import { PropertyCardPart } from "./property-card-part";
-import { ResourceCardPart } from "./resources-card-part";
-import { SpellLevelCardPart } from "./spell-level-card-part";
-import { TargetCardPart } from "./target-card-part";
-import { TemplateCardPart } from "./template-card-part";
+import { LayOnHandsCardPart } from "./srd/index";
 
 export interface ModularCardPartData<T = any> {
   readonly id: string;

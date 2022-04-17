@@ -1,7 +1,7 @@
 import { staticValues } from "../static-values";
 import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
-import { ResourceCardData } from '../modular-card/resources-card-part';
+import { ResourceCardData } from "../modular-card/base/index";
 
 interface InlineHelperOption {
   blockParams: any;
