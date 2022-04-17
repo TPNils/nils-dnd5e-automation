@@ -17,6 +17,8 @@ import sassCompiler from 'sass';
 import gulpSass from 'gulp-sass';
 import git from 'gulp-git';
 import sourcemaps from 'gulp-sourcemaps';
+import minify from 'gulp-minify';
+
 
 import child_process from 'child_process';
 import yargs from 'yargs';
@@ -268,6 +270,15 @@ class BuildActions {
       return gulp.src('src/**/*.ts')
         .pipe(sourcemaps.init())
         .pipe(BuildActions.#getTsConfig()())
+        .pipe(minify({
+          ext: { min: '.js' },
+          mangle: false,
+          noSource: true,
+          output: {
+            source_map: false,
+            comments: false,
+          }
+        }))
         .pipe(sourcemaps.mapSources(function(sourcePath, file) {
           const filePathParts = path.normalize(sourcePath).split(path.sep);
           return filePathParts[filePathParts.length - 1];
