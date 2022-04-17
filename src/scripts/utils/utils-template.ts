@@ -23,10 +23,18 @@ export class UtilsTemplate {
           x: token.data.x + x * grid - templatePos.x,
           y: token.data.y + y * grid - templatePos.y,
         };
-        let contains = templateDetails.shape?.contains(currGrid.x, currGrid.y);
+        let contains = false;
+        if (true) {
+          // DMG p.251 Areas Of Effect
+          // If a *tile* is at least 50% in the area (Foundry default)
+          contains = templateDetails.shape?.contains(currGrid.x, currGrid.y);
+        } else {
+          // XGE. p.86 If a *token* is within the area, it is affected
+          // TODO
+        }
         if (contains && wallsBlockTargeting) {
           const r = new Ray({x: currGrid.x + templatePos.x, y: currGrid.y + templatePos.y}, templatePos);
-          contains = !canvas.walls?.checkCollision(r);
+          contains = !canvas.walls?.checkCollision(r, {type: 'movement', mode: 'any'});
         }
         if (contains) {
           return true;
@@ -104,6 +112,29 @@ export class UtilsTemplate {
   public static feetToPx(value: number): number {
     const dimensions = game.canvas.dimensions || {size: 1, distance: 1};
     return value * dimensions.size  / dimensions.distance;
+  }
+
+  public static getCenter(template: MeasuredTemplateDocument, token: TokenDocument): {x: number; y: number;} {
+    const gridSize = template.parent.data.grid;
+    switch ( template.data.t ) {
+      case "circle":
+        return {
+          x: token.data.x + ((token.data.width * gridSize) / 2),
+          y: token.data.y + ((token.data.height * gridSize) / 2),
+        }
+      case "cone":
+        // @ts-expect-error
+        shape = document._object._getConeShape(direction, angle, distance);
+        break;
+      case "rect":
+        // @ts-expect-error
+        shape = document._object._getRectShape(direction, distance);
+        break;
+      case "ray":
+        // @ts-expect-error
+        shape = document._object._getRayShape(direction, distance, width);
+        break;
+    }
   }
 
 }
