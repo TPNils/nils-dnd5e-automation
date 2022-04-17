@@ -25,335 +25,365 @@ const sass = gulpSass(sassCompiler);
 const exec = child_process.exec;
 const argv = yargs.argv;
 
-/**
-* @returns {{
-*   dataPath: string,
-*   foundryPath: string,
-*   githubRepository: string
-* }}
-*/
-function getConfig() {
-  const configPath = path.resolve(process.cwd(), 'foundryconfig.json');
-  let config;
+class Meta {
 
-  if (fs.existsSync(configPath)) {
-    config = fs.readJSONSync(configPath);
-    if (config.dataPath) {
-      { // Validate correct path
-        const files = fs.readdirSync(config.dataPath);
-        if (!files.includes('Data') || !files.includes('Config') || !files.includes('Logs')) {
-          throw new Error('dataPath in foundryconfig.json is not recognised as a foundry folder. The folder should include 3 other folders: Data, Config & Logs');
+  /**
+  * @returns {{
+  *   dataPath: string,
+  *   foundryPath: string,
+  *   githubRepository: string
+  * }}
+  */
+  static getConfig() {
+    const configPath = path.resolve(process.cwd(), 'foundryconfig.json');
+    let config;
+  
+    if (fs.existsSync(configPath)) {
+      config = fs.readJSONSync(configPath);
+      if (config.dataPath) {
+        { // Validate correct path
+          const files = fs.readdirSync(config.dataPath);
+          if (!files.includes('Data') || !files.includes('Config') || !files.includes('Logs')) {
+            throw new Error('dataPath in foundryconfig.json is not recognised as a foundry folder. The folder should include 3 other folders: Data, Config & Logs');
+          }
         }
       }
+      return config;
+    } else {
+      return;
     }
-    return config;
-  } else {
-    return;
   }
-}
+  
+  /**
+  * @returns {{
+   *   file: any,
+   *   name: string,
+   *   root: string
+   * }}
+   */
+  static getManifest() {
+    const json = {};
+  
+    if (fs.existsSync('src')) {
+      json.root = 'src';
+    } else {
+      json.root = 'dist';
+    }
+  
+    const modulePath = path.join(json.root, 'module.json');
+    const systemPath = path.join(json.root, 'system.json');
+  
+    if (fs.existsSync(modulePath)) {
+      json.file = fs.readJSONSync(modulePath);
+      json.name = 'module.json';
+    } else if (fs.existsSync(systemPath)) {
+      json.file = fs.readJSONSync(systemPath);
+      json.name = 'system.json';
+    } else {
+      return;
+    }
+  
+    return json;
+  }
 
- function getManifest() {
-   const json = {};
- 
-   if (fs.existsSync('src')) {
-     json.root = 'src';
-   } else {
-     json.root = 'dist';
-   }
- 
-   const modulePath = path.join(json.root, 'module.json');
-   const systemPath = path.join(json.root, 'system.json');
- 
-   if (fs.existsSync(modulePath)) {
-     json.file = fs.readJSONSync(modulePath);
-     json.name = 'module.json';
-   } else if (fs.existsSync(systemPath)) {
-     json.file = fs.readJSONSync(systemPath);
-     json.name = 'system.json';
-   } else {
-     return;
-   }
- 
-   return json;
- }
-
-function buildManifest() {
-  const manifest = getManifest();
-
-  /** @type {Promise<string[]>[]} */
-  const filePromises = [];
-  filePromises.push(new Promise((resolve, reject) => {
-    glob('dist/**/*.css', (err, matches) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(matches);
-    })
-  }));
-  filePromises.push(new Promise((resolve, reject) => {
-    glob('dist/**/*.hbs', (err, matches) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(matches);
-    })
-  }));
-
-  return Promise.all(filePromises).then(fileNameCollection => {
-    /** @type {Set<string>} */
-    const cssFiles = new Set();
-    /** @type {Set<string>} */
-    const hbsFiles = new Set();
-    for (const fileNames of fileNameCollection) {
-      for (let fileName of fileNames) {
-        fileName = fileName.replace(/^(dist|src)\//, '');
-        if (fileName.toLowerCase().endsWith('.css')) {
-          cssFiles.add(fileName);
-        } else if (fileName.toLowerCase().endsWith('.hbs')) {
-          hbsFiles.add(fileName);
+  /**
+   * @param {string} dest
+   * @returns {Promise<void>}
+   */
+  static createBuildManifest(dest) {
+    dest = path.normalize(dest);
+    return async function buildManifest() {
+      const manifest = Meta.getManifest();
+  
+      /** @type {Promise<string[]>[]} */
+      const filePromises = [];
+      filePromises.push(new Promise((resolve, reject) => {
+        glob(path.join(dest, '**/*.css'), (err, matches) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve(matches);
+        })
+      }));
+      filePromises.push(new Promise((resolve, reject) => {
+        glob(path.join(dest, '**/*.hbs'), (err, matches) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve(matches);
+        })
+      }));
+    
+      const fileNameCollection = await Promise.all(filePromises)
+      /** @type {Set<string>} */
+      const cssFiles = new Set();
+      /** @type {Set<string>} */
+      const hbsFiles = new Set();
+      for (const fileNames of fileNameCollection) {
+        for (let fileName of fileNames) {
+          fileName = path.normalize(fileName);
+          if (fileName.startsWith('src' + path.delimiter)) {
+            fileName = fileName.substring(('src' + path.delimiter).length)
+          } else if (fileName.startsWith(dest)) {
+            fileName = fileName.substring(dest.length)
+          }
+          if (fileName.toLowerCase().endsWith('.css')) {
+            cssFiles.add(fileName);
+          } else if (fileName.toLowerCase().endsWith('.hbs')) {
+            hbsFiles.add(fileName);
+          }
         }
       }
+  
+      if (manifest.file.flags == null) {
+        manifest.file.flags = {};
+      }
+      if (Array.isArray(manifest.file.styles)) {
+        cssFiles.add(...manifest.file.styles)
+      }
+      cssFiles.delete(null);
+      cssFiles.delete(undefined);
+  
+      if (Array.isArray(manifest.file.flags.hbsFiles)) {
+        hbsFiles.add(...manifest.file.flags.hbsFiles)
+      }
+      hbsFiles.delete(null);
+      hbsFiles.delete(undefined);
+  
+      manifest.file.styles = Array.from(cssFiles).sort();
+      manifest.file.flags.hbsFiles = Array.from(hbsFiles).sort();
+  
+      fs.writeFileSync(path.join(dest, manifest.name), JSON.stringify(manifest.file, null, 2));
     }
-
-    if (manifest.file.flags == null) {
-      manifest.file.flags = {};
-    }
-    if (Array.isArray(manifest.file.styles)) {
-      cssFiles.add(...manifest.file.styles)
-    }
-    cssFiles.delete(null);
-    cssFiles.delete(undefined);
-
-    if (Array.isArray(manifest.file.flags.hbsFiles)) {
-      hbsFiles.add(...manifest.file.flags.hbsFiles)
-    }
-    hbsFiles.delete(null);
-    hbsFiles.delete(undefined);
-
-    manifest.file.styles = Array.from(cssFiles).sort();
-    manifest.file.flags.hbsFiles = Array.from(hbsFiles).sort();
-
-    fs.writeFileSync(path.join('dist', manifest.name), JSON.stringify(manifest.file, null, 2));
-  })
-}
- 
+  }
+  
  /**
   * TypeScript transformers
   * @returns {typescript.TransformerFactory<typescript.SourceFile>}
   */
- function createTransformer() {
-   /**
-    * @param {typescript.Node} node
-    */
-   function shouldMutateModuleSpecifier(node) {
-     if (
-       !typescript.isImportDeclaration(node) &&
-       !typescript.isExportDeclaration(node)
-     )
-       return false;
-     if (node.moduleSpecifier === undefined) return false;
-     if (!typescript.isStringLiteral(node.moduleSpecifier)) return false;
-     if (
-       !node.moduleSpecifier.text.startsWith('./') &&
-       !node.moduleSpecifier.text.startsWith('../')
-     )
-       return false;
-     if (path.extname(node.moduleSpecifier.text) !== '') return false;
-     return true;
-   }
- 
-   /**
-    * Transforms import/export declarations to append `.js` extension
-    * @param {typescript.TransformationContext} context
-    */
-   function importTransformer(context) {
-     return (node) => {
-       /**
-        * @param {typescript.Node} node
-        */
-       function visitor(node) {
-         if (shouldMutateModuleSpecifier(node)) {
-           if (typescript.isImportDeclaration(node)) {
-             const newModuleSpecifier = typescript.createLiteral(
-               `${node.moduleSpecifier.text}.js`
-             );
-             return typescript.updateImportDeclaration(
-               node,
-               node.decorators,
-               node.modifiers,
-               node.importClause,
-               newModuleSpecifier
-             );
-           } else if (typescript.isExportDeclaration(node)) {
-             const newModuleSpecifier = typescript.createLiteral(
-               `${node.moduleSpecifier.text}.js`
-             );
-             return typescript.updateExportDeclaration(
-               node,
-               node.decorators,
-               node.modifiers,
-               node.exportClause,
-               newModuleSpecifier
-             );
-           }
-         }
-         return typescript.visitEachChild(node, visitor, context);
-       }
- 
-       return typescript.visitNode(node, visitor);
-     };
-   }
- 
-   return importTransformer;
- }
- 
- const tsConfig = ts.createProject('tsconfig.json', {
-   getCustomTransformers: (_program) => ({
-     after: [createTransformer()],
-   }),
- });
- 
- /********************/
- /*    BUILD    */
- /********************/
- 
-/**
- * Build TypeScript
- * @param {string} target the destination directory
- */
-function buildTS(target) {
-   return function buildTS() {
-    return gulp.src('src/**/*.ts')
-    .pipe(sourcemaps.init())
-    .pipe(tsConfig())
-    .pipe(sourcemaps.write())
-    .pipe(gulp.dest(target));
-   }
-}
- 
-/**
- * Build Less
- * @param {string} target the destination directory
- */
-function buildLess(target) {
-  return function buildLess() {
-    return gulp.src('src/**/*.less').pipe(less()).pipe(gulp.dest(target));
-  }
-}
- 
-/**
- * Build SASS
- * @param {string} target the destination directory
- */
-function buildSASS(target) {
-  return function buildSASS() {
-   return gulp
-     .src('src/**/*.scss')
-     .pipe(sass().on('error', sass.logError))
-     .pipe(gulp.dest(target));
-  }
-}
- 
- const staticCopyFiles = [
-   {from: ['src','lang'], to: ['lang']},
-   {from: ['src','fonts'], to: ['fonts']},
-   {from: ['src','assets'], to: ['assets']},
-   {from: ['src','templates'], to: ['templates']},
-   {from: ['src','module.json'], to: ['module.json']},
-   {from: ['src','system.json'], to: ['system.json']},
-   {from: ['src','template.json'], to: ['template.json']},
- ];
- 
- /**
-  * Copy static files
-  * @param {Array<{from: string, to: string, options?: any}>} copyFilesArg How files should be copied
-  */
- function createCopyFiles(copyFilesArg) {
-   return async function copyFiles() {
-     const promises = [];
-     for (const file of copyFilesArg) {
-       if (fs.existsSync(path.join(...file.from))) {
-         if (file.options) {
-           promises.push(fs.copy(path.join(...file.from), path.join(...file.to), file.options));
-         } else {
-           promises.push(fs.copy(path.join(...file.from), path.join(...file.to)));
-         }
-       }
-     }
-     return await Promise.all(promises);
-   }
- }
- 
-/**
- * Watch for changes for each build step
- */
-function buildWatch() {
-  const config = getConfig();
-  const manifest = getManifest();
-  if (config?.dataPath == null) {
-    throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
-  }
-  const destPath = path.join(config.dataPath, 'Data', 'modules', manifest.file.name);
-  if (!fs.existsSync(destPath)) {
-    fs.mkdirSync(destPath);
-  }
-  const copyFiles = [...staticCopyFiles, {from: ['src','packs'], to: ['packs'], options: {override: false}}];
-  for (let i = 0; i < copyFiles.length; i++) {
-    copyFiles[i].to = [destPath, ...copyFiles[i].to];
-  }
-  const copyFilesFunc = createCopyFiles(copyFiles);
-  
-  return gulp.series(
-    async function initialSetup() {
-      // Initial build
-      //console.log(buildTS().eventNames())
-      // finish, close, end
-      await clean();
-      await Promise.all([
-        new Promise((resolve) => buildTS(destPath)().once('end', () => resolve())),
-        new Promise((resolve) => buildLess(destPath)().once('end', () => resolve())),
-        new Promise((resolve) => buildSASS(destPath)().once('end', () => resolve())),
-        copyFilesFunc(),
-      ]);
-      // Only build manifest once all hbs & css files are generated
-      await buildManifest();
-
-      // Only start foundry when the manifest is build
-      startFoundry();
-    },
-    function watch() {
-      // Do not watch to build the manifest since it only gets loaded on server start
-      gulp.watch('src/**/*.ts', { ignoreInitial: true }, buildTS(destPath));
-      gulp.watch('src/**/*.less', { ignoreInitial: true }, buildLess(destPath));
-      gulp.watch('src/**/*.scss', { ignoreInitial: true }, buildSASS(destPath));
-      gulp.watch(
-        [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
-        { ignoreInitial: true },
-        copyFilesFunc
+  static #createTransformer() {
+    /**
+     * @param {typescript.Node} node
+     */
+    function shouldMutateModuleSpecifier(node) {
+      if (
+        !typescript.isImportDeclaration(node) &&
+        !typescript.isExportDeclaration(node)
       )
+        return false;
+      if (node.moduleSpecifier === undefined) return false;
+      if (!typescript.isStringLiteral(node.moduleSpecifier)) return false;
+      if (
+        !node.moduleSpecifier.text.startsWith('./') &&
+        !node.moduleSpecifier.text.startsWith('../')
+      )
+        return false;
+      if (path.extname(node.moduleSpecifier.text) !== '') return false;
+      return true;
     }
-  );
-}
- 
- /********************/
- /*    CLEAN    */
- /********************/
- 
-/**
- * Remove built files from `dist` folder
- * @param {string} target the destination directory
- */
-function clean(target) {
-  return async function clean() {
-    const promises = [];
-    for (const file of await fs.readdir('dist')) {
-      promises.push(fs.rm(path.join('dist', file), {recursive: true}));
+
+    /**
+     * Transforms import/export declarations to append `.js` extension
+     * @param {typescript.TransformationContext} context
+     */
+    function importTransformer(context) {
+      return (node) => {
+        /**
+         * @param {typescript.Node} node
+         */
+        function visitor(node) {
+          if (shouldMutateModuleSpecifier(node)) {
+            if (typescript.isImportDeclaration(node)) {
+              const newModuleSpecifier = typescript.createLiteral(
+                `${node.moduleSpecifier.text}.js`
+              );
+              return typescript.updateImportDeclaration(
+                node,
+                node.decorators,
+                node.modifiers,
+                node.importClause,
+                newModuleSpecifier
+              );
+            } else if (typescript.isExportDeclaration(node)) {
+              const newModuleSpecifier = typescript.createLiteral(
+                `${node.moduleSpecifier.text}.js`
+              );
+              return typescript.updateExportDeclaration(
+                node,
+                node.decorators,
+                node.modifiers,
+                node.exportClause,
+                newModuleSpecifier
+              );
+            }
+          }
+          return typescript.visitEachChild(node, visitor, context);
+        }
+
+        return typescript.visitNode(node, visitor);
+      };
     }
-    return Promise.all(promises).then();
+
+    return importTransformer;
   }
+
+  /** @type {ts.Project} */
+  static #tsConfig;
+  /**
+   * @returns {ts.Project}
+   */
+  static getTsConfig() {
+    if (Meta.#tsConfig == null) {
+      Meta.#tsConfig = ts.createProject('tsconfig.json', {
+        getCustomTransformers: (_program) => ({
+          after: [Meta.#createTransformer()],
+        }),
+      });
+    }
+    return Meta.#tsConfig;
+  }
+
 }
+
+class BuildActions {
+
+  /**
+   * @param {string} target the destination directory
+   */
+  static createBuildTS(target) {
+    return function buildTS() {
+      return gulp.src('src/**/*.ts')
+        .pipe(sourcemaps.init())
+        .pipe(Meta.getTsConfig()())
+        .pipe(sourcemaps.write())
+        .pipe(gulp.dest(target));
+    }
+  }
+
+  /**
+   * @param {string} target the destination directory
+   */
+  static createBuildLess(target) {
+    return function buildLess() {
+      return gulp.src('src/**/*.less').pipe(less()).pipe(gulp.dest(target));
+    }
+  }
+  
+  /**
+   * @param {string} target the destination directory
+   */
+  static createBuildSASS(target) {
+    return function buildSASS() {
+      return gulp
+        .src('src/**/*.scss')
+        .pipe(sass().on('error', sass.logError))
+        .pipe(gulp.dest(target));
+    }
+  }
+
+  /**
+   * @returns {Array<{from: string[], to: string[], options?: any}>}
+   */
+  static getStaticCopyFiles() {
+    return [
+      {from: ['src','lang'], to: ['lang']},
+      {from: ['src','fonts'], to: ['fonts']},
+      {from: ['src','assets'], to: ['assets']},
+      {from: ['src','templates'], to: ['templates']},
+      {from: ['src','module.json'], to: ['module.json']},
+      {from: ['src','system.json'], to: ['system.json']},
+      {from: ['src','template.json'], to: ['template.json']},
+    ]
+  }
+  
+  /**
+   * @param {Array<{from: string[], to: string[], options?: any}>} copyFilesArg How files should be copied
+   */
+  static createCopyFiles(copyFilesArg) {
+    return async function copyFiles() {
+      const promises = [];
+      for (const file of copyFilesArg) {
+        if (fs.existsSync(path.join(...file.from))) {
+          if (file.options) {
+            promises.push(fs.copy(path.join(...file.from), path.join(...file.to), file.options));
+          } else {
+            promises.push(fs.copy(path.join(...file.from), path.join(...file.to)));
+          }
+        }
+      }
+      return await Promise.all(promises);
+    }
+  }
+
+ /**
+  * Watch for changes for each build step
+  */
+  static createWatch() {
+   const config = Meta.getConfig();
+   const manifest = Meta.getManifest();
+   if (config?.dataPath == null) {
+     throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
+   }
+   const destPath = path.join(config.dataPath, 'Data', 'modules', manifest.file.name);
+   if (!fs.existsSync(destPath)) {
+     fs.mkdirSync(destPath);
+   }
+   const copyFiles = [...BuildActions.getStaticCopyFiles(), {from: ['src','packs'], to: ['packs'], options: {override: false}}];
+   for (let i = 0; i < copyFiles.length; i++) {
+     copyFiles[i].to = [destPath, ...copyFiles[i].to];
+   }
+   const copyFilesFunc = BuildActions.createCopyFiles(copyFiles);
+   
+   return gulp.series(
+     async function initialSetup() {
+       // Initial build
+       //console.log(buildTS().eventNames())
+       // finish, close, end
+       await BuildActions.createClean(destPath)();
+       await Promise.all([
+         new Promise((resolve) => BuildActions.createBuildTS(destPath)().once('end', () => resolve())),
+         new Promise((resolve) => BuildActions.createBuildLess(destPath)().once('end', () => resolve())),
+         new Promise((resolve) => BuildActions.createBuildSASS(destPath)().once('end', () => resolve())),
+         copyFilesFunc(),
+       ]);
+       // Only build manifest once all hbs & css files are generated
+       await Meta.createBuildManifest(destPath)();
+ 
+       // Only start foundry when the manifest is build
+       startFoundry();
+     },
+     function watch() {
+       // Do not watch to build the manifest since it only gets loaded on server start
+       gulp.watch('src/**/*.ts', { ignoreInitial: true }, BuildActions.createBuildTS(destPath));
+       gulp.watch('src/**/*.less', { ignoreInitial: true }, BuildActions.createBuildLess(destPath));
+       gulp.watch('src/**/*.scss', { ignoreInitial: true }, BuildActions.createBuildSASS(destPath));
+       gulp.watch(
+         [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
+         { ignoreInitial: true },
+         copyFilesFunc
+       )
+     }
+   );
+  }
+
+  /**
+   * Delete every file and folder within the target
+   * @param {string} target the directory which should be made empty
+   */
+  static createClean(target) {
+    return async function clean() {
+      const promises = [];
+      for (const file of await fs.readdir(target)) {
+        promises.push(fs.rm(path.join(target, file), {recursive: true}));
+      }
+      return Promise.all(promises).then();
+    }
+  }
+
+}
+
  
  /*********************/
  /*    PACKAGE     */
@@ -554,14 +584,12 @@ function clean(target) {
  
  const execGit = gulp.series(gitCommit, gitTag, gitPush, gitPushTag);
  
- const execBuild = gulp.parallel(buildTS('dist'), buildLess('dist'), buildSASS('dist'), createCopyFiles([...staticCopyFiles, {from: ['src','packs'], to: ['dist','packs']}]));
- 
  function startFoundry() {
    if (!fs.existsSync('foundryconfig.json')) {
      console.warn('Could not start foundry: foundryconfig.json not found in project root');
      return;
    }
-   const config = getConfig();
+   const config = Meta.getConfig();
    if (!config.dataPath) {
      console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
    }
@@ -575,20 +603,32 @@ function clean(target) {
  }
  
  
- export const build = gulp.series(clean, execBuild, buildManifest);
- const config = getConfig();
+ export const build = gulp.series(
+   BuildActions.createClean('dist'),
+   gulp.parallel(
+     BuildActions.createBuildTS('dist'),
+     BuildActions.createBuildLess('dist'),
+     BuildActions.createBuildSASS('dist'),
+     BuildActions.createCopyFiles([
+      {from: ['src','packs'], to: ['dist','packs']},
+       ...BuildActions.getStaticCopyFiles().map(copy => {
+         copy.to = ['dist', ...copy.to];
+         return copy;
+       }),
+     ])),
+   Meta.createBuildManifest('dist'),
+ );
+ const config = Meta.getConfig();
  if (!config.dataPath) {
    console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
  }
- const manifest = getManifest();
- export const updateSrcPacks =  gulp.parallel(createCopyFiles([{from: [config.dataPath, 'Data', 'modules', manifest.file.name, 'packs'], to: ['src','packs']}]));
- export const watch = buildWatch();
- export {clean};
+ const manifest = Meta.getManifest();
+ export const updateSrcPacks =  gulp.parallel(BuildActions.createCopyFiles([{from: [config.dataPath, 'Data', 'modules', manifest.file.name, 'packs'], to: ['src','packs']}]));
+ export const watch = BuildActions.createWatch();
  export const buildZip = packageBuild;
  export const updateManifest = updateGithubManifest;
  export const test = gitPushTag;
  export const publish = gulp.series(
-   clean,
    validateCleanRepo,
    updateGithubManifest,
    execGit
