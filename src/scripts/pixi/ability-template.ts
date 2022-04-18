@@ -11,10 +11,8 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
   @RunOnce()
   public static registerHooks() {
     Hooks.on('init', () => {
-      if (!game.modules.get('df-templates')?.active) {
-        // df-templates definitly does it better, we just need to provide a minimum baseline
-        CONFIG.MeasuredTemplate.objectClass = MyAbilityTemplate;
-      }
+      // TODO Look into working nicely with the module df-templates
+      CONFIG.MeasuredTemplate.objectClass = MyAbilityTemplate;
     })
   }
 
