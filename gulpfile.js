@@ -555,25 +555,62 @@ class Args {
     return targetVersion;
   }
 
+  /**
+   * @param {string} version
+   * @returns {{major: number, minor: number, patch: number, addon?: string}}
+   */
+  static parseVersion(version) {
+    if (version == null) {
+      return null;
+    }
+    const versionMatch = /^v?(\d{1,}).(\d{1,}).(\d{1,})(-.+)?$/;
+    const exec = versionMatch.exec(version);
+    if (exec) {
+      return {
+        major: Number(exec[1]),
+        minor: Number(exec[2]),
+        patch: Number(exec[3]),
+        addon: exec[4],
+      }
+    }
+
+    return null;
+  }
+
   static createVersionValdiation() {
     return function versionValdiation(cb) {
-      let currentVersion = Meta.getManifest().file.version;
-      const newVersion = Args.getVersion(currentVersion, false);
+      const currentVersionString = Meta.getManifest().file.version;
+      const currentVersion = Args.parseVersion(Meta.getManifest().file.version);
       if (!currentVersion) {
         cb();
         return;
       }
+      const newVersionString  = Args.getVersion(currentVersionString, false);
+      const newVersion = Args.parseVersion(newVersionString);
 
-      const currentVersionParts = currentVersion.split('.');
-      const newVersionParts = newVersion.split('.');
-      for (let i = 0; i < 3; i++) {
-        if (Number(currentVersionParts[i]) < Number(newVersionParts[i])) {
-          cb();
-          return;
-        }
+      if (currentVersion.major < newVersion.major) {
+        cb();
+        return;
+      } else if (currentVersion.major > newVersion.major) {
+        cb(new Error(`New version is not higher. old: ${currentVersionString} | new: ${newVersionString}`));
+        return;
+      }
+      if (currentVersion.minor < newVersion.minor) {
+        cb();
+        return;
+      } else if (currentVersion.minor > newVersion.minor) {
+        cb(new Error(`New version is not higher. old: ${currentVersionString} | new: ${newVersionString}`));
+        return;
+      }
+      if (currentVersion.patch < newVersion.patch) {
+        cb();
+        return;
+      } else if (currentVersion.patch > newVersion.patch) {
+        cb(new Error(`New version is not higher. old: ${currentVersionString} | new: ${newVersionString}`));
+        return;
       }
       
-      cb(new Error(`New version is not higher. old: ${currentVersion} | new: ${newVersion}`))
+      cb(new Error(`New version is not higher. old: ${currentVersionString} | new: ${newVersionString}`));
     }
   }
 }
