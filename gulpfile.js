@@ -25,6 +25,19 @@ import yargs from 'yargs';
 
 const sass = gulpSass(sassCompiler);
 const exec = child_process.exec;
+const execPromise = (command) => {
+  return new Promise((resolve, reject) => {
+    child_process.exec(command, (err, stdout, stderr) => {
+      if (err) {
+        return reject(err);
+      }
+      if (stderr) {
+        return reject(stderr);
+      }
+      return resolve(stdout);
+    })
+  });
+}
 
 class Meta {
 
@@ -32,11 +45,35 @@ class Meta {
   * @returns {{
   *   dataPath: string,
   *   foundryPath: string,
-  *   githubRepository: string
+  * }}
+  */
+  static getFoundryConfig() {
+    const configPath = path.resolve(process.cwd(), 'foundryconfig.json');
+    let config;
+  
+    if (fs.existsSync(configPath)) {
+      config = fs.readJSONSync(configPath);
+      if (config.dataPath) {
+        { // Validate correct path
+          const files = fs.readdirSync(config.dataPath);
+          if (!files.includes('Data') || !files.includes('Config') || !files.includes('Logs')) {
+            throw new Error('dataPath in foundryconfig.json is not recognised as a foundry folder. The folder should include 3 other folders: Data, Config & Logs');
+          }
+        }
+      }
+      return config;
+    } else {
+      return;
+    }
+  }
+
+  /**
+  * @returns {{
+  *   githubRepository: string,
   * }}
   */
   static getConfig() {
-    const configPath = path.resolve(process.cwd(), 'foundryconfig.json');
+    const configPath = path.resolve(process.cwd(), 'config.json');
     let config;
   
     if (fs.existsSync(configPath)) {
@@ -354,7 +391,7 @@ class BuildActions {
       console.warn('Could not start foundry: foundryconfig.json not found in project root');
       return;
     }
-    const config = Meta.getConfig();
+    const config = Meta.getFoundryConfig();
     if (!config.dataPath) {
       console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
     }
@@ -379,7 +416,7 @@ class BuildActions {
     
     return gulp.series(
       async function init() {
-        config = Meta.getConfig();
+        config = Meta.getFoundryConfig();
         manifest = Meta.getManifest();
         if (config?.dataPath == null) {
           throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
@@ -491,7 +528,7 @@ class BuildActions {
    */
   static createUpdateSrcPacks() {
     return function updateSrcPacks() {
-      const config = Meta.getConfig();
+      const config = Meta.getFoundryConfig();
       if (!config.dataPath) {
         console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
       }
@@ -637,7 +674,7 @@ class Git {
         return cb(Error(chalk.red('Manifest JSON not found in the ./src folder')));
       }
       if (!config.githubRepository) {
-        return cb(Error(chalk.red('Missing "githubRepository" property in ./foundryconfig.json. Epxected format: <githubUsername>/<githubRepo>')));
+        return cb(Error(chalk.red('Missing "githubRepository" property in ./config.json. Expected format: <githubUsername>/<githubRepo>')));
       }
 
       try {
@@ -705,17 +742,9 @@ class Git {
     return gulp.src('.').pipe(git.commit(`Updated to ${newVersion}`));
   }
 
-  static gitTag() {
-    let newVersion = 'v' + Meta.getManifest().file.version;
-    return git.tag(
-      `${newVersion}`,
-      `Updated to ${newVersion}`,
-      (err) => {
-        if (err) {
-          throw err;
-        }
-      }
-    );
+  static async gitTag() {
+    let version = 'v' + Meta.getManifest().file.version;
+    await execPromise(`git tag -a ${currentVersion} -m "Updated to ${version}"`);
   }
 
   static gitPush(cb) {
@@ -728,15 +757,17 @@ class Git {
     });
   }
 
-  static gitPushTag(cb) {
-    let newVersion = 'v' + Meta.getManifest().file.version;
-    git.push('origin', newVersion, (err) => {
-      if (err) {
-        cb(err);
-        throw err;
-      }
-      cb();
-    });
+  static async gitPushTag() {
+    let version = 'v' + Meta.getManifest().file.version;
+    await execPromise(`git push origin ${version}`);
+  }
+
+  static async gitMoveTag(cb) {
+    let currentVersion = 'v' + Meta.getManifest().file.version;
+    await execPromise(`git tag -d ${currentVersion}`);
+    await execPromise(`git push --delete origin ${currentVersion}`);
+    await Git.gitTag();
+    await Git.gitPushTag();
   }
 
 }
