@@ -108,7 +108,6 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
    * Highlight the grid squares which should be shown under the area of effect
    */
   public highlightGrid(): void {
-    console.log('highlightGrid')
     const grid = canvas.grid;
     const d = canvas.dimensions as any;
     const border = this.borderColor as any;
@@ -159,9 +158,6 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
     for (let r = -nr; r < nr; r++) {
       for (let c = -nc; c < nc; c++) {
         let [gx, gy] = canvas.grid.grid.getPixelsFromGridPosition(row0 + r, col0 + c);
-        const testX = (gx+hx) - this.data.x;
-        const testY = (gy+hy) - this.data.y;
-        // let contains = ((r === 0) && (c === 0) && isCenter ) || this.shape.contains(testX, testY);
         let contains = ((r === 0) && (c === 0) && isCenter ) || UtilsTemplate.isTokenInside(details, {x: gx, y: gy, width: canvas.grid.w, height: canvas.grid.h}, true);
         if ( !contains ) continue;
         grid.grid.highlightGridPosition(hl, {x: gx, y: gy, border, color});
