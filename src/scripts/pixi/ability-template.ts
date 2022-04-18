@@ -239,7 +239,29 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
     canvas.app.view.onwheel = handlers.mw;
   }
 
+  public _onDelete(options: any, userId: string) {
+    this.disableHighlight();
+    super._onDelete(options, userId);
+  }
+
+  public _onDragLeftDrop(event: any) {
+    if (canvas.grid.getHighlightLayer(`Template.null`)) {
+      canvas.grid.destroyHighlightLayer(`Template.null`);
+    }
+    return super._onDragLeftDrop(event);
+  }
+
+  public _onDragLeftCancel(event: any) {
+    if (canvas.grid.getHighlightLayer(`Template.null`)) {
+      canvas.grid.destroyHighlightLayer(`Template.null`);
+    }
+    return super._onDragLeftCancel(event);
+  }
+
   private disableHighlight() {
+    if (canvas.grid.getHighlightLayer(`Template.${this.id}`)) {
+      canvas.grid.destroyHighlightLayer(`Template.${this.id}`);
+    }
     if (canvas.grid.getHighlightLayer(`Template.null`)) {
       canvas.grid.destroyHighlightLayer(`Template.null`);
     }
