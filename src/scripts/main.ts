@@ -10,10 +10,12 @@ import { RollD20Element } from "./elements/roll-d20-element";
 import { ModuleSettings } from "./module-settings";
 import { registerHooks as registerModularCardBaseHooks } from "./modular-card/base/index";
 import { registerHooks as registerModularCardSrdHooks } from "./modular-card/srd/index";
+import MyAbilityTemplate from "./pixi/ability-template";
 
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
 MutableDiceTerm.registerHooks();
+MyAbilityTemplate.registerHooks();
 registerHtmlHooks();
 provider.registerHooks();
 registerOverrideHooks()

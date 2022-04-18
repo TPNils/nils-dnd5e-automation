@@ -1,17 +1,26 @@
 import { MeasuredTemplateData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
+import { RunOnce } from "../lib/decorator/run-once.js";
 import { MyItemData } from "../types/fixed-types.js";
 import { TemplateDetails, UtilsTemplate } from "../utils/utils-template.js";
-
-let nextVirtualId = 0;
 
 /**
  * Basically a copy from DND5e AbilityTemplate, except that actorSheet can be null
  */
 export default class MyAbilityTemplate extends MeasuredTemplate {
 
+  @RunOnce()
+  public static registerHooks() {
+    Hooks.on('init', () => {
+      if (!game.modules.get('df-templates')?.active) {
+        // df-templates definitly does it better, we just need to provide a minimum baseline
+        CONFIG.MeasuredTemplate.objectClass = MyAbilityTemplate;
+      }
+    })
+  }
+
   private actorSheet?: ActorSheet;
 
-  public static fromItem({target, flags, actorSheet}: {target: MyItemData['data']['target'], flags?: any, actorSheet?: ActorSheet}): MyAbilityTemplate {
+  public static fromItem({target, flags, actorSheet}: {target: MyItemData['data']['target'], flags?: any, actorSheet?: ActorSheet}): MeasuredTemplate | MyAbilityTemplate {
     // @ts-expect-error
     let templateShape = CONFIG.DND5E.areaTargetTypes[target?.type];
     let distance = target?.value;
@@ -59,20 +68,20 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
 
     // Return the template constructed from the item data
     const baseTemplate = new CONFIG.MeasuredTemplate.documentClass(templateData, {parent: canvas.scene});
-    const abilityTemplate = new this(baseTemplate);
-    abilityTemplate.actorSheet = actorSheet;
+    const abilityTemplate = new CONFIG.MeasuredTemplate.objectClass(baseTemplate);
+    (abilityTemplate as any).actorSheet = actorSheet;
     return abilityTemplate;
   }
 
-  private _virtualId: string;
+  private provideDummyId = false;
   /**
    * Required to make highlightGrid work
    */
-  public get virtualId(): string {
-    if (this._virtualId === undefined) {
-      this._virtualId = String(nextVirtualId++);
+  public get id(): string {
+    if (!super.id && this.provideDummyId) {
+      return 'null';
     }
-    return this._virtualId;
+    return super.id;
   }
 
   /* -------------------------------------------- */
@@ -85,9 +94,9 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
 
     // Draw the template and switch to the template layer
     this.draw();
-    this.highlightGrid();
     this.layer.activate();
     this.layer.preview.addChild(this);
+    this.highlightGrid();
 
     // Hide the sheet that originated the preview
     if (this.actorSheet) {
@@ -100,7 +109,9 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
   
   public refresh(): this {
     const value = super.refresh()
-    this.highlightGrid();
+    if (this.template) {
+      this.highlightGrid();
+    }
     return value;
   }
 
@@ -117,9 +128,9 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
     if ( !this.shape ) return;
 
     // Clear existing highlight
-    let hl = grid.getHighlightLayer(`Template.${this.virtualId}`);
+    let hl = grid.getHighlightLayer(`Template.${this.id}`);
     if (!hl) {
-      hl = grid.addHighlightLayer(`Template.${this.virtualId}`);
+      hl = grid.addHighlightLayer(`Template.${this.id}`);
     }
     hl.clear();
 
@@ -229,7 +240,8 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
   }
 
   private disableHighlight() {
-    canvas.grid.destroyHighlightLayer(`Template.${this.virtualId}`);
-    this._virtualId = null;
+    if (canvas.grid.getHighlightLayer(`Template.null`)) {
+      canvas.grid.destroyHighlightLayer(`Template.null`);
+    }
   }
 }

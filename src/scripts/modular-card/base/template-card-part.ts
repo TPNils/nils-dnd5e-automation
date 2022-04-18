@@ -85,7 +85,9 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
               }
             }
           });
-          template.drawPreview();
+          if ((template as MyAbilityTemplate)?.drawPreview) {
+            (template as MyAbilityTemplate).drawPreview();
+          }
         })
       )
       .addOnAttributeChange(({element, attributes}) => {
@@ -145,8 +147,8 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData> {
           }
         }
       });
-      if (template) {
-        template.drawPreview();
+      if (template && (template as MyAbilityTemplate).drawPreview) {
+        (template as MyAbilityTemplate).drawPreview();
         return;
       }
     }

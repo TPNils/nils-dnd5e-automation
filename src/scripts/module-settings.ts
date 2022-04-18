@@ -114,6 +114,14 @@ export class ModuleSettings {
         xge: 'XGE (experimental)',
       },
       default: 'dmg',
+      onChange: () => {
+        // redraw
+        for (const template of <IterableIterator<MeasuredTemplateDocument>> canvas.scene.getEmbeddedCollection(MeasuredTemplateDocument.documentName).values()) {
+          if (template.object) {
+            template.object.draw();
+          }
+        }
+      }
     });
   }
 
