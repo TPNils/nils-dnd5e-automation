@@ -24,7 +24,7 @@ jobs:
     # This manifest points to the latest, allowing foundry to find the latest version when updating (this should be in the zipped package)
     - name: Create package manifest
       shell: bash
-      id: build
+      id: create-package-manifest
       run: npm run updateZipManifestForGithub
 
     # create a zip file with all files required by the module to add to the release
@@ -36,12 +36,12 @@ jobs:
     # This manifest points to itself, allowing to download a specific version
     - name: Create external manifest
       shell: bash
-      id: build
+      id: create-external-manifest
       run: npm run updateExternalManifestForGithub
 
     # Update the 'latest' release
     - name: Update Latest Release
-      id: create_latest_release
+      id: create-latest-release
       uses: ncipollo/release-action@v1
       with:
         allowUpdates: true
@@ -54,7 +54,7 @@ jobs:
     
     # Create a release for this specific version
     - name: Create Version Release
-      id: create_version_release
+      id: create-version-release
       uses: ncipollo/release-action@v1
       with:
         allowUpdates: true # set this to false if you want to prevent updating existing releases
