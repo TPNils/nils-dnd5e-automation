@@ -84,7 +84,7 @@ export class UtilsTemplate {
   }
 
   public static getTemplateDetails(document: MeasuredTemplateDocument): TemplateDetails {
-    let {direction, distance, angle, width} = document.data;
+    let {direction, distance, angle = 90, width} = document.data;
     distance = UtilsTemplate.feetToPx(distance);
     width = UtilsTemplate.feetToPx(width);
     direction = Math.toRadians(direction);
@@ -97,15 +97,15 @@ export class UtilsTemplate {
         break;
       case "cone":
         // @ts-expect-error
-        shape = document._object._getConeShape(direction, angle, distance);
+        shape = MeasuredTemplate.prototype._getConeShape(direction, angle, distance);
         break;
       case "rect":
         // @ts-expect-error
-        shape = document._object._getRectShape(direction, distance);
+        shape = MeasuredTemplate.prototype._getRectShape(direction, distance);
         break;
       case "ray":
         // @ts-expect-error
-        shape = document._object._getRayShape(direction, distance, width);
+        shape = MeasuredTemplate.prototype._getRayShape(direction, distance, width);
         break;
     }
     return {
@@ -163,15 +163,15 @@ export class UtilsTemplate {
         }
       case "cone":
         // @ts-expect-error
-        shape = document._object._getConeShape(direction, angle, distance);
+        shape = document.object._getConeShape(direction, angle, distance);
         break;
       case "rect":
         // @ts-expect-error
-        shape = document._object._getRectShape(direction, distance);
+        shape = document.object._getRectShape(direction, distance);
         break;
       case "ray":
         // @ts-expect-error
-        shape = document._object._getRayShape(direction, distance, width);
+        shape = document.object._getRayShape(direction, distance, width);
         break;
     }
   }

@@ -240,8 +240,9 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
   }
 
   public _onDelete(options: any, userId: string) {
+    const response = super._onDelete(options, userId);
     this.disableHighlight();
-    super._onDelete(options, userId);
+    return response;
   }
 
   public _onDragLeftDrop(event: any) {
