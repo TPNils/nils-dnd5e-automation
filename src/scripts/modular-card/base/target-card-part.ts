@@ -131,8 +131,6 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     
     target.selected = uuidsToSelected(selectedTargets.map(t => t.uuid));
 
-    // TODO "item.data.data.target.value" does not support formulas => does not support spell scaling
-    //  Solutions: hook into the sheet and add an option for target scaling
     if (item.data.data.target?.value > 0 && ['ally', 'creature', 'enemy', 'object'].includes(item.data.data.target?.type)) {
       // Should not be any units, if units is specified, assume its in a radius
       if ([''].includes(item.data.data.target?.units)) {
@@ -143,8 +141,14 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     return target;
   }
 
-  public refresh(data: TargetCardData, args: ModularCardCreateArgs): TargetCardData {
-    return data; // TODO
+  public refresh(oldData: TargetCardData, args: ModularCardCreateArgs): TargetCardData {
+    const newData = this.create(args);
+    if (!newData && !oldData) {
+      return null;
+    }
+    newData.selected = oldData.selected;
+    newData.calc$.tokenData = oldData.calc$.tokenData;
+    return newData;
   }
 
   private nextCallbackId = 0;

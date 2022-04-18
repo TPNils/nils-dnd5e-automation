@@ -11,11 +11,13 @@ import { ModuleSettings } from "./module-settings";
 import { registerHooks as registerModularCardBaseHooks } from "./modular-card/base/index";
 import { registerHooks as registerModularCardSrdHooks } from "./modular-card/srd/index";
 import MyAbilityTemplate from "./pixi/ability-template";
+import { ItemSheetHooks } from "./modular-card/item-sheet-hooks";
 
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
 MutableDiceTerm.registerHooks();
 MyAbilityTemplate.registerHooks();
+ItemSheetHooks.registerHooks();
 registerHtmlHooks();
 provider.registerHooks();
 registerOverrideHooks()
