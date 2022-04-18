@@ -100,6 +100,21 @@ export class ModuleSettings {
         *Player or permission*: Match 'Permission' or 'Player'.
       `,
     });
+    game.settings.register(staticValues.moduleName, 'aoeTargetRule', {
+      name: 'Area of effect rules (targeting)',
+      hint: `
+        *DMG*: If a token is standing in an affected query which is at least 50% in the template area.
+        *XGE*: If a token is touching the template.
+      `,
+      scope: 'world',
+      config: true,
+      type: String,
+      choices: {
+        dmg: 'DMG - Foundry default',
+        xge: 'XGE (experimental)',
+      },
+      default: 'dmg',
+    });
   }
 
   @RunOnce()

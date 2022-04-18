@@ -1,3 +1,4 @@
+import { staticValues } from "../static-values";
 import { RangeUnits } from "../types/fixed-types";
 
 export interface TemplateDetails {
@@ -6,42 +7,80 @@ export interface TemplateDetails {
   shape: MeasuredTemplate['shape'];
 }
 
-// Source: https://gitlab.com/tposney/midi-qol/-/blob/ee67ca2468aa2f6912e5c6154cdc44ac85abec82/src/module/itemhandling.ts
+interface Rectangle {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export class UtilsTemplate {
 
-  public static isTokenInside(templateDetails: TemplateDetails, token: TokenDocument, wallsBlockTargeting: boolean): boolean {
-    const grid = canvas.scene?.data.grid;
-    const templatePos = { x: templateDetails.x, y: templateDetails.y };
+  public static isTokenInside(templateDetails: TemplateDetails, token: TokenDocument | Rectangle, wallsBlockTargeting: boolean): boolean {
+    const rectangle = token instanceof TokenDocument ? {
+      x: token.data.x,
+      y: token.data.y,
+      width: token.data.width * canvas.scene.data.grid,
+      height: token.data.height * canvas.scene.data.grid,
+    } : token;
+
+    if (game.settings.get(staticValues.moduleName, 'aoeTargetRule') === 'xge') {
+      return UtilsTemplate.isTokenInsideXge(templateDetails, rectangle, wallsBlockTargeting);
+    }
+    return UtilsTemplate.isTokenInsideDmg(templateDetails, rectangle, wallsBlockTargeting);
+  }
+
+  /**
+   * DMG p.251 Areas Of Effect
+   * If a *tile* is at least 50% in the area (Foundry default)
+   */
+  private static isTokenInsideDmg(templateDetails: TemplateDetails, rectangle: Rectangle, wallsBlockTargeting: boolean): boolean {
+    const grid = canvas.scene.data.grid;
+    const steps = grid;
   
     // Check for center of each square the token uses.
     // e.g. for large tokens all 4 squares
-    const startX = token.data.width >= 1 ? 0.5 : token.data.width / 2;
-    const startY = token.data.height >= 1 ? 0.5 : token.data.height / 2;
-    for (let x = startX; x < token.data.width; x++) {
-      for (let y = startY; y < token.data.height; y++) {
-        const currGrid = {
-          x: token.data.x + x * grid - templatePos.x,
-          y: token.data.y + y * grid - templatePos.y,
-        };
-        let contains = false;
-        if (true) {
-          // DMG p.251 Areas Of Effect
-          // If a *tile* is at least 50% in the area (Foundry default)
-          contains = templateDetails.shape?.contains(currGrid.x, currGrid.y);
-        } else {
-          // XGE. p.86 If a *token* is within the area, it is affected
-          // TODO
-        }
-        if (contains && wallsBlockTargeting) {
-          const r = new Ray({x: currGrid.x + templatePos.x, y: currGrid.y + templatePos.y}, templatePos);
-          contains = !canvas.walls?.checkCollision(r, {type: 'movement', mode: 'any'});
-        }
-        if (contains) {
+    const startX = rectangle.width >= grid ? grid / 2 : rectangle.width / 2;
+    const startY = rectangle.height >= grid ? grid / 2 : rectangle.height / 2;
+    for (let x = startX; x < rectangle.width; x += steps) {
+      for (let y = startY; y < rectangle.height; y += steps) {
+        if (UtilsTemplate.containsPoint(templateDetails, {x: rectangle.x + x, y: rectangle.y + x}, wallsBlockTargeting)) {
           return true;
         }
       }
     }
     return false;
+  }
+  
+  /**
+   * XGE. p.86 If a *token* is within the area, it is affected
+   */
+   private static isTokenInsideXge(templateDetails: TemplateDetails, rectangle: Rectangle, wallsBlockTargeting: boolean): boolean {
+    const steps = Math.min(canvas.scene.data.grid / 2, rectangle.width / 2, rectangle.height / 2);
+
+    // This isnt't perfect, but it should work well enough with the limitations of PIXI
+    for (let x = 0; x <= rectangle.width; x += steps) {
+      for (let y = 0; y <= rectangle.height; y += steps) {
+        if (UtilsTemplate.containsPoint(templateDetails, {x: rectangle.x + x, y: rectangle.y + y}, wallsBlockTargeting)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  private static containsPoint(templateDetails: TemplateDetails, point: {x: number; y: number;}, wallsBlockTargeting: boolean) {
+    let contains = templateDetails.shape?.contains(point.x - templateDetails.x, point.y - templateDetails.y);
+    if (contains && wallsBlockTargeting) {
+      const r = new Ray({x: point.x, y: point.y}, templateDetails);
+      contains = !canvas.walls?.checkCollision(r, {type: 'movement', mode: 'any'});
+    }
+    if (contains) {
+      return true;
+    }
+    return false;
+    
   }
 
   public static getTemplateDetails(document: MeasuredTemplateDocument): TemplateDetails {
