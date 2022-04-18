@@ -375,51 +375,53 @@ class BuildActions {
    * Watch for changes for each build step
    */
   static createWatch() {
-   const config = Meta.getConfig();
-   const manifest = Meta.getManifest();
-   if (config?.dataPath == null) {
-     throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
-   }
-   const destPath = path.join(config.dataPath, 'Data', 'modules', manifest.file.name);
-   if (!fs.existsSync(destPath)) {
-     fs.mkdirSync(destPath);
-   }
-   const copyFiles = [...BuildActions.getStaticCopyFiles(), {from: ['src','packs'], to: ['packs'], options: {override: false}}];
-   for (let i = 0; i < copyFiles.length; i++) {
-     copyFiles[i].to = [destPath, ...copyFiles[i].to];
-   }
-   const copyFilesFunc = BuildActions.createCopyFiles(copyFiles);
-   
-   return gulp.series(
-     async function initialSetup() {
-       // Initial build
-       //console.log(buildTS().eventNames())
-       // finish, close, end
-       await BuildActions.createClean(destPath)();
-       await Promise.all([
-         new Promise((resolve) => BuildActions.createBuildTS(destPath)().once('end', () => resolve())),
-         new Promise((resolve) => BuildActions.createBuildLess(destPath)().once('end', () => resolve())),
-         new Promise((resolve) => BuildActions.createBuildSASS(destPath)().once('end', () => resolve())),
-         copyFilesFunc(),
-       ]);
-       // Only build manifest once all hbs & css files are generated
-       await Meta.createBuildManifest(destPath)();
- 
-       // Only start foundry when the manifest is build
-       BuildActions.#startFoundry();
-     },
-     function watch() {
-       // Do not watch to build the manifest since it only gets loaded on server start
-       gulp.watch('src/**/*.ts', { ignoreInitial: true }, BuildActions.createBuildTS(destPath));
-       gulp.watch('src/**/*.less', { ignoreInitial: true }, BuildActions.createBuildLess(destPath));
-       gulp.watch('src/**/*.scss', { ignoreInitial: true }, BuildActions.createBuildSASS(destPath));
-       gulp.watch(
-         [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
-         { ignoreInitial: true },
-         copyFilesFunc
-       )
-     }
-   );
+    return function watch() {
+      const config = Meta.getConfig();
+      const manifest = Meta.getManifest();
+      if (config?.dataPath == null) {
+        throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
+      }
+      const destPath = path.join(config.dataPath, 'Data', 'modules', manifest.file.name);
+      if (!fs.existsSync(destPath)) {
+        fs.mkdirSync(destPath);
+      }
+      const copyFiles = [...BuildActions.getStaticCopyFiles(), {from: ['src','packs'], to: ['packs'], options: {override: false}}];
+      for (let i = 0; i < copyFiles.length; i++) {
+        copyFiles[i].to = [destPath, ...copyFiles[i].to];
+      }
+      const copyFilesFunc = BuildActions.createCopyFiles(copyFiles);
+      
+      return gulp.series(
+        async function initialSetup() {
+          // Initial build
+          //console.log(buildTS().eventNames())
+          // finish, close, end
+          await BuildActions.createClean(destPath)();
+          await Promise.all([
+            new Promise((resolve) => BuildActions.createBuildTS(destPath)().once('end', () => resolve())),
+            new Promise((resolve) => BuildActions.createBuildLess(destPath)().once('end', () => resolve())),
+            new Promise((resolve) => BuildActions.createBuildSASS(destPath)().once('end', () => resolve())),
+            copyFilesFunc(),
+          ]);
+          // Only build manifest once all hbs & css files are generated
+          await Meta.createBuildManifest(destPath)();
+    
+          // Only start foundry when the manifest is build
+          BuildActions.#startFoundry();
+        },
+        function watch() {
+          // Do not watch to build the manifest since it only gets loaded on server start
+          gulp.watch('src/**/*.ts', { ignoreInitial: true }, BuildActions.createBuildTS(destPath));
+          gulp.watch('src/**/*.less', { ignoreInitial: true }, BuildActions.createBuildLess(destPath));
+          gulp.watch('src/**/*.scss', { ignoreInitial: true }, BuildActions.createBuildSASS(destPath));
+          gulp.watch(
+            [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
+            { ignoreInitial: true },
+            copyFilesFunc
+          )
+        }
+      );
+    }
   }
 
   /**
