@@ -744,7 +744,7 @@ class Git {
 
   static async gitTag() {
     let version = 'v' + Meta.getManifest().file.version;
-    await execPromise(`git tag -a ${currentVersion} -m "Updated to ${version}"`);
+    await execPromise(`git tag -a ${version} -m "Updated to ${version}"`);
   }
 
   static gitPush(cb) {
@@ -762,10 +762,14 @@ class Git {
     await execPromise(`git push origin ${version}`);
   }
 
-  static async gitMoveTag(cb) {
+  static async gitMoveTag() {
     let currentVersion = 'v' + Meta.getManifest().file.version;
-    await execPromise(`git tag -d ${currentVersion}`);
-    await execPromise(`git push --delete origin ${currentVersion}`);
+    try {
+      await execPromise(`git tag -d ${currentVersion}`);
+    } catch {}
+    try {
+      await execPromise(`git push --delete origin ${currentVersion}`);
+    } catch {}
     await Git.gitTag();
     await Git.gitPushTag();
   }
@@ -796,6 +800,7 @@ export const buildZip = gulp.series(
   BuildActions.createBuildPackage('dist')
 );
 export const test = Args.createVersionValdiation();
+export const rePublish = Git.gitMoveTag;
 export const updateZipManifestForGithub = Git.createUpdateManifestForGithub('dist', false);
 export const updateExternalManifestForGithub = Git.createUpdateManifestForGithub('dist', true);
 export const publish = gulp.series(
