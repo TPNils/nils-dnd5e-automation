@@ -565,6 +565,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
       const autoTargetTokens: string[] = [];
       const allTokens = template.document.parent.getEmbeddedCollection('Token').values() as IterableIterator<TokenDocument>;
       for (const sceneToken of allTokens) {
+        // Since its an AOE which always targets itself, *assume* it should not target itself.
         if (token.uuid !== sceneToken.uuid) {
           if (UtilsTemplate.isTokenInside(templateDetails, sceneToken, true)) {
             autoTargetTokens.push(sceneToken.uuid)
