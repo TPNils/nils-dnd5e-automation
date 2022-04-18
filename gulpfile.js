@@ -270,7 +270,7 @@ class BuildActions {
       return gulp.src('src/**/*.ts')
         .pipe(sourcemaps.init())
         .pipe(BuildActions.#getTsConfig()())
-        .pipe(minifyJs({
+        /*.pipe(minifyJs({
           ext: { min: '.js' },
           mangle: false,
           noSource: true,
@@ -278,7 +278,7 @@ class BuildActions {
             source_map: false,
             comments: false,
           }
-        }))
+        }))*/
         .pipe(sourcemaps.mapSources(function(sourcePath, file) {
           const filePathParts = path.normalize(sourcePath).split(path.sep);
           return filePathParts[filePathParts.length - 1];
