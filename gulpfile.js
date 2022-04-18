@@ -56,20 +56,16 @@ class Meta {
   }
   
   /**
-  * @returns {{
+   * @param {'src' | 'dist'} type
+   * @returns {{
    *   file: any,
    *   name: string,
    *   root: string
    * }}
    */
-  static getManifest() {
+  static getManifest(type = 'src') {
     const json = {};
-  
-    if (fs.existsSync('src')) {
-      json.root = 'src';
-    } else {
-      json.root = 'dist';
-    }
+    json.root = type;
   
     const modulePath = path.join(json.root, 'module.json');
     const systemPath = path.join(json.root, 'system.json');
@@ -375,53 +371,58 @@ class BuildActions {
    * Watch for changes for each build step
    */
   static createWatch() {
-    return function watch() {
-      const config = Meta.getConfig();
-      const manifest = Meta.getManifest();
-      if (config?.dataPath == null) {
-        throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
-      }
-      const destPath = path.join(config.dataPath, 'Data', 'modules', manifest.file.name);
-      if (!fs.existsSync(destPath)) {
-        fs.mkdirSync(destPath);
-      }
-      const copyFiles = [...BuildActions.getStaticCopyFiles(), {from: ['src','packs'], to: ['packs'], options: {override: false}}];
-      for (let i = 0; i < copyFiles.length; i++) {
-        copyFiles[i].to = [destPath, ...copyFiles[i].to];
-      }
-      const copyFilesFunc = BuildActions.createCopyFiles(copyFiles);
-      
-      return gulp.series(
-        async function initialSetup() {
-          // Initial build
-          //console.log(buildTS().eventNames())
-          // finish, close, end
-          await BuildActions.createClean(destPath)();
-          await Promise.all([
-            new Promise((resolve) => BuildActions.createBuildTS(destPath)().once('end', () => resolve())),
-            new Promise((resolve) => BuildActions.createBuildLess(destPath)().once('end', () => resolve())),
-            new Promise((resolve) => BuildActions.createBuildSASS(destPath)().once('end', () => resolve())),
-            copyFilesFunc(),
-          ]);
-          // Only build manifest once all hbs & css files are generated
-          await Meta.createBuildManifest(destPath)();
+    let config;
+    let manifest;
+    let destPath;
+    let copyFiles;
+    let copyFilesFunc;
     
-          // Only start foundry when the manifest is build
-          BuildActions.#startFoundry();
-        },
-        function watch() {
-          // Do not watch to build the manifest since it only gets loaded on server start
-          gulp.watch('src/**/*.ts', { ignoreInitial: true }, BuildActions.createBuildTS(destPath));
-          gulp.watch('src/**/*.less', { ignoreInitial: true }, BuildActions.createBuildLess(destPath));
-          gulp.watch('src/**/*.scss', { ignoreInitial: true }, BuildActions.createBuildSASS(destPath));
-          gulp.watch(
-            [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
-            { ignoreInitial: true },
-            copyFilesFunc
-          )
+    return gulp.series(
+      async function init() {
+        config = Meta.getConfig();
+        manifest = Meta.getManifest();
+        if (config?.dataPath == null) {
+          throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
         }
-      );
-    }
+        destPath = path.join(config.dataPath, 'Data', 'modules', manifest.file.name);
+        if (!fs.existsSync(destPath)) {
+          fs.mkdirSync(destPath);
+        }
+        copyFiles = [...BuildActions.getStaticCopyFiles(), {from: ['src','packs'], to: ['packs'], options: {override: false}}];
+        for (let i = 0; i < copyFiles.length; i++) {
+          copyFiles[i].to = [destPath, ...copyFiles[i].to];
+        }
+        copyFilesFunc = BuildActions.createCopyFiles(copyFiles);
+      },
+      async function initialSetup() {
+        // Initial build
+        //console.log(buildTS().eventNames())
+        // finish, close, end
+        await BuildActions.createClean(destPath)();
+        await Promise.all([
+          new Promise((resolve) => BuildActions.createBuildTS(destPath)().once('end', () => resolve())),
+          new Promise((resolve) => BuildActions.createBuildLess(destPath)().once('end', () => resolve())),
+          new Promise((resolve) => BuildActions.createBuildSASS(destPath)().once('end', () => resolve())),
+          copyFilesFunc(),
+        ]);
+        // Only build manifest once all hbs & css files are generated
+        await Meta.createBuildManifest(destPath)();
+  
+        // Only start foundry when the manifest is build
+        BuildActions.#startFoundry();
+      },
+      function watch() {
+        // Do not watch to build the manifest since it only gets loaded on server start
+        gulp.watch('src/**/*.ts', { ignoreInitial: true }, BuildActions.createBuildTS(destPath));
+        gulp.watch('src/**/*.less', { ignoreInitial: true }, BuildActions.createBuildLess(destPath));
+        gulp.watch('src/**/*.scss', { ignoreInitial: true }, BuildActions.createBuildSASS(destPath));
+        gulp.watch(
+          [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
+          { ignoreInitial: true },
+          copyFilesFunc
+        )
+      }
+    );
   }
 
   /**
@@ -509,9 +510,15 @@ class Args {
    * @param {string} currentVersion
    * @returns {string} version name
    */
-  static getVersion(currentVersion) {
+  static getVersion(currentVersion, allowNoVersion = false) {
+    if (currentVersion == null || currentVersion == '') {
+      currentVersion = '0.0.0';
+    }
     const version = Args.#args.update || Args.#args.u;
     if (!version) {
+      if (allowNoVersion) {
+        return null;
+      }
       throw new Error('Missing version number. Use -u <version> (or --update) to specify a version.');
     }
   
@@ -547,64 +554,99 @@ class Args {
     }
     return targetVersion;
   }
+
+  static createVersionValdiation() {
+    return function versionValdiation(cb) {
+      let currentVersion = Meta.getManifest().file.version;
+      const newVersion = Args.getVersion(currentVersion, false);
+      if (!currentVersion) {
+        cb();
+        return;
+      }
+
+      const currentVersionParts = currentVersion.split('.');
+      const newVersionParts = newVersion.split('.');
+      for (let i = 0; i < 3; i++) {
+        if (Number(currentVersionParts[i]) < Number(newVersionParts[i])) {
+          cb();
+          return;
+        }
+      }
+      
+      cb(new Error(`New version is not higher. old: ${currentVersion} | new: ${newVersion}`))
+    }
+  }
 }
 
 class Git {
 
   /**
    * Update version and URLs in the manifest JSON
+   * @param {'src' | 'dist'} manifestType
    */
-  static updateManifestForGithub(cb) {
-    const packageJson = fs.readJSONSync('package.json');
-    const config = Meta.getConfig();
-    const manifest = Meta.getManifest();
+  static createUpdateManifestForGithub(manifestType, externalManifest = false) {
+    /**
+     * @param {Function} cb
+     */
+    return function updateManifestForGithub(cb) {
+      const packageJson = fs.readJSONSync('package.json');
+      const config = Meta.getConfig();
+      const manifest = Meta.getManifest(manifestType);
 
-    if (!config) {
-      return cb(Error(chalk.red('foundryconfig.json not found in the ./ (root) folder')));
-    }
-    if (!manifest) {
-      return cb(Error(chalk.red('Manifest JSON not found in the ./src folder')));
-    }
-    if (!config.githubRepository) {
-      return cb(Error(chalk.red('Missing "githubRepository" property in ./foundryconfig.json. Epxected format: <githubUsername>/<githubRepo>')));
-    }
-
-    try {
-      const currentVersion = manifest.file.version;
-      let targetVersion = Args.getVersion(currentVersion)
-
-      if (targetVersion.startsWith('v')) {
-        targetVersion = targetVersion.substring(1);
+      if (!config) {
+        return cb(Error(chalk.red('foundryconfig.json not found in the ./ (root) folder')));
       }
-      
-      // Don't allow the same version for explicit verions (not 'latest')
-      if (targetVersion === currentVersion) {
-        return cb(Error(chalk.red('Error: Target version is identical to current version.')));
+      if (!manifest) {
+        return cb(Error(chalk.red('Manifest JSON not found in the ./src folder')));
+      }
+      if (!config.githubRepository) {
+        return cb(Error(chalk.red('Missing "githubRepository" property in ./foundryconfig.json. Epxected format: <githubUsername>/<githubRepo>')));
       }
 
-      console.log(`Updating version number to '${targetVersion}'`);
+      try {
+        const currentVersion = manifest.file.version;
+        let targetVersion = Args.getVersion(currentVersion, true);
+        if (targetVersion == null) {
+          targetVersion = currentVersion;
+        }
 
-      packageJson.version = targetVersion;
+        if (targetVersion.startsWith('v')) {
+          targetVersion = targetVersion.substring(1);
+        }
 
-      manifest.file.version = targetVersion;
-      manifest.file.url = `https://github.com/${config.githubRepository}`;
-      manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.json`;
-      manifest.file.download = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.zip`;
+        console.log(`Updating version number to '${targetVersion}'`);
 
-      fs.writeFileSync(
-        'package.json',
-        stringify(packageJson, {indent: '  '}),
-        'utf8'
-      );
-      fs.writeFileSync(
-        path.join(manifest.root, manifest.name),
-        stringify(manifest.file, {indent: '  '}),
-        'utf8'
-      );
+        packageJson.version = targetVersion;
 
-      return cb();
-    } catch (err) {
-      return cb(err);
+        manifest.file.version = targetVersion;
+        manifest.file.url = `https://github.com/${config.githubRepository}`;
+        // When foundry checks if there is an update, it will fetch the manifest present in the zip, for us it points to the latest one.
+        // The external one should point to itself so you can download a specific version
+        // The zipped one should point to the latest manifest so when the "check for update" is executed it will fetch the latest
+        if (externalManifest) {
+          // Seperate file uploaded for github
+          manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.json`;
+        } else {
+          // The manifest which is within the module zip
+          manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/latest/module.json`;
+        }
+        manifest.file.download = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.zip`;
+
+        fs.writeFileSync(
+          'package.json',
+          stringify(packageJson, {indent: '  '}),
+          'utf8'
+        );
+        fs.writeFileSync(
+          path.join(manifest.root, manifest.name),
+          stringify(manifest.file, {indent: '  '}),
+          'utf8'
+        );
+
+        return cb();
+      } catch (err) {
+        return cb(err);
+      }
     }
   }
 
@@ -685,10 +727,13 @@ export const buildZip = gulp.series(
   build,
   BuildActions.createBuildPackage('dist')
 );
-export const test = Git.gitPushTag;
+export const test = Args.createVersionValdiation();
+export const updateZipManifestForGithub = Git.createUpdateManifestForGithub('dist', false);
+export const updateExternalManifestForGithub = Git.createUpdateManifestForGithub('dist', true);
 export const publish = gulp.series(
+  Args.createVersionValdiation(),
   Git.validateCleanRepo,
-  Git.updateManifestForGithub,
+  Git.createUpdateManifestForGithub('src'),
   Git.gitCommit, 
   Git.gitTag,
   Git.gitPush,
