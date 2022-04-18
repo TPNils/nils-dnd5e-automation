@@ -4,8 +4,10 @@ import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Stoppable } from "../../lib/utils/stoppable";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
+import MyAbilityTemplate from "../../pixi/ability-template";
 import { staticValues } from "../../static-values";
-import { MyActor } from "../../types/fixed-types";
+import { MyActor, MyItemData } from "../../types/fixed-types";
+import { UtilsTemplate } from "../../utils/utils-template";
 import { ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
@@ -14,6 +16,9 @@ export interface TargetCardData {
   selected: Array<{selectionId: string, tokenUuid: string;}>;
   calc$: {
     actorUuid?: string;
+    tokenUuid?: string;
+    targetDefinition?: MyItemData['data']['target'];
+    rangeDefinition?: MyItemData['data']['range'];
     expectedTargets?: number;
     tokenData: Array<{
       tokenUuid: string;
@@ -106,6 +111,9 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       selected: [],
       calc$: {
         actorUuid: actor?.uuid,
+        tokenUuid: token?.uuid,
+        targetDefinition: deepClone(item.data.data.target),
+        rangeDefinition: deepClone(item.data.data.range),
         tokenData: [],
       },
     };
@@ -126,14 +134,17 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     // TODO "item.data.data.target.value" does not support formulas => does not support spell scaling
     //  Solutions: hook into the sheet and add an option for target scaling
     if (item.data.data.target?.value > 0 && ['ally', 'creature', 'enemy', 'object'].includes(item.data.data.target?.type)) {
-      target.calc$.expectedTargets = item.data.data.target?.value;
+      // Should not be any units, if units is specified, assume its in a radius
+      if ([''].includes(item.data.data.target?.units)) {
+        target.calc$.expectedTargets = item.data.data.target?.value;
+      }
     }
 
     return target;
   }
 
   public refresh(data: TargetCardData, args: ModularCardCreateArgs): TargetCardData {
-    return data; // There is nothing to refresh
+    return data; // TODO
   }
 
   private nextCallbackId = 0;
@@ -503,6 +514,73 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
 }
 
 class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
+
+  //#region afterCreate
+  public async afterCreate(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+    await this.setTargets(context);
+  }
+  
+  private async setTargets(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+    for (const {newRow, changedByUserId} of context.rows) {
+      if (game.userId !== changedByUserId) {
+        continue;
+      }
+      if (!this.isTargetTriggerType(newRow)) {
+        continue;
+      }
+      if (newRow.data.calc$.tokenUuid == null) {
+        continue;
+      }
+      if (newRow.data.calc$.rangeDefinition?.units !== 'self') {
+        continue;
+      }
+      const token = await UtilsDocument.tokenFromUuid(newRow.data.calc$.tokenUuid);
+      if (token == null) {
+        continue;
+      }
+
+      if (newRow.data.calc$.targetDefinition.type === 'self') {
+        await UtilsDocument.setTargets({tokenUuids: [newRow.data.calc$.tokenUuid]});
+        return;
+      }
+
+      const template = MyAbilityTemplate.fromItem({
+        target: newRow.data.calc$.targetDefinition,
+        flags: {
+          [staticValues.moduleName]: {
+            dmlCallbackMessageId: newRow.messageId,
+            dmlCallbackPartId: newRow.id,
+          }
+        }
+      });
+      if (!template) {
+        continue;
+      }
+      template.document.data.update({
+        x: token.data.x + ((token.data.width * template.document.parent.data.grid) / 2),
+        y: token.data.y + ((token.data.height * template.document.parent.data.grid) / 2),
+      });
+      const templateDetails = UtilsTemplate.getTemplateDetails(template.document);
+
+      const autoTargetTokens: string[] = [];
+      const allTokens = template.document.parent.getEmbeddedCollection('Token').values() as IterableIterator<TokenDocument>;
+      for (const sceneToken of allTokens) {
+        if (token.uuid !== sceneToken.uuid) {
+          if (UtilsTemplate.isTokenInside(templateDetails, sceneToken, true)) {
+            autoTargetTokens.push(sceneToken.uuid)
+          }
+        }
+      }
+
+      if (autoTargetTokens.length === 0) {
+        return;
+      }
+
+      await UtilsDocument.setTargets({tokenUuids: autoTargetTokens});
+      return;
+    }
+  }
+  //#endregion
 
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {

@@ -1,5 +1,6 @@
 import { MeasuredTemplateData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 import { MyItemData } from "../types/fixed-types.js";
+import { UtilsTemplate } from "../utils/utils-template.js";
 
 /**
  * Basically a copy from DND5e AbilityTemplate, except that actorSheet can be null
@@ -10,8 +11,17 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
 
   public static fromItem({target, flags, actorSheet}: {target: MyItemData['data']['target'], flags?: any, actorSheet?: ActorSheet}): MyAbilityTemplate {
     // @ts-expect-error
-    const templateShape = CONFIG.DND5E.areaTargetTypes[target?.type];
-    if ( !templateShape ) {
+    let templateShape = CONFIG.DND5E.areaTargetTypes[target?.type];
+    let distance = target?.value;
+    if (!templateShape && ['ft', 'mi', 'm', 'km'].includes(target?.units)) {
+      templateShape = 'circle';
+      distance = UtilsTemplate.getFeet({value: target?.value, unit: target.units});
+    }
+    if (!templateShape && ['touch'].includes(target?.units)) {
+      templateShape = 'rect';
+      distance = 15;
+    }
+    if (!templateShape || !distance || distance < 0 || distance === Infinity) {
       return null;
     }
 
@@ -19,7 +29,7 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
     const templateData: Partial<MeasuredTemplateData> = {
       t: templateShape,
       user: game.user.id,
-      distance: target.value,
+      distance: distance,
       direction: 0,
       x: 0,
       y: 0,
