@@ -8,10 +8,20 @@ async function roll(this: MyItem, {rollMode, createMessage=true}: {configureDial
 }
 
 async function displayCard(this: Item, {rollMode, createMessage=true}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage> {
+  let token: TokenDocument = ((this.actor as any).token);
+  if (!token) {
+    // In 0.8.9, actor.token seems very broken, might be fixed in later versions?
+    const speaker = ChatMessage.getSpeaker();
+    if (speaker.actor === (this.actor as MyActor)?.id) {
+      if (speaker.scene && speaker.token) {
+        token = game.scenes.get(speaker.scene).getEmbeddedDocument(TokenDocument.documentName, speaker.token) as TokenDocument;
+      }
+    }
+  }
   const parts = await ModularCard.getDefaultItemParts({
     item: this as any,
     actor: this.actor as MyActor,
-    token: ((this.actor as any).token) == null ? undefined : (this.actor as any).token,
+    token: token,
   });
 
   return ModularCard.createCard(parts, true);
