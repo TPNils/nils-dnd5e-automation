@@ -1,6 +1,8 @@
 import { MeasuredTemplateData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 import { MyItemData } from "../types/fixed-types.js";
-import { UtilsTemplate } from "../utils/utils-template.js";
+import { TemplateDetails, UtilsTemplate } from "../utils/utils-template.js";
+
+let nextVirtualId = 0;
 
 /**
  * Basically a copy from DND5e AbilityTemplate, except that actorSheet can be null
@@ -62,6 +64,17 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
     return abilityTemplate;
   }
 
+  private _virtualId: string;
+  /**
+   * Required to make highlightGrid work
+   */
+  public get virtualId(): string {
+    if (this._virtualId === undefined) {
+      this._virtualId = String(nextVirtualId++);
+    }
+    return this._virtualId;
+  }
+
   /* -------------------------------------------- */
 
   /**
@@ -72,6 +85,7 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
 
     // Draw the template and switch to the template layer
     this.draw();
+    this.highlightGrid();
     this.layer.activate();
     this.layer.preview.addChild(this);
 
@@ -82,6 +96,77 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
 
     // Activate interactivity
     this.activatePreviewListeners(initialLayer);
+  }
+  
+  public refresh(): this {
+    const value = super.refresh()
+    this.highlightGrid();
+    return value;
+  }
+
+  /**
+   * Highlight the grid squares which should be shown under the area of effect
+   */
+  public highlightGrid(): void {
+    console.log('highlightGrid')
+    const grid = canvas.grid;
+    const d = canvas.dimensions as any;
+    const border = this.borderColor as any;
+    const color = this.fillColor as any;
+
+    // Only highlight for objects which have a defined shape
+    if ( !this.shape ) return;
+
+    // Clear existing highlight
+    let hl = grid.getHighlightLayer(`Template.${this.virtualId}`);
+    if (!hl) {
+      hl = grid.addHighlightLayer(`Template.${this.virtualId}`);
+    }
+    hl.clear();
+
+    // If we are in gridless mode, highlight the shape directly
+    if ( grid.type === CONST.GRID_TYPES.GRIDLESS ) {
+      const shape = this.shape.clone();
+      if ( "points" in shape ) {
+        shape.points = shape.points.map((p, i) => {
+          if ( i % 2 ) return this.y + p;
+          else return this.x + p;
+        });
+      } else {
+        shape.x += this.x;
+        shape.y += this.y;
+      }
+      return grid.grid.highlightGridPosition(hl, {border, color, shape: shape as any});
+    }
+
+    // Get number of rows and columns
+    const nr = Math.ceil(((this.data.distance * 1.5) / d.distance) / (d.size / grid.h));
+    const nc = Math.ceil(((this.data.distance * 1.5) / d.distance) / (d.size / grid.w));
+
+    // Get the offset of the template origin relative to the top-left grid space
+    const [tx, ty] = canvas.grid.getTopLeft(this.data.x, this.data.y);
+    const [row0, col0] = grid.grid.getGridPositionFromPixels(tx, ty);
+    const hx = canvas.grid.w / 2;
+    const hy = canvas.grid.h / 2;
+    const isCenter = (this.data.x - tx === hx) && (this.data.y - ty === hy);
+
+    // Identify grid coordinates covered by the template Graphics
+    const details: TemplateDetails = {
+      x: this.x,
+      y: this.y,
+      shape: this.shape,
+    }
+    for (let r = -nr; r < nr; r++) {
+      for (let c = -nc; c < nc; c++) {
+        let [gx, gy] = canvas.grid.grid.getPixelsFromGridPosition(row0 + r, col0 + c);
+        const testX = (gx+hx) - this.data.x;
+        const testY = (gy+hy) - this.data.y;
+        // let contains = ((r === 0) && (c === 0) && isCenter ) || this.shape.contains(testX, testY);
+        let contains = ((r === 0) && (c === 0) && isCenter ) || UtilsTemplate.isTokenInside(details, {x: gx, y: gy, width: canvas.grid.w, height: canvas.grid.h}, true);
+        if ( !contains ) continue;
+        grid.grid.highlightGridPosition(hl, {x: gx, y: gy, border, color});
+      }
+    }
   }
 
   /* -------------------------------------------- */
@@ -114,6 +199,7 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
       canvas.stage.off("mousedown", handlers.lc);
       canvas.app.view.oncontextmenu = null;
       canvas.app.view.onwheel = null;
+      this.disableHighlight();
       initialLayer.activate();
       if (this.actorSheet) {
         this.actorSheet.maximize();
@@ -125,6 +211,7 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
       handlers.rc(event);
       const destination = canvas.grid.getSnappedPosition(this.data.x, this.data.y, 2);
       this.data.update(destination);
+      this.disableHighlight();
       canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [this.data as any]);
     };
 
@@ -143,5 +230,10 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
     canvas.stage.on("mousedown", handlers.lc);
     canvas.app.view.oncontextmenu = handlers.rc;
     canvas.app.view.onwheel = handlers.mw;
+  }
+
+  private disableHighlight() {
+    canvas.grid.destroyHighlightLayer(`Template.${this.virtualId}`);
+    this._virtualId = null;
   }
 }
