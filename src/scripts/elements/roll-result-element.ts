@@ -52,6 +52,19 @@ export class RollResultElement {
       })
       .addListener(new ElementCallbackBuilder()
         .setEvent('click')
+        .addFilter(({event}) => {
+          if (event.target instanceof HTMLInputElement) {
+            return true;
+          }
+          if (event.target instanceof HTMLButtonElement) {
+            return true;
+          }
+          if (event.target instanceof HTMLSelectElement) {
+            return true;
+          }
+
+          return false;
+        })
         .setExecute(({element}) => {
           const value = MemoryStorageService.getElementValue(element, 'roll-open');
           value.set(!value.get());

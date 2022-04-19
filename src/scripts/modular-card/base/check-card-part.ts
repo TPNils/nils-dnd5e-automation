@@ -164,7 +164,9 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
             // Only show error on key press
             throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
           }
-          targetCache.phase = 'mode-select';
+          if (targetCache.phase === 'bonus-input') {
+            targetCache.phase = 'mode-select';
+          }
           targetCache.userBonus = inputValue ?? '';
           return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
         })
@@ -228,7 +230,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
         })
       )
       .addOnAttributeChange(async ({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
+        return ItemCardHelpers.ifAttrData<CheckCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
           const cache = getTargetCache(part.data, attributes['data-sub-type']);
           if (!cache) {
             return '';
@@ -236,7 +238,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
           const d20attributes = {
             ['data-roll']: cache.roll,
             ['data-bonus-formula']: cache.userBonus,
-            ['data-show-bonus']: cache.phase === 'bonus-input',
+            ['data-show-bonus']: cache.phase !== 'mode-select',
           };
           if (cache.actorUuid) {
             d20attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid}`;

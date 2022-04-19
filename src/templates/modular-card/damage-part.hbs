@@ -1,3 +1,9 @@
+{{#*inline "user-bonus"}}
+  {{#nacPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}
+    <input class="{{@root.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{@root.data.userBonus}}" data-action="item-damage-bonus" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
+  {{/nacPerm}}
+{{/inline}}
+
 <div class="{{@root.moduleName}}-damage">
   <div class="{{@root.moduleName}}-flavor">
     {{#if @root.data.calc$.roll.evaluated}}
@@ -17,6 +23,9 @@
         data-display-type="{{nacSetting 'damageHiddenRoll'}}"
         {{/nacMisPerm}}
         data-override-formula="{{@root.data.calc$.displayFormula}}">
+          <div slot="top">
+            {{> user-bonus}}
+          </div>
       </nac-roll-result>
     {{else}}
       <div class="{{@root.moduleName}}-bonus-container">
@@ -33,8 +42,8 @@
           {{/nacPerm}}
         </button>
         
-        {{#if (and (eq @root.data.phase "bonus-input") (nacPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)) )}}
-          <input class="{{@root.moduleName}}-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{@root.data.userBonus}}" data-action="item-damage-bonus" {{#nacMisPerm (nacConcat "OwnerUuid:" @root.data.calc$.actorUuid)}}disabled{{/nacMisPerm}}/>
+        {{#if (eq @root.data.phase "bonus-input") }}
+          {{> user-bonus}}
         {{/if}}
       </div>
     {{/if}}

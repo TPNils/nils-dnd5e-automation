@@ -9,6 +9,12 @@
   interactionPermission?=string
   highlightTotalOnFirstTerm?=boolean
 }}
+{{#*inline "user-bonus"}}
+  {{#if (and showBonus (nacPerm interactionPermission)) }}
+    <input class="user-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{bonusFormula}}" data-action="user-bonus" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}/>
+  {{/if}}
+{{/inline}}
+
 <div class="flavor">
   {{#if roll.evaluated}}
     {{ localize (nacConcat "DND5E." (nacCapitalize mode)) }}
@@ -22,6 +28,11 @@
       data-highlight-total-on-firstTerm="{{highlightTotalOnFirstTerm}}"
       {{#nacMisPerm readPermission}}data-display-type="{{readHiddenDisplayType}}"{{/nacMisPerm}}
       data-override-max-roll="{{overrideMaxRoll}}">
+      {{#if showBonus }}
+        <div slot="top">
+          {{> user-bonus}}
+        </div>
+      {{/if}}
     </nac-roll-result>
   {{else}}
     <div class="bonus-container">
@@ -53,9 +64,7 @@
         {{/if}}
       </button>
       
-      {{#if (and showBonus (nacPerm interactionPermission) )}}
-        <input class="user-bonus" placeholder="{{localize "DND5E.Bonus"}}: {{localize 'DND5E.RollExample'}}" type="text" value="{{bonusFormula}}" data-action="user-bonus" {{#nacMisPerm interactionPermission}}disabled{{/nacMisPerm}}/>
-      {{/if}}
+      {{> user-bonus}}
     </div>
   {{/if}}
   {{#nacPerm interactionPermission}}

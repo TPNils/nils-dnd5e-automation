@@ -188,7 +188,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             // Only show error on key press
             throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
           }
-          part.data.phase = 'mode-select';
+          if (part.data.phase === 'bonus-input') {
+            part.data.phase = 'mode-select';
+          }
           part.data.userBonus = inputValue ?? '';
           return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
         })
@@ -249,11 +251,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         })
       )
       .addOnAttributeChange(async ({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
+        return ItemCardHelpers.ifAttrData<AttackCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
           const d20attributes = {
             ['data-roll']: part.data.calc$.roll,
             ['data-bonus-formula']: part.data.userBonus,
-            ['data-show-bonus']: part.data.phase === 'bonus-input',
+            ['data-show-bonus']: part.data.phase !== 'mode-select',
             ['data-label']: 'DND5E.Attack',
             ['data-override-max-roll']: part.data.calc$.critTreshold,
           };

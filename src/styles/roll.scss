@@ -16,6 +16,8 @@
   font-size: var(--font-size-14, 14px);
 
   .wrapper:not(.open) {
+    [slot="top"],
+    [slot="bottom"],
     .terms,
     .roll-formula {
       display: none;
