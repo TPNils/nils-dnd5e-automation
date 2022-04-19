@@ -289,6 +289,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
   public getHtml(data: HtmlContext): string {
     // TODO technically, you would roll an attack for each target
+    //  UI idea: unrolled keep it as is, once rolled (1 button for multiple rolls) show a list below for each target
     return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
   }
   //#endregion
