@@ -38,6 +38,13 @@
 
   .roll-total {
     font-weight: bold;
+    
+    &.success {
+      color: green;
+    }
+    &.failure {
+      color: #aa0200;
+    }
   }
 
   .terms {

@@ -6,7 +6,7 @@
   highlightTotalOnFirstTerm?=boolean
 }}
 {{#*inline "result"}}
-  <div class="roll-total boxed{{#if (nacIsMaxRoll roll highlightTotalOnFirstTerm overrideMaxRoll)}} success{{/if}}{{#if (nacIsMinRoll roll)}} failure{{/if}}">{{roll.total}}</div>
+  <div class="roll-total boxed{{#if (nacIsMaxRoll roll highlightTotalOnFirstTerm overrideMaxRoll)}} success{{/if}}{{#if (nacIsMinRoll roll highlightTotalOnFirstTerm)}} failure{{/if}}">{{roll.total}}</div>
   
   <slot name="top"></slot>
   <div class="terms">
