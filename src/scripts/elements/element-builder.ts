@@ -267,7 +267,7 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
    * To help the permission check and execute,
    * 
    * @param enricher function which return data which should be extended to the serialized data
-   * @returns this
+   * @returns {this}
    */
   public addEnricher<T extends object>(enricher: (serializedData: S) => T | Promise<T>): ElementCallbackBuilder<E, C, T & S> {
     this.enricherFuncs.push(enricher);
@@ -275,6 +275,10 @@ export class ElementCallbackBuilder<E extends string = string, C extends Event =
   }
 
   private filters: Array<(args: {element: HTMLElement, event: C}) => boolean | Promise<boolean>> = [];
+  /**
+   * @param filter If the filter returns true, prevent execution
+   * @returns {this}
+   */
   public addFilter(filter: (args: {element: HTMLElement, event: C}) => boolean | Promise<boolean>): this {
     this.filters.push(filter);
     return this;
