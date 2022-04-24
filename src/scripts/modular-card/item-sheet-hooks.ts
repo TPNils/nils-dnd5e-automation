@@ -1,7 +1,9 @@
 import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
-import { MyItem, MyItemData } from "../types/fixed-types";
+import { MyActor, MyItem, MyItemData } from "../types/fixed-types";
+
+const hasInitDataSymbol = Symbol('actor data has been init')
 
 export class ItemSheetHooks {
   
@@ -17,14 +19,17 @@ export class ItemSheetHooks {
     const result = wrapped(...args);
     const targetFormula = this.getFlag(staticValues.moduleName, 'targetFormula');
     if (targetFormula) {
-      const formula = Roll.replaceFormulaData(targetFormula, {item: this.data.data});
-      if (this.data.data.target == null) {
-        this.data.data.target = {
-          type: '',
-          units: '',
+      // this.actor.data is sometimes null, causing an error for this.getRollData()
+      setTimeout(() => {
+        const formula = Roll.replaceFormulaData(targetFormula, this.getRollData());
+        if (this.data.data.target == null) {
+          this.data.data.target = {
+            type: '',
+            units: '',
+          };
         };
-      };
-      this.data.data.target.value = Roll.safeEval(formula);
+        this.data.data.target.value = Roll.safeEval(formula);
+      }, 10);
     }
     return result;
   }
@@ -63,6 +68,7 @@ export class ItemSheetHooks {
       const valueNr = Number(value);
       if (Number.isNaN(valueNr)) {
         if (!Roll.validate(value)) {
+          targetInput.setCustomValidity('Not a valid roll formula')
           event.preventDefault();
           return;
         }
