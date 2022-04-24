@@ -27,10 +27,12 @@ export class ItemSheetHooks {
             units: '',
           };
         };
-        this.data.data.target.value = Roll.safeEval(formula);
+        try {
+          this.data.data.target.value = Roll.safeEval(formula);
+        } catch {/* ignore, probably an error for a formula refering to actor data, while not having an actor */}
       }
 
-      if (this.actor.data != null) {
+      if (this.actor == null || this.actor.data != null) {
         onActorDataIsSet();
       } else {
         setTimeout(() => {
