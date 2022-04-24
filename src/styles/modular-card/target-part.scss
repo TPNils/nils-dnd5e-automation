@@ -49,8 +49,7 @@ body:not(.key-shift) #{$module-code}-target-part .delete,
 
     .undo {
       &[data-state="not-applied"] {
-        opacity: .5;
-        pointer-events: none;
+        color: green;
       }
     }
   }
