@@ -237,7 +237,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       .build(this.getSelector())
 
     ModularCard.registerModularCardPart(staticValues.moduleName, TargetCardPart.instance);
-    ModularCard.registerModularCardTrigger(new TargetCardTrigger());
+    ModularCard.registerModularCardTrigger(this, new TargetCardTrigger());
     DmlTrigger.registerTrigger(new DmlTriggerUser());
   }
 
@@ -517,14 +517,14 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
 
 }
 
-class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
+class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardData>> {
 
   //#region afterCreate
-  public async afterCreate(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  public async afterCreate(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     await this.setTargets(context);
   }
   
-  private async setTargets(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  private async setTargets(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     for (const {newRow, changedByUserId} of context.rows) {
       if (game.userId !== changedByUserId) {
         continue;
@@ -532,28 +532,28 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
       if (!this.isTargetTriggerType(newRow)) {
         continue;
       }
-      if (newRow.data.calc$.tokenUuid == null) {
+      if (newRow.part.data.calc$.tokenUuid == null) {
         continue;
       }
-      if (newRow.data.calc$.rangeDefinition?.units !== 'self') {
+      if (newRow.part.data.calc$.rangeDefinition?.units !== 'self') {
         continue;
       }
-      const token = await UtilsDocument.tokenFromUuid(newRow.data.calc$.tokenUuid);
+      const token = await UtilsDocument.tokenFromUuid(newRow.part.data.calc$.tokenUuid);
       if (token == null) {
         continue;
       }
 
-      if (newRow.data.calc$.targetDefinition.type === 'self') {
-        await UtilsDocument.setTargets({tokenUuids: [newRow.data.calc$.tokenUuid]});
+      if (newRow.part.data.calc$.targetDefinition.type === 'self') {
+        await UtilsDocument.setTargets({tokenUuids: [newRow.part.data.calc$.tokenUuid]});
         return;
       }
 
       const template = MyAbilityTemplate.fromItem({
-        target: newRow.data.calc$.targetDefinition,
+        target: newRow.part.data.calc$.targetDefinition,
         flags: {
           [staticValues.moduleName]: {
             dmlCallbackMessageId: newRow.messageId,
-            dmlCallbackPartId: newRow.id,
+            dmlCallbackPartId: newRow.part.id,
           }
         }
       });
@@ -588,19 +588,19 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
   //#endregion
 
   //#region upsert
-  public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     await this.calcTargetCache(context);
   }
 
-  private async calcTargetCache(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  private async calcTargetCache(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const missingTokenCaches = new Set<string>();
     for (const {newRow} of context.rows) {
       if (!this.isTargetTriggerType(newRow)) {
         continue;
       }
 
-      const cachedUuids = newRow.data.calc$.tokenData.map(t => t.tokenUuid);
-      for (const selected of newRow.data.selected) {
+      const cachedUuids = newRow.part.data.calc$.tokenData.map(t => t.tokenUuid);
+      for (const selected of newRow.part.data.selected) {
         if (!cachedUuids.includes(selected.tokenUuid)) {
           missingTokenCaches.add(selected.tokenUuid);
         }
@@ -618,10 +618,10 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
 
       const cache = new Map<string, TargetCardData['calc$']['tokenData'][0]>();
-      for (const entry of newRow.data.calc$.tokenData) {
+      for (const entry of newRow.part.data.calc$.tokenData) {
         cache.set(entry.tokenUuid, entry);
       }
-      for (const selected of newRow.data.selected) {
+      for (const selected of newRow.part.data.selected) {
         if (!cache.has(selected.tokenUuid) && tokenMap.has(selected.tokenUuid)) {
           const token = tokenMap.get(selected.tokenUuid);
           cache.set(token.uuid, {
@@ -634,8 +634,8 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData> {
         }
       }
 
-      if (cache.size !== newRow.data.calc$.tokenData.length) {
-        newRow.data.calc$.tokenData = Array.from(cache.values());
+      if (cache.size !== newRow.part.data.calc$.tokenData.length) {
+        newRow.part.data.calc$.tokenData = Array.from(cache.values());
       }
     }
   }

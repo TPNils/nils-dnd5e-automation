@@ -26,6 +26,10 @@ export class TransformTrigger<FROM, TO> implements ITrigger<FROM> {
     }
   }
 
+  public hasTriggers(): boolean {
+    return this.triggers.size > 0;
+  }
+
   public beforeCreate(context: IDmlContext<FROM>): boolean | void { return this.before(this.transform(context)); }
   public beforeUpdate?(context: IDmlContext<FROM>): boolean | void { return this.before(this.transform(context)); }
   public beforeDelete?(context: IDmlContext<FROM>): boolean | void { return this.before(this.transform(context)); }

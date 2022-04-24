@@ -17,39 +17,48 @@ export interface ModularCardPartData<T = any> {
   data: T;
 }
 
-export interface ModularCardTriggerData<T = any> extends ModularCardPartData<T> {
+export interface ModularCardTriggerData<T = any> {
   readonly messageId: string;
   readonly typeHandler: ModularCardPart<T>;
+  readonly part: ModularCardPartData<T>;
+  readonly allParts: ModularCardPartData<any>[];
 }
 
-class ChatMessageTransformer extends TransformTrigger<ChatMessage, ModularCardTriggerData> implements IDmlTrigger<ChatMessage> {
+class ChatMessageTransformer<T> extends TransformTrigger<ChatMessage, ModularCardTriggerData<T>> implements IDmlTrigger<ChatMessage> {
 
-  constructor() {
-    super(ChatMessageTransformer.transformFunc);
+  public triggerStoppable: Stoppable;
+
+  constructor(private cardPartType: ModularCardPart<T>) {
+    super((from: ChatMessage) => this.transformFunc(from));
   }
 
   get type(): typeof ChatMessage {
     return ChatMessage;
   }
 
-  private static transformFunc(from: ChatMessage): {uniqueKey: string, data: ModularCardTriggerData} | Array<{uniqueKey: string, data: ModularCardTriggerData}> {
+  private transformFunc(from: ChatMessage): {uniqueKey: string, data: ModularCardTriggerData} | Array<{uniqueKey: string, data: ModularCardTriggerData}> {
     const parts = ModularCard.getCardPartDatas(from);
     if (!Array.isArray(parts)) {
       return [];
     }
-    
-    return parts.map(p => {
-      return {
-        uniqueKey: `${from.uuid}.${p.id}`,
-        data: {
-          ...p,
-          messageId: from.id,
-          typeHandler: ModularCard.getTypeHandler(p.type),
-        }
+
+    const response: Array<{uniqueKey: string, data: ModularCardTriggerData}> = [];
+    for (const part of parts) {
+      if (ModularCard.isType(this.cardPartType, part)) {
+        response.push({
+          uniqueKey: `${from.uuid}.${part.id}`,
+          data: {
+            part: part,
+            allParts: parts,
+            messageId: from.id,
+            typeHandler: ModularCard.getTypeHandler(part.type),
+          }
+        });
       }
-    });
+    }
+
+    return response;
   }
-  
 }
 
 class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
@@ -69,6 +78,38 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
   }
   
   public beforeUpdate(context: IDmlContext<ChatMessage>): boolean | void {
+    this.injectIsAtBottom(context);
+    this.finalFields(context);
+  }
+  
+  private finalFields(context: IDmlContext<ChatMessage>): boolean {
+    for (const {newRow, oldRow} of context.rows) {
+      const parts = ModularCard.getCardPartDatas(newRow);
+      if (parts == null) {
+        continue;
+      }
+
+      const oldParts = new Map<string, ModularCardPartData>();
+      for (const part of ModularCard.getCardPartDatas(oldRow)) {
+        oldParts.set(part.id, part);
+      }
+
+      for (const part of parts) {
+        const oldPart = oldParts.get(part.id);
+        if (!oldPart) {
+          continue;
+        }
+        if (part.type !== oldPart?.type) {
+          console.error(`Can't change the type of part and retain the same id.`)
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  private injectIsAtBottom(context: IDmlContext<ChatMessage>) {
     const log = document.querySelector("#chat-log");
     const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
     if (isAtBottom) {
@@ -86,28 +127,6 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
       }, 0);
     }
   }
-}
-
-class TriggerMessagePart implements ITrigger<ModularCardPartData> {
-
-  public beforeUpdate(context: IDmlContext<ModularCardPartData>): boolean {
-    if (this.finalFields(context) === false) {
-      return false;
-    }
-    return true;
-  }
-  
-  private finalFields(context: IDmlContext<ModularCardPartData>): boolean {
-    for (const {newRow, oldRow} of context.rows) {
-      if (newRow.type !== oldRow?.type) {
-        console.error(`Can't change the type of part and retain the same id.`)
-        return false;
-      }
-    }
-
-    return true;
-  }
-  
 }
 
 async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...args: any[]): Promise<JQuery> {
@@ -173,7 +192,7 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
   return wrapped(args);
 }
 
-const chatMessageTransformer = new ChatMessageTransformer();
+const chatMessageTransformerMap = new Map<string, ChatMessageTransformer<any>>();
 
 export class ModularCard {
 
@@ -187,9 +206,20 @@ export class ModularCard {
     ModularCard.typeToModule.set(part.getType(), moduleName);
   }
   
-  public static registerModularCardTrigger(trigger: ITrigger<ModularCardTriggerData>): Stoppable {
-    // TODO this should only trigger for a specific part type => should be more effecient as more parts get added
-    return chatMessageTransformer.register(trigger);
+  public static registerModularCardTrigger<T>(type: ModularCardPart<T>, trigger: ITrigger<ModularCardTriggerData>): Stoppable {
+    let chatMessageTransformer: ChatMessageTransformer<T> = chatMessageTransformerMap.get(type.getType());
+    if (!chatMessageTransformer) {
+      chatMessageTransformer = new ChatMessageTransformer(type);
+      chatMessageTransformerMap.set(type.getType(), chatMessageTransformer);
+      chatMessageTransformer.triggerStoppable = DmlTrigger.registerTrigger(chatMessageTransformer);
+    }
+    const transformerStoppable = chatMessageTransformer.register(trigger);
+    return {stop: () => {
+      transformerStoppable.stop();
+      if (!chatMessageTransformer.hasTriggers()) {
+        chatMessageTransformer.triggerStoppable.stop();
+      }
+    }};
   }
 
   public static getTypeHandler<T extends ModularCardPart = ModularCardPart>(type: string): T | null {
@@ -283,10 +313,6 @@ export class ModularCard {
   
   @RunOnce()
   public static registerHooks(): void {
-    // Register message => part transformer
-    DmlTrigger.registerTrigger(chatMessageTransformer);
-    chatMessageTransformer.register(new TriggerMessagePart());
-    
     // Override render behaviour
     DmlTrigger.registerTrigger(new ChatMessageTrigger());
     Hooks.on('setup', () => {

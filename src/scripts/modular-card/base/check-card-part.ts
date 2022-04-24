@@ -259,7 +259,8 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
       getVisualState: context => this.getTargetState(context),
     });
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
-    ModularCard.registerModularCardTrigger(new CheckCardTrigger());
+    ModularCard.registerModularCardTrigger<TargetCardData>(TargetCardPart.instance, new TargetCardTrigger());
+    ModularCard.registerModularCardTrigger(this, new CheckCardTrigger());
   }
 
   public getType(): string {
@@ -329,76 +330,32 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
 }
 
 
-class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
-
-  //#region beforeUpsert
-  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {
-    this.calcResultCache(context);
-  }
-
-  private calcResultCache(context: IDmlContext<ModularCardTriggerData>): void {
-    for (const {newRow} of context.rows) {
-      if (!this.isThisType(newRow) || !this.assumeThisType(newRow)) {
-        continue;
-      }
-
-      for (const targetCache of newRow.data.calc$.targetCaches) {
-        if (targetCache.roll?.evaluated) {
-          // Checks & saves are a success on a match
-          if (targetCache.roll.total >= newRow.data.dc) {
-            targetCache.resultType = 'pass';
-          } else {
-            targetCache.resultType = 'fail';
-          }
-        } else if (targetCache.resultType) {
-          delete targetCache.resultType;
-        }
-      }
-    }
-  }
-  //#endregion
+class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardData>> {
 
   //#region upsert
-  public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     await this.addTargetCache(context);
-    await this.calcTargetRoll(context);
-    await this.rollTargetRoll(context);
   }
   
-  private async addTargetCache(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
-    const partsByMessageId = new Map<string, ModularCardTriggerData[]>();
-    for (const {newRow} of context.rows) {
-      if (!partsByMessageId.has(newRow.messageId)) {
-        partsByMessageId.set(newRow.messageId, []);
-      }
-      partsByMessageId.get(newRow.messageId).push(newRow);
-    }
-
+  private async addTargetCache(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const missingTargetUuids = new Set<string>();
-    for (const rows of partsByMessageId.values()) {
+    for (const {newRow} of context.rows) {
       const allTargetIds = new Set<string>();
       const cachedSelectionIds = new Set<string>();
-      for (const row of rows) {
-        if (this.isAnyTargetType(row)) {
-          for (const selected of row.data.selected) {
-            allTargetIds.add(selected.selectionId);
-          }
-        }
-
-        if (this.isThisType(row) && this.assumeThisType(row)) {
-          for (const target of row.data.calc$.targetCaches) {
+      for (const selected of newRow.part.data.selected) {
+        allTargetIds.add(selected.selectionId);
+      }
+      for (const part of newRow.allParts) {
+        if (ModularCard.isType(CheckCardPart.instance, part)) {
+          for (const target of part.data.calc$.targetCaches) {
             cachedSelectionIds.add(target.selectionId);
           }
         }
       }
 
-      for (const row of rows) {
-        if (this.isAnyTargetType(row)) {
-          for (const selected of row.data.selected) {
-            if (!cachedSelectionIds.has(selected.selectionId)) {
-              missingTargetUuids.add(selected.tokenUuid);
-            }
-          }
+      for (const selected of newRow.part.data.selected) {
+        if (!cachedSelectionIds.has(selected.selectionId)) {
+          missingTargetUuids.add(selected.tokenUuid);
         }
       }
     }
@@ -409,18 +366,13 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
 
     // Cache the values of the tokens
     const tokens = await UtilsDocument.tokenFromUuid(missingTargetUuids);
-    for (const rows of partsByMessageId.values()) {
-      const allSelected: TargetCardData['selected'] = [];
-      for (const row of rows) {
-        if (this.isAnyTargetType(row)) {
-          allSelected.push(...row.data.selected);
-        }
-      }
+    for (const {newRow} of context.rows) {
+      const allSelected = newRow.part.data.selected;
 
-      for (const row of rows) {
-        if (this.isThisType(row) && this.assumeThisType(row)) {
+      for (const part of newRow.allParts) {
+        if (ModularCard.isType(CheckCardPart.instance, part)) {
           const cachedBySelectionId = new Set<string>();
-          for (const target of row.data.calc$.targetCaches) {
+          for (const target of part.data.calc$.targetCaches) {
             cachedBySelectionId.add(target.selectionId);
           }
 
@@ -438,8 +390,8 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
                 visibleToUsers: Array.from(game.users.values()).filter(user => actor.testUserPermission(user, 'OWNER')).map(user => user.id),
               };
               if (actor) {
-                const actorAbility = actor.data.data.abilities[row.data.ability];
-                const actorSkill = actor.data.data.skills[row.data.skill];
+                const actorAbility = actor.data.data.abilities[part.data.ability];
+                const actorSkill = actor.data.data.skills[part.data.skill];
                 targetCache.actorUuid = actor.uuid;
                 targetCache.hasHalflingLucky = actor?.getFlag("dnd5e", "halflingLucky") === true;
                 // Reliable Talent applies to any skill check we have full or better proficiency in
@@ -456,7 +408,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
                 parts.push('@abilityMod');
                 data.abilityMod = actorAbility.mod;
             
-                if (row.data.iSave && actorAbility.prof !== 0) {
+                if (part.data.iSave && actorAbility.prof !== 0) {
                   parts.push('@abilitySaveProf');
                   data.abilitySaveProf = actorAbility.prof;
                   
@@ -486,7 +438,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
                 targetCache.actorBonus = Roll.replaceFormulaData(parts.join('+'), data);
               }
 
-              row.data.calc$.targetCaches.push(targetCache);
+              part.data.calc$.targetCaches.push(targetCache);
               cachedBySelectionId.add(selected.selectionId);
             }
           }
@@ -494,14 +446,44 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
     }
   }
+  //#endregion
 
-  private async calcTargetRoll(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+}
+
+class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>> {
+
+  //#region beforeUpsert
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): boolean | void {
+    this.calcResultCache(context);
+  }
+
+  private calcResultCache(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): void {
     for (const {newRow} of context.rows) {
-      if (!this.isThisType(newRow)) {
-        continue;
+      for (const targetCache of newRow.part.data.calc$.targetCaches) {
+        if (targetCache.roll?.evaluated) {
+          // Checks & saves are a success on a match
+          if (targetCache.roll.total >= newRow.part.data.dc) {
+            targetCache.resultType = 'pass';
+          } else {
+            targetCache.resultType = 'fail';
+          }
+        } else if (targetCache.resultType) {
+          delete targetCache.resultType;
+        }
       }
+    }
+  }
+  //#endregion
 
-      for (const target of newRow.data.calc$.targetCaches) {
+  //#region upsert
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<CheckCardData>>): Promise<void> {
+    await this.calcTargetRoll(context);
+    await this.rollTargetRoll(context);
+  }
+
+  private async calcTargetRoll(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): Promise<void> {
+    for (const {newRow} of context.rows) {
+      for (const target of newRow.part.data.calc$.targetCaches) {
         let baseRoll = new Die({faces: 20, number: 1});
         if (target.minRoll != null) {
           // reroll a base roll 1 once
@@ -541,21 +523,17 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
     }
   }
 
-  private async rollTargetRoll(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+  private async rollTargetRoll(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): Promise<void> {
     const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
-      if (!this.isThisType(newRow) || !this.assumeThisType(oldRow)) {
-        continue;
-      }
-
       const oldTargets = new Map<string, TargetCache>();
       if (oldRow) {
-        for (const target of oldRow.data.calc$.targetCaches) {
+        for (const target of oldRow.part.data.calc$.targetCaches) {
           oldTargets.set(target.selectionId, target);
         }
       }
 
-      for (const target of newRow.data.calc$.targetCaches) {
+      for (const target of newRow.part.data.calc$.targetCaches) {
         const oldTarget = oldTargets.get(target.selectionId);
         if (target.requestRollFormula !== oldTarget?.requestRollFormula) {
           if (!target.roll) {
@@ -619,20 +597,20 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
   //#endregion
 
   //#region afterUpdate
-  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<any>>): void | Promise<void> {
+  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<CheckCardData>>): void | Promise<void> {
     this.onBonusChange(context);
   }
   
-  private onBonusChange(context: IDmlContext<ModularCardTriggerData>): void {
+  private onBonusChange(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): void {
     for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId || !this.isThisType(newRow) || !this.assumeThisType(oldRow)) {
+      if (changedByUserId !== game.userId) {
         continue;
       }
-      for (let i = 0; i < newRow.data.calc$.targetCaches.length; i++) {
-        const newCache = newRow.data.calc$.targetCaches[i];
-        const oldCache = oldRow?.data?.calc$?.targetCaches?.[i];
+      for (let i = 0; i < newRow.part.data.calc$.targetCaches.length; i++) {
+        const newCache = newRow.part.data.calc$.targetCaches[i];
+        const oldCache = oldRow?.part.data?.calc$?.targetCaches?.[i];
         if (newCache.phase === 'bonus-input' && oldCache.phase !== 'bonus-input') {
-          MemoryStorageService.setFocusedElementSelector(`${CheckCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.id}"] input.user-bonus`);
+          MemoryStorageService.setFocusedElementSelector(`${CheckCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
           return;
         }
       }
@@ -641,23 +619,11 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData> {
   //#endregion 
   
   //#region helpers
-  private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<CheckCardData> {
-    if (row.type !== CheckCardPart.instance.getType()) {
-      return false;
-    }
-    if (row.typeHandler) {
-      return row.typeHandler instanceof CheckCardPart;
-    }
-    return ModularCard.getTypeHandler(row.type) instanceof CheckCardPart;
-  }
 
   private isAnyTargetType(row: ModularCardTriggerData): row is ModularCardTriggerData<TargetCardData> {
     return row.typeHandler instanceof TargetCardPart;
   }
 
-  private assumeThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<CheckCardData> {
-    return true;
-  }
   //#endregion
 
 }

@@ -274,7 +274,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       .build(this.getSelector())
     
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
-    ModularCard.registerModularCardTrigger(new AttackCardTrigger());
+    ModularCard.registerModularCardTrigger(this, new AttackCardTrigger());
     TargetCardPart.instance.registerIntegration({
       getVisualState: context => this.getTargetState(context),
     });
@@ -400,7 +400,75 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
 }
 
-class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
+class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardData>> {
+
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
+    await this.addTargetCache(context);
+  }
+  
+  private async addTargetCache(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
+    const missingTargetUuids = new Set<string>();
+    for (const {newRow} of context.rows) {
+      const allTargetUuids = new Set<string>();
+      const cachedTargetUuids = new Set<string>();
+      for (const selected of newRow.part.data.selected) {
+        allTargetUuids.add(selected.tokenUuid);
+      }
+      for (const part of newRow.allParts) {
+        if (!ModularCard.isType<AttackCardData>(AttackCardPart.instance, part)) {
+          continue;
+        }
+        for (const target of part.data.calc$.targetCaches) {
+          cachedTargetUuids.add(target.targetUuid);
+        }
+      }
+
+      for (const expectedUuid of allTargetUuids) {
+        if (!cachedTargetUuids.has(expectedUuid)) {
+          missingTargetUuids.add(expectedUuid);
+        }
+      }
+    }
+
+    if (missingTargetUuids.size === 0) {
+      return;
+    }
+
+    // Cache the values of the tokens
+    const tokens = await UtilsDocument.tokenFromUuid(missingTargetUuids);
+    for (const {newRow} of context.rows) {
+      const allTargetUuids = new Set<string>();
+      for (const selected of newRow.part.data.selected) {
+        allTargetUuids.add(selected.tokenUuid);
+      }
+
+      for (const part of newRow.allParts) {
+        if (!ModularCard.isType<AttackCardData>(AttackCardPart.instance, part)) {
+          continue;
+        }
+        const cachedTargetUuids = new Set<string>();
+        for (const target of part.data.calc$.targetCaches) {
+          cachedTargetUuids.add(target.targetUuid);
+        }
+
+        for (const expectedUuid of allTargetUuids) {
+          if (!cachedTargetUuids.has(expectedUuid)) {
+            const actor = (tokens.get(expectedUuid).getActor() as MyActor);
+            part.data.calc$.targetCaches.push({
+              targetUuid: expectedUuid,
+              actorUuid: actor.uuid,
+              ac: actor.data.data.attributes.ac.value,
+            });
+            cachedTargetUuids.add(expectedUuid);
+          }
+        }
+      }
+    }
+  }
+
+}
+
+class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardData>> {
 
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {
@@ -409,77 +477,46 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
     this.calcResultCache(context);
   }
 
-  private calcIsCrit(context: IDmlContext<ModularCardTriggerData>): void {
+  private calcIsCrit(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow} of context.rows) {
-      if (!this.isThisType(newRow)) {
+      if (!newRow.part.data.calc$.roll?.evaluated) {
+        newRow.part.data.calc$.isCrit = false;
         continue;
       }
 
-      if (!newRow.data.calc$.roll?.evaluated) {
-        newRow.data.calc$.isCrit = false;
-        continue;
-      }
-
-      const baseRollResult = newRow.data.calc$.roll.terms[0].results.filter(result => result.active)[0];
-      newRow.data.calc$.isCrit = baseRollResult?.result >= newRow.data.calc$.critTreshold;
+      const baseRollResult = newRow.part.data.calc$.roll.terms[0].results.filter(result => result.active)[0];
+      newRow.part.data.calc$.isCrit = baseRollResult?.result >= newRow.part.data.calc$.critTreshold;
     }
   }
 
-  private setDamageAsCrit(context: IDmlContext<ModularCardTriggerData>): void {
-    const messagesBecameCrit = new Set<string>();
-    const messagesBecameNormal = new Set<string>();
+  private setDamageAsCrit(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
-      if (!this.isThisType(newRow)) {
-        continue;
-      }
-      if (newRow.data.calc$.isCrit !== oldRow?.data?.calc$?.isCrit) {
-        if (newRow.data.calc$.isCrit) {
-          messagesBecameCrit.add(newRow.messageId);
-        } else {
-          messagesBecameNormal.add(newRow.messageId);
-        }
-      }
-    }
-    messagesBecameCrit.delete(null);
-    messagesBecameCrit.delete(undefined);
-    messagesBecameNormal.delete(null);
-    messagesBecameNormal.delete(undefined);
-
-    if (messagesBecameCrit.size === 0 && messagesBecameNormal.size === 0) {
-      return;
-    }
-
-    for (const {newRow} of context.rows) {
-      if (!messagesBecameCrit.has(newRow.messageId) && !messagesBecameNormal.has(newRow.messageId)) {
-        continue;
-      }
-
-      if (!this.isAnyDamageType(newRow)) {
-        continue;
-      }
-
-      if (newRow.data.phase === 'mode-select') {
-        if (messagesBecameCrit.has(newRow.messageId)) {
-          newRow.data.mode = 'critical';
-        } else {
-          newRow.data.mode = 'normal';
+      if (newRow.part.data.calc$.isCrit !== oldRow?.part?.data?.calc$?.isCrit) {
+        for (const part of newRow.allParts) {
+          if (!ModularCard.isType<DamageCardData>(DamageCardPart.instance, part)) {
+            continue;
+          }
+          
+          if (part.data.phase === 'mode-select') {
+            if (newRow.part.data.calc$.isCrit) {
+              part.data.mode = 'critical';
+            } else {
+              part.data.mode = 'normal';
+            }
+          }
         }
       }
     }
   }
 
-  private calcResultCache(context: IDmlContext<ModularCardTriggerData>): void {
+  private calcResultCache(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow} of context.rows) {
-      if (!this.isThisType(newRow) || !this.assumeThisType(newRow)) {
-        continue;
-      }
-
-      for (const targetCache of newRow.data.calc$.targetCaches) {
-        if (newRow.data.calc$.roll?.evaluated) {
-          const firstRoll = newRow.data.calc$.roll.terms[0].results.find(r => r.active);
-          if (firstRoll.result === 20 || targetCache.ac <= newRow.data.calc$.roll.total) {
+      for (const targetCache of newRow.part.data.calc$.targetCaches) {
+        if (newRow.part.data.calc$.roll?.evaluated) {
+          const firstRoll = newRow.part.data.calc$.roll.terms[0].results.find(r => r.active);
+          if (firstRoll.result === 20 || targetCache.ac <= newRow.part.data.calc$.roll.total) {
             // 20 always hits, lower crit treshold does not
-            if (firstRoll.result >= newRow.data.calc$.critTreshold) {
+            if (firstRoll.result >= newRow.part.data.calc$.critTreshold) {
               targetCache.resultType = 'critical-hit';
             } else {
               targetCache.resultType = 'hit';
@@ -498,28 +535,23 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
   //#endregion
 
   //#region upsert
-  public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
     await this.calcAttackRoll(context);
     await this.rollAttack(context);
-    await this.addTargetCache(context);
   }
 
-  private async calcAttackRoll(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+  private async calcAttackRoll(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
     for (const {newRow} of context.rows) {
-      if (!this.isThisType(newRow)) {
-        continue;
-      }
-
       let baseRoll = new Die({faces: 20, number: 1});
-      if (newRow.data.calc$.hasHalflingLucky) {
+      if (newRow.part.data.calc$.hasHalflingLucky) {
         // reroll a base roll 1 once
         // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
         // second 2 = reroll when the roll result is equal to 1 (=1)
         baseRoll.modifiers.push('r1=1');
       }
-      switch (newRow.data.mode) {
+      switch (newRow.part.data.mode) {
         case 'advantage': {
-          if (newRow.data.calc$.elvenAccuracy) {
+          if (newRow.part.data.calc$.elvenAccuracy) {
             baseRoll.number = 3;
           } else {
             baseRoll.number = 2;
@@ -534,38 +566,34 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
         }
       }
       const parts: string[] = [baseRoll.formula];
-      if (newRow.data.calc$.rollBonus) {
-        parts.push(newRow.data.calc$.rollBonus);
+      if (newRow.part.data.calc$.rollBonus) {
+        parts.push(newRow.part.data.calc$.rollBonus);
       }
       
-      if (newRow.data.userBonus && Roll.validate(newRow.data.userBonus)) {
-        parts.push(newRow.data.userBonus);
+      if (newRow.part.data.userBonus && Roll.validate(newRow.part.data.userBonus)) {
+        parts.push(newRow.part.data.userBonus);
       }
 
-      newRow.data.calc$.requestRollFormula = UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).formula;
+      newRow.part.data.calc$.requestRollFormula = UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).formula;
     }
   }
 
-  private async rollAttack(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+  private async rollAttack(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
     const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
-      if (!this.isThisType(newRow) || !this.assumeThisType(oldRow)) {
-        continue;
-      }
-
-      if (newRow.data.calc$.requestRollFormula !== oldRow?.data?.calc$?.requestRollFormula) {
-        if (!newRow.data.calc$.roll) {
-          newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(newRow.data.calc$.requestRollFormula));
+      if (newRow.part.data.calc$.requestRollFormula !== oldRow?.part?.data?.calc$?.requestRollFormula) {
+        if (!newRow.part.data.calc$.roll) {
+          newRow.part.data.calc$.roll = UtilsRoll.toRollData(new Roll(newRow.part.data.calc$.requestRollFormula));
         } else {
-          const oldRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
-          const result = await UtilsRoll.setRoll(oldRoll, newRow.data.calc$.requestRollFormula);
-          newRow.data.calc$.roll = UtilsRoll.toRollData(result.result);
+          const oldRoll = UtilsRoll.fromRollData(newRow.part.data.calc$.roll);
+          const result = await UtilsRoll.setRoll(oldRoll, newRow.part.data.calc$.requestRollFormula);
+          newRow.part.data.calc$.roll = UtilsRoll.toRollData(result.result);
           if (result.rollToDisplay) {
             // Auto rolls if original roll was already evaluated
             for (const user of game.users.values()) {
               if (user.active) {
                 showRolls.push({
-                  uuid: newRow.data.calc$.actorUuid,
+                  uuid: newRow.part.data.calc$.actorUuid,
                   permission: `${staticValues.code}ReadCheck`,
                   user: user,
                   meta: result.rollToDisplay
@@ -577,13 +605,13 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
 
       // Execute initial roll
-      if ((newRow.data.phase === 'result') && newRow.data.calc$.roll?.evaluated !== true) {
-        const roll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
-        newRow.data.calc$.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
+      if ((newRow.part.data.phase === 'result') && newRow.part.data.calc$.roll?.evaluated !== true) {
+        const roll = UtilsRoll.fromRollData(newRow.part.data.calc$.roll);
+        newRow.part.data.calc$.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
         for (const user of game.users.values()) {
           if (user.active) {
             showRolls.push({
-              uuid: newRow.data.calc$.actorUuid,
+              uuid: newRow.part.data.calc$.actorUuid,
               permission: `${staticValues.code}ReadCheck`,
               user: user,
               meta: roll,
@@ -611,93 +639,20 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
       return rollPromises;
     });
   }
-  
-  private async addTargetCache(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
-    const partsByMessageId = new Map<string, ModularCardTriggerData[]>();
-    for (const {newRow} of context.rows) {
-      if (!partsByMessageId.has(newRow.messageId)) {
-        partsByMessageId.set(newRow.messageId, []);
-      }
-      partsByMessageId.get(newRow.messageId).push(newRow);
-    }
-
-    const missingTargetUuids = new Set<string>();
-    for (const rows of partsByMessageId.values()) {
-      const allTargetUuids = new Set<string>();
-      const cachedTargetUuids = new Set<string>();
-      for (const row of rows) {
-        if (this.isAnyTargetType(row)) {
-          for (const selected of row.data.selected) {
-            allTargetUuids.add(selected.tokenUuid);
-          }
-        }
-
-        if (this.isThisType(row) && this.assumeThisType(row)) {
-          for (const target of row.data.calc$.targetCaches) {
-            cachedTargetUuids.add(target.targetUuid);
-          }
-        }
-      }
-
-      for (const expectedUuid of allTargetUuids) {
-        if (!cachedTargetUuids.has(expectedUuid)) {
-          missingTargetUuids.add(expectedUuid);
-        }
-      }
-    }
-
-    if (missingTargetUuids.size === 0) {
-      return;
-    }
-
-    // Cache the values of the tokens
-    const tokens = await UtilsDocument.tokenFromUuid(missingTargetUuids);
-    for (const rows of partsByMessageId.values()) {
-      const allTargetUuids = new Set<string>();
-      for (const row of rows) {
-        if (this.isAnyTargetType(row)) {
-          for (const selected of row.data.selected) {
-            allTargetUuids.add(selected.tokenUuid);
-          }
-        }
-      }
-
-      for (const row of rows) {
-        if (this.isThisType(row) && this.assumeThisType(row)) {
-          const cachedTargetUuids = new Set<string>();
-          for (const target of row.data.calc$.targetCaches) {
-            cachedTargetUuids.add(target.targetUuid);
-          }
-
-          for (const expectedUuid of allTargetUuids) {
-            if (!cachedTargetUuids.has(expectedUuid)) {
-              const actor = (tokens.get(expectedUuid).getActor() as MyActor);
-              row.data.calc$.targetCaches.push({
-                targetUuid: expectedUuid,
-                actorUuid: actor.uuid,
-                ac: actor.data.data.attributes.ac.value,
-              });
-              cachedTargetUuids.add(expectedUuid);
-            }
-          }
-        }
-      }
-    }
-  }
   //#endregion
 
   //#region afterUpdate
-  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<any>>): void | Promise<void> {
+  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): void | Promise<void> {
     this.onBonusChange(context);
   }
   
-  private onBonusChange(context: IDmlContext<ModularCardTriggerData>): void {
+  private onBonusChange(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId || !this.isThisType(newRow)) {
+      if (changedByUserId !== game.userId) {
         continue;
       }
-      if (newRow.data.phase === 'bonus-input' && (oldRow?.data as AttackCardData)?.phase !== 'bonus-input') {
-        MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.id}"] input.user-bonus`);
+      if (newRow.part.data.phase === 'bonus-input' && (oldRow?.part?.data as AttackCardData)?.phase !== 'bonus-input') {
+        MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
         return;
       }
     }
@@ -705,26 +660,8 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData> {
   //#endregion 
   
   //#region helpers
-  private isThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData> {
-    if (row.type !== AttackCardPart.instance.getType()) {
-      return false;
-    }
-    if (row.typeHandler) {
-      return row.typeHandler instanceof AttackCardPart;
-    }
-    return ModularCard.getTypeHandler(row.type) instanceof AttackCardPart;
-  }
-
   private isAnyTargetType(row: ModularCardTriggerData): row is ModularCardTriggerData<TargetCardData> {
     return row.typeHandler instanceof TargetCardPart;
-  }
-
-  private isAnyDamageType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
-    return row.typeHandler instanceof DamageCardPart;
-  }
-
-  private assumeThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<AttackCardData> {
-    return true;
   }
   //#endregion
 

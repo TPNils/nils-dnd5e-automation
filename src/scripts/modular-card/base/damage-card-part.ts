@@ -19,6 +19,9 @@ interface TargetCache {
   selectionId: string;
   targetUuid: string;
   actorUuid: string;
+  immunities?: string[];
+  resistances?: string[];
+  vulnerabilities?: string[];
   // TODO store requested action => can and should be used to auto apply when there is no attack or check
   smartState: State['state'];
   appliedState: State['state'];
@@ -332,7 +335,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       .build(this.getSelector())
 
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
-    ModularCard.registerModularCardTrigger(new DamageCardTrigger());
+    ModularCard.registerModularCardTrigger(this, new DamageCardTrigger());
+    ModularCard.registerModularCardTrigger(TargetCardPart.instance, new TargetCardTrigger());
     TargetCardPart.instance.registerIntegration({
       onChange: event => this.targetCallback(event),
       getState: context => this.getTargetState(context),
@@ -592,54 +596,121 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
 }
 
-class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
-
-  //#region beforeUpsert
-  public beforeUpsert(context: IDmlContext<ModularCardTriggerData>): boolean | void {
-    this.calculateLabel(context);
-    this.calculateRollDisplay(context);
+class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardData>> {
+  
+  //#region upsert
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
+    await this.calcTargetCache(context);
   }
 
-  private calculateLabel(context: IDmlContext<ModularCardTriggerData>): void {
+  private async calcTargetCache(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
+    const recalcTokens: Array<{selectionId: string, tokenUuid: string, data: DamageCardData}> = [];
+    for (const {newRow, oldRow} of context.rows) {
+      const damageParts: DamageCardData[] = newRow.allParts
+        .filter(part => ModularCard.isType<DamageCardData>(DamageCardPart.instance, part))
+        .map(part => part.data);
+      if (damageParts.length === 0) {
+        continue;
+      }
+      const oldSelectionIds = (oldRow as ModularCardTriggerData<TargetCardData>)?.part?.data?.selected.map(s => s.selectionId) ?? [];
+      for (const target of newRow.part.data.selected) {
+        if (!oldSelectionIds.includes(target.selectionId)) {
+          for (const dmg of damageParts) {
+            recalcTokens.push({selectionId: target.selectionId, tokenUuid: target.tokenUuid, data: dmg});
+          }
+        }
+      }
+    }
+
+    const allTokenUuids = new Set<string>();
+    for (const token of recalcTokens) {
+      allTokenUuids.add(token.tokenUuid);
+    }
+
+    if (allTokenUuids.size === 0) {
+      return;
+    }
+
+    const tokenMap = await UtilsDocument.tokenFromUuid(allTokenUuids);
+
+    for (const recalcToken of recalcTokens) {
+      const token = tokenMap.get(recalcToken.tokenUuid);
+      const actor = (token.getActor() as MyActor);
+      if (!token) {
+        continue;
+      }
+      let cache: TargetCache = getTargetCache(recalcToken.data, recalcToken.selectionId);
+      if (cache === null) {
+        cache = {
+          selectionId: recalcToken.selectionId,
+          targetUuid: recalcToken.tokenUuid,
+          actorUuid: actor?.uuid,
+          smartState: 'not-applied',
+          appliedState: 'not-applied',
+          calcAddTmpHp: 0,
+          calcFailedDeathSaved: 0,
+          calcHpChange: 0,
+        }
+      }
+
+      if (actor) {
+        cache.immunities = [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))];
+        cache.resistances = [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))];
+        cache.vulnerabilities = [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))];
+      } else {
+        cache.immunities = [];
+        cache.resistances = [];
+        cache.vulnerabilities = [];
+      }
+      
+      setTargetCache(recalcToken.data, cache);
+    }
+  }
+  //#endregion
+
+}
+
+class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardData>> {
+
+  //#region beforeUpsert
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): boolean | void {
+    this.calculateLabel(context);
+    this.calculateRollDisplay(context);
+    this.calcTargetCache(context);
+  }
+
+  private calculateLabel(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
     for (const {newRow} of context.rows) {
-      if (!this.isThisTriggerType(newRow)) {
+      if (newRow.part.data.mode === 'critical') {
+        newRow.part.data.calc$.label = 'DND5E.Critical';
         continue;
       }
 
-      if (newRow.data.mode === 'critical') {
-        newRow.data.calc$.label = 'DND5E.Critical';
-        continue;
-      }
-
-      const baseRoll = newRow.data.source === 'versatile' ? newRow.data.calc$.versatileBaseRoll : newRow.data.calc$.normalBaseRoll;
+      const baseRoll = newRow.part.data.source === 'versatile' ? newRow.part.data.calc$.versatileBaseRoll : newRow.part.data.calc$.normalBaseRoll;
       const damageTypes: DamageType[] = baseRoll.map(roll => roll.options?.flavor).filter(flavor => UtilsRoll.isValidDamageType(flavor)) as DamageType[];
       const isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
       if (isHealing) {
-        newRow.data.calc$.label = 'DND5E.Healing';
+        newRow.part.data.calc$.label = 'DND5E.Healing';
       } else {
-        if (newRow.data.source === 'versatile') {
-          newRow.data.calc$.label = 'DND5E.Versatile';
+        if (newRow.part.data.source === 'versatile') {
+          newRow.part.data.calc$.label = 'DND5E.Versatile';
         } else {
-          newRow.data.calc$.label = 'DND5E.Damage';
+          newRow.part.data.calc$.label = 'DND5E.Damage';
         }
       }
     }
   }
 
-  private calculateRollDisplay(context: IDmlContext<ModularCardTriggerData>): void {
+  private calculateRollDisplay(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
     for (const {newRow} of context.rows) {
-      if (!this.isThisTriggerType(newRow)) {
-        continue;
-      }
-
-      if (!newRow.data.calc$.roll) {
-        newRow.data.calc$.displayFormula = null;
-        newRow.data.calc$.displayDamageTypes = null;
+      if (!newRow.part.data.calc$.roll) {
+        newRow.part.data.calc$.displayFormula = null;
+        newRow.part.data.calc$.displayDamageTypes = null;
         continue;
       }
     
       const damageTypes: DamageType[] = [];
-      let shortenedFormula = newRow.data.calc$.roll.formula;
+      let shortenedFormula = newRow.part.data.calc$.roll.formula;
       for (const damageType of UtilsRoll.getValidDamageTypes()) {
         if (shortenedFormula.match(`\\[${damageType}\\]`)) {
           damageTypes.push(damageType);
@@ -648,170 +719,94 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
 
       // formula without damage comments
-      newRow.data.calc$.displayFormula = shortenedFormula;
-      newRow.data.calc$.displayDamageTypes = damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined;
+      newRow.part.data.calc$.displayFormula = shortenedFormula;
+      newRow.part.data.calc$.displayDamageTypes = damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined;
+    }
+  }
+  
+  private calcTargetCache(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
+    for (const {newRow} of context.rows) {
+      for (const cache of newRow.part.data.calc$.targetCaches) {
+        cache.calcAddTmpHp = 0;
+        cache.calcHpChange = 0;
+        cache.calcFailedDeathSaved = 0;
+        if (newRow.part.data.calc$.roll?.evaluated) {
+          for (let [dmgType, amount] of UtilsRoll.rollToDamageResults(UtilsRoll.fromRollData(newRow.part.data.calc$.roll)).entries()) {
+            if (cache.immunities.includes(dmgType)) {
+              continue;
+            }
+            if (cache.resistances.includes(dmgType)) {
+              amount /= 2;
+            }
+            if (cache.vulnerabilities.includes(dmgType)) {
+              amount *= 2;
+            }
+            amount = Math.ceil(amount);
+            // Assume that negative amounts are from negative modifiers => should be 0.
+            //  Negative healing does not become damage & negative damage does no become healing.
+            amount = Math.max(0, amount);
+            if (ItemCardHelpers.tmpHealingDamageTypes.includes(dmgType)) {
+              cache.calcAddTmpHp += amount;
+            } else if (ItemCardHelpers.healingDamageTypes.includes(dmgType)) {
+              cache.calcHpChange += amount;
+            } else /* damage */ {
+              cache.calcHpChange -= amount;
+
+              // TODO calculate death saves.
+              //  RAW: Crit = 2 fails
+              //  RAW: magic missile = 1 damage source => 1 failed save
+              //  RAW: Scorching Ray = multiple damage sources => multiple failed saves
+            }
+          }
+        }
+      }
     }
   }
   //#endregion
 
   //#region upsert
-  public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<DamageCardData>>): Promise<void> {
     await this.calcDamageFormulas(context);
-    await this.calcTargetCache(context);
     // TODO auto apply healing, but it needs to be sync?
   }
   
-  private async calcTargetCache(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
-    const selectedByMessageId = new Map<string, TargetCardData['selected']>();
-    const newSelectedByMessageId = new Map<string, TargetCardData['selected']>();
-    for (const {newRow, oldRow} of context.rows) {
-      if (!this.isTargetTriggerType(newRow)) {
-        continue;
-      }
-
-      if (!newSelectedByMessageId.has(newRow.messageId)) {
-        newSelectedByMessageId.set(newRow.messageId, []);
-      }
-      if (!selectedByMessageId.has(newRow.messageId)) {
-        selectedByMessageId.set(newRow.messageId, []);
-      }
-      const newSelected = newSelectedByMessageId.get(newRow.messageId);
-      const allSelected = selectedByMessageId.get(newRow.messageId);
-      const oldSelectionIds = (oldRow as ModularCardTriggerData<TargetCardData>)?.data?.selected.map(s => s.selectionId) ?? [];
-      for (const target of newRow.data.selected) {
-        allSelected.push(target);
-        if (!oldSelectionIds.includes(target.selectionId)) {
-          newSelected.push(target);
-        }
-      }
-    }
-
-    const recalcTokens: Array<{selectionId: string, tokenUuid: string, data: DamageCardData}> = [];
-    for (const {newRow, oldRow} of context.rows) {
-      if (!this.isThisTriggerType(newRow) || !this.assumeThisType(oldRow)) {
-        continue;
-      }
-      // Recalc all caches if damage changes
-      if (
-        (newRow.data.calc$.roll?.evaluated !== oldRow?.data?.calc$?.roll?.evaluated) || 
-        (newRow.data.calc$.roll?.evaluated && newRow.data.calc$.roll.formula !== oldRow?.data?.calc$?.roll?.formula)
-      ) {
-        if (selectedByMessageId.has(newRow.messageId)) {
-          for (const selection of selectedByMessageId.get(newRow.messageId)) {
-            recalcTokens.push({data: newRow.data, tokenUuid: selection.tokenUuid, selectionId: selection.selectionId});
-          }
-        }
-        continue;
-      }
-
-      // Calc new targets
-      if (newSelectedByMessageId.has(newRow.messageId)) {
-        for (const selection of newSelectedByMessageId.get(newRow.messageId)) {
-          // Ignore what is already cached, always fetch when a new target has been selected
-          recalcTokens.push({data: newRow.data, tokenUuid: selection.tokenUuid, selectionId: selection.selectionId});
-        }
-      }
-    }
-
-    if (recalcTokens.length === 0) {
-      return;
-    }
-
-    const fetchTokenUuids = new Set<string>();
-    for (const recalcToken of recalcTokens) {
-      fetchTokenUuids.add(recalcToken.tokenUuid);
-    }
-    const tokenDocuments = await UtilsDocument.tokenFromUuid(fetchTokenUuids);
-    for (const recalcToken of recalcTokens) {
-      const actor: MyActor = tokenDocuments.get(recalcToken.tokenUuid).getActor();
-      const currentCache = getTargetCache(recalcToken.data, recalcToken.selectionId);
-      const cache: TargetCache = {
-        ...currentCache ?? {targetUuid: recalcToken.tokenUuid, selectionId: recalcToken.selectionId, appliedState: 'not-applied', smartState: 'not-applied'},
-        actorUuid: actor.uuid,
-        calcHpChange: 0,
-        calcAddTmpHp: 0,
-        calcFailedDeathSaved: 0,
-      };
-      const immunities = [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))];
-      const resistances = [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))];
-      const vulnerabilities = [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))];
-
-      if (recalcToken.data.calc$.roll?.evaluated) {
-        for (let [dmgType, amount] of UtilsRoll.rollToDamageResults(UtilsRoll.fromRollData(recalcToken.data.calc$.roll)).entries()) {
-          if (immunities.includes(dmgType)) {
-            continue;
-          }
-          if (resistances.includes(dmgType)) {
-            amount /= 2;
-          }
-          if (vulnerabilities.includes(dmgType)) {
-            amount *= 2;
-          }
-          amount = Math.ceil(amount);
-          // Assume that negative amounts are from negative modifiers => should be 0.
-          //  Negative healing does not become damage & negative damage does no become healing.
-          amount = Math.max(0, amount);
-          if (ItemCardHelpers.tmpHealingDamageTypes.includes(dmgType)) {
-            cache.calcAddTmpHp += amount;
-          } else if (ItemCardHelpers.healingDamageTypes.includes(dmgType)) {
-            cache.calcHpChange += amount;
-          } else /* damage */ {
-            cache.calcHpChange -= amount;
-
-            // TODO calculate death saves.
-            //  RAW: Crit = 2 fails
-            //  RAW: magic missile = 1 damage source => 1 failed save
-            //  RAW: Scorching Ray = multiple damage sources => multiple failed saves
-          }
-        }
-      }
-
-
-      setTargetCache(recalcToken.data, cache);
-    }
-  }
-  
-  private async calcDamageFormulas(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+  private async calcDamageFormulas(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): Promise<void> {
     const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
-      if (!this.isThisTriggerType(newRow) || !this.assumeThisType(oldRow)) {
-        continue;
-      }
-
       const newRollTerms: TermData[] = [];
-      for (const rollProperty of this.getRollProperties(newRow.data)) {
+      for (const rollProperty of this.getRollProperties(newRow.part.data)) {
         if (newRollTerms.length > 0) {
           newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermData);
         }
-        newRollTerms.push(...(UtilsObject.getProperty(newRow.data, rollProperty)));
+        newRollTerms.push(...(UtilsObject.getProperty(newRow.part.data, rollProperty)));
       }
-      if (newRow.data.userBonus) {
+      if (newRow.part.data.userBonus) {
         if (newRollTerms.length > 0) {
           newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermData);
         }
-        newRollTerms.push(...new Roll(newRow.data.userBonus).terms.map(t => t.toJSON() as TermData));
+        newRollTerms.push(...new Roll(newRow.part.data.userBonus).terms.map(t => t.toJSON() as TermData));
       }
       if (newRollTerms.length === 0) {
         newRollTerms.push(new NumericTerm({number: 0}).toJSON() as TermData);
       }
       
       // Store the requested formula seperatly since the UtilsRoll.setRoll may change it, causing an infinite loop to changing the formula
-      newRow.data.calc$.requestRollFormula = UtilsRoll.createDamageRoll(newRollTerms.map(t => RollTerm.fromData(t)), {critical: newRow.data.mode === 'critical'}).formula;
+      newRow.part.data.calc$.requestRollFormula = UtilsRoll.createDamageRoll(newRollTerms.map(t => RollTerm.fromData(t)), {critical: newRow.part.data.mode === 'critical'}).formula;
 
       // Calc roll
-      if (newRow.data.calc$.requestRollFormula !== oldRow?.data?.calc$?.requestRollFormula) {
-        if (!newRow.data.calc$.roll) {
-          newRow.data.calc$.roll = UtilsRoll.toRollData(new Roll(newRow.data.calc$.requestRollFormula));
+      if (newRow.part.data.calc$.requestRollFormula !== oldRow?.part?.data?.calc$?.requestRollFormula) {
+        if (!newRow.part.data.calc$.roll) {
+          newRow.part.data.calc$.roll = UtilsRoll.toRollData(new Roll(newRow.part.data.calc$.requestRollFormula));
         } else {
-          const oldRoll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
-          const result = await UtilsRoll.setRoll(oldRoll, newRow.data.calc$.requestRollFormula);
-          newRow.data.calc$.roll = UtilsRoll.toRollData(result.result);
+          const oldRoll = UtilsRoll.fromRollData(newRow.part.data.calc$.roll);
+          const result = await UtilsRoll.setRoll(oldRoll, newRow.part.data.calc$.requestRollFormula);
+          newRow.part.data.calc$.roll = UtilsRoll.toRollData(result.result);
           if (result.rollToDisplay) {
             // Auto rolls if original roll was already evaluated
             for (const user of game.users.values()) {
               if (user.active) {
                 showRolls.push({
-                  uuid: newRow.data.calc$.actorUuid,
+                  uuid: newRow.part.data.calc$.actorUuid,
                   permission: `${staticValues.code}ReadDamage`,
                   user: user,
                   meta: result.rollToDisplay
@@ -823,13 +818,13 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
       
       // Execute initial roll
-      if ((newRow.data.phase === 'result') && newRow.data.calc$.roll?.evaluated !== true) {
-        const roll = UtilsRoll.fromRollData(newRow.data.calc$.roll);
-        newRow.data.calc$.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
+      if ((newRow.part.data.phase === 'result') && newRow.part.data.calc$.roll?.evaluated !== true) {
+        const roll = UtilsRoll.fromRollData(newRow.part.data.calc$.roll);
+        newRow.part.data.calc$.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
         for (const user of game.users.values()) {
           if (user.active) {
             showRolls.push({
-              uuid: newRow.data.calc$.actorUuid,
+              uuid: newRow.part.data.calc$.actorUuid,
               permission: `${staticValues.code}ReadDamage`,
               user: user,
               meta: roll,
@@ -860,17 +855,17 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
   //#endregion
 
   //#region afterUpdate
-  public afterUpdate(context: IDmlContext<ModularCardTriggerData>): void {
+  public afterUpdate(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
     this.onBonusChange(context);
   }
   
-  private onBonusChange(context: IDmlContext<ModularCardTriggerData>): void {
+  private onBonusChange(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
     for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId || !this.isThisTriggerType(newRow)) {
+      if (changedByUserId !== game.userId) {
         continue;
       }
-      if (newRow.data.phase === 'bonus-input' && (oldRow?.data as DamageCardData)?.phase !== 'bonus-input') {
-        MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.id}"] input.user-bonus`);
+      if (newRow.part.data.phase === 'bonus-input' && (oldRow?.part?.data as DamageCardData)?.phase !== 'bonus-input') {
+        MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
         return;
       }
     }
@@ -892,18 +887,6 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData> {
       rollProperties.push(['calc$', 'actorBonusRoll']);
     }
     return rollProperties;
-  }
-  
-  private isThisTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
-    return row.typeHandler instanceof DamageCardPart;
-  }
-  
-  private isTargetTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<TargetCardData> {
-    return row.typeHandler instanceof TargetCardPart;
-  }
-  
-  private assumeThisType(row: ModularCardTriggerData): row is ModularCardTriggerData<DamageCardData> {
-    return true;
   }
   //#endregion
 

@@ -128,7 +128,7 @@ export class LayOnHandsCardPart extends DamageCardPart {
     elementBuilder.build(this.getSelector());
 
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
-    ModularCard.registerModularCardTrigger(new LayOnHandsCardTrigger());
+    ModularCard.registerModularCardTrigger(this, new LayOnHandsCardTrigger());
   }
   
   //#region Front end
@@ -140,70 +140,49 @@ export class LayOnHandsCardPart extends DamageCardPart {
 }
 
 
-class LayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData> {
+class LayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<LayOnHandsCardData>> {
   
-  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<LayOnHandsCardData>>): boolean | void {
     this.calcRoll(context);
     this.calcResource(context);
   }
 
-  private calcRoll(context: IDmlContext<ModularCardTriggerData<any>>): void {
+  private calcRoll(context: IDmlContext<ModularCardTriggerData<LayOnHandsCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
-      if (!ModularCard.isType<LayOnHandsCardData>(LayOnHandsCardPart.instance, newRow)) {
-        continue;
-      }
-      if (newRow.data.heal !== oldRow?.data.heal) {
-        const terms = UtilsRoll.fromRollTermData(newRow.data.calc$.normalBaseRoll).terms;
-        terms[0] = new NumericTerm({number: newRow.data.heal, options: {flavor: 'healing'}});
-        newRow.data.calc$.normalBaseRoll = UtilsRoll.toRollData(new Roll(Roll.getFormula(terms))).terms;
+      if (newRow.part.data.heal !== oldRow?.part.data.heal) {
+        const terms = UtilsRoll.fromRollTermData(newRow.part.data.calc$.normalBaseRoll).terms;
+        terms[0] = new NumericTerm({number: newRow.part.data.heal, options: {flavor: 'healing'}});
+        newRow.part.data.calc$.normalBaseRoll = UtilsRoll.toRollData(new Roll(Roll.getFormula(terms))).terms;
       }
     }
   }
 
-  private calcResource(context: IDmlContext<ModularCardTriggerData<any>>): void {
+  private calcResource(context: IDmlContext<ModularCardTriggerData<LayOnHandsCardData>>): void {
     const resourcesByMessageId = new Map<string, ResourceCardData[]>();
     const targetsByMessageId = new Map<string, TargetCardData[]>();
     const layOfHandsByMessageId = new Map<string, LayOnHandsCardData[]>();
 
     for (const {newRow} of context.rows) {
-      if (!resourcesByMessageId.has(newRow.messageId)) {
-        resourcesByMessageId.set(newRow.messageId, []);
-      }
-      if (!targetsByMessageId.has(newRow.messageId)) {
-        targetsByMessageId.set(newRow.messageId, []);
-      }
-      if (!layOfHandsByMessageId.has(newRow.messageId)) {
-        layOfHandsByMessageId.set(newRow.messageId, []);
-      }
-      if (ModularCard.isType<ResourceCardData>(ResourceCardPart.instance, newRow)) {
-        resourcesByMessageId.get(newRow.messageId).push(newRow.data);
-      }
-      if (ModularCard.isType<TargetCardData>(TargetCardPart.instance, newRow)) {
-        targetsByMessageId.get(newRow.messageId).push(newRow.data);
-      }
-      if (ModularCard.isType<LayOnHandsCardData>(LayOnHandsCardPart.instance, newRow)) {
-        layOfHandsByMessageId.get(newRow.messageId).push(newRow.data);
-      }
-    }
-
-    for (const [messageId, layOfHands] of layOfHandsByMessageId.entries()) {
-      const resources = resourcesByMessageId.get(messageId);
-      if (resources.length === 0) {
-        continue;
-      }
-      const targets = targetsByMessageId.get(messageId);
+      const resources: ResourceCardData[] = [];
       let amountOfTargets = 0;
-      for (const target of targets) {
-        amountOfTargets += target.selected.length;
+
+      let healAmount = newRow.part.data.heal + (newRow.part.data.cure * 5);
+      for (const part of newRow.allParts) {
+        if (ModularCard.isType<LayOnHandsCardData>(LayOnHandsCardPart.instance, part)) {
+          // If for some reason there are multiple instances
+          healAmount += part.data.heal;
+          healAmount += (part.data.cure * 5);
+        }
+        if (ModularCard.isType<ResourceCardData>(ResourceCardPart.instance, part)) {
+          resources.push(part.data);
+        }
+        if (ModularCard.isType<TargetCardData>(TargetCardPart.instance, part)) {
+          amountOfTargets += part.data.selected.length;
+        }
       }
       // If there are no targets, assume it has been mentioned verbally => set to 1
       amountOfTargets = Math.max(1, amountOfTargets);
-
-      let healAmount = 0;
-      for (const layOfHand of layOfHands) {
-        healAmount += layOfHand.heal;
-        healAmount += (layOfHand.cure * 5);
-      }
+      
       const resourceAmount = healAmount * amountOfTargets;
       for (const resource of resources.map(r => r.consumeResources).deepFlatten()) {
         if (resource.calc$.uuid.includes('Item.') && resource.calc$.path === 'data.uses.value') {

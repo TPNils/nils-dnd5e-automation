@@ -102,7 +102,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
       .build(this.getSelector())
     
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
-    ModularCard.registerModularCardTrigger(new TemplateCardTrigger());
+    ModularCard.registerModularCardTrigger(this, new TemplateCardTrigger());
     DmlTrigger.registerTrigger(new DmlTriggerTemplate());
   }
 
@@ -122,14 +122,14 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
 
 }
 
-class TemplateCardTrigger implements ITrigger<ModularCardTriggerData> {
+class TemplateCardTrigger implements ITrigger<ModularCardTriggerData<TemplateCardData>> {
 
   //#region afterCreate
-  public afterCreate(context: IAfterDmlContext<ModularCardTriggerData>): void | Promise<void> {
+  public afterCreate(context: IAfterDmlContext<ModularCardTriggerData<TemplateCardData>>): void | Promise<void> {
     this.createTemplatePreview(context);
   }
 
-  private createTemplatePreview(context: IAfterDmlContext<ModularCardTriggerData>): void {
+  private createTemplatePreview(context: IAfterDmlContext<ModularCardTriggerData<TemplateCardData>>): void {
     for (const {newRow, changedByUserId} of context.rows) {
       if (!this.isThisTriggerType(newRow)) {
         continue;
@@ -139,11 +139,11 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData> {
       }
       // Initiate measured template creation
       const template = MyAbilityTemplate.fromItem({
-        target: newRow.data.calc$.target,
+        target: newRow.part.data.calc$.target,
         flags: {
           [staticValues.moduleName]: {
             dmlCallbackMessageId: newRow.messageId,
-            dmlCallbackPartId: newRow.id,
+            dmlCallbackPartId: newRow.part.id,
           }
         }
       });
@@ -156,18 +156,18 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData> {
   //#endregion
   
   //#region afterDelete
-  public async afterDelete(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  public async afterDelete(context: IAfterDmlContext<ModularCardTriggerData<TemplateCardData>>): Promise<void> {
     await this.deleteTemplates(context);
   }
 
-  private async deleteTemplates(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  private async deleteTemplates(context: IAfterDmlContext<ModularCardTriggerData<TemplateCardData>>): Promise<void> {
     const templateUuids = new Set<string>();
     for (const {oldRow, changedByUserId} of context.rows) {
       if (!this.isThisTriggerType(oldRow) || game.userId !== changedByUserId) {
         continue;
       }
 
-      templateUuids.add(oldRow.data.calc$.createdTemplateUuid)
+      templateUuids.add(oldRow.part.data.calc$.createdTemplateUuid)
     }
     templateUuids.delete(null);
     templateUuids.delete(undefined);

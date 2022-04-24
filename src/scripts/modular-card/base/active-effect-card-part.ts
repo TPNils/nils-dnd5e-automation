@@ -91,7 +91,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       getVisualState: context => this.getTargetState(context),
     })
 
-    ModularCard.registerModularCardTrigger(new ActiveEffectCardTrigger());
+    ModularCard.registerModularCardTrigger(TargetCardPart.instance, new TargetCardTrigger());
   }
 
   public getType(): string {
@@ -351,21 +351,18 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
 
 }
 
-class ActiveEffectCardTrigger implements ITrigger<ModularCardTriggerData> {
+class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardData>> {
 
   //#region upsert
-  public async upsert(context: IAfterDmlContext<ModularCardTriggerData>): Promise<void> {
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     await this.calcTargetCache(context);
   }
   
-  private async calcTargetCache(context: IDmlContext<ModularCardTriggerData>): Promise<void> {
+  private async calcTargetCache(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const selectedByMessageId = new Map<string, TargetCardData['selected']>();
     const newSelectedByMessageId = new Map<string, TargetCardData['selected']>();
+    const recalcTokens: Array<{selectionId: string, tokenUuid: string, data: ActiveEffectCardData, messageId: string}> = [];
     for (const {newRow, oldRow} of context.rows) {
-      if (!ModularCard.isType<TargetCardData>(TargetCardPart.instance, newRow)) {
-        continue;
-      }
-
       if (!newSelectedByMessageId.has(newRow.messageId)) {
         newSelectedByMessageId.set(newRow.messageId, []);
       }
@@ -373,26 +370,25 @@ class ActiveEffectCardTrigger implements ITrigger<ModularCardTriggerData> {
         selectedByMessageId.set(newRow.messageId, []);
       }
       const newSelected = newSelectedByMessageId.get(newRow.messageId);
+      const newSelectedThisMessage: TargetCardData['selected'] = [];
       const allSelected = selectedByMessageId.get(newRow.messageId);
-      const oldSelectionIds = (oldRow as ModularCardTriggerData<TargetCardData>)?.data?.selected.map(s => s.selectionId) ?? [];
-      for (const target of newRow.data.selected) {
+      const oldSelectionIds = oldRow?.part?.data?.selected.map(s => s.selectionId) ?? [];
+      for (const target of newRow.part.data.selected) {
         allSelected.push(target);
         if (!oldSelectionIds.includes(target.selectionId)) {
           newSelected.push(target);
+          newSelectedThisMessage.push(target);
         }
       }
-    }
 
-    const recalcTokens: Array<{selectionId: string, tokenUuid: string, data: ActiveEffectCardData, messageId: string}> = [];
-    for (const {newRow} of context.rows) {
-      if (!ModularCard.isType<ActiveEffectCardData>(ActiveEffectCardPart.instance, newRow)) {
-        continue;
-      }
-      // Calc new targets
-      if (newSelectedByMessageId.has(newRow.messageId)) {
-        for (const selection of newSelectedByMessageId.get(newRow.messageId)) {
+      for (const part of newRow.allParts) {
+        if (!ModularCard.isType<ActiveEffectCardData>(ActiveEffectCardPart.instance, part)) {
+          continue;
+        }
+        // Calc new targets
+        for (const selection of newSelectedThisMessage) {
           // Ignore what is already cached, always fetch when a new target has been selected
-          recalcTokens.push({data: newRow.data, tokenUuid: selection.tokenUuid, selectionId: selection.selectionId, messageId: newRow.messageId});
+          recalcTokens.push({data: part.data, tokenUuid: selection.tokenUuid, selectionId: selection.selectionId, messageId: newRow.messageId});
         }
       }
     }
