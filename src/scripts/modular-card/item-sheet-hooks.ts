@@ -19,8 +19,7 @@ export class ItemSheetHooks {
     const result = wrapped(...args);
     const targetFormula = this.getFlag(staticValues.moduleName, 'targetFormula');
     if (targetFormula) {
-      // this.actor.data is sometimes null, causing an error for this.getRollData()
-      setTimeout(() => {
+      const onActorDataIsSet = () => {
         const formula = Roll.replaceFormulaData(targetFormula, this.getRollData());
         if (this.data.data.target == null) {
           this.data.data.target = {
@@ -29,7 +28,16 @@ export class ItemSheetHooks {
           };
         };
         this.data.data.target.value = Roll.safeEval(formula);
-      }, 10);
+      }
+
+      if (this.actor.data != null) {
+        onActorDataIsSet();
+      } else {
+        setTimeout(() => {
+          // this.actor.data is sometimes null, causing an error for this.getRollData()
+          onActorDataIsSet();
+        }, 10);
+      }
     }
     return result;
   }
