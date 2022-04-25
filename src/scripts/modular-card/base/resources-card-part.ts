@@ -186,9 +186,6 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
   private constructor(){}
   
   public create({item, actor}: ModularCardCreateArgs): ResourceCardData {
-    // TODO doesnt consume spells with innate spells and limited uses
-    // TODO doesnt consume usage of bardic inspiration
-    // TODO not visable to the player
     const data: ResourceCardData = {
       consumeResources: [],
       calc$: {
