@@ -533,9 +533,6 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       if (game.userId !== changedByUserId) {
         continue;
       }
-      if (!this.isTargetTriggerType(newRow)) {
-        continue;
-      }
       if (newRow.part.data.calc$.tokenUuid == null) {
         continue;
       }
@@ -623,10 +620,6 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
   private async calcTargetCache(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const missingTokenCaches = new Set<string>();
     for (const {newRow} of context.rows) {
-      if (!this.isTargetTriggerType(newRow)) {
-        continue;
-      }
-
       const cachedUuids = newRow.part.data.calc$.tokenData.map(t => t.tokenUuid);
       for (const selected of newRow.part.data.selected) {
         if (!cachedUuids.includes(selected.tokenUuid)) {
@@ -641,10 +634,6 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
 
     const tokenMap = await UtilsDocument.tokenFromUuid(missingTokenCaches);
     for (const {newRow} of context.rows) {
-      if (!this.isTargetTriggerType(newRow)) {
-        continue;
-      }
-
       const cache = new Map<string, TargetCardData['calc$']['tokenData'][0]>();
       for (const entry of newRow.part.data.calc$.tokenData) {
         cache.set(entry.tokenUuid, entry);
@@ -666,12 +655,6 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         newRow.part.data.calc$.tokenData = Array.from(cache.values());
       }
     }
-  }
-  //#endregion
-  
-  //#region helpers
-  private isTargetTriggerType(row: ModularCardTriggerData): row is ModularCardTriggerData<TargetCardData> {
-    return row.typeHandler instanceof TargetCardPart;
   }
   //#endregion
 
