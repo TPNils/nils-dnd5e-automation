@@ -95,6 +95,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       rollData.prof = item.data.data.prof.term;
     }
 
+    // TODO Fix: there shouldnt be any damage for bless/bane
     const inputDamages: DamageCardData = {
       mode: 'normal',
       phase: 'mode-select',
@@ -360,6 +361,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   //#region Targeting
   private async targetCallback(targetEvents: TargetCallbackData[]): Promise<void> {
+    // TODO seems bugged, smart apply applies when check has succeeded
+    //  Also: when succeeded cantrip save => no damage, otherwise halve
     const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.selected.tokenUuid));
     let tokenHpSnapshot = new Map<string, {hp: number; failedDeathSaves: number; maxHp: number; tempHp: number}>();
     for (const token of tokenDocuments.values()) {

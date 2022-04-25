@@ -357,7 +357,7 @@ export class ModularCard {
     if (UtilsCompare.deepEquals(originalCards, cardsObj)) {
       return Promise.resolve(message);
     }
-    UtilsObject.injectDeleteForDml(originalCards, cardsObj);
+    //UtilsObject.injectDeleteForDml(originalCards, cardsObj);
     
     return message.update({
       [`flags.${staticValues.moduleName}.modularCardData`]: cardsObj

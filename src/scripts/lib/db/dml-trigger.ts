@@ -5,6 +5,18 @@ import { Stoppable } from "../utils/stoppable";
 import { UtilsCompare } from "../utils/utils-compare";
 import { FoundryDocument } from "./utils-document";
 
+// Foundry VTT | Deleted ActiveEffect with id [fXinFhK8O4tC7Ogw] in parent Actor [DaR5iLkwtvG98Oc4]
+// & also ActiveAuras | Removed 'Aura of Protection' from Gilor
+// altijd active effect?
+
+// Uncaught TypeError: currentDocument is undefined
+// [Detected 1 package: nils-automated-compendium]
+//     _postUpdateDocumentCallbacks dml-trigger.ts:349
+//     _handleUpdateDocuments foundry.js:10211
+//     activateSocketListeners foundry.js:9845
+//     emit index.js:143
+
+// is delete = update on parent?
 
 export interface ITrigger<T> {
 
