@@ -11,6 +11,10 @@ import { UtilsTemplate } from "../../utils/utils-template";
 import { ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
+import { ActiveEffectCardPart } from "./active-effect-card-part";
+import { AttackCardPart } from "./attack-card-part";
+import { CheckCardPart } from "./check-card-part";
+import { DamageCardPart } from "./damage-card-part";
 
 export interface TargetCardData {
   selected: Array<{selectionId: string, tokenUuid: string;}>;
@@ -538,6 +542,30 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       if (newRow.part.data.calc$.rangeDefinition?.units !== 'self') {
         continue;
       }
+      
+      let hasTargettableAction = false;
+      for (const part of newRow.allParts) {
+        if (ModularCard.isType(ActiveEffectCardPart.instance, part)) {
+          hasTargettableAction = true;
+          break;
+        }
+        if (ModularCard.isType(AttackCardPart.instance, part)) {
+          hasTargettableAction = true;
+          break;
+        }
+        if (ModularCard.isType(DamageCardPart.instance, part)) {
+          hasTargettableAction = true;
+          break;
+        }
+        if (ModularCard.isType(CheckCardPart.instance, part)) {
+          hasTargettableAction = true;
+          break;
+        }
+      }
+      if (!hasTargettableAction) {
+        continue;
+      }
+
       const token = await UtilsDocument.tokenFromUuid(newRow.part.data.calc$.tokenUuid);
       if (token == null) {
         continue;

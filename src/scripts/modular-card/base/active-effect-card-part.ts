@@ -60,14 +60,20 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
   protected constructor(){}
 
   public async create({item}: ModularCardCreateArgs): Promise<ActiveEffectCardData> {
+    const activeEffects: ActiveEffectData[] = Array.from(item.effects.values())
+      .filter(effectData => !effectData.data.transfer)
+      .map(effect => {
+        const data = deepClone(effect.data);
+        delete data._id;
+        return data;
+      });
+
+    if (activeEffects.length === 0) {
+      return null;
+    }
+
     return {
-      activeEffects: Array.from(item.effects.values())
-        .filter(effectData => !effectData.data.transfer)
-        .map(effect => {
-          const data = deepClone(effect.data);
-          delete data._id;
-          return data;
-        }),
+      activeEffects: activeEffects,
       calc$: {
         targetCaches: [],
       }
