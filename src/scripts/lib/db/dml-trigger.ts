@@ -5,19 +5,6 @@ import { Stoppable } from "../utils/stoppable";
 import { UtilsCompare } from "../utils/utils-compare";
 import { FoundryDocument } from "./utils-document";
 
-// Foundry VTT | Deleted ActiveEffect with id [fXinFhK8O4tC7Ogw] in parent Actor [DaR5iLkwtvG98Oc4]
-// & also ActiveAuras | Removed 'Aura of Protection' from Gilor
-// altijd active effect?
-
-// Uncaught TypeError: currentDocument is undefined
-// [Detected 1 package: nils-automated-compendium]
-//     _postUpdateDocumentCallbacks dml-trigger.ts:349
-//     _handleUpdateDocuments foundry.js:10211
-//     activateSocketListeners foundry.js:9845
-//     emit index.js:143
-
-// is delete = update on parent?
-
 export interface ITrigger<T> {
 
   /**
@@ -359,7 +346,9 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       for (const result of results) {
         const currentDocument = collection.get(result._id);
         if (currentDocument == null) {
-          console.debug('missing currentDocument for some reason?', collection, result)
+          // Found 1 instance, can happen when updating fog of war. Not really sure what to do with this though...
+          console.error('missing currentDocument for some reason?', collection, result);
+          continue;
         }
         oldDocuments[currentDocument.uuid] = new currentDocument.constructor(currentDocument.toObject(), {parent: currentDocument.parent, pack: currentDocument.pack});
       }
@@ -491,6 +480,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     let documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
     const oldDocument = this.extractOldValue(document as any, options);
+    if (oldDocument === undefined) {
+      // See injector (initOldValueInjector) for more info
+      return;
+    }
     let context = new AfterDmlContext<T>(
       [{
         newRow: documentSnapshot,
