@@ -1,4 +1,4 @@
-{{#if (and data.consumeResources.length (nacPerm (nacConcat "ActorObserverUuid:" @data.calc$.actorUuid)))}}
+{{#if (and data.consumeResources.length (nacPerm (nacConcat "ObserverUuid:" data.calc$.actorUuid)))}}
   <table class="{{@root.staticValues.moduleName}}-consume-resouces">
     <thead>
       <tr>
