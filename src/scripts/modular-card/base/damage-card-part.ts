@@ -95,7 +95,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       rollData.prof = item.data.data.prof.term;
     }
 
-    // TODO Fix: there shouldnt be any damage for bless/bane
+    let hasDamage = false;
     const inputDamages: DamageCardData = {
       mode: 'normal',
       phase: 'mode-select',
@@ -111,12 +111,14 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     {
       const damageParts = item.data.data.damage?.parts;
       if (damageParts && damageParts.length > 0) {
+        hasDamage = true;
         inputDamages.calc$.normalBaseRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(damageParts, rollData)).terms;
       }
     }
 
     // Versatile damage
     if (item.data.data.damage?.versatile) {
+      hasDamage = true;
       inputDamages.calc$.versatileBaseRoll = UtilsRoll.toRollData(new Roll(item.data.data.damage.versatile, rollData)).terms;
       const versatileTermWithDamageType = inputDamages.calc$.versatileBaseRoll.find(term => UtilsRoll.isValidDamageType(term.options?.flavor));
       if (!versatileTermWithDamageType) {
@@ -162,6 +164,26 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           inputDamages.calc$[rollBaseKey] = UtilsRoll.toRollData(UtilsRoll.mergeRolls(UtilsRoll.fromRollTermData(currentValue), scalingRoll)).terms;
         }
       }
+    }
+    
+    if (!hasDamage) {
+      for (const rollBaseKey of rollBaseKeys) {
+        const currentValue: TermData[] = inputDamages.calc$[rollBaseKey];
+        if (!currentValue) {
+          continue;
+        }
+        if (currentValue.length === 0) {
+          continue;
+        }
+        if (currentValue.length === 1 && currentValue[0].class === NumericTerm.name && (currentValue[0] as any).number === 0) {
+          continue;
+        }
+        hasDamage = true;
+      }
+    }
+
+    if (!hasDamage) {
+      return null;
     }
     
     // Add damage bonus formula
