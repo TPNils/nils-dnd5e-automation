@@ -15,8 +15,10 @@ import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-p
 export interface TemplateCardData {
   calc$: {
     actorUuid: string;
+    tokenUuid?: string;
     createdTemplateUuid?: string;
     target: MyItemData['data']['target'];
+    rangeUnit?: MyItemData['data']['range']['units'];
   }
 }
 
@@ -25,7 +27,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   public static readonly instance = new TemplateCardPart();
   private constructor(){}
   
-  public create({item, actor}: ModularCardCreateArgs): TemplateCardData {
+  public create({item, actor, token}: ModularCardCreateArgs): TemplateCardData {
     // @ts-expect-error
     const hasAoe = CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type);
     if (!hasAoe) {
@@ -34,7 +36,9 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
     return {
       calc$: {
         actorUuid: actor?.uuid,
+        tokenUuid: token?.uuid,
         target: item.data.data.target,
+        rangeUnit: item.data.data.range?.units
       }
     };
   }
@@ -125,11 +129,11 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
 class TemplateCardTrigger implements ITrigger<ModularCardTriggerData<TemplateCardData>> {
 
   //#region afterCreate
-  public afterCreate(context: IAfterDmlContext<ModularCardTriggerData<TemplateCardData>>): void | Promise<void> {
-    this.createTemplatePreview(context);
+  public async afterCreate(context: IAfterDmlContext<ModularCardTriggerData<TemplateCardData>>): Promise<void> {
+    await this.createTemplatePreview(context);
   }
 
-  private createTemplatePreview(context: IAfterDmlContext<ModularCardTriggerData<TemplateCardData>>): void {
+  private async createTemplatePreview(context: IAfterDmlContext<ModularCardTriggerData<TemplateCardData>>): Promise<void> {
     for (const {newRow, changedByUserId} of context.rows) {
       if (!this.isThisTriggerType(newRow)) {
         continue;
@@ -147,6 +151,19 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData<TemplateCar
           }
         }
       });
+      // Auto place circle templates with range self
+      if (newRow.part.data.calc$.tokenUuid && newRow.part.data.calc$.rangeUnit === 'self' && template.document.data.t === 'circle') {
+        const token = await UtilsDocument.tokenFromUuid(newRow.part.data.calc$.tokenUuid);
+        if (token) {
+          template.document.data.update({
+            x: token.data.x + (token.data.width * token.parent.data.grid / 2),
+            y: token.data.y + (token.data.height * token.parent.data.grid / 2),
+          })
+          UtilsDocument.bulkCreate([template.document]);
+          return;
+        }
+      }
+      // Manually place template
       if (template && (template as MyAbilityTemplate).drawPreview) {
         (template as MyAbilityTemplate).drawPreview();
         return;
