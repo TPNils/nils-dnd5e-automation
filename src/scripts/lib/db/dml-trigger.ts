@@ -358,6 +358,9 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const oldDocuments: {[uuid: string]: FoundryDocument} = {};
       for (const result of results) {
         const currentDocument = collection.get(result._id);
+        if (currentDocument == null) {
+          console.debug('missing currentDocument for some reason?', collection, result)
+        }
         oldDocuments[currentDocument.uuid] = new currentDocument.constructor(currentDocument.toObject(), {parent: currentDocument.parent, pack: currentDocument.pack});
       }
       
