@@ -33,6 +33,14 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       return null;
     }
 
+    // TODO happens on level change wih the Command spell for Erling
+    //   Uncaught (in promise) TypeError: obj is null
+    //   [Detected 1 package: nils-automated-compendium]
+    //   setProperty utils-object.ts:24
+    //   injectDeleteForDml utils-object.ts:32
+    //   setCardPartDatas modular-card.ts:360
+    //   registerHooks spell-level-card-part.ts:176
+
     let spellSlots: SpellLevelCardData['calc$']['spellSlots'] = [];
     for (const spellKey in actor.data.data.spells) {
       const spellData: SpellData = actor.data.data.spells[spellKey];
@@ -146,7 +154,9 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
           ]);
       
           if (item.data.data.level !== spellSlot.level) {
-            item = item.clone({data: {level: spellSlot.level}}, {keepId: true});
+            const itemDataClone = deepClone(item.data);
+            itemDataClone.data.level = spellSlot.level;
+            item = new CONFIG.Item.documentClass(itemDataClone, {parent: item.parent, pack: item.pack});
           }
       
           const responses: Array<Promise<ModularCardPartData>> = [];
