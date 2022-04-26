@@ -22,6 +22,8 @@ interface SpellLevelCardData {
   }
 }
 
+const originalLevelSymbol = Symbol('Original level');
+
 export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
 
   public static readonly instance = new SpellLevelCardPart();
@@ -64,7 +66,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       }
     }
     // The item passed may have its level changed => vanilla foundry/dnd5e behaviour.
-    const originalLevel = (await UtilsDocument.itemFromUuid(item.uuid)).data.data.level
+    const originalLevel = item[originalLevelSymbol] !== undefined ? item[originalLevelSymbol] : (await UtilsDocument.itemFromUuid(item.uuid)).data.data.level;
     spellSlots = spellSlots.filter(slot => slot.level >= originalLevel);
     
     // Sort pact before spell levels
@@ -154,9 +156,10 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
           ]);
       
           if (item.data.data.level !== spellSlot.level) {
-            const itemDataClone = deepClone(item.data);
-            itemDataClone.data.level = spellSlot.level;
-            item = new CONFIG.Item.documentClass(itemDataClone, {parent: item.parent, pack: item.pack});
+            const originalLevel = item.data.data.level;
+            item = item.clone({data: {level: spellSlot.level}}, {keepId: true});
+            item.prepareFinalAttributes(); // Spell save DC, etc...
+            item[originalLevelSymbol] = originalLevel;
           }
       
           const responses: Array<Promise<ModularCardPartData>> = [];
