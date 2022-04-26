@@ -62,7 +62,7 @@ export class UtilsCompare {
       return false;
     }
   
-    if (original === null && compareTo !== null) {
+    if (original === null || compareTo === null && original !== compareTo) {
       // null is an object, undefined is it's own type
       return false;
     }

@@ -14,7 +14,7 @@ export class UtilsObject {
 
   public static setProperty(obj: any, key: string[], value: any): void {
     for (let i = 0; i < key.length - 1; i++) {
-      if (obj == null || typeof obj !== 'object') {
+      if (obj[key[i]] == null || typeof obj[key[i]] !== 'object') {
         obj[key[i]] = {};
       }
 
@@ -42,7 +42,7 @@ export class UtilsObject {
       if (!original.hasOwnProperty(key) || original[key] == null) {
         continue;
       }
-      if (newValue == null || !newValue.hasOwnProperty(key)) {
+      if (newValue?.[key] == null) {
         deleteProperties.add(key);
       } else if (Array.isArray(newValue[key])) {
         // Arrays always 100% overwrite in foundry
