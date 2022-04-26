@@ -274,7 +274,7 @@ export class ModularCard {
     const chatMessageData: ChatMessageDataConstructorData = {
       flags: {
         [staticValues.moduleName]: {
-          modularCardData: parts,
+          modularCardData: ModularCard.createFlagObject(parts),
         }
       }
     };
@@ -331,7 +331,9 @@ export class ModularCard {
 
       const keys = Object.keys(cards).map(Number).sort();
       for (const key of keys) {
-        cardsArray.push(cards[key]);
+        if (cards[key] != null) {
+          cardsArray.push(cards[key]);
+        }
       }
 
       cards = cardsArray;
@@ -344,15 +346,7 @@ export class ModularCard {
       return Promise.resolve(message);
     }
 
-    // Foundry change detection is not perfect.
-    // If a single part of an array has been changed the whole array needs to be updated, this is not a problem with objects.
-    // Ideally all arrays would be converted to object, but thats more complex and this solution will be fine for now.
-    const cardsObj = {};
-    if (data) {
-      for (let i = 0; i < data.length; i++) {
-        cardsObj[i] = data[i];
-      }
-    }
+    const cardsObj = ModularCard.createFlagObject(data);
     const originalCards = message.getFlag(staticValues.moduleName, 'modularCardData');
     if (UtilsCompare.deepEquals(originalCards, cardsObj)) {
       return Promise.resolve(message);
@@ -362,7 +356,23 @@ export class ModularCard {
     return message.update({
       [`flags.${staticValues.moduleName}.modularCardData`]: cardsObj
     });
-    //return message.setFlag(staticValues.moduleName, 'modularCardData', cardsObj);
+  }
+
+  /**
+   * Foundry change detection is not perfect.
+   * If a single part of an array has been changed the whole array needs to be updated, this is not a problem with objects.
+   * Ideally all arrays would be converted to object, but thats more complex and this solution will be fine for now.
+   */
+  private static createFlagObject(data: Array<ModularCardPartData>): {[key: string]: ModularCardPartData} {
+    const cardsObj: {[key: string]: ModularCardPartData} = {};
+    if (data) {
+      for (const part of data) {
+        if (part.data != null) {
+          cardsObj[part.id] = part;
+        }
+      }
+    }
+    return cardsObj;
   }
 
   public static async getHtml(messageId: string, parts: ModularCardPartData[]): Promise<string> {
