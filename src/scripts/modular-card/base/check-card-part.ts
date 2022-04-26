@@ -58,8 +58,8 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
   public static readonly instance = new CheckCardPart();
   private constructor(){}
   
-  public create({item, actor}: ModularCardCreateArgs): CheckCardData {
-    if (!actor || item.data.data.save?.dc == null || !item.data.data.save?.ability) {
+  public create({item}: ModularCardCreateArgs): CheckCardData {
+    if (item.data.data.save?.dc == null || !item.data.data.save?.ability) {
       return null;
     }
 
