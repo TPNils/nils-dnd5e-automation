@@ -455,7 +455,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           const maxHp = Math.max(snapshot.maxHp, snapshot.hp);
           const beforeApplyTokenHp = deepClone(tokenHp);
 
-          tokenHp.tempHp += cache.calcAddTmpHp;
+          // PHB p198. Temp HP does not stack => take the highest
+          tokenHp.tempHp = Math.max(cache.calcAddTmpHp, tokenHp.tempHp);
           let hpChange = cache.calcHpChange;
           if (tokenHp.tempHp > 0 && hpChange < 0) {
             const dmgTempHp = Math.min(tokenHp.tempHp, -hpChange);
