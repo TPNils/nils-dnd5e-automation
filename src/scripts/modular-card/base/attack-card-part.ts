@@ -275,6 +275,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new AttackCardTrigger());
+    ModularCard.registerModularCardTrigger(TargetCardPart.instance, new TargetCardTrigger());
     TargetCardPart.instance.registerIntegration({
       getVisualState: context => this.getTargetState(context),
     });
