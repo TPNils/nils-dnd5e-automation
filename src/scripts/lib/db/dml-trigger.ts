@@ -360,6 +360,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   //#region Before
   private onFoundryBeforeCreate(document: T & {constructor: new (...args: any[]) => T}, data: any, options: DmlOptions, userId: string): void | boolean {
+    const originalDocumentData = deepClone(document.toJSON());
     const context: IDmlContext<T> = {
       rows: [{
         newRow: document,
@@ -372,6 +373,11 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       if (response === false) {
         return false;
       }
+    }
+
+    const totalDiff = UtilsCompare.findDiff(originalDocumentData, document.data);
+    if (totalDiff.changed) {
+      document.data.update(totalDiff.diff);
     }
   }
   
