@@ -1,3 +1,4 @@
+import EmbeddedCollection from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/embedded-collection.mjs";
 import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
 import { RollD20Element } from "../../elements/roll-d20-element";
 import { UtilsElement } from "../../elements/utils-element";
@@ -16,6 +17,7 @@ import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
+const modeOrder: Array<AttackCardData['mode']> = ['disadvantage', 'normal', 'advantage'];
 
 interface TargetCache {
   targetUuid: string;
@@ -32,6 +34,8 @@ export interface AttackCardData {
   userBonus: string;
   calc$: {
     actorUuid?: string;
+    advantageSources: Array<{uuid: string, name: string, image: string}>;
+    disadvantageSources: Array<{uuid: string, name: string, image: string}>;
     hasHalflingLucky: boolean;
     elvenAccuracy: boolean;
     rollBonus?: string;
@@ -95,6 +99,8 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       userBonus: "",
       calc$: {
         targetCaches: [],
+        advantageSources: [],
+        disadvantageSources: [],
         elvenAccuracy: actor?.getFlag("dnd5e", "elvenAccuracy") === true && ["dex", "int", "wis", "cha"].includes(item.abilityMod),
         hasHalflingLucky: actor?.getFlag("dnd5e", "halflingLucky") === true,
         actorUuid: actor?.uuid,
@@ -112,6 +118,79 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       critTreshold = Math.min(critTreshold, actor.data.flags.dnd5e.spellCriticalThreshold);
     }
     attack.calc$.critTreshold = critTreshold;
+
+    {
+      let suffixes = ['all', item.data.data.actionType, item.abilityMod];
+      if (actor) {
+        if (actor.type === 'character') {
+          suffixes.push('humanoid');
+        } else if (actor.type === 'npc' && actor.data.data.details?.type) {
+          suffixes.push(actor.data.data.details.type.custom);
+          suffixes.push(actor.data.data.details.type.value);
+        }
+      }
+      suffixes = suffixes.filter(suffix => !!suffix);
+      
+      {
+        // TODO could also detect midi flags => should probably contact the author for permission
+        let advantage = false;
+        let disadvantage = false;
+        for (const suffix of suffixes) {
+          if (getProperty(actor.data._source, `flags.${staticValues.moduleName}.attack.advantage.${suffix}`) > 0) {
+            advantage = true;
+          }
+          if (getProperty(actor.data._source, `flags.${staticValues.moduleName}.attack.disadvantage.${suffix}`) > 0) {
+            disadvantage = true;
+          }
+        }
+        
+        if (advantage) {
+          attack.calc$.advantageSources.push({
+            uuid: actor.uuid,
+            image: actor.img,
+            name: actor.data.name,
+          });
+        }
+        if (disadvantage) {
+          attack.calc$.disadvantageSources.push({
+            uuid: actor.uuid,
+            image: actor.img,
+            name: actor.data.name,
+          });
+        }
+      }
+
+      for (const effect of actor.getEmbeddedCollection(ActiveEffect.name) as any as Array<ActiveEffect>) {
+        let advantage = false;
+        let disadvantage = false;
+  
+        for (const suffix of suffixes) {
+          for (const change of effect.data.changes) {
+            if (change.key === `data.flags.${staticValues.moduleName}.attack.advantage.${suffix}`) {
+              advantage = true;
+            }
+            if (change.key === `data.flags.${staticValues.moduleName}.attack.disadvantage.${suffix}`) {
+              disadvantage = true;
+            }
+          }
+        }
+  
+        if (advantage) {
+          attack.calc$.advantageSources.push({
+            uuid: effect.uuid,
+            image: effect.data.icon,
+            name: effect.sourceName ?? effect.name,
+          });
+        }
+        if (disadvantage) {
+          attack.calc$.disadvantageSources.push({
+            uuid: effect.uuid,
+            image: effect.data.icon,
+            name: effect.sourceName ?? effect.name,
+          });
+        }
+      }
+    }
 
     return attack;
   }
@@ -237,12 +316,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             modifier--;
           }
           
-          const order: Array<AttackCardData['mode']> = ['disadvantage', 'normal', 'advantage'];
-          const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(part.data.mode) + modifier));
-          if (part.data.mode === order[newIndex]) {
+          const newIndex = Math.max(0, Math.min(modeOrder.length-1, modeOrder.indexOf(part.data.mode) + modifier));
+          if (part.data.mode === modeOrder[newIndex]) {
             return;
           }
-          part.data.mode = order[newIndex];
+          part.data.mode = modeOrder[newIndex];
 
           if (click.shiftKey) {
             part.data.phase = 'result';
@@ -473,6 +551,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
 
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {
+    this.calcRollMode(context);
     this.calcIsCrit(context);
     this.setDamageAsCrit(context);
     this.calcResultCache(context);
@@ -532,6 +611,30 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
         }
       }
     }
+  }
+
+  private calcRollMode(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
+    for (const {newRow, oldRow} of context.rows) {
+      const newMode = this.calcAutoMode(newRow.part.data);
+      if (oldRow) {
+        if (newMode !== this.calcAutoMode(oldRow.part.data)) {
+          newRow.part.data.mode = newMode;
+        }
+      } else {
+        newRow.part.data.mode = newMode;
+      }
+    }
+  }
+
+  private calcAutoMode(data: AttackCardData): AttackCardData['mode'] {
+    let modeIndex = 1;
+    if (data.calc$.advantageSources.length > 0) {
+      modeIndex++;
+    }
+    if (data.calc$.disadvantageSources.length > 0) {
+      modeIndex--;
+    }
+    return modeOrder[modeIndex];
   }
   //#endregion
 
@@ -659,11 +762,5 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
     }
   }
   //#endregion 
-  
-  //#region helpers
-  private isAnyTargetType(row: ModularCardTriggerData): row is ModularCardTriggerData<TargetCardData> {
-    return row.typeHandler instanceof TargetCardPart;
-  }
-  //#endregion
 
 }

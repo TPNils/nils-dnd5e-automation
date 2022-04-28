@@ -4,7 +4,7 @@ import { ActorData } from "@league-of-foundry-developers/foundry-vtt-types/src/f
 interface BaseDocument<DATA> {
   id?: string;
   uuid: string;
-  data: DATA;
+  data: {_source: DATA} & DATA;
   folder?: string;
   getFlag(moduleName: string, key: string): any;
   testUserPermission(user: User, permission: keyof CONST.ENTITY_PERMISSIONS, exact?: boolean);
@@ -62,7 +62,7 @@ export type MyActorData = {
     };
     attributes: {
       [key: string]: any;
-      ac: {​
+      ac: {
         base?: number;
         bonus?: number;
         calc: string;
@@ -112,6 +112,13 @@ export type MyActorData = {
       level: number;
       race?: string;
       spellLevel: number;
+      /** NPC only */
+      type?: {
+        custom?: string;
+        subtype?: string;
+        swarm?: '' | 'tiny' | 'sm' | 'med' | 'lg' | 'huge' | 'grg';
+        value?: 'aberration' | 'beast' | 'celestial' | 'construct' | 'dragon' | 'elemental' | 'fey' | 'fiend' | 'giant' | 'humanoid' | 'monstrosity' | 'ooze' | 'plant' | 'undead';
+      }
       trait?: string;
       xp?: {
         max: number;
