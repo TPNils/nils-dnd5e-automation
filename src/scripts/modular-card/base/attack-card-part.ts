@@ -19,10 +19,10 @@ type RollPhase = 'mode-select' | 'bonus-input' | 'result';
 const modeOrder: Array<AttackCardData['mode']> = ['disadvantage', 'normal', 'advantage'];
 
 interface TargetCache {
-  $targetUuid: string;
-  $actorUuid: string;
-  $ac: number;
-  $resultType?: 'hit' | 'critical-hit' | 'mis' | 'critical-mis';
+  targetUuid$: string;
+  actorUuid$: string;
+  ac$: number;
+  resultType$?: 'hit' | 'critical-hit' | 'mis' | 'critical-mis';
 }
 
 // TODO when expanding attack card, show the user bonus, which can be edited
@@ -413,7 +413,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         let canSeeAc: boolean;
         if (cache.has(selected.tokenUuid)) {
           canSeeAc = UtilsDocument.hasPermissions([{
-            uuid: cache.get(selected.tokenUuid).$actorUuid,
+            uuid: cache.get(selected.tokenUuid).actorUuid$,
             user: game.user,
             permission: `Observer`,
           }], {sync: true}).every(permission => permission.result);
@@ -431,7 +431,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           rowValue = '';
         } else {
           const styles = ['text-align: center'];
-          let resultType = cache.get(selected.tokenUuid).$resultType;
+          let resultType = cache.get(selected.tokenUuid).resultType$;
           if (!canReadAttack && canSeeTotal) {
             if (resultType === 'critical-hit') {
               resultType = 'hit';
@@ -453,12 +453,12 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             }
             case 'hit': {
               styles.push('color: green');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).$ac} <= ${attack.data.roll$?.total}">✓</div>`;
+              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac$} <= ${attack.data.roll$?.total}">✓</div>`;
               break;
             }
             case 'mis': {
               styles.push('color: red');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).$ac} <= ${attack.data.roll$?.total}">✗</div>`;
+              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac$} <= ${attack.data.roll$?.total}">✗</div>`;
               break;
             }
           }
@@ -486,7 +486,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     const cacheByUuid = new Map<string, TargetCache>();
     for (const cache of caches) {
       for (const targetCache of cache.targetCaches$) {
-        cacheByUuid.set(targetCache.$targetUuid, targetCache);
+        cacheByUuid.set(targetCache.targetUuid$, targetCache);
       }
     }
     return cacheByUuid;
@@ -514,7 +514,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
           continue;
         }
         for (const target of part.data.targetCaches$) {
-          cachedTargetUuids.add(target.$targetUuid);
+          cachedTargetUuids.add(target.targetUuid$);
         }
       }
 
@@ -543,16 +543,16 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         }
         const cachedTargetUuids = new Set<string>();
         for (const target of part.data.targetCaches$) {
-          cachedTargetUuids.add(target.$targetUuid);
+          cachedTargetUuids.add(target.targetUuid$);
         }
 
         for (const expectedUuid of allTargetUuids) {
           if (!cachedTargetUuids.has(expectedUuid)) {
             const actor = (tokens.get(expectedUuid).getActor() as MyActor);
             part.data.targetCaches$.push({
-              $targetUuid: expectedUuid,
-              $actorUuid: actor.uuid,
-              $ac: actor.data.data.attributes.ac.value,
+              targetUuid$: expectedUuid,
+              actorUuid$: actor.uuid,
+              ac$: actor.data.data.attributes.ac.value,
             });
             cachedTargetUuids.add(expectedUuid);
           }
@@ -610,20 +610,20 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
       for (const targetCache of newRow.part.data.targetCaches$) {
         if (newRow.part.data.roll$?.evaluated) {
           const firstRoll = newRow.part.data.roll$.terms[0].results.find(r => r.active);
-          if (firstRoll.result === 20 || targetCache.$ac <= newRow.part.data.roll$.total) {
+          if (firstRoll.result === 20 || targetCache.ac$ <= newRow.part.data.roll$.total) {
             // 20 always hits, lower crit treshold does not
             if (firstRoll.result >= newRow.part.data.critTreshold$) {
-              targetCache.$resultType = 'critical-hit';
+              targetCache.resultType$ = 'critical-hit';
             } else {
-              targetCache.$resultType = 'hit';
+              targetCache.resultType$ = 'hit';
             }
           } else if (firstRoll.result === 1) {
-            targetCache.$resultType = 'critical-mis';
+            targetCache.resultType$ = 'critical-mis';
           } else {
-            targetCache.$resultType = 'mis';
+            targetCache.resultType$ = 'mis';
           }
-        } else if (targetCache.$resultType) {
-          delete targetCache.$resultType;
+        } else if (targetCache.resultType$) {
+          delete targetCache.resultType$;
         }
       }
     }

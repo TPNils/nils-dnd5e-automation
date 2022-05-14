@@ -142,8 +142,8 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
 
       for (const attack of attacks) {
         for (const cache of attack.targetCaches$) {
-          if (cache.$resultType == null || cache.$resultType === 'critical-mis' || cache.$resultType === 'mis') {
-            shouldApplyToActors.set(cache.$actorUuid, false);
+          if (cache.resultType$ == null || cache.resultType$ === 'critical-mis' || cache.resultType$ === 'mis') {
+            shouldApplyToActors.set(cache.actorUuid$, false);
           }
         }
       }
