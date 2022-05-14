@@ -15,20 +15,19 @@ import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePe
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 interface TargetCache {
-  selectionId: string;
-  targetUuid: string;
-  actorUuid?: string;
+  selectionId$: string;
+  targetUuid$: string;
+  actorUuid$?: string;
   
   mode: 'normal' | 'advantage' | 'disadvantage';
   phase: 'mode-select' | 'bonus-input' | 'result';
-  resultType?: 'pass' | 'fail'; // There is no critical pass/fail for ability|skill checks or saving throws (RAW) // TODO maybe this needs to be a setting
-  actorBonus: string;
   userBonus: string;
-  hasHalflingLucky: boolean;
-  minRoll?: number;
-  requestRollFormula?: string;
-  roll?: RollData;
-  visibleToUsers: string[];
+  resultType$?: 'pass' | 'fail'; // There is no critical pass/fail for ability|skill checks or saving throws (RAW) // TODO maybe this needs to be a setting
+  actorBonus$: string;
+  hasHalflingLucky$: boolean;
+  minRoll$?: number;
+  requestRollFormula$?: string;
+  roll$?: RollData;
 }
 
 export interface CheckCardData {
@@ -36,17 +35,15 @@ export interface CheckCardData {
   dc: number;
   skill?: keyof MyActorData['data']['skills'];
   iSave?: boolean;
-  calc$: {
-    targetCaches: TargetCache[];
-  }
+  targetCaches$: TargetCache[];
 }
 
 function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache | null {
-  if (!cache.calc$.targetCaches) {
+  if (!cache.targetCaches$) {
     return null;
   }
-  for (const targetCache of cache.calc$.targetCaches) {
-    if (targetCache.selectionId === selectionId) {
+  for (const targetCache of cache.targetCaches$) {
+    if (targetCache.selectionId$ === selectionId) {
       return targetCache;
     }
   }
@@ -67,9 +64,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
       ability: item.data.data.save?.ability,
       dc: item.data.data.save.dc,
       iSave: true,
-      calc$: {
-        targetCaches: []
-      }
+      targetCaches$: []
     };
   }
 
@@ -84,23 +79,22 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
     }
 
     const newTargetCaches = new Map<string, TargetCache>();
-    for (const cache of newData.calc$.targetCaches) {
-      newTargetCaches.set(cache.selectionId, cache);
+    for (const cache of newData.targetCaches$) {
+      newTargetCaches.set(cache.selectionId$, cache);
     }
     const oldTargetCaches = new Map<string, TargetCache>();
-    for (const cache of oldData.calc$.targetCaches) {
-      if (!newTargetCaches.has(cache.selectionId)) {
-        newTargetCaches.set(cache.selectionId, cache);
+    for (const cache of oldData.targetCaches$) {
+      if (!newTargetCaches.has(cache.selectionId$)) {
+        newTargetCaches.set(cache.selectionId$, cache);
       } else {
-        const newCache = newTargetCaches.get(cache.selectionId);
+        const newCache = newTargetCaches.get(cache.selectionId$);
         newCache.mode = cache.mode;
         newCache.phase = cache.phase;
         newCache.userBonus = cache.userBonus;
-        newCache.roll = cache.roll;
-        newCache.visibleToUsers = cache.visibleToUsers;
+        newCache.roll$ = cache.roll$;
       }
     }
-    newData.calc$.targetCaches = Array.from(newTargetCaches.values());
+    newData.targetCaches$ = Array.from(newTargetCaches.values());
     return newData;
   }
 
@@ -108,11 +102,11 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
   public registerHooks(): void {
     const permissionCheck = createPermissionCheck<{part: {data: CheckCardData}}>(({part, subType}) => {
       const cache = getTargetCache(part.data, subType);
-      if (!cache?.actorUuid) {
+      if (!cache?.actorUuid$) {
         return {mustBeGm: true};
       }
       const documents: CreatePermissionCheckArgs['documents'] = [];
-      documents.push({uuid: cache.actorUuid, permission: 'OWNER', security: true});
+      documents.push({uuid: cache.actorUuid$, permission: 'OWNER', security: true});
       return {documents: documents};
     })
     
@@ -236,13 +230,13 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
             return '';
           }
           const d20attributes = {
-            ['data-roll']: cache.roll,
+            ['data-roll']: cache.roll$,
             ['data-bonus-formula']: cache.userBonus,
             ['data-show-bonus']: cache.phase !== 'mode-select',
           };
-          if (cache.actorUuid) {
-            d20attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid}`;
-            d20attributes['data-read-permission'] = `${staticValues.code}ReadCheckUuid:${cache.actorUuid}`;
+          if (cache.actorUuid$) {
+            d20attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid$}`;
+            d20attributes['data-read-permission'] = `${staticValues.code}ReadCheckUuid:${cache.actorUuid$}`;
             d20attributes['data-read-hidden-display-type'] = game.settings.get(staticValues.moduleName, 'checkHiddenRoll');
           }
           const attributeArray: string[] = [];
@@ -301,9 +295,9 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
             })
           }
           
-          const cache = part.data.calc$.targetCaches.find(cache => cache.targetUuid === selected.tokenUuid);
-          const canReadCheck = cache?.actorUuid != null && UtilsDocument.hasPermissions([{
-            uuid: cache.actorUuid,
+          const cache = part.data.targetCaches$.find(cache => cache.targetUuid$ === selected.tokenUuid);
+          const canReadCheck = cache?.actorUuid$ != null && UtilsDocument.hasPermissions([{
+            uuid: cache.actorUuid$,
             user: game.user,
             permission: `${staticValues.code}ReadCheckDc`,
           }], {sync: true}).every(permission => permission.result);
@@ -347,8 +341,8 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       }
       for (const part of newRow.allParts) {
         if (ModularCard.isType(CheckCardPart.instance, part)) {
-          for (const target of part.data.calc$.targetCaches) {
-            cachedSelectionIds.add(target.selectionId);
+          for (const target of part.data.targetCaches$) {
+            cachedSelectionIds.add(target.selectionId$);
           }
         }
       }
@@ -372,31 +366,30 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       for (const part of newRow.allParts) {
         if (ModularCard.isType(CheckCardPart.instance, part)) {
           const cachedBySelectionId = new Set<string>();
-          for (const target of part.data.calc$.targetCaches) {
-            cachedBySelectionId.add(target.selectionId);
+          for (const target of part.data.targetCaches$) {
+            cachedBySelectionId.add(target.selectionId$);
           }
 
           for (const selected of allSelected) {
             if (!cachedBySelectionId.has(selected.selectionId)) {
               const actor = (tokens.get(selected.tokenUuid).getActor() as MyActor);
               const targetCache: TargetCache = {
-                targetUuid: selected.tokenUuid,
-                selectionId: selected.selectionId,
+                targetUuid$: selected.tokenUuid,
+                selectionId$: selected.selectionId,
                 mode: 'normal',
                 phase: 'mode-select',
-                actorBonus: '',
+                actorBonus$: '',
                 userBonus: '',
-                hasHalflingLucky: false,
-                visibleToUsers: Array.from(game.users.values()).filter(user => actor.testUserPermission(user, 'OWNER')).map(user => user.id),
+                hasHalflingLucky$: false,
               };
               if (actor) {
                 const actorAbility = actor.data.data.abilities[part.data.ability];
                 const actorSkill = actor.data.data.skills[part.data.skill];
-                targetCache.actorUuid = actor.uuid;
-                targetCache.hasHalflingLucky = actor?.getFlag("dnd5e", "halflingLucky") === true;
+                targetCache.actorUuid$ = actor.uuid;
+                targetCache.hasHalflingLucky$ = actor?.getFlag("dnd5e", "halflingLucky") === true;
                 // Reliable Talent applies to any skill check we have full or better proficiency in
                 if (actor?.getFlag("dnd5e", "reliableTalent") === true && actorSkill?.value >= 1) {
-                  targetCache.minRoll = 10;
+                  targetCache.minRoll$ = 10;
                 }
 
                 const bonuses = getProperty(actor.data.data, 'bonuses.abilities') || {};
@@ -435,10 +428,10 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
                   }
                 }
 
-                targetCache.actorBonus = Roll.replaceFormulaData(parts.join('+'), data);
+                targetCache.actorBonus$ = Roll.replaceFormulaData(parts.join('+'), data);
               }
 
-              part.data.calc$.targetCaches.push(targetCache);
+              part.data.targetCaches$.push(targetCache);
               cachedBySelectionId.add(selected.selectionId);
             }
           }
@@ -459,16 +452,16 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
 
   private calcResultCache(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): void {
     for (const {newRow} of context.rows) {
-      for (const targetCache of newRow.part.data.calc$.targetCaches) {
-        if (targetCache.roll?.evaluated) {
+      for (const targetCache of newRow.part.data.targetCaches$) {
+        if (targetCache.roll$?.evaluated) {
           // Checks & saves are a success on a match
-          if (targetCache.roll.total >= newRow.part.data.dc) {
-            targetCache.resultType = 'pass';
+          if (targetCache.roll$.total >= newRow.part.data.dc) {
+            targetCache.resultType$ = 'pass';
           } else {
-            targetCache.resultType = 'fail';
+            targetCache.resultType$ = 'fail';
           }
-        } else if (targetCache.resultType) {
-          delete targetCache.resultType;
+        } else if (targetCache.resultType$) {
+          delete targetCache.resultType$;
         }
       }
     }
@@ -483,15 +476,15 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
 
   private async calcTargetRoll(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): Promise<void> {
     for (const {newRow} of context.rows) {
-      for (const target of newRow.part.data.calc$.targetCaches) {
+      for (const target of newRow.part.data.targetCaches$) {
         let baseRoll = new Die({faces: 20, number: 1});
-        if (target.minRoll != null) {
+        if (target.minRoll$ != null) {
           // reroll a base roll 1 once
           // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
           // second 2 = reroll when the roll result is equal to 1 (=1)
-          baseRoll.modifiers.push(`min${target.minRoll}`);
+          baseRoll.modifiers.push(`min${target.minRoll$}`);
         }
-        if (target.hasHalflingLucky) {
+        if (target.hasHalflingLucky$) {
           // reroll a base roll 1 once
           // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
           // second 2 = reroll when the roll result is equal to 1 (=1)
@@ -510,15 +503,15 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
           }
         }
         const parts: string[] = [baseRoll.formula];
-        if (target.actorBonus) {
-          parts.push(target.actorBonus);
+        if (target.actorBonus$) {
+          parts.push(target.actorBonus$);
         }
         
         if (target.userBonus && Roll.validate(target.userBonus)) {
           parts.push(target.userBonus);
         }
 
-        target.requestRollFormula = UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).formula;
+        target.requestRollFormula$ = UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).formula;
       }
     }
   }
@@ -528,26 +521,26 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
     for (const {newRow, oldRow} of context.rows) {
       const oldTargets = new Map<string, TargetCache>();
       if (oldRow) {
-        for (const target of oldRow.part.data.calc$.targetCaches) {
-          oldTargets.set(target.selectionId, target);
+        for (const target of oldRow.part.data.targetCaches$) {
+          oldTargets.set(target.selectionId$, target);
         }
       }
 
-      for (const target of newRow.part.data.calc$.targetCaches) {
-        const oldTarget = oldTargets.get(target.selectionId);
-        if (target.requestRollFormula !== oldTarget?.requestRollFormula) {
-          if (!target.roll) {
-            target.roll = UtilsRoll.toRollData(new Roll(target.requestRollFormula));
+      for (const target of newRow.part.data.targetCaches$) {
+        const oldTarget = oldTargets.get(target.selectionId$);
+        if (target.requestRollFormula$ !== oldTarget?.requestRollFormula$) {
+          if (!target.roll$) {
+            target.roll$ = UtilsRoll.toRollData(new Roll(target.requestRollFormula$));
           } else {
-            const oldRoll = UtilsRoll.fromRollData(target.roll);
-            const result = await UtilsRoll.setRoll(oldRoll, target.requestRollFormula);
-            target.roll = UtilsRoll.toRollData(result.result);
+            const oldRoll = UtilsRoll.fromRollData(target.roll$);
+            const result = await UtilsRoll.setRoll(oldRoll, target.requestRollFormula$);
+            target.roll$ = UtilsRoll.toRollData(result.result);
             if (result.rollToDisplay) {
               // Auto rolls if original roll was already evaluated
               for (const user of game.users.values()) {
                 if (user.active) {
                   showRolls.push({
-                    uuid: target.actorUuid ?? target.targetUuid, // Players don't seem to have owner permission of their own token
+                    uuid: target.actorUuid$ ?? target.targetUuid$, // Players don't seem to have owner permission of their own token
                     permission: `${staticValues.code}ReadCheck`,
                     user: user,
                     meta: result.rollToDisplay,
@@ -559,13 +552,13 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
         }
 
         // Execute initial roll
-        if ((target.phase === 'result') && target.roll?.evaluated !== true) {
-          const roll = UtilsRoll.fromRollData(target.roll);
-          target.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
+        if ((target.phase === 'result') && target.roll$?.evaluated !== true) {
+          const roll = UtilsRoll.fromRollData(target.roll$);
+          target.roll$ = UtilsRoll.toRollData(await roll.roll({async: true}));
           for (const user of game.users.values()) {
             if (user.active) {
               showRolls.push({
-                uuid: target.actorUuid ?? target.targetUuid, // Players don't seem to have owner permission of their own token
+                uuid: target.actorUuid$ ?? target.targetUuid$, // Players don't seem to have owner permission of their own token
                 permission: `${staticValues.code}ReadCheck`,
                 user: user,
                 meta: roll,
@@ -606,9 +599,9 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
       if (changedByUserId !== game.userId) {
         continue;
       }
-      for (let i = 0; i < newRow.part.data.calc$.targetCaches.length; i++) {
-        const newCache = newRow.part.data.calc$.targetCaches[i];
-        const oldCache = oldRow?.part.data?.calc$?.targetCaches?.[i];
+      for (let i = 0; i < newRow.part.data.targetCaches$.length; i++) {
+        const newCache = newRow.part.data.targetCaches$[i];
+        const oldCache = oldRow?.part.data?.targetCaches$?.[i];
         if (newCache.phase === 'bonus-input' && oldCache.phase !== 'bonus-input') {
           MemoryStorageService.setFocusedElementSelector(`${CheckCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
           return;
@@ -617,13 +610,5 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
     }
   }
   //#endregion 
-  
-  //#region helpers
-
-  private isAnyTargetType(row: ModularCardTriggerData): row is ModularCardTriggerData<TargetCardData> {
-    return row.typeHandler instanceof TargetCardPart;
-  }
-
-  //#endregion
 
 }

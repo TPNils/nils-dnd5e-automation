@@ -1,13 +1,13 @@
 <div class="{{@root.moduleName}}-header" data-action="toggle-collapse">
-  <img src="{{data.calc$.img}}" title="{{data.calc$.name}}" width="36" height="36"/>
-  <h3 class="{{@root.moduleName}}-item-name">{{data.calc$.name}}</h3>
+  <img src="{{data.img$}}" title="{{data.name$}}" width="36" height="36"/>
+  <h3 class="{{@root.moduleName}}-item-name">{{data.name$}}</h3>
 </div>
 
 <div class="{{@root.moduleName}}-section description">
-  {{#if data.calc$.description}}
-    {{{data.calc$.description}}}
+  {{#if data.description$}}
+    {{{data.description$}}}
   {{/if}}
-  {{#if data.calc$.materials}}
-    <p><strong>{{ localize "DND5E.RequiredMaterials" }}.</strong> {{data.calc$.materials}}</p>
+  {{#if data.materials$}}
+    <p><strong>{{ localize "DND5E.RequiredMaterials" }}.</strong> {{data.materials$}}</p>
   {{/if}}
 </div>

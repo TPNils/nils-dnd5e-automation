@@ -162,7 +162,7 @@ function getMessageState(allParts: ModularCardPartData[]): MessageState {
     }
     if (ModularCard.isType<CheckCardData>(CheckCardPart.instance, part)) {
       messageState.hasStates.add('check');
-      for (const target of (part.data.calc$.targetCaches ?? [])) {
+      for (const target of (part.data.targetCaches$ ?? [])) {
         if (target.phase === 'result') {
           messageState.completedStates.add('check');
           break;

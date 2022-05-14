@@ -11,43 +11,41 @@ import { ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 import { StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 interface TargetCache {
-  actorUuid: string;
-  selections: Array<{
-    selectionId: string;
-    tokenUuid: string;
+  actorUuid$: string;
+  selections$: Array<{
+    selectionId$: string;
+    tokenUuid$: string;
   }>;
-  appliedEffects: Array<{
-    originalIndex: number;
-    createdUuid: string;
+  appliedEffects$: Array<{
+    originalIndex$: number;
+    createdUuid$: string;
   }>;
 }
 
 export interface ActiveEffectCardData {
   activeEffects: Array<ActiveEffectData>;
-  calc$: {
-    targetCaches: TargetCache[];
-  }
+  targetCaches$: TargetCache[];
 }
 
 function setTargetCache(cache: ActiveEffectCardData, targetCache: TargetCache): void {
-  if (!cache.calc$.targetCaches) {
-    cache.calc$.targetCaches = [];
+  if (!cache.targetCaches$) {
+    cache.targetCaches$ = [];
   }
-  for (let i = 0; i < cache.calc$.targetCaches.length; i++) {
-    if (cache.calc$.targetCaches[i].actorUuid === targetCache.actorUuid) {
-      cache.calc$.targetCaches[i] = targetCache;
+  for (let i = 0; i < cache.targetCaches$.length; i++) {
+    if (cache.targetCaches$[i].actorUuid$ === targetCache.actorUuid$) {
+      cache.targetCaches$[i] = targetCache;
       return;
     }
   }
-  cache.calc$.targetCaches.push(targetCache);
+  cache.targetCaches$.push(targetCache);
 }
 
 function getTargetCache(cache: ActiveEffectCardData, actorUuid: string): TargetCache | null {
-  if (!cache.calc$.targetCaches) {
+  if (!cache.targetCaches$) {
     return null;
   }
-  for (const targetCache of cache.calc$.targetCaches) {
-    if (targetCache.actorUuid === actorUuid) {
+  for (const targetCache of cache.targetCaches$) {
+    if (targetCache.actorUuid$ === actorUuid) {
       return targetCache;
     }
   }
@@ -74,9 +72,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
 
     return {
       activeEffects: activeEffects,
-      calc$: {
-        targetCaches: [],
-      }
+      targetCaches$: [],
     }
   }
 
@@ -134,28 +130,28 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
 
       const actorsByTokenUuid = new Map<string, string>();
       for (const effect of activeEffects) {
-        for (const cache of effect.calc$.targetCaches) {
-          if (!shouldApplyToActors.has(cache.actorUuid)) {
-            shouldApplyToActors.set(cache.actorUuid, true);
+        for (const cache of effect.targetCaches$) {
+          if (!shouldApplyToActors.has(cache.actorUuid$)) {
+            shouldApplyToActors.set(cache.actorUuid$, true);
           }
-          for (const selection of cache.selections) {
-            actorsByTokenUuid.set(selection.tokenUuid, cache.actorUuid);
+          for (const selection of cache.selections$) {
+            actorsByTokenUuid.set(selection.tokenUuid$, cache.actorUuid$);
           }
         }
       }
 
       for (const attack of attacks) {
-        for (const cache of attack.calc$.targetCaches) {
-          if (cache.resultType == null || cache.resultType === 'critical-mis' || cache.resultType === 'mis') {
-            shouldApplyToActors.set(cache.actorUuid, false);
+        for (const cache of attack.targetCaches$) {
+          if (cache.$resultType == null || cache.$resultType === 'critical-mis' || cache.$resultType === 'mis') {
+            shouldApplyToActors.set(cache.$actorUuid, false);
           }
         }
       }
       
       for (const check of checks) {
-        for (const cache of check.calc$.targetCaches) {
-          if (cache.resultType === 'pass') {
-            shouldApplyToActors.set(cache.actorUuid, false);
+        for (const cache of check.targetCaches$) {
+          if (cache.resultType$ === 'pass') {
+            shouldApplyToActors.set(cache.actorUuid$, false);
           }
         }
       }
@@ -182,9 +178,9 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
     for (const targetEvent of targetEvents) {
       for (const part of targetEvent.messageCardParts) {
         if (ModularCard.isType<ActiveEffectCardData>(ActiveEffectCardPart.instance, part)) {
-          for (const targetCache of part.data.calc$.targetCaches) {
-            for (const effect of targetCache.appliedEffects) {
-              allRelevantActiveEffectUuids.add(effect.createdUuid);
+          for (const targetCache of part.data.targetCaches$) {
+            for (const effect of targetCache.appliedEffects$) {
+              allRelevantActiveEffectUuids.add(effect.createdUuid$);
             }
           }
         }
@@ -206,18 +202,18 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
         const expectedActiveEffectIndexes: number[] = [];
         const appliedActiveEffectIndexes: number[] = [];
         const cache = getTargetCache(activeEffectCard.data, actor.uuid);
-        if (targetEvent.apply === 'force-apply' || (targetEvent.apply === 'smart-apply' && applySmartStateByActor.has(cache.actorUuid))) {
+        if (targetEvent.apply === 'force-apply' || (targetEvent.apply === 'smart-apply' && applySmartStateByActor.has(cache.actorUuid$))) {
           for (let i = 0; i < activeEffectCard.data.activeEffects.length; i++) {
             expectedActiveEffectIndexes.push(i);
           }
         }
-        for (const applied of cache.appliedEffects) {
-          if (expectedActiveEffectIndexes.includes(applied.originalIndex)) {
-            if (activeEffectsMap.has(applied.createdUuid)) {
-              appliedActiveEffectIndexes.push(applied.originalIndex);
+        for (const applied of cache.appliedEffects$) {
+          if (expectedActiveEffectIndexes.includes(applied.originalIndex$)) {
+            if (activeEffectsMap.has(applied.createdUuid$)) {
+              appliedActiveEffectIndexes.push(applied.originalIndex$);
             }
           } else {
-            deleteActiveEffectUuids.add(applied.createdUuid);
+            deleteActiveEffectUuids.add(applied.createdUuid$);
           }
         }
 
@@ -258,14 +254,14 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
 
       const activeEffectCards: ModularCardPartData<ActiveEffectCardData>[] = targetEvent.messageCardParts.filter(part => ModularCard.isType<ActiveEffectCardData>(ActiveEffectCardPart.instance, part));
       for (const activeEffectCard of activeEffectCards) {
-        for (const targetCache of activeEffectCard.data.calc$.targetCaches) {
-          targetCache.appliedEffects = targetCache.appliedEffects.filter(applied => {
-            return !deleteActiveEffectUuids.has(applied.createdUuid);
+        for (const targetCache of activeEffectCard.data.targetCaches$) {
+          targetCache.appliedEffects$ = targetCache.appliedEffects$.filter(applied => {
+            return !deleteActiveEffectUuids.has(applied.createdUuid$);
           });
           for (let i = 0; i < activeEffectCard.data.activeEffects.length; i++) {
-            const key = `${targetEvent.messageId}/${activeEffectCard.id}/${targetCache.actorUuid}/${i}`;
+            const key = `${targetEvent.messageId}/${activeEffectCard.id}/${targetCache.actorUuid$}/${i}`;
             if (createdUuidsByOriginKey.has(key)) {
-              targetCache.appliedEffects.push({originalIndex: i, createdUuid: createdUuidsByOriginKey.get(key)});
+              targetCache.appliedEffects$.push({originalIndex$: i, createdUuid$: createdUuidsByOriginKey.get(key)});
             }
           }
         }
@@ -282,9 +278,9 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
         continue;
       }
       activeEffectParts.push(part.data);
-      for (const targetCache of part.data.calc$.targetCaches) {
-        for (const selection of targetCache.selections) {
-          selectionIdToActorUuid.set(selection.selectionId, targetCache.actorUuid);
+      for (const targetCache of part.data.targetCaches$) {
+        for (const selection of targetCache.selections$) {
+          selectionIdToActorUuid.set(selection.selectionId$, targetCache.actorUuid$);
         }
       }
     }
@@ -292,13 +288,13 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
     const states: VisualState[] = [];
     for (const part of activeEffectParts) {
       const addedTargetIds = new Set<string>();
-      for (const targetCache of part.calc$.targetCaches) {
-        const appliedActiveEffects = targetCache.appliedEffects.map(effect => effect.originalIndex);
-        for (const selection of targetCache.selections) {
-          addedTargetIds.add(selection.selectionId)
+      for (const targetCache of part.targetCaches$) {
+        const appliedActiveEffects = targetCache.appliedEffects$.map(effect => effect.originalIndex$);
+        for (const selection of targetCache.selections$) {
+          addedTargetIds.add(selection.selectionId$)
           const visualState: VisualState = {
-            selectionId: selection.selectionId,
-            tokenUuid: selection.tokenUuid,
+            selectionId: selection.selectionId$,
+            tokenUuid: selection.tokenUuid$,
             state: 'not-applied',
             columns: []
           };
@@ -318,9 +314,9 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
           } else if (appliedStates.size === 1 && appliedStates.has(true)) {
             visualState.state = 'applied';
           }
-          if (visualState.state === 'applied' && applySmartStateByActor.has(targetCache.actorUuid)) {
+          if (visualState.state === 'applied' && applySmartStateByActor.has(targetCache.actorUuid$)) {
             visualState.smartState = 'applied';
-          } else if (visualState.state === 'not-applied' && !applySmartStateByActor.has(targetCache.actorUuid)) {
+          } else if (visualState.state === 'not-applied' && !applySmartStateByActor.has(targetCache.actorUuid$)) {
             visualState.smartState = 'applied';
           } else {
             visualState.smartState = 'not-applied';
@@ -424,16 +420,16 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       }
       const currentCache = getTargetCache(recalcToken.data, actor.uuid);
       const cache: TargetCache = {
-        actorUuid: actor.uuid,
-        selections: [],
-        appliedEffects: currentCache ? currentCache.appliedEffects : [],
+        actorUuid$: actor.uuid,
+        selections$: [],
+        appliedEffects$: currentCache ? currentCache.appliedEffects$ : [],
       };
 
       for (const selected of selectedByMessageId.get(recalcToken.messageId) ?? []) {
         if (tokenUuidsByActorUuid.get(actor.uuid).includes(selected.tokenUuid)) {
-          cache.selections.push({
-            selectionId: selected.selectionId,
-            tokenUuid: selected.tokenUuid,
+          cache.selections$.push({
+            selectionId$: selected.selectionId,
+            tokenUuid$: selected.tokenUuid,
           });
         }
       }

@@ -430,7 +430,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         switch (targetEvent.apply) {
           case 'smart-apply': {
             const allHit = attackCards.every(attack => {
-              const hitType = attack.data.calc$.targetCaches.find(target => target.targetUuid === targetEvent.selected.tokenUuid)?.resultType;
+              const hitType = attack.data.targetCaches$.find(target => target.$targetUuid === targetEvent.selected.tokenUuid)?.$resultType;
               return hitType === 'hit' || hitType === 'critical-hit';
             });
             cache.smartState = 'applied';

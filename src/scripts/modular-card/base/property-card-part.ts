@@ -7,9 +7,7 @@ import { ModularCard } from "../modular-card";
 import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 
 interface PropertyCardData {
-  calc$: {
-    properties: string[];
-  }
+  properties$: string[];
 }
 
 export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
@@ -19,9 +17,7 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
   
   public create({item}: {item: MyItem}): PropertyCardData {
     return {
-      calc$: {
-        properties: item.getChatData().properties,
-      }
+      properties$: item.getChatData().properties,
     };
   }
 

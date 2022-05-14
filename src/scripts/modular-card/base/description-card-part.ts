@@ -7,12 +7,10 @@ import { ModularCard } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
 
 interface DescriptionCardData {
-  calc$: {
-    name: string;
-    img: string;
-    description?: string;
-    materials?: string;
-  }
+  name$: string;
+  img$: string;
+  description$?: string;
+  materials$?: string;
 }
 
 function getDefaultCardCollpased(): boolean {
@@ -26,12 +24,10 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   
   public create({item}: ModularCardCreateArgs): DescriptionCardData {
     return {
-      calc$: {
-        name: item.name,
-        img: item.img,
-        description: item.data?.data?.description?.value,
-        materials: item.data?.data?.materials?.value,
-      }
+      name$: item.name,
+      img$: item.img,
+      description$: item.data?.data?.description?.value,
+      materials$: item.data?.data?.materials?.value,
     };
   }
 
@@ -58,7 +54,7 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
       })
       .addOnAttributeChange(({element, attributes}) => {
         return ItemCardHelpers.ifAttrData<DescriptionCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
-          let description = part.data.calc$.description;
+          let description = part.data.description$;
           if (description) {
             const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {};
             if (game.user.isGM) {
@@ -70,10 +66,7 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
             `modules/${staticValues.moduleName}/templates/modular-card/description-part.hbs`, {
               data: {
                 ...part.data,
-                calc$: {
-                  ...part.data.calc$,
-                  description: description,
-                }
+                description$: description,
               },
               messageId: attributes['data-message-id'],
               moduleName: staticValues.moduleName
