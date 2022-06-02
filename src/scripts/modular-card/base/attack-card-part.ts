@@ -216,6 +216,13 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       .listenForAttribute('data-part-id', 'string')
       .listenForAttribute('data-message-id', 'string')
       .listenForAttribute('data-target-id', 'string')
+      .setCss(/*css*/`
+        ${TokenImgElement.selector()} {
+          margin-right: 2px;
+          width: 1em;
+          height: 1em;
+        }
+      `)
       .addListener(new ElementCallbackBuilder()
         .setEvent('click')
         .addSelectorFilter('[data-action="roll"]')
@@ -372,7 +379,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
               }
             }
             const tokenImg = document.createElement(TokenImgElement.selector()) as DynamicElement;
-            tokenImg.style.marginRight = '5px';
             tokenImg.setInput({
               'data-token-uuid': targetCache.targetUuid$
             })

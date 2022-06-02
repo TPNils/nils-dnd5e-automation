@@ -17,7 +17,9 @@
 
 <div class="flavor">
   {{#if roll.evaluated}}
-    {{ localize (nacConcat "DND5E." (nacCapitalize mode)) }}
+    <slot name="label">
+      {{ localize (nacConcat "DND5E." (nacCapitalize mode)) }}
+    </slot>
   {{/if}}
 </div>
 <div class="roll-wrapper">
