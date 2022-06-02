@@ -2,6 +2,7 @@ import { buffer } from "../lib/decorator/buffer";
 import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { provider } from "../provider/provider";
+import { staticValues } from "../static-values";
 
 interface DynamicElementConfig {
   selector: string;
@@ -403,6 +404,12 @@ export class ElementBuilder<INPUT extends object = {}> {
     return this;
   }
 
+  private css: string;
+  public setCss(css: string): this {
+    this.css = css;
+    return this;
+  }
+
   private listenerBuilders: ElementCallbackBuilder[] = [];
   public addListener(listenerBuilder: ElementCallbackBuilder): this {
     this.listenerBuilders.push(listenerBuilder);
@@ -451,6 +458,43 @@ export class ElementBuilder<INPUT extends object = {}> {
     };
 
     customElements.define(config.selector, element);
+    if (this.css) {
+      const dummyStyleSheet = new CSSStyleSheet();
+      // @ts-ignore
+      dummyStyleSheet.replaceSync(this.css)
+
+      const rules: string[] = [];
+      for (let i = 0; i < dummyStyleSheet.cssRules.length; i++) {
+        const cssRule = dummyStyleSheet.cssRules[i];
+        let ruleString = cssRule.cssText;
+        if (cssRule instanceof CSSStyleRule) {
+          const modifiedSelectors: string[] = [];
+
+          for (const selector of cssRule.selectorText.split(',')) {
+            const modifiedSelector: string[] = [];
+            for (const part of selector.split(' ')) {
+              if (part === ':host') {
+                modifiedSelector.push(config.selector);
+              } else if (part) {
+                modifiedSelector.push(part);
+              }
+            }
+            if (!modifiedSelector.includes(config.selector)) {
+              modifiedSelector.unshift(config.selector);
+            }
+            modifiedSelectors.push(modifiedSelector.join(' '));
+          }
+
+          ruleString = modifiedSelectors.join(',') + ' ' + cssRule.cssText.substring(cssRule.cssText.indexOf('{'));
+        }
+        rules.push(ruleString);
+      }
+      const styleElement = document.createElement('style');
+      styleElement.id = staticValues.code + '-element-' + config.selector;
+      styleElement.innerHTML = rules.join('\n');
+      
+      document.head.appendChild(styleElement);
+    }
     provider.getSocket().then(socket => {
       for (let i = 0; i < config.callbacks.length; i++) {
         const callback = config.callbacks[i];
