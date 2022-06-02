@@ -158,15 +158,11 @@ class LayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<LayOnHand
   }
 
   private calcResource(context: IDmlContext<ModularCardTriggerData<LayOnHandsCardData>>): void {
-    const resourcesByMessageId = new Map<string, ResourceCardData[]>();
-    const targetsByMessageId = new Map<string, TargetCardData[]>();
-    const layOfHandsByMessageId = new Map<string, LayOnHandsCardData[]>();
-
     for (const {newRow} of context.rows) {
       const resources: ResourceCardData[] = [];
       let amountOfTargets = 0;
 
-      let healAmount = newRow.part.data.heal + (newRow.part.data.cure * 5);
+      let healAmount = 0;
       for (const part of newRow.allParts) {
         if (ModularCard.isType<LayOnHandsCardData>(LayOnHandsCardPart.instance, part)) {
           // If for some reason there are multiple instances
