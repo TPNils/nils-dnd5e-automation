@@ -437,9 +437,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             await d20Element.setInput(d20attributes);
             elements.push(d20Element);
           }
-          
-          element.innerText = '';
-          element.append(...elements)
+
+          // @ts-ignore
+          element.replaceChildren(...elements);
         }});
       })
       .build(this.getSelector())
