@@ -45,11 +45,11 @@ interface TargetCache {
   /** Disdvantage sources which apply to only this target */
   disadvantageSources$: Array<RollModifierSource>;
 
-  targetUuid$: string;
+  targetUuid$?: string;
   selectionId$: string;
   name$: string;
-  actorUuid$: string;
-  ac$: number;
+  actorUuid$?: string;
+  ac$?: number;
   resultType$?: 'hit' | 'critical-hit' | 'mis' | 'critical-mis';
 }
 
@@ -64,7 +64,22 @@ export interface AttackCardData {
   rollBonus$?: string;
   critTreshold$: number;
   rolls$: AttackRoll[];
-  targetCaches$: TargetCache[]
+  targetCaches$: TargetCache[];
+  dummyCache$: TargetCache;
+}
+
+function getTargetCache(cache: AttackCardData): Map<string, AttackCardData['dummyCache$']> {
+  const cacheMap = new Map<string, AttackCardData['dummyCache$']>();
+  if (!cache) {
+    return cacheMap;
+  }
+  for (const targetCache of cache.targetCaches$) {
+    cacheMap.set(targetCache.selectionId$, targetCache);
+  }
+  if (cache.dummyCache$) {
+    cacheMap.set(cache.dummyCache$.selectionId$, cache.dummyCache$);
+  }
+  return cacheMap;
 }
 
 /**
@@ -123,6 +138,16 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
     const attack: AttackCardData = {
       targetCaches$: [],
+      dummyCache$: {
+        phase: 'mode-select',
+        mode: 'normal',
+        userBonus: '',
+        isSelected$: true,
+        advantageSources$: [],
+        disadvantageSources$: [],
+        selectionId$: 'dummy',
+        name$: 'dummy',
+      },
       rolls$: [],
       advantageSources$: [],
       disadvantageSources$: [],
@@ -346,7 +371,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       .addOnAttributeChange(async ({element, attributes}) => {
         return ItemCardHelpers.ifAttrData<AttackCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
           const elements: Element[] = [];
-          for (const targetCache of part.data.targetCaches$.sort((a, b) => a.name$.localeCompare(b.name$))) {
+          for (const targetCache of Array.from(getTargetCache(part.data).values()).sort((a, b) => a.name$.localeCompare(b.name$))) {
             if (!targetCache.isSelected$) {
               continue;
             }
@@ -378,14 +403,37 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
                 break;
               }
             }
-            const tokenImg = document.createElement(TokenImgElement.selector()) as DynamicElement;
-            tokenImg.setInput({
-              'data-token-uuid': targetCache.targetUuid$
-            })
-            label.append(tokenImg, game.i18n.localize(labelText));
+            if (targetCache.targetUuid$) {
+              const tokenImg = document.createElement(TokenImgElement.selector()) as DynamicElement;
+              tokenImg.setInput({
+                'data-token-uuid': targetCache.targetUuid$
+              })
+              label.append(tokenImg);
+            }
+            label.append(game.i18n.localize(labelText));
             d20Element.appendChild(label);
             d20Element.setAttribute('data-selection-id', targetCache.selectionId$);
             d20Element.setAttribute('data-memory-context', targetCache.selectionId$);
+            await d20Element.setInput(d20attributes);
+            elements.push(d20Element);
+          }
+
+          if (elements.length === 0) {
+            const d20attributes = {
+              ['data-roll']: part.data.rolls$[part.data.dummyCache$.selectedRoll$].roll$,
+              ['data-bonus-formula']: part.data.dummyCache$.userBonus,
+              ['data-show-bonus']: part.data.dummyCache$.phase !== 'mode-select',
+              ['data-override-max-roll']: part.data.critTreshold$,
+            };
+            if (part.data.actorUuid$) {
+              d20attributes['data-interaction-permission'] = `OwnerUuid:${part.data.actorUuid$}`;
+              d20attributes['data-read-permission'] = `${staticValues.code}ReadAttackUuid:${part.data.actorUuid$}`;
+              d20attributes['data-read-hidden-display-type'] = game.settings.get(staticValues.moduleName, 'attackHiddenRoll');
+            }
+
+            const d20Element = document.createElement(RollD20Element.selector()) as DynamicElement;
+            d20Element.setAttribute('data-selection-id', 'dummy');
+            d20Element.setAttribute('data-memory-context', 'dummy');
             await d20Element.setInput(d20attributes);
             elements.push(d20Element);
           }
@@ -518,9 +566,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   
   private readonly getTargetCacheEnricher = (data: ChatPartIdData & ChatPartEnriched<AttackCardData> & {selectionId: string}): {targetCaches: TargetCache[]} => {
     if (data.selectionId === '*') {
-      return {targetCaches: Array.from(this.getTargetCache([data.part.data]).values())};
+      return {targetCaches: Array.from(getTargetCache(data.part.data).values())};
     }
-    return {targetCaches: [this.getTargetCache([data.part.data]).get(data.selectionId)]};
+    return {targetCaches: [getTargetCache(data.part.data).get(data.selectionId)]};
   }
   //#endregion
 
@@ -533,9 +581,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       return [];
     }
 
-    const cache = this.getTargetCache(attackParts.map(attack => attack.data));
     for (let i = 0; i < attackParts.length; i++) {
       const attack = attackParts[i];
+      const cache = getTargetCache(attack.data);
       for (const selected of context.selected) {
         let rowValue: string;
         const canReadAttack = UtilsDocument.hasPermissions([{
@@ -612,16 +660,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
     return visualStates;
   }
-
-  private getTargetCache(caches: AttackCardData[]): Map<string, TargetCache> {
-    const cacheMap = new Map<string, TargetCache>();
-    for (const cache of caches) {
-      for (const targetCache of cache.targetCaches$) {
-        cacheMap.set(targetCache.selectionId$, targetCache);
-      }
-    }
-    return cacheMap;
-  }
   //#endregion
 
 }
@@ -644,6 +682,8 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         if (!ModularCard.isType<AttackCardData>(AttackCardPart.instance, part)) {
           continue;
         }
+        // Dummy is only selected when no real targets are selected
+        part.data.dummyCache$.isSelected$ = allSelectionIds.size === 0;
         for (const target of part.data.targetCaches$) {
           target.isSelected$ = allSelectionIds.has(target.selectionId$);
           cachedSelectionIds.add(target.selectionId$);
@@ -708,6 +748,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
     this.setDamageAsCrit(context);
     this.calcResultCache(context);
     this.linkTargetsWithRolls(context);
+    this.calcAttackRoll(context);
   }
 
   private calcIsCrit(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
@@ -749,10 +790,10 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
 
   private calcResultCache(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow} of context.rows) {
-      for (const targetCache of newRow.part.data.targetCaches$) {
+      for (const targetCache of getTargetCache(newRow.part.data).values()) {
         const roll = newRow.part.data.rolls$[targetCache.selectedRoll$];
-        if (roll?.roll$?.evaluated) {
-          const firstRoll = roll.roll$.terms[0].results.find(r => r.active);
+        const firstRoll = roll?.roll$?.terms?.[0]?.results?.find(r => r.active);
+        if (roll?.roll$?.evaluated && firstRoll) {
           if (firstRoll.result === 20 || targetCache.ac$ <= roll.roll$.total) {
             // 20 always hits, lower crit treshold does not
             if (roll.isCrit$) {
@@ -774,7 +815,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
 
   private calcRollMode(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
-      for (const targetCache of newRow.part.data.targetCaches$) {
+      for (const targetCache of getTargetCache(newRow.part.data).values()) {
         const newMode = this.calcAutoMode(newRow.part.data, targetCache);
         if (oldRow) {
           if (newMode !== this.calcAutoMode(oldRow.part.data, targetCache)) {
@@ -804,7 +845,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
     for (const {newRow} of context.rows) {
       const matchWithRolls: TargetCache[] = [];
       const activeCacheIds = [];
-      for (const cache of newRow.part.data.targetCaches$) {
+      for (const cache of getTargetCache(newRow.part.data).values()) {
         if (cache.isSelected$) {
           matchWithRolls.push(cache);
           activeCacheIds.push(cache.selectionId$);
@@ -862,20 +903,17 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
 
       for (const cache of matchWithRolls) {
         cache.selectedRoll$ = rollPriorityInvertedMap.get(cache.selectionId$);
+        // If the initial selection was the dummy, move it to a real target
+        if (newRow.part.data.rolls$[cache.selectedRoll$].initialSelectionId$ === newRow.part.data.dummyCache$.selectionId$) {
+          newRow.part.data.rolls$[cache.selectedRoll$].initialSelectionId$ === cache.selectionId$;
+        }
       }
     }
   }
-  //#endregion
 
-  //#region upsert
-  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
-    await this.calcAttackRoll(context);
-    await this.rollAttack(context);
-  }
-
-  private async calcAttackRoll(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
+  private calcAttackRoll(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow} of context.rows) {
-      for (const targetCache of newRow.part.data.targetCaches$) {
+      for (const targetCache of getTargetCache(newRow.part.data).values()) {
         if (!targetCache.isSelected$) {
           delete targetCache.requestRollFormula$;
           continue;
@@ -917,15 +955,21 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
       }
     }
   }
+  //#endregion
+
+  //#region upsert
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
+    await this.rollAttack(context);
+  }
 
   private async rollAttack(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
     const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
       const oldTargets = new Map<string, TargetCache>();
-      for (const targetCache of oldRow?.part?.data?.targetCaches$ ?? []) {
+      for (const targetCache of getTargetCache(oldRow?.part?.data).values()) {
         oldTargets.set(targetCache.selectionId$, targetCache)
       }
-      for (const targetCache of newRow.part.data.targetCaches$) {
+      for (const targetCache of getTargetCache(newRow.part.data).values()) {
         const attackRoll = newRow.part.data.rolls$[targetCache.selectedRoll$];
         if (!attackRoll) {
           continue;
@@ -998,10 +1042,10 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
         continue;
       }
       const oldTargets = new Map<string, TargetCache>();
-      for (const targetCache of oldRow?.part?.data?.targetCaches$ ?? []) {
+      for (const targetCache of getTargetCache(oldRow?.part?.data).values()) {
         oldTargets.set(targetCache.selectionId$, targetCache)
       }
-      for (const targetCache of newRow.part.data.targetCaches$) {
+      for (const targetCache of getTargetCache(newRow.part.data).values()) {
         const oldTargetCache = oldTargets.get(targetCache.selectionId$);
         if (targetCache.phase === 'bonus-input' && oldTargetCache?.phase !== 'bonus-input') {
           MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] [data-selection-id="${targetCache.selectionId$}"] input.user-bonus`);
