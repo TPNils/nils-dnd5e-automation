@@ -12,7 +12,7 @@ import { Stoppable } from "../lib/utils/stoppable";
 
   constructor(value?: T) {
     this.value = value;
-    this.valueProvided = true;
+    this.valueProvided = value !== undefined;
   }
 
   public listenFirst(): Promise<T> {
