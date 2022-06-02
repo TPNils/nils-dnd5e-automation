@@ -98,7 +98,11 @@ export class DynamicElement extends HTMLElement {
 
   public getInput(qualifiedName: string): any {
     if (this.inputValues[qualifiedName] === undefined) {
-      return super.getAttribute(qualifiedName);
+      let value = super.getAttribute(qualifiedName);
+      if (this.config.watchingAttributes[qualifiedName]) {
+        value = this.config.watchingAttributes[qualifiedName](value);
+      }
+      return value;
     }
 
     return this.inputValues[qualifiedName].get();
