@@ -96,7 +96,7 @@ export class RollD20Element {
       const slots = (detatchedRoot == null ? element : detatchedRoot).querySelectorAll(`slot[name="${slotName}"]`);
       slots.forEach(slot => {
         for (let i = replaceElements.length - 1; i >= 0; i--) {
-          slot.parentNode.insertBefore(replaceElements[i].cloneNode(true), slot);
+          slot.parentNode.insertBefore(replaceElements[i], slot);
         }
       });
       slots.forEach(slot => {
