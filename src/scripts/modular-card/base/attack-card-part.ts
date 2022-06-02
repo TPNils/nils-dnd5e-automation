@@ -803,9 +803,11 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
   private linkTargetsWithRolls(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow} of context.rows) {
       const matchWithRolls: TargetCache[] = [];
+      const activeCacheIds = [];
       for (const cache of newRow.part.data.targetCaches$) {
         if (cache.isSelected$) {
           matchWithRolls.push(cache);
+          activeCacheIds.push(cache.selectionId$);
         } else {
           delete cache.selectedRoll$;
         }
@@ -814,7 +816,9 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
       const rollPriorityMap = new Map<number, string>();
       // Prio 1: initial roll
       for (let i = 0; i < newRow.part.data.rolls$.length; i++) {
-        rollPriorityMap.set(i, newRow.part.data.rolls$[i].initialSelectionId$);
+        if (activeCacheIds.includes(newRow.part.data.rolls$[i].initialSelectionId$)) {
+          rollPriorityMap.set(i, newRow.part.data.rolls$[i].initialSelectionId$);
+        }
       }
       // Prio 2: retain if already linked
       let assignedSelectionIds = Array.from(rollPriorityMap.values());
