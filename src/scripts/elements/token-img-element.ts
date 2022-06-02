@@ -31,7 +31,6 @@ export class TokenImgElement {
   }
 
   private static doRender: OnAttributeChange<{'data-token-uuid': string, 'data-token-img': string}> = async ({element, attributes}) => {
-    console.log('doRender', attributes)
     if (!attributes['data-token-uuid']) {
       element.textContent = '';
       return;

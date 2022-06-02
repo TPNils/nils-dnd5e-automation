@@ -202,7 +202,6 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
         .addEnricher(this.getTargetCacheEnricher)
         .setPermissionCheck(permissionCheck)
         .setExecute(({messageId, allCardParts, targetCache, click, action}) => {
-          console.log(action)
           let modifier = action === 'mode-plus' ? 1 : -1;
           if (click.shiftKey && modifier > 0) {
             modifier++;
