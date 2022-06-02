@@ -29,13 +29,23 @@ export class TokenImgElement {
       `)
       .addListener(new ElementCallbackBuilder()
         .setEvent('click')
-        .setExecute(async ({element}) => {
+        .setExecute(async ({event, element}) => {
           const token = await UtilsDocument.tokenFromUuid(element.getAttribute('data-token-uuid'));
-          if (!token || !token.visible) {
+          if (!token) {
             return;
           }
 
-          canvas.animatePan({x: token.data.x, y: token.data.y});
+          
+          const canvasToken = game.canvas.tokens.placeables.find(ct => ct.document.uuid === token.uuid);
+          if (!canvasToken || !canvasToken.visible) {
+            return;
+          }
+          if (!event.shiftKey) {
+            canvas.animatePan({x: token.data.x, y: token.data.y});
+          }
+          if (token.canUserModify(game.user, 'update')) {
+            canvasToken.control({releaseOthers: !event.shiftKey});
+          }
         })
       )
       .build(TokenImgElement.selector())
