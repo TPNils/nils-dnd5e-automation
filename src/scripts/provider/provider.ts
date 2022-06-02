@@ -11,7 +11,7 @@ class Provider {
 
   private socket = new ValueProvider<SocketlibSocket>();
   public getSocket(): Promise<SocketlibSocket> {
-    return this.socket.get();
+    return this.socket.listenFirst();
   }
 
   public setSocket(socket: SocketlibSocket): void {

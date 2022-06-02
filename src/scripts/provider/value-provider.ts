@@ -1,12 +1,21 @@
+import { Stoppable } from "../lib/utils/stoppable";
+
 /**
  * Allow to request a value before it may have been initialized, queueing the requests if the value is missing
  */
- export class ValueProvider<T> {
+ export class ValueProvider<T = any> {
+  private nextListenerId = 0;
+  private listeners = new Map<number, (value?: T) => void>();
   private valueProvided = false;
   private value: T;
-  private queue: Array<(value?: T) => void> = [];
+  private requestFirstQueue: Array<(value?: T) => void> = [];
 
-  public get(): Promise<T> {
+  constructor(value?: T) {
+    this.value = value;
+    this.valueProvided = true;
+  }
+
+  public listenFirst(): Promise<T> {
     if (this.valueProvided) {
       return new Promise((resolve) => {
         resolve(this.value);
@@ -17,13 +26,13 @@
         if (this.valueProvided) {
           resolve(this.value);
         } else {
-          this.queue.push(resolve);
+          this.requestFirstQueue.push(resolve);
         }
       });
     }
   }
 
-  public getSync(): T {
+  public get(): T {
     return this.value;
   }
 
@@ -34,9 +43,25 @@
   public set(value: T): void {
     this.valueProvided = true;
     this.value = value;
-    for (const callback of this.queue) {
+    for (const callback of this.requestFirstQueue) {
       callback(value);
     }
-    this.queue = [];
+    for (const callback of this.listeners.values()) {
+      callback(value);
+    }
+    this.requestFirstQueue = [];
+  }
+
+  public listen(callback: (value?: T) => void): Stoppable {
+    const id = this.nextListenerId++;
+    this.listeners.set(id, callback);
+    if (this.valueProvided) {
+      callback(this.value);
+    }
+    return {
+      stop: () => {
+        this.listeners.delete(id);
+      }
+    }
   }
 }

@@ -1,42 +1,9 @@
 import { UtilsElement } from "../elements/utils-element";
-import { Stoppable } from "../lib/utils/stoppable";
-
-export class MemoryValue<T = any> {
-  private nextListenerId = 0;
-  private listeners = new Map<number, (value?: T) => void>();
-  private hasSetValue: boolean;
-  private value?: T;
-
-  public set(value?: T): void {
-    this.value = value;
-    this.hasSetValue = true;
-    for (const listener of this.listeners.values()) {
-      listener(this.value);
-    }
-  }
-
-  public get(): T | undefined {
-    return this.value;
-  }
-
-  public listen(callback: (value?: T) => void): Stoppable {
-    const id = this.nextListenerId++;
-    this.listeners.set(id, callback);
-    if (this.hasSetValue) {
-      callback(this.value);
-    }
-    return {
-      stop: () => {
-        this.listeners.delete(id);
-      }
-    }
-  }
-}
-
+import { ValueProvider } from "../provider/value-provider";
 
 export class MemoryStorageService {
 
-  private static properties = new Map<string, MemoryValue>();
+  private static properties = new Map<string, ValueProvider>();
 
   public static getFocusedElementSelector(): string | null {
     return MemoryStorageService.getValue<string>(`focusedElementSelector`).get();
@@ -46,7 +13,7 @@ export class MemoryStorageService {
     MemoryStorageService.getValue(`focusedElementSelector`).set(selector);
   }
 
-  public static getElementValue<T>(element: Element, subKey: string | string[] = [], defaultValue?: T | (() => T)): MemoryValue<T> {
+  public static getElementValue<T>(element: Element, subKey: string | string[] = [], defaultValue?: T | (() => T)): ValueProvider<T> {
     if (typeof subKey === 'string') {
       subKey = [subKey];
     }
@@ -97,9 +64,9 @@ export class MemoryStorageService {
     return memoryValue;
   }
 
-  private static getValue<T>(key: string): MemoryValue<T> {
+  private static getValue<T>(key: string): ValueProvider<T> {
     if (!MemoryStorageService.properties.has(key)) {
-      MemoryStorageService.properties.set(key, new MemoryValue())
+      MemoryStorageService.properties.set(key, new ValueProvider())
     }
     return MemoryStorageService.properties.get(key);
   }
