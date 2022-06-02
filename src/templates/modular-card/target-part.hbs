@@ -31,7 +31,7 @@
         <button {{#if (or (nacMisPerm (nacConcat 'OwnerUuid:' @root.actorUuid)) (and (or (nacExpr target.state '===' 'partial-applied') (nacExpr target.state '===' 'applied')) (nacMisPerm (nacConcat 'OwnerUuid:' target.actorUuid))))}}disabled{{/if}} data-action="delete" data-delete-uuid="{{target.selectionId}}" class="icon-button delete"><i class="fas fa-trash"></i></button>
         <button {{#if (nacMisPerm (nacConcat 'OwnerUuid:' @root.actorUuid))}}disabled{{/if}} data-action="copy" data-copy-uuid="{{target.tokenUuid}}" class="icon-button copy"><i class="far fa-copy"></i></button>
       </div>
-      <div class="body-cell" {{#if (or target.nameVisibleAnyone (nacPerm (nacConcat "ObserverUuid:" target.actorUuid)) )}}title="{{target.name}}"{{/if}}>{{#if target.img}}<img src="{{target.img}}" height="20px" width="20px">{{/if}}</div>
+      <div class="body-cell" {{#if (or target.nameVisibleAnyone (nacPerm (nacConcat "ObserverUuid:" target.actorUuid)) )}}title="{{target.name}}"{{/if}}><nac-token-img data-token-uuid="{{target.tokenUuid}}" data-token-img="{{target.img}}"></nac-token-img></div>
       {{#each target.row}}
         <div class="body-cell">{{{this}}}</div>
       {{/each}}
