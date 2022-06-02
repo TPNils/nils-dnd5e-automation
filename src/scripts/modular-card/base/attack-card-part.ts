@@ -376,10 +376,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             tokenImg.setInput({
               'data-token-uuid': targetCache.targetUuid$
             })
-            tokenImg.setAttribute('data-token-uuid', targetCache.targetUuid$)
             label.append(tokenImg, game.i18n.localize(labelText));
             d20Element.appendChild(label);
             d20Element.setAttribute('data-selection-id', targetCache.selectionId$);
+            d20Element.setAttribute('data-memory-context', targetCache.selectionId$);
             await d20Element.setInput(d20attributes);
             elements.push(d20Element);
           }
