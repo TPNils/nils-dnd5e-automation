@@ -1,7 +1,7 @@
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
-import { ElementBuilder, OnAttributeChange } from "./element-builder";
+import { ElementBuilder, ElementCallbackBuilder, OnAttributeChange } from "./element-builder";
 
 export class TokenImgElement {
 
@@ -27,6 +27,17 @@ export class TokenImgElement {
           width: 100%;
         }
       `)
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('click')
+        .setExecute(async ({element}) => {
+          const token = await UtilsDocument.tokenFromUuid(element.getAttribute('data-token-uuid'));
+          if (!token || !token.visible) {
+            return;
+          }
+
+          canvas.animatePan({x: token.data.x, y: token.data.y});
+        })
+      )
       .build(TokenImgElement.selector())
   }
 
