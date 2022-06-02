@@ -57,46 +57,46 @@ export class TokenImgElement {
       return;
     }
 
-    const token = await UtilsDocument.tokenFromUuid(attributes['data-token-uuid']);
     let img: HTMLImageElement = element.querySelector('img');
     if (!img) {
       img = document.createElement('img');
-      if (token) {
-        img.addEventListener('mouseenter', () => {
-          if (!canvas.ready) {
-            return;
+      img.addEventListener('mouseenter', async () => {
+        const token = await UtilsDocument.tokenFromUuid(element.getInput('data-token-uuid'));
+        if (!token || !canvas.ready) {
+          return;
+        }
+        for (const canvasToken of game.canvas.tokens.placeables) {
+          if (!canvasToken.visible || !canvasToken.can(game.user, "hover")) {
+            continue;
           }
-          for (const canvasToken of game.canvas.tokens.placeables) {
-            if (!canvasToken.visible || !canvasToken.can(game.user, "hover")) {
-              continue;
-            }
-            if (canvasToken.document.uuid !== token.uuid) {
-              continue;
-            }
-            // @ts-ignore
-            canvasToken._onHoverIn(null, {hoverOutOthers: false});
+          if (canvasToken.document.uuid !== token.uuid) {
+            continue;
           }
-        });
-        img.addEventListener('mouseleave', () => {
-          if (!canvas.ready) {
-            return;
+          // @ts-ignore
+          canvasToken._onHoverIn(null, {hoverOutOthers: false});
+        }
+      });
+      img.addEventListener('mouseleave', async () => {
+        const token = await UtilsDocument.tokenFromUuid(element.getInput('data-token-uuid'));
+        if (!token || !canvas.ready) {
+          return;
+        }
+        for (const canvasToken of game.canvas.tokens.placeables) {
+          if (!canvasToken.visible || !canvasToken.can(game.user, "hover")) {
+            continue;
           }
-          for (const canvasToken of game.canvas.tokens.placeables) {
-            if (!canvasToken.visible || !canvasToken.can(game.user, "hover")) {
-              continue;
-            }
-            if (canvasToken.document.uuid !== token.uuid) {
-              continue;
-            }
-            // @ts-ignore
-            canvasToken._onHoverOut(null, {hoverOutOthers: false});
+          if (canvasToken.document.uuid !== token.uuid) {
+            continue;
           }
-        });
-      }
+          // @ts-ignore
+          canvasToken._onHoverOut(null, {hoverOutOthers: false});
+        }
+      });
       element.appendChild(img);
     }
 
     let imgUrl: string;
+    const token = await UtilsDocument.tokenFromUuid(attributes['data-token-uuid']);
     if (token) {
       imgUrl = token.data.img;
     }

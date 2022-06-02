@@ -35,6 +35,9 @@
   --button-height: calc(2em - 2px);
 
   button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     font-size: var(--font-size-14, 14px);
     background: rgb(190, 189, 178);
     border: 2px groove #eeede0;

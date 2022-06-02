@@ -1,8 +1,9 @@
 import { buffer } from "../lib/decorator/buffer";
 import { Stoppable } from "../lib/utils/stoppable";
-import { UtilsCompare } from "../lib/utils/utils-compare";
 import { provider } from "../provider/provider";
 import { staticValues } from "../static-values";
+import { ValueProvider } from "../provider/value-provider";
+import { UtilsElement } from "./utils-element";
 
 interface DynamicElementConfig {
   selector: string;
@@ -83,16 +84,48 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
   }
 }
 
-class DynamicElement extends HTMLElement {
+export class DynamicElement extends HTMLElement {
   protected config: DynamicElementConfig;
   
-  private readonly baseCallbackContext: BaseCallbackContext<object>;
+  private readonly baseCallbackContext: Omit<BaseCallbackContext<any>, 'attributes'>;
   constructor() {
     super();
     this.baseCallbackContext = {
       element: this,
-      attributes: {},
       addStoppable: (...stoppables: Stoppable[]) => this.unregisters.push(...stoppables),
+    }
+  }
+
+  public getInput(qualifiedName: string): any {
+    if (this.inputValues[qualifiedName] === undefined) {
+      return super.getAttribute(qualifiedName);
+    }
+
+    return this.inputValues[qualifiedName].get();
+  }
+
+  private readonly inputValues: {[qualifiedName: string]: ValueProvider} = {};
+  public async setInput(attributes: {[qualifiedName: string]: any | ValueProvider}): Promise<void> {
+    let changed = false;
+    for (const qualifiedName of Object.keys(attributes)) {
+      const oldValue = this.inputValues[qualifiedName];
+      const newValue = attributes[qualifiedName] instanceof ValueProvider ? (attributes[qualifiedName] as ValueProvider).get() : attributes[qualifiedName];
+      if (this.inputValues[qualifiedName] === undefined) {
+        this.inputValues[qualifiedName] = new ValueProvider();
+      }
+      
+      if (attributes[qualifiedName] instanceof ValueProvider) {
+        this.inputValues[qualifiedName].set(attributes[qualifiedName].get())
+      } else {
+        this.inputValues[qualifiedName].set(attributes[qualifiedName]);
+      }
+      if (oldValue !== newValue) {
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await this.emitInputChanges();
     }
   }
 
@@ -101,30 +134,49 @@ class DynamicElement extends HTMLElement {
    */
   @buffer()
   public async attributeChangedCallback(args: Array<[string, string, string]>): Promise<void> {
-    const changes: AttributeChange<any> = {};
-    for (const attribute of Object.keys(this.config.watchingAttributes)) {
-      changes[attribute] = {
-        changed: false,
-        currentValue: this.baseCallbackContext.attributes[attribute],
-        oldValue: this.baseCallbackContext.attributes[attribute],
+    let changed = false;
+    for (const [name, callbackOldValue, newValue] of args) {
+      const oldValue = this.inputValues[name]?.get();
+      if (newValue !== oldValue) {
+        if (this.inputValues[name] === undefined) {
+          this.inputValues[name] = new ValueProvider();
+        }
+        this.inputValues[name].set(this.config.watchingAttributes[name](newValue));
+        changed = true;
       }
     }
-    for (const [name, oldValue, newValue] of args) {
-      this.baseCallbackContext.attributes[name] = await this.config.watchingAttributes[name](newValue);
-      changes[name].currentValue = this.baseCallbackContext.attributes[name];
+
+    if (changed) {
+      this.emitInputChanges();
     }
+  }
+
+  private lastAttributeEmit: {[qualifiedName: string]: any} = {}
+  private async emitInputChanges(): Promise<void> {
+    if (!this.hasConnected) {
+      return;
+    }
+    const changes: AttributeChange<any> = {};
+    const attributes: object = {};
     let anyChanged = false;
-    for (const attribute of Object.keys(this.config.watchingAttributes)) {
-      changes[attribute].changed = changes[attribute].oldValue !== changes[attribute].currentValue;
-      if (changes[attribute].changed) {
+    for (const qualifiedName of Object.keys(this.config.watchingAttributes)) {
+      attributes[qualifiedName] = await this.getInput(qualifiedName);
+      changes[qualifiedName] = {
+        changed: false,
+        currentValue: attributes[qualifiedName],
+        oldValue: this.lastAttributeEmit[qualifiedName],
+      }
+      changes[qualifiedName].changed = changes[qualifiedName].oldValue !== changes[qualifiedName].currentValue;
+      if (changes[qualifiedName].changed) {
         anyChanged = true;
       }
     }
     if (!anyChanged) {
       return;
     }
+    this.lastAttributeEmit = attributes;
     for (const onAttributeChange of this.config.onAttributeChanges) {
-      await onAttributeChange({...this.baseCallbackContext, changes: changes});
+      await onAttributeChange({...this.baseCallbackContext, attributes: attributes, changes: changes});
     }
   }
 
@@ -132,29 +184,20 @@ class DynamicElement extends HTMLElement {
    * Invoked each time the custom element is appended into a document-connected element.
    * This will happen each time the node is moved, and may happen before the element's contents have been fully parsed. 
    */
+  private hasConnected = false;
   private unregisters: Stoppable[] = [];
   public async connectedCallback(): Promise<void> {
+    this.hasConnected = true;
     // Since attributeChangedCallback is async, ensure the most up-to-date values are available
-    const changes: AttributeChange<any> = {};
-    for (const attribute of Object.keys(this.config.watchingAttributes)) {
-      const value = await this.config.watchingAttributes[attribute](this.getAttribute(attribute));
-      changes[attribute] = {
-        changed: false,
-        currentValue: value,
-        oldValue: this.baseCallbackContext.attributes[attribute],
-      }
-      this.baseCallbackContext.attributes[attribute] = value;
+    const attributes: object = {};
+    for (const qualifiedName of Object.keys(this.config.watchingAttributes)) {
+      attributes[qualifiedName] = await this.getInput(qualifiedName);
     }
     this.registerEventListeners();
     for (const init of this.config.inits) {
-      await init(this.baseCallbackContext);
+      await init({...this.baseCallbackContext, attributes: attributes});
     }
-    for (const attribute of Object.keys(changes)) {
-      changes[attribute].changed = UtilsCompare.deepEquals(changes[attribute].currentValue, changes[attribute].oldValue);
-    }
-    for (const onAttributeChange of this.config.onAttributeChanges) {
-      await onAttributeChange({...this.baseCallbackContext, changes: changes});
-    }
+    await this.emitInputChanges();
   }
 
   /**
@@ -348,7 +391,7 @@ type AttributeChange<T> = {
   };
 };
 export interface BaseCallbackContext<T> {
-  readonly element: HTMLElement;
+  readonly element: DynamicElement;
   readonly attributes: Readonly<Partial<T>>;
   addStoppable(...stoppables: Stoppable[]): void;
 }
@@ -374,6 +417,15 @@ const defaultAttributeTypes = {
     }
     if (value === '') {
       return true;
+    }
+    if (value.toLowerCase() === 'false') {
+      return false;
+    }
+    return Boolean(value);
+  },
+  nullableBoolean: (value: string) => {
+    if (value == null || value === '') {
+      return undefined;
     }
     if (value.toLowerCase() === 'false') {
       return false;
