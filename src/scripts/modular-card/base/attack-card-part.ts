@@ -761,22 +761,4 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
   }
   //#endregion
 
-  //#region afterUpdate
-  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): void | Promise<void> {
-    this.onBonusChange(context);
-  }
-  
-  private onBonusChange(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
-    for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId) {
-        continue;
-      }
-      if (newRow.part.data.phase === 'bonus-input' && (oldRow?.part?.data as AttackCardData)?.phase !== 'bonus-input') {
-        MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
-        return;
-      }
-    }
-  }
-  //#endregion 
-
 }

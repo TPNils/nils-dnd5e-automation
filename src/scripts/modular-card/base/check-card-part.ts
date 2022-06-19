@@ -588,26 +588,4 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
   }
   //#endregion
 
-  //#region afterUpdate
-  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<CheckCardData>>): void | Promise<void> {
-    this.onBonusChange(context);
-  }
-  
-  private onBonusChange(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): void {
-    for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId) {
-        continue;
-      }
-      for (let i = 0; i < newRow.part.data.targetCaches$.length; i++) {
-        const newCache = newRow.part.data.targetCaches$[i];
-        const oldCache = oldRow?.part.data?.targetCaches$?.[i];
-        if (newCache.phase === 'bonus-input' && oldCache.phase !== 'bonus-input') {
-          MemoryStorageService.setFocusedElementSelector(`${CheckCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
-          return;
-        }
-      }
-    }
-  }
-  //#endregion 
-
 }

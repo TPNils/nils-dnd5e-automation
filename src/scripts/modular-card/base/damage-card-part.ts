@@ -880,24 +880,6 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
   }
   //#endregion
 
-  //#region afterUpdate
-  public afterUpdate(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
-    this.onBonusChange(context);
-  }
-  
-  private onBonusChange(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
-    for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId) {
-        continue;
-      }
-      if (newRow.part.data.phase === 'bonus-input' && (oldRow?.part?.data as DamageCardData)?.phase !== 'bonus-input') {
-        MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
-        return;
-      }
-    }
-  }
-  //#endregion
-
   //#region helpers
   private getRollProperties(data: DamageCardData): string[][] {
     const rollProperties: string[][] = [];
