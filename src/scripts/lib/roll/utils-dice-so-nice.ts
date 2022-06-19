@@ -21,7 +21,8 @@ export class UtilsDiceSoNice {
       rollMode = game.settings.get('core', 'rollMode');
     }
 
-    const synchronize = rollMode === 'roll';
+    // @ts-ignore
+    const synchronize = rollMode === 'publicroll' || rollMode === 'roll';
     let blind = rollMode === 'blindroll';
     let whispers: string[] = null;
     if (showUserIds == null) {

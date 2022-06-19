@@ -74,7 +74,12 @@ export class UtilsTemplate {
     let contains = templateDetails.shape?.contains(point.x - templateDetails.x, point.y - templateDetails.y);
     if (contains && wallsBlockTargeting) {
       const r = new Ray({x: point.x, y: point.y}, templateDetails);
-      contains = !canvas.walls?.checkCollision(r, {type: 'movement', mode: 'any'});
+      if (game.version.startsWith('0')) {
+        // @ts-ignore pre 9.x
+        contains = !canvas.walls?.checkCollision(r, {type: 'movement', mode: 'any'});
+      } else {
+        contains = !canvas.walls?.checkCollision(r, {type: 'move', mode: 'any'});
+      }
     }
     if (contains) {
       return true;
