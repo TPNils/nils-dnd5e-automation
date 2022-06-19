@@ -742,6 +742,17 @@ class Git {
     return gulp.src('.').pipe(git.commit(`Updated to ${newVersion}`));
   }
 
+  static async gitDeleteTag() {
+    let version = 'v' + Meta.getManifest().file.version;
+    // Ignore errors
+    try {
+      await execPromise(`git tag -d ${version}`);
+    } catch {}
+    try {
+      await execPromise(`git push --delete origin ${version}`);
+    } catch {}
+  }
+
   static async gitTag() {
     let version = 'v' + Meta.getManifest().file.version;
     await execPromise(`git tag -a ${version} -m "Updated to ${version}"`);
@@ -810,5 +821,10 @@ export const publish = gulp.series(
   Git.gitCommit, 
   Git.gitTag,
   Git.gitPush,
+  Git.gitPushTag
+);
+export const reupload = gulp.series(
+  Git.gitDeleteTag,
+  Git.gitTag,
   Git.gitPushTag
 );
