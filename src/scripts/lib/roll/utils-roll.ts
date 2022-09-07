@@ -495,11 +495,14 @@ export class UtilsRoll {
 
     for (const added of additionalTermsByMergeKey.values()) {
       if (!added.merged) {
-        const operator = new OperatorTerm({operator: '+'});
-        if ((added.terms[0] as any)._evaluated) {
-          operator.evaluate({async: false});
+        if (added.terms.length > 0 && !(added.terms[0] instanceof OperatorTerm)) {
+          const operator = new OperatorTerm({operator: '+'});
+          if ((added.terms[0] as any)._evaluated) {
+            operator.evaluate({async: false});
+          }
+          baseTerms.push(operator);
         }
-        baseTerms.push(...Roll.simplifyTerms([operator, ...added.terms]));
+        baseTerms.push(...Roll.simplifyTerms([...added.terms]));
       }
     }
 

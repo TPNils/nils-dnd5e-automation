@@ -5,7 +5,7 @@
 import glob from 'glob';
 import gulp from 'gulp';
 import fs from 'fs-extra';
-import path from 'path';
+import path, { join } from 'path';
 import chalk from 'chalk';
 import archiver from 'archiver';
 import stringify from 'json-stringify-pretty-compact';
@@ -527,13 +527,31 @@ class BuildActions {
    * Copy packs from foundry to source
    */
   static createUpdateSrcPacks() {
-    return function updateSrcPacks() {
+    return async function updateSrcPacks() {
       const config = Meta.getFoundryConfig();
       if (!config.dataPath) {
         console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
       }
       const manifest = Meta.getManifest();
-      return BuildActions.createCopyFiles([{from: [config.dataPath, 'Data', 'modules', manifest.file.name, 'packs'], to: ['src','packs']}])();
+      const srcPath = ['src','packs'];
+      await BuildActions.createCopyFiles([{from: [config.dataPath, 'Data', 'modules', manifest.file.name, 'packs'], to: srcPath}])();
+      for (const fileName of fs.readdirSync(path.join(...srcPath))) {
+        const lines = fs.readFileSync(path.join(...srcPath, fileName), {encoding: 'UTF-8'}).split('\n');
+        const filteredLines = [];
+        const foundIds = new Set();
+        for (let i = lines.length - 1; i >= 0; i--) {
+          if (!lines[i]) {
+            continue;
+          }
+          const line = JSON.parse(lines[i]);
+          if (foundIds.has(line._id)) {
+            continue;
+          }
+          foundIds.add(line._id);
+          filteredLines.unshift(lines[i]);
+        }
+        fs.writeFileSync(path.join(...srcPath, fileName), filteredLines.join('\n'), {encoding: 'UTF-8'});
+      }
     }
   }
 
@@ -742,6 +760,17 @@ class Git {
     return gulp.src('.').pipe(git.commit(`Updated to ${newVersion}`));
   }
 
+  static async gitDeleteTag() {
+    let version = 'v' + Meta.getManifest().file.version;
+    // Ignore errors
+    try {
+      await execPromise(`git tag -d ${version}`);
+    } catch {}
+    try {
+      await execPromise(`git push --delete origin ${version}`);
+    } catch {}
+  }
+
   static async gitTag() {
     let version = 'v' + Meta.getManifest().file.version;
     await execPromise(`git tag -a ${version} -m "Updated to ${version}"`);
@@ -810,5 +839,10 @@ export const publish = gulp.series(
   Git.gitCommit, 
   Git.gitTag,
   Git.gitPush,
+  Git.gitPushTag
+);
+export const reupload = gulp.series(
+  Git.gitDeleteTag,
+  Git.gitTag,
   Git.gitPushTag
 );

@@ -12,7 +12,7 @@ const refreshMessages = () => {
   }
 };
 
-const partialVisibilitySetting = {
+const partialVisibilitySetting: ClientSettings.PartialSettingConfig<string> = {
   hint: `
     *All details*: Nothing is hidden, all is visible to everyone.
     *Permission*: Require the observer permission of the item.
@@ -32,7 +32,7 @@ const partialVisibilitySetting = {
   onChange: refreshMessages,
 };
 
-const partialHidingRollSetting = {
+const partialHidingRollSetting: ClientSettings.PartialSettingConfig<string> = {
   hint: `
     *Hidden*: Nothing is shown.
     *Show total*: Only the total is shown, the roll result and bonuses are hidden.
@@ -62,35 +62,35 @@ export class ModuleSettings {
   @RunOnce()
   private static registerSettings(): void {
     // Define a new setting which can be stored and retrieved
-    game.settings.register(staticValues.moduleName, 'attackVisibility', {
+    game.settings.register<string, string, string>(staticValues.moduleName, 'attackVisibility', {
       ...partialVisibilitySetting,
       name: 'Show attack roll',
     });
-    game.settings.register(staticValues.moduleName, 'attackHiddenRoll', {
+    game.settings.register<string, string, string>(staticValues.moduleName, 'attackHiddenRoll', {
       ...partialHidingRollSetting,
       name: 'Hidden attack roll behaviour',
     });
-    game.settings.register(staticValues.moduleName, 'damageVisibility', {
+    game.settings.register<string, string, string>(staticValues.moduleName, 'damageVisibility', {
       ...partialVisibilitySetting,
       name: 'Show damage roll',
     });
-    game.settings.register(staticValues.moduleName, 'damageHiddenRoll', {
+    game.settings.register<string, string, string>(staticValues.moduleName, 'damageHiddenRoll', {
       ...partialHidingRollSetting,
       name: 'Hidden damage roll behaviour',
     });
-    game.settings.register(staticValues.moduleName, 'immunityVisibility', {
+    game.settings.register<string, string, string>(staticValues.moduleName, 'immunityVisibility', {
       ...partialVisibilitySetting,
       name: 'Show immunity, resistance & vulnerabilities',
     });
-    game.settings.register(staticValues.moduleName, 'checkVisibility', {
+    game.settings.register<string, string, string>(staticValues.moduleName, 'checkVisibility', {
       ...partialVisibilitySetting,
       name: 'Show skill check and saving throw roll',
     });
-    game.settings.register(staticValues.moduleName, 'checkHiddenRoll', {
+    game.settings.register<string, string, string>(staticValues.moduleName, 'checkHiddenRoll', {
       ...partialHidingRollSetting,
       name: 'Hidden skill check and saving throw roll behaviour',
     });
-    game.settings.register(staticValues.moduleName, 'checkDcVisibility', {
+    game.settings.register<string, string, string>(staticValues.moduleName, 'checkDcVisibility', {
       ...partialVisibilitySetting,
       name: 'Show skill check DC',
       hint: `
@@ -100,7 +100,7 @@ export class ModuleSettings {
         *Player or permission*: Match 'Permission' or 'Player'.
       `,
     });
-    game.settings.register(staticValues.moduleName, 'aoeTargetRule', {
+    game.settings.register<string, string, string>(staticValues.moduleName, 'aoeTargetRule', {
       name: 'Area of effect rules (targeting)',
       hint: `
         *DMG*: If a token is standing in an affected query which is at least 50% in the template area.

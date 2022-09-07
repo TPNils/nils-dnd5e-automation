@@ -43,7 +43,6 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
       x: 0,
       y: 0,
       flags: flags,
-      // @ts-expect-error
       fillColor: game.user.color
     };
 

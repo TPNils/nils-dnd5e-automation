@@ -159,9 +159,22 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           if (!currentValue) {
             continue;
           }
-          const scalingRoll = new Roll(scaling.formula == null || scaling.formula.length === 0 ? Roll.getFormula(currentValue.map(RollTerm.fromData)) : scaling.formula, rollData).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
+          const currentRoll = UtilsRoll.fromRollTermData(currentValue);
+          let scalingFormula = scaling.formula == null || scaling.formula.length === 0 ? Roll.getFormula(currentValue.map(RollTerm.fromData)) : scaling.formula;
+          let scalingDamageType: DamageType = '';
+          for (let i = currentValue.length - 1; i >= 0; i--) {
+            const flavor = currentValue[i].options.flavor;
+            if (UtilsRoll.isValidDamageType(flavor)) {
+              scalingDamageType = flavor;
+              break;
+            }
+          }
+          if (scalingDamageType) {
+            scalingFormula += `[${scalingDamageType}]`;
+          }
+          const scalingRoll = new Roll(scalingFormula, rollData, deepClone(currentRoll.options)).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
           // Override normal roll since cantrip scaling is static, not dynamic like level scaling
-          inputDamages.calc$[rollBaseKey] = UtilsRoll.toRollData(UtilsRoll.mergeRolls(UtilsRoll.fromRollTermData(currentValue), scalingRoll)).terms;
+          inputDamages.calc$[rollBaseKey] = UtilsRoll.toRollData(UtilsRoll.mergeRolls(currentRoll, scalingRoll)).terms;
         }
       }
     }
@@ -877,24 +890,6 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
       }
       return rollPromises;
     });
-  }
-  //#endregion
-
-  //#region afterUpdate
-  public afterUpdate(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
-    this.onBonusChange(context);
-  }
-  
-  private onBonusChange(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
-    for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId) {
-        continue;
-      }
-      if (newRow.part.data.phase === 'bonus-input' && (oldRow?.part?.data as DamageCardData)?.phase !== 'bonus-input') {
-        MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
-        return;
-      }
-    }
   }
   //#endregion
 

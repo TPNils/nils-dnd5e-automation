@@ -5,6 +5,11 @@ import { Stoppable } from "../utils/stoppable";
 import { UtilsCompare } from "../utils/utils-compare";
 import { FoundryDocument } from "./utils-document";
 
+const unsupportedAfterDocuments = [
+  FogExploration, // Old document is only available on the client
+];
+const unsupportedAfterDocumentNames = unsupportedAfterDocuments.map(doc => doc.documentName);
+
 export interface ITrigger<T> {
 
   /**
@@ -246,16 +251,28 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   
     // after
     if (typeof trigger.afterCreate === 'function') {
+      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
+        throw new Error(`${this.documentName} does not support the after trigger`);
+      }
       unregisterTriggers.push(this.afterCallbackGroups.get('create').register(trigger.afterCreate.bind(trigger)));
     }
     if (typeof trigger.afterUpdate === 'function') {
+      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
+        throw new Error(`${this.documentName} does not support the after trigger`);
+      }
       unregisterTriggers.push(this.afterCallbackGroups.get('update').register(trigger.afterUpdate.bind(trigger)));
     }
     if (typeof trigger.afterUpsert === 'function') {
+      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
+        throw new Error(`${this.documentName} does not support the after trigger`);
+      }
       unregisterTriggers.push(this.afterCallbackGroups.get('create').register(trigger.afterUpsert.bind(trigger)));
       unregisterTriggers.push(this.afterCallbackGroups.get('update').register(trigger.afterUpsert.bind(trigger)));
     }
     if (typeof trigger.afterDelete === 'function') {
+      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
+        throw new Error(`${this.documentName} does not support the after trigger`);
+      }
       unregisterTriggers.push(this.afterCallbackGroups.get('delete').register(trigger.afterDelete.bind(trigger)));
     }
 
@@ -339,21 +356,30 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     // @ts-ignore
     ClientDatabaseBackend.prototype._postUpdateDocumentCallbacks = function (...args: any[]): void {
       const collection = args[0];
-      const results: any[] = args[1];
-      const options: any = args[2].options;
-
-      const oldDocuments: {[uuid: string]: FoundryDocument} = {};
-      for (const result of results) {
-        const currentDocument = collection.get(result._id);
-        if (currentDocument == null) {
-          // Found 1 instance, can happen when updating fog of war. Not really sure what to do with this though...
-          console.error('missing currentDocument for some reason?', collection, result);
-          continue;
+      let canInject = true;
+      for (const unsupportedAfterDocument of unsupportedAfterDocuments) {
+        if (game.collections.get(unsupportedAfterDocument.documentName) === collection) {
+          canInject = false;
+          break;
         }
-        oldDocuments[currentDocument.uuid] = new currentDocument.constructor(currentDocument.toObject(), {parent: currentDocument.parent, pack: currentDocument.pack});
       }
-      
-      options[Wrapper.oldDocumentSymbol] = oldDocuments;
+      if (canInject) {
+        const results: any[] = args[1];
+        const options: any = args[2].options;
+  
+        const oldDocuments: {[uuid: string]: FoundryDocument} = {};
+        for (const result of results) {
+          const currentDocument = collection.get(result._id);
+          if (currentDocument == null) {
+            // Found 1 instance, can happen when updating fog of war. Not really sure what to do with this though...
+            console.error('missing currentDocument for some reason?', collection, result);
+            continue;
+          }
+          oldDocuments[currentDocument.uuid] = new currentDocument.constructor(currentDocument.toObject(), {parent: currentDocument.parent, pack: currentDocument.pack});
+        }
+        
+        options[Wrapper.oldDocumentSymbol] = oldDocuments;
+      }
       return originalFunction.call(this, ...args);
     }
   }

@@ -272,10 +272,12 @@ export type MyItemData = {
   }
 }
 
-export type MyItem = Item & BaseDocument<MyItemData> & {
+export type MyItem = Omit<Item, 'getRollData', 'parent'> & BaseDocument<MyItemData> & {
   name: string;
+  type: 'weapon' | 'equipment' | 'consumable' | 'tool' | 'loot' | 'class' | 'spell' | 'feat' | 'backpack';
   parent: MyActor;
   readonly abilityMod: keyof MyActorData['data']['abilities']
+  getRollData: () => {[key: string]: any};
   getChatData: () => any;
   roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
   displayCard({}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
@@ -287,6 +289,7 @@ export type MyItem = Item & BaseDocument<MyItemData> & {
 };
 
 export type MyActor = Actor & BaseDocument<MyActorData> & {
+  type: 'character' | 'npc' | 'vehicle';
   items: Map<string, MyItem>;
   parent: any;
   pack: any;

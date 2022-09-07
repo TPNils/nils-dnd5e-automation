@@ -1,6 +1,6 @@
 {
   "name": "nils-automated-compendium",
-  "version": "2.0.5-beta",
+  "version": "2.0.7-beta",
   "type": "module",
   "description": "",
   "scripts": {
@@ -10,6 +10,7 @@
     "patch": "gulp publish -u patch",
     "minor": "gulp publish -u minor",
     "major": "gulp publish -u major",
+    "reupload": "gulp reupload",
     "updateSrcPacks": "gulp updateSrcPacks",
     "updateZipManifestForGithub": "gulp updateZipManifestForGithub",
     "updateExternalManifestForGithub": "gulp updateExternalManifestForGithub"
@@ -17,7 +18,7 @@
   "author": "TPNils",
   "license": "MIT",
   "devDependencies": {
-    "@league-of-foundry-developers/foundry-vtt-types": "^0.8.8-8",
+    "@league-of-foundry-developers/foundry-vtt-types": "^9.268.0",
     "@types/gulp": "^4.0.8",
     "@types/node": "^14.10.1",
     "archiver": "^5.0.0",

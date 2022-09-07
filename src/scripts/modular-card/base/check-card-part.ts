@@ -6,7 +6,6 @@ import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
-import { MemoryStorageService } from "../../service/memory-storage-service";
 import { staticValues } from "../../static-values";
 import { MyActor, MyActorData } from "../../types/fixed-types";
 import { ItemCardHelpers, ChatPartIdData, ChatPartEnriched } from "../item-card-helpers";
@@ -31,6 +30,7 @@ interface TargetCache {
 }
 
 export interface CheckCardData {
+  actorUuid$?: string;
   ability: keyof MyActor['data']['data']['abilities'];
   dc: number;
   skill?: keyof MyActorData['data']['skills'];
@@ -55,12 +55,13 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
   public static readonly instance = new CheckCardPart();
   private constructor(){}
   
-  public create({item}: ModularCardCreateArgs): CheckCardData {
+  public create({item, actor}: ModularCardCreateArgs): CheckCardData {
     if (item.data.data.save?.dc == null || !item.data.data.save?.ability) {
       return null;
     }
 
     return {
+      actorUuid$: actor?.uuid,
       ability: item.data.data.save?.ability,
       dc: item.data.data.save.dc,
       iSave: true,
@@ -294,16 +295,15 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
             })
           }
           
-          const cache = part.data.targetCaches$.find(cache => cache.targetUuid$ === selected.tokenUuid);
-          const canReadCheck = cache?.actorUuid$ != null && UtilsDocument.hasPermissions([{
-            uuid: cache.actorUuid$,
+          const canReadCheckDc = part.data.actorUuid$ != null && UtilsDocument.hasPermissions([{
+            uuid: part.data.actorUuid$,
             user: game.user,
             permission: `${staticValues.code}ReadCheckDc`,
           }], {sync: true}).every(permission => permission.result);
           const visualState = visualStatesBySelectionId.get(selected.selectionId);
           visualState.columns.push({
             key: `${this.getType()}-check-${partNr}`,
-            label: game.i18n.format('DND5E.SaveDC', {dc: canReadCheck ? part.data.dc : '?', ability: ''}),
+            label: game.i18n.format('DND5E.SaveDC', {dc: canReadCheckDc ? part.data.dc : '?', ability: ''}),
             rowValue: `<${this.getSelector()} data-part-id="${part.id}" data-message-id="${context.messageId}" data-sub-type="${selected.selectionId}"></${this.getSelector()}>`
           });
         }
@@ -587,27 +587,5 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
     });
   }
   //#endregion
-
-  //#region afterUpdate
-  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<CheckCardData>>): void | Promise<void> {
-    this.onBonusChange(context);
-  }
-  
-  private onBonusChange(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): void {
-    for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId) {
-        continue;
-      }
-      for (let i = 0; i < newRow.part.data.targetCaches$.length; i++) {
-        const newCache = newRow.part.data.targetCaches$[i];
-        const oldCache = oldRow?.part.data?.targetCaches$?.[i];
-        if (newCache.phase === 'bonus-input' && oldCache.phase !== 'bonus-input') {
-          MemoryStorageService.setFocusedElementSelector(`${CheckCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
-          return;
-        }
-      }
-    }
-  }
-  //#endregion 
 
 }
