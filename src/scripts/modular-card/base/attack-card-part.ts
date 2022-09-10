@@ -90,6 +90,24 @@ function getTargetCache(cache: AttackCardData): Map<string, AttackCardData['dumm
  * - Scorching Ray
  * - Eldritch Blast
  */
+@Component({
+  tag: 'Attack-CardPart',
+  html: /*html*/`
+    <div class="host">
+      I am a Attack-CardPart
+      <label>I am a {{testField}} {{aaa}}</label>
+    </div>
+  `,
+  style: /*css*/`
+    :host {
+      display: block;
+    }
+
+    .host label {
+      color: red;
+    }
+  `,
+})
 export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
   public static readonly instance = new AttackCardPart();

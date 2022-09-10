@@ -5,8 +5,8 @@ let nextComponentId = 0;
 const componentConfigSymbol = Symbol('ComponentConfig');
 export interface ComponentConfig {
   tag: string;
-  innerHtml?: string; // TODO
-  innerCss?: string; // TODO
+  html?: string; // TODO
+  style?: string; // TODO
 }
 interface ComponentConfigInternal extends ComponentConfig {
   componentId: string;
@@ -51,6 +51,40 @@ export function Component(config: ComponentConfig | string) {
     };
 
     customElements.define(internalConfig.tag, element);
+    if (internalConfig.style) {
+      const dummyStyleSheet = new CSSStyleSheet();
+      // @ts-ignore
+      dummyStyleSheet.replaceSync(internalConfig.style)
+
+      const rules: string[] = [];
+      for (let i = 0; i < dummyStyleSheet.cssRules.length; i++) {
+        const cssRule = dummyStyleSheet.cssRules[i];
+        let ruleString = cssRule.cssText;
+        if (cssRule instanceof CSSStyleRule) {
+          const modifiedSelectors: string[] = [];
+
+          for (let selector of cssRule.selectorText.split(',')) {
+            if (selector.toLowerCase().startsWith(':host')) {
+              selector = selector.replace(/^:host/i, `[${cssComponentHostIdAttrPrefix}-${internalConfig.componentId}]`);
+            } else {
+              selector = selector
+                .split(' ')
+                .map(part => `${part}[${cssComponentIdAttrPrefix}-${internalConfig.componentId}]`)
+                .join(' ');
+            }
+            modifiedSelectors.push(selector);
+          }
+
+          ruleString = modifiedSelectors.join(',') + ' ' + cssRule.cssText.substring(cssRule.cssText.indexOf('{'));
+        }
+        rules.push(ruleString);
+      }
+      const styleElement = document.createElement('style');
+      styleElement.id = staticValues.code + '-element-' + internalConfig.componentId;
+      styleElement.innerHTML = rules.join('\n');
+      
+      document.head.appendChild(styleElement);
+    }
   };
 }
 
