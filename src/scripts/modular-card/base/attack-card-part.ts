@@ -96,7 +96,7 @@ function getTargetCache(cache: AttackCardData): Map<string, AttackCardData['dumm
     <div class="host" *if="this.dataPartId">
       I am a Attack-CardPart
       <div *for="let i of [1,2,3]">{{i}}</div>
-      <label class="testing {{this.testField}}">dataPartId = {{this.dataPartId}}</label>
+      <label class="testing {{this.testField}}" (click)="console.log('click', $event)">dataPartId = {{this.dataPartId}}</label>
     </div>
   `,
   style: /*css*/`

@@ -397,6 +397,10 @@ class ComponentElement extends HTMLElement {
               }
             }
             fieldTemplateBindRegex.lastIndex = 0;
+            if (attr.name.startsWith('(') && attr.name.endsWith(')')) {
+              const callback = Function('$event', '$element', `return ${attr.nodeValue}`);
+              node.addEventListener(attr.name.substring(1, attr.name.length - 1), event => callback.call(this.controller, event, node));
+            }
           }
           node.setAttribute(attrName, '');
         }
