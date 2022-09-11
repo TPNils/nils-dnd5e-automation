@@ -1,11 +1,10 @@
 import { DynamicElement, ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
 import { RollD20Element } from "../../elements/roll-d20-element";
 import { TokenImgElement } from "../../elements/token-img-element";
-import { UtilsElement } from "../../elements/utils-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
-import { Component } from "../../lib/render-engine/component";
+import { Attribute, BindEvent, Component } from "../../lib/render-engine/component.js";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { MemoryStorageService } from "../../service/memory-storage-service";
@@ -94,9 +93,10 @@ function getTargetCache(cache: AttackCardData): Map<string, AttackCardData['dumm
 @Component({
   tag: 'Attack-CardPart',
   html: /*html*/`
-    <div class="host">
+    <div class="host" *if="this.dataPartId">
       I am a Attack-CardPart
-      <label>I am a {{testField}} {{aaa}}</label>
+      <div *for="let i of [1,2,3]">{{i}}</div>
+      <label class="testing {{this.testField}}">dataPartId = {{this.dataPartId}}</label>
     </div>
   `,
   style: /*css*/`
@@ -112,7 +112,13 @@ function getTargetCache(cache: AttackCardData): Map<string, AttackCardData['dumm
 export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
   public static readonly instance = new AttackCardPart();
-  private constructor(){}
+
+  @Attribute('data-part-id')
+  public dataPartId: string;
+  @Attribute('data-message-id')
+  public dataMessageId: string;
+  @Attribute('data-target-id')
+  public dataTargetId: string;
 
   public create({item, actor}: ModularCardCreateArgs): AttackCardData {
     if (!['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
@@ -390,6 +396,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       .addOnAttributeChange(async ({element, attributes}) => {
         return ItemCardHelpers.ifAttrData<AttackCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
           const elements: Element[] = [];
+          {
+            const elem = document.createElement('Attack-CardPart');
+            elem.setAttribute('data-part-id', attributes["data-part-id"]);
+            elements.push(elem);
+          }
           for (const targetCache of Array.from(getTargetCache(part.data).values()).sort((a, b) => a.name$.localeCompare(b.name$))) {
             if (!targetCache.isSelected$) {
               continue;
