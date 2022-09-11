@@ -62,7 +62,7 @@ export function Component(config: ComponentConfig | string) {
     // TODO find fields used in *if and *for
     for (const field of internalConfig.fieldsInHtml) {
       if (!(field in dummyController)) {
-        UtilsLog.warn(`Field '${field}' expected in element ${internalConfig.tag} but was not found.`);
+        //UtilsLog.warn(`Field '${field}' expected in element ${internalConfig.tag} but was not found.`);
       }
     }
 
@@ -341,7 +341,6 @@ class ComponentElement extends HTMLElement {
       const nodes = pendingNodes;
       pendingNodes = [];
       for (const node of nodes) {
-        UtilsLog.log('context', node, node[templateContextSymbol])
         if (node instanceof Element) {
           if (node instanceof Element && node.hasAttribute('*for')) {
             const forRgx = /^ *let +(.*?) +of +(.*)$/.exec(node.getAttribute('*for'));
@@ -366,7 +365,6 @@ class ComponentElement extends HTMLElement {
                     }
                     forFragment.appendChild(clone);
                     pendingNodes.push(clone);
-                    UtilsLog.log('clone', clone)
                   }
                   node.parentNode.replaceChild(forFragment, node);
                   continue;
@@ -400,6 +398,7 @@ class ComponentElement extends HTMLElement {
               }
             }
             fieldTemplateBindRegex.lastIndex = 0;
+            UtilsLog.debug(node, attr.name, attr.nodeValue)
             if (attr.name.startsWith('(') && attr.name.endsWith(')')) {
               const callback = Function('$event', '$element', `return ${attr.nodeValue}`);
               node.addEventListener(attr.name.substring(1, attr.name.length - 1), event => callback.call(this.controller, event, node));
@@ -411,7 +410,6 @@ class ComponentElement extends HTMLElement {
         while (regexMatch = fieldTemplateBindRegex.exec(node.nodeValue)) {
           try {
             const result = this.evalTemplate(regexMatch[1], node);
-            UtilsLog.debug(regexMatch[1], result)
             node.nodeValue = node.nodeValue.replace(regexMatch[0], result == null ? '' : String(result));
           } catch (e) {
             UtilsLog.error('failed to parse expression', regexMatch[1], e)
@@ -424,7 +422,6 @@ class ComponentElement extends HTMLElement {
         }
       }
     }
-    UtilsLog.debug(container.innerHTML)
     fragment.append(...Array.from(container.children));
     return fragment;
   }
