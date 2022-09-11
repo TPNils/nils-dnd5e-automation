@@ -7,6 +7,7 @@ import { UtilsCompare } from "../../lib/utils/utils-compare";
 import MyAbilityTemplate from "../../pixi/ability-template";
 import { staticValues } from "../../static-values";
 import { MyActor, MyItemData } from "../../types/fixed-types";
+import { UtilsLog } from "../../utils/utils-log";
 import { UtilsTemplate } from "../../utils/utils-template";
 import { ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
@@ -280,7 +281,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
             fetchedVisualStates.push(Promise.resolve(visualState));
           }
         } catch (e) {
-          console.error('Error during getVisualState()', e);
+          UtilsLog.error('Error during getVisualState()', e);
         }
       }
       

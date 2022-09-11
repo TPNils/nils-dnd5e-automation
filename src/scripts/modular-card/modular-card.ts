@@ -7,6 +7,7 @@ import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
+import { UtilsLog } from "../utils/utils-log";
 import { ActiveEffectCardPart, AttackCardPart, CheckCardPart, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardPart, SpellLevelCardPart, TargetCardPart, TemplateCardPart } from "./base/index";
 import { ModularCardPart } from "./modular-card-part";
 import { LayOnHandsCardPart } from "./srd/index";
@@ -100,7 +101,7 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
           continue;
         }
         if (part.type !== oldPart?.type) {
-          console.error(`Can't change the type of part and retain the same id.`)
+          UtilsLog.error(`Can't change the type of part and retain the same id.`)
           return false;
         }
       }
@@ -142,7 +143,7 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
     try {
       this.data.update({content: await ModularCard.getHtml(this.id, clientTemplateData)});
     } catch (e) {
-      console.error(e);
+      UtilsLog.error(e);
 
       let errorString: string;
       if (e instanceof Error) {
@@ -200,7 +201,7 @@ export class ModularCard {
   private static typeToModule = new Map<string, string>();
   public static registerModularCardPart(moduleName: string, part: ModularCardPart): void {
     if (ModularCard.registeredPartsByType.has(part.getType())) {
-      console.info(`ModularCardPart type "${part.getType()}" from module ${ModularCard.typeToModule.get(part.getType())} gets overwritten by module ${moduleName}`);
+      UtilsLog.info(`ModularCardPart type "${part.getType()}" from module ${ModularCard.typeToModule.get(part.getType())} gets overwritten by module ${moduleName}`);
     }
     ModularCard.registeredPartsByType.set(part.getType(), {part: part});
     ModularCard.typeToModule.set(part.getType(), moduleName);
@@ -379,7 +380,7 @@ export class ModularCard {
     const htmlParts$: Array<{html: string, id: string} | Promise<{html: string, id: string}>> = [];
     for (const partData of parts) {
       if (!ModularCard.registeredPartsByType.has(partData.type)) {
-        console.error(`Could not render ModularCardPart ${partData.type} of module ${ModularCard.typeToModule.get(partData.type)}`);
+        UtilsLog.error(`Could not render ModularCardPart ${partData.type} of module ${ModularCard.typeToModule.get(partData.type)}`);
         // Don't throw(?), what if a module extention got disabled
         continue;
       }

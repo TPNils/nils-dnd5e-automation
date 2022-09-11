@@ -2,6 +2,7 @@ import { FolderDataConstructorData } from "@league-of-foundry-developers/foundry
 import { staticValues } from "./static-values";
 import { MyItem } from "./types/fixed-types";
 import { UtilsDocument } from "./lib/db/utils-document";
+import { UtilsLog } from "./utils/utils-log";
 
 interface CompendiumItemDml {
   compendiumUuid: string;
@@ -113,7 +114,7 @@ export class DevTools {
         syncWorldItems.push(item)
       }
     }
-    console.debug(syncWorldItems, compendiumFolderIds);
+    UtilsLog.debug(syncWorldItems, compendiumFolderIds);
 
     const compendiumItemsByUuid = await UtilsDocument.itemFromUuid(syncWorldItems.map(item => item.getFlag(staticValues.moduleName, 'source-uuid')).filter(uuid => typeof uuid === 'string'));
 
@@ -163,7 +164,7 @@ export class DevTools {
 
     // TODO delete
 
-    console.debug(compendiumDmls)
+    UtilsLog.debug(compendiumDmls)
     for (const [compendiumUuid, dmls] of compendiumDmls.entries()) {
       if (dmls.insertItems.length > 0) {
         CONFIG.Item.documentClass.createDocuments(dmls.insertItems, {pack: compendiumUuid, render: false});

@@ -3,7 +3,7 @@ import { Stoppable } from "../lib/utils/stoppable";
 import { provider } from "../provider/provider";
 import { staticValues } from "../static-values";
 import { ValueProvider } from "../provider/value-provider";
-import { UtilsElement } from "./utils-element";
+import { UtilsLog } from "../utils/utils-log";
 
 interface DynamicElementConfig {
   selector: string;
@@ -220,7 +220,7 @@ export class DynamicElement extends HTMLElement {
   private registerEventListeners() {
     for (const callback of this.config.callbacks) {
       const listener: EventListenerOrEventListenerObject = async event => {
-        // console.log(callback.eventName, callback, event);
+        // UtilsLog.log(callback.eventName, callback, event);
         for (const filter of callback.filters) {
           const result = filter({element: this, event: event});
           if (result instanceof Promise) {
@@ -245,11 +245,11 @@ export class DynamicElement extends HTMLElement {
         const response = await executeIfAllowed(callback, serializedData);
         if (response.success === false) {
           if (response.errorType === 'warn') {
-            console.warn(response);
+            UtilsLog.warn(response);
             ui.notifications.warn(response.errorMessage);
           }
           if (response.errorType === 'error') {
-            console.error(response);
+            UtilsLog.error(response);
             ui.notifications.error(response.errorMessage);
           }
         }

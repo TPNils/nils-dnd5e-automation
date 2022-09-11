@@ -124,7 +124,7 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
     const originalValue = currentValue + resource.resource.calc$.appliedChange;
     const newValue = Math.max(0, originalValue - expectedApplyAmount);
     resource.resource.calc$.appliedChange = originalValue - newValue;
-    // console.log({expectedApplyAmount, currentValue, originalValue: newValue})
+    // UtilsLog.log({expectedApplyAmount, currentValue, originalValue: newValue})
     
     setProperty(updates, resource.resource.calc$.path, newValue);
   }
