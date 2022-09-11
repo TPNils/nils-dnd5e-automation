@@ -90,9 +90,24 @@ function getTargetCache(cache: AttackCardData): Map<string, AttackCardData['dumm
  * - Scorching Ray
  * - Eldritch Blast
  */
+
 @Component({
   tag: 'Attack-CardPart',
   html: /*html*/`
+    <nac-roll-d20 *for="let targetCache of this.targetCaches" *if="targetCache.isSelected$"
+      data-roll="{{JSON.serialize(this.part.data.rolls$[targetCache.selectedRoll$].roll$)}}"
+      data-bonus-formula="{{targetCache.userBonus}}"
+      data-show-bonus="{{targetCache.phase !== 'mode-select'}}"
+      data-override-max-roll="{{this.part.data.critTreshold$}}"
+
+      data-interaction-permission="{{this.interactionPermission}}"
+      data-read-permission="{{this.readPermission}}"
+      data-read-hidden-display-type="{{this.readHiddenDisplayType}}"
+
+      data-selection-id="targetCache.selectionId$"
+      data-memory-context="targetCache.selectionId$"
+      >
+    </nac-roll-d20>
     <div class="host" *if="this.dataPartId">
       I am a Attack-CardPart
       <div *for="let i of [1,2,3]">{{i}}</div>
@@ -100,6 +115,13 @@ function getTargetCache(cache: AttackCardData): Map<string, AttackCardData['dumm
     </div>
   `,
   style: /*css*/`
+    ${TokenImgElement.selector()} {
+      margin-right: 2px;
+      width: 1em;
+      height: 1em;
+    }
+
+    /* testing */
     :host {
       display: block;
     }
@@ -119,6 +141,29 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   public dataMessageId: string;
   @Attribute('data-target-id')
   public dataTargetId: string;
+
+  public part: ModularCardPartData<AttackCardData>;
+  public targetCaches: TargetCache[] = [];
+  public interactionPermission: string;
+  public readPermission: string;
+  public readHiddenDisplayType: string;
+
+  public onInit(): void {
+    this.targetCaches = [];
+    const allParts = ModularCard.getCardPartDatas(game.messages.get(this.dataMessageId));
+    if (allParts != null) {
+      this.part = allParts.find(p => p.id === this.dataPartId && p.type === this.getType());
+      if (this.part != null) {
+        this.targetCaches = Array.from(getTargetCache(this.part.data).values()).sort((a, b) => a.name$.localeCompare(b.name$));
+      }
+    }
+
+    if (this.part != null) {
+      this.interactionPermission = `OwnerUuid:${this.part.data.actorUuid$}`;
+      this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.data.actorUuid$}`;
+      this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
+    }
+  }
 
   public create({item, actor}: ModularCardCreateArgs): AttackCardData {
     if (!['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
@@ -405,17 +450,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             if (!targetCache.isSelected$) {
               continue;
             }
-            const d20attributes = {
-              ['data-roll']: part.data.rolls$[targetCache.selectedRoll$].roll$,
-              ['data-bonus-formula']: targetCache.userBonus,
-              ['data-show-bonus']: targetCache.phase !== 'mode-select',
-              ['data-override-max-roll']: part.data.critTreshold$,
-            };
-            if (part.data.actorUuid$) {
-              d20attributes['data-interaction-permission'] = `OwnerUuid:${part.data.actorUuid$}`;
-              d20attributes['data-read-permission'] = `${staticValues.code}ReadAttackUuid:${part.data.actorUuid$}`;
-              d20attributes['data-read-hidden-display-type'] = game.settings.get(staticValues.moduleName, 'attackHiddenRoll');
-            }
 
             const d20Element = document.createElement(RollD20Element.selector()) as DynamicElement;
             const label = document.createElement('div');
@@ -442,9 +476,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             }
             label.append(game.i18n.localize(labelText));
             d20Element.appendChild(label);
-            d20Element.setAttribute('data-selection-id', targetCache.selectionId$);
-            d20Element.setAttribute('data-memory-context', targetCache.selectionId$);
-            await d20Element.setInput(d20attributes);
             elements.push(d20Element);
           }
 

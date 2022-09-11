@@ -277,6 +277,9 @@ class ComponentElement extends HTMLElement {
   public connectedCallback(): void {
     this.connected = true;
     this.setAttribute(`${cssComponentHostIdAttrPrefix}-${this.getComponentConfig().componentId}`, '');
+    if (typeof this.controller['onInit'] === 'function') {
+      this.controller['onInit']();
+    }
     this.innerHTML = ``;
     this.replaceChildren(this.generateHtml());
     this.registerEventListeners();
