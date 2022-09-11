@@ -203,7 +203,7 @@ class ComponentElement extends HTMLElement {
       if (attrConfigs.byAttribute[name]) {
         for (const config of attrConfigs.byAttribute[name]) {
           // TODO support functions?
-          this.controller[config.attribute] = newValue;
+          this.controller[config.propertyKey] = newValue;
         }
       }
     }
