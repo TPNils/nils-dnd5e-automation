@@ -4,6 +4,9 @@ import { Stoppable } from "../utils/stoppable";
 //#region Decorators
 let nextComponentId = 0;
 const componentConfigSymbol = Symbol('ComponentConfig');
+const cssComponentHostIdAttrPrefix = `${staticValues.code}-host`;
+const cssComponentIdAttrPrefix = `${staticValues.code}-cid`;
+
 export interface ComponentConfig {
   tag: string;
   html?: string; // TODO
