@@ -1,3 +1,4 @@
+import { staticValues } from "../../static-values";
 import { Stoppable } from "../utils/stoppable";
 
 //#region Decorators
