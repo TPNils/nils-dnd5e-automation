@@ -22,3 +22,8 @@
 !/src/scripts
 !/src/styles
 !/src/templates
+
+
+!/.vscode
+/.vscode/*
+!/.vscode/extensions.json
