@@ -1,3 +1,5 @@
+import { VirtualTextNode } from "./virtual-text-node";
+
 class PlaceholderClass {}
 type Constructor<I = PlaceholderClass> = new (...args: any[]) => I;
 
@@ -240,11 +242,11 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
       return true;
     }
 
-    private toVirtualNodes<T extends VirtualBaseNode>(nodes: (T | string)[]): T[] {
-      const virtualNodes: T[] = [];
+    private toVirtualNodes<T extends VirtualBaseNode>(nodes: (T | string)[]): Array<T | VirtualTextNode> {
+      const virtualNodes: Array<T | VirtualTextNode> = [];
       for (const node of nodes) {
         if (typeof node === 'string') {
-          // TODO
+          virtualNodes.push(new VirtualTextNode(node))
         } else {
           virtualNodes.push(node);
         }
