@@ -129,7 +129,9 @@ export function VirtualEventNode<T extends Constructor>(clazz: T = PlaceholderCl
       return this.#callbackMap.values();
     }
     public addEventListener(type: string, callback: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
-      callback[eventCallbackId] = nextEventCallbackId++;
+      if (callback[eventCallbackId] == null) {
+        callback[eventCallbackId] = nextEventCallbackId++;
+      }
       this.#callbackMap.set(callback[eventCallbackId], {type: type, callback: callback, options: options});
     }
     public removeEventListener(type: string, callback: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
@@ -137,6 +139,11 @@ export function VirtualEventNode<T extends Constructor>(clazz: T = PlaceholderCl
     }
     public isEventNode(): this is VirtualEventNode {
       return true;
+    }
+    protected startEventClone(original: VirtualEventNode, deep?: boolean) {
+      for (const listener of original.getEventListerners()) {
+        this.#callbackMap.set(listener.callback[eventCallbackId], listener);
+      }
     }
   }
 }
@@ -240,6 +247,19 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
 
     public isParentNode(): this is VirtualParentNode {
       return true;
+    }
+    
+    protected startEventClone(original: VirtualParentNode, deep?: boolean) {
+      if (!deep) {
+        return;
+      }
+      const clones: VirtualChildNode[] = [];
+      for (const child of original[getRawChildren]()) {
+        if (child.isNode && child.isNode()) {
+          clones.push(child.cloneNode(true));
+        }
+      }
+      this.appendChild(...clones);
     }
 
     private toVirtualNodes<T extends VirtualBaseNode>(nodes: (T | string)[]): Array<T | VirtualTextNode> {
