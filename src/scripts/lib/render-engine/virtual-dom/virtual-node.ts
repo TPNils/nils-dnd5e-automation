@@ -6,6 +6,7 @@ type Constructor<I = PlaceholderClass> = new (...args: any[]) => I;
 interface VirtualBaseNode {
 
   isNode?(): this is VirtualNode;
+  isAttributeNode?(): this is VirtualAttributeNode;
   isChildNode?(): this is VirtualChildNode;
   isEventNode?(): this is VirtualEventNode;
   isParentNode?(): this is VirtualParentNode;
@@ -20,13 +21,64 @@ export interface VirtualNode extends VirtualBaseNode {
   updateDomNode(node: Node): void;
 
   isNode(): this is VirtualNode;
+  isAttributeNode(): this is VirtualAttributeNode;
   isChildNode(): this is VirtualChildNode;
   isEventNode(): this is VirtualEventNode;
   isParentNode(): this is VirtualParentNode;
   
 }
 
-//#region parent
+//#region attribute
+export function VirtualAttributeNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
+  return class extends clazz implements VirtualAttributeNode {
+    readonly #attributes = new Map<string, string>();
+
+    public getAttributeNames(): IterableIterator<string> {
+      return this.#attributes.keys();
+    }
+
+    public hasAttribute(qualifiedName: string): boolean {
+      return this.#attributes.has(qualifiedName?.toLowerCase());
+    }
+
+    public getAttribute(qualifiedName: string): string {
+      return this.#attributes.get(qualifiedName?.toLowerCase());
+    }
+    
+    public setAttribute(qualifiedName: string, value: string): void {
+      if (qualifiedName == null || qualifiedName === '')  {
+        throw new Error(`qualifiedName needs to have a value. Found: "${qualifiedName}"`)
+      }
+      this.#attributes.set(qualifiedName?.toLowerCase(), value == null ? '' : value);
+    }
+
+    public removeAttribute(qualifiedName: string): void {
+      this.#attributes.delete(qualifiedName?.toLowerCase());
+    }
+
+    public isAttributeNode(): this is VirtualAttributeNode {
+      return true;
+    }
+    
+    protected startAttributeClone(original: VirtualAttributeNode, deep?: boolean) {
+      for (const attrName of original.getAttributeNames()) {
+        this.#attributes.set(attrName, original.getAttribute(attrName));
+      }
+    }
+    
+  }
+}
+export interface VirtualAttributeNode extends VirtualBaseNode {
+  getAttributeNames(): IterableIterator<string>;
+  hasAttribute(qualifiedName: string): boolean;
+  getAttribute(qualifiedName: string): string | null;
+  setAttribute(qualifiedName: string, value: string | null): void;
+  removeAttribute(qualifiedName: string): void;
+  isAttributeNode(): this is VirtualAttributeNode;
+}
+//#endregion
+
+//#region child
 const setParentOnChild = Symbol('setParent');
 export function VirtualChildNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualChildNode {
@@ -157,7 +209,6 @@ export interface VirtualEventNode extends VirtualBaseNode {
   isEventNode(): this is VirtualEventNode;
 }
 //#endregion
-
 
 //#region parent
 const getRawChildren = Symbol('getRawChildren');

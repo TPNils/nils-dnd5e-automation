@@ -1,4 +1,4 @@
-import { VirtualChildNode, VirtualEventNode, VirtualNode, VirtualParentNode } from "./virtual-node";
+import { VirtualAttributeNode, VirtualChildNode, VirtualEventNode, VirtualNode, VirtualParentNode } from "./virtual-node";
 
 export class VirtualTextNode extends VirtualChildNode() implements VirtualNode {
 
@@ -41,6 +41,10 @@ export class VirtualTextNode extends VirtualChildNode() implements VirtualNode {
 
   public isNode(): this is VirtualNode {
     return true;
+  }
+
+  public isAttributeNode(): this is VirtualAttributeNode {
+    return false;
   }
 
   public isEventNode(): this is VirtualEventNode {
