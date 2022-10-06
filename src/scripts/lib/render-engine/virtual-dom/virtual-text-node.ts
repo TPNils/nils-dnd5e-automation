@@ -29,13 +29,20 @@ export class VirtualTextNode extends VirtualChildNode() implements VirtualNode {
     return clone as this;
   }
 
-  public createDomNode(): Node {
-    return document.createTextNode(this.nodeValue);
+  #node: Text;
+  #appliedState: this;
+  public domNode(): Node {
+    if (this.#node == null) {
+      this.#node = document.createTextNode(this.nodeValue);
+      this.#appliedState = this.cloneNode(false);
+    }
+    return this.#node;
   }
 
-  public updateDomNode(node: Text): void {
-    if (node.nodeValue !== this.#nodeValue) {
-      node.nodeValue = this.#nodeValue;
+  public executeUpdate(): void {
+    if (this.#appliedState.nodeValue !== this.#nodeValue) {
+      this.#node.nodeValue = this.#nodeValue;
+      this.#appliedState = this.cloneNode(false);
     }
   }
 

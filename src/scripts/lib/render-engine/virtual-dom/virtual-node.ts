@@ -17,8 +17,8 @@ export interface VirtualNode extends VirtualBaseNode {
 
   readonly nodeName: string;
   cloneNode(deep?: boolean): this;
-  createDomNode(): Node;
-  updateDomNode(node: Node): void;
+  domNode(): Node;
+  executeUpdate(): void;
 
   isNode(): this is VirtualNode;
   isAttributeNode(): this is VirtualAttributeNode;
@@ -174,6 +174,7 @@ let nextEventCallbackId = 0;
 export interface StoredEventCallback {
   readonly type: string;
   readonly callback: EventListenerOrEventListenerObject;
+  readonly guid: number;
   readonly options?: boolean | AddEventListenerOptions;
 }
 export function VirtualEventNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
@@ -183,18 +184,22 @@ export function VirtualEventNode<T extends Constructor>(clazz: T = PlaceholderCl
     public getEventListerners(): Iterable<StoredEventCallback> {
       return this.#callbackMap.values();
     }
+
     public addEventListener(type: string, callback: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
       if (callback[eventCallbackId] == null) {
         callback[eventCallbackId] = nextEventCallbackId++;
       }
-      this.#callbackMap.set(callback[eventCallbackId], {type: type, callback: callback, options: options});
+      this.#callbackMap.set(callback[eventCallbackId], {type: type, callback: callback, options: options, guid: callback[eventCallbackId]});
     }
+
     public removeEventListener(type: string, callback: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
       this.#callbackMap.delete(callback[eventCallbackId]);
     }
+
     public isEventNode(): this is VirtualEventNode {
       return true;
     }
+
     protected startEventClone(original: VirtualEventNode, deep?: boolean) {
       for (const listener of original.getEventListerners()) {
         this.#callbackMap.set(listener.callback[eventCallbackId], listener);
@@ -217,6 +222,10 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
     #childNodes: Array<VirtualChildNode>;
     get childNodes(): ReadonlyArray<VirtualChildNode> {
       return [...this.#childNodes];
+    }
+
+    protected getRawChildren(): ReadonlyArray<VirtualChildNode> {
+      return this.#childNodes;
     }
     
     [getRawChildren](): ReadonlyArray<VirtualChildNode> {
