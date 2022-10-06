@@ -25,7 +25,7 @@ export class VirtualTextNode extends VirtualChildNode() implements VirtualNode {
   public cloneNode(deep?: boolean): this {
     const clone = new VirtualTextNode();
     clone.#nodeValue = this.#nodeValue;
-    this.startChildClone(clone, deep);
+    clone.startChildClone(this, deep);
     return clone as this;
   }
 

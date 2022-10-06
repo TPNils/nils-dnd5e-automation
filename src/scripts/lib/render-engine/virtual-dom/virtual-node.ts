@@ -306,7 +306,7 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
       return true;
     }
     
-    protected startEventClone(original: VirtualParentNode, deep?: boolean) {
+    protected startParentClone(original: VirtualParentNode, deep?: boolean) {
       if (!deep) {
         return;
       }
