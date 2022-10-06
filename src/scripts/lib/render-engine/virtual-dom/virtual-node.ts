@@ -26,6 +26,7 @@ export interface VirtualNode extends VirtualBaseNode {
   
 }
 
+//#region parent
 const setParentOnChild = Symbol('setParent');
 export function VirtualChildNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualChildNode {
@@ -113,10 +114,12 @@ export interface VirtualChildNode extends VirtualBaseNode {
   
   isChildNode(): this is VirtualChildNode;
 }
+//#endregion
 
+//#region event
 const eventCallbackId = Symbol('eventCallbackId');
 let nextEventCallbackId = 0;
-interface StoredEventCallback {
+export interface StoredEventCallback {
   readonly type: string;
   readonly callback: EventListenerOrEventListenerObject;
   readonly options?: boolean | AddEventListenerOptions;
@@ -147,14 +150,17 @@ export function VirtualEventNode<T extends Constructor>(clazz: T = PlaceholderCl
     }
   }
 }
-
 export interface VirtualEventNode extends VirtualBaseNode {
   getEventListerners(): Iterable<StoredEventCallback>;
   addEventListener(type: string, callback: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
   removeEventListener(type: string, callback: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
   isEventNode(): this is VirtualEventNode;
 }
+//#endregion
 
+
+//#region parent
+const getRawChildren = Symbol('getRawChildren');
 export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualParentNode {
     #childNodes: Array<VirtualChildNode>;
@@ -275,8 +281,6 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
     }
   }
 }
-
-const getRawChildren = Symbol('getRawChildren');
 export interface VirtualParentNode extends VirtualBaseNode {
   readonly childNodes: ReadonlyArray<VirtualChildNode>;
   [getRawChildren](): ReadonlyArray<VirtualChildNode>;
@@ -318,3 +322,4 @@ export interface VirtualParentNode extends VirtualBaseNode {
   
   isParentNode(): this is VirtualParentNode;
 }
+//#endregion
