@@ -87,7 +87,8 @@ export class VirtualHtmlNode extends VirtualChildNode(VirtualParentNode(VirtualE
 
     // TODO check if updating children works
     // TODO do I even want this behavour? should only update itself... but how do I solve new children?
-    if (this.hasChildNodes()) {
+    //  => should be handled on a higher level? maybe the whole create/update node should be
+    /*if (this.hasChildNodes()) {
       const childNodes = this.getRawChildren();
       const missingDomChildren: Array<{index: number, node: VirtualChildNode & VirtualNode}> = [];
       let i = 0;
@@ -116,7 +117,7 @@ export class VirtualHtmlNode extends VirtualChildNode(VirtualParentNode(VirtualE
         }
         this.#appliedChildren.splice(domChild.index, 0, domChild.node);
       }
-    }
+    }*/
 
     if (stateChanged) {
       this.#appliedState = this.cloneNode(false);
