@@ -113,11 +113,11 @@ export function VirtualChildNode<T extends Constructor>(clazz: T = PlaceholderCl
       return node;
     }
 
-    public after(...nodes: Array<VirtualChildNode | string>): void {
+    public after(...nodes: Array<(VirtualChildNode & VirtualNode) | string>): void {
       this.parentNode.insertAfter(this, ...nodes);
     }
 
-    public before(...nodes: Array<VirtualChildNode | string>): void {
+    public before(...nodes: Array<(VirtualChildNode & VirtualNode) | string>): void {
       this.parentNode.insertBefore(this, ...nodes);
     }
 
@@ -125,7 +125,7 @@ export function VirtualChildNode<T extends Constructor>(clazz: T = PlaceholderCl
       this.parentNode.removeChild(this);
     }
 
-    public replaceWith(...nodes: Array<VirtualChildNode | string>): void {
+    public replaceWith(...nodes: Array<(VirtualChildNode & VirtualNode) | string>): void {
       this.parentNode.replaceChild(this, ...nodes);
     }
 
@@ -219,24 +219,24 @@ export interface VirtualEventNode extends VirtualBaseNode {
 const getRawChildren = Symbol('getRawChildren');
 export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualParentNode {
-    #childNodes: Array<VirtualChildNode>;
-    get childNodes(): ReadonlyArray<VirtualChildNode> {
+    #childNodes: Array<VirtualChildNode & VirtualNode>;
+    get childNodes(): ReadonlyArray<VirtualChildNode & VirtualNode> {
       return [...this.#childNodes];
     }
 
-    protected getRawChildren(): ReadonlyArray<VirtualChildNode> {
+    protected getRawChildren(): ReadonlyArray<VirtualChildNode & VirtualNode> {
       return this.#childNodes;
     }
     
-    [getRawChildren](): ReadonlyArray<VirtualChildNode> {
+    [getRawChildren](): ReadonlyArray<VirtualChildNode & VirtualNode> {
       return this.#childNodes;
     }
 
-    public firstChild(): VirtualChildNode {
+    public firstChild(): VirtualChildNode & VirtualNode {
       return this.#childNodes[0];
     }
 
-    public lastChild(): VirtualChildNode {
+    public lastChild(): VirtualChildNode & VirtualNode {
       return this.#childNodes[this.#childNodes.length - 1];
     }
 
@@ -244,15 +244,15 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
       return this.#childNodes.length > 0;
     }
     
-    public appendChild(...nodes: Array<VirtualChildNode | string>): void {
+    public appendChild(...nodes: Array<(VirtualChildNode & VirtualNode) | string>): void {
       this.insertIndex('appendChild', this.#childNodes.length, this.toVirtualNodes(nodes));
     }
     
-    public prependChild(...nodes: Array<VirtualChildNode | string>): void {
+    public prependChild(...nodes: Array<(VirtualChildNode & VirtualNode) | string>): void {
       this.insertIndex('prependChild', 0, this.toVirtualNodes(nodes));
     }
     
-    public insertBefore(child: VirtualChildNode, ...nodes: Array<VirtualChildNode | string>): void {
+    public insertBefore(child: VirtualChildNode & VirtualNode, ...nodes: Array<(VirtualChildNode & VirtualNode) | string>): void {
       const index = this.#childNodes.indexOf(child);
       if (index === -1) {
         throw new Error(`Failed to execute 'insertBefore' on 'Node': The reference child is not a child of this node.`);
@@ -260,7 +260,7 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
       this.insertIndex('insertBefore', index, this.toVirtualNodes(nodes));
     }
     
-    public insertAfter(child: VirtualChildNode, ...nodes: Array<VirtualChildNode | string>): void {
+    public insertAfter(child: VirtualChildNode & VirtualNode, ...nodes: Array<(VirtualChildNode & VirtualNode) | string>): void {
       const index = this.#childNodes.indexOf(child);
       if (index === -1) {
         throw new Error(`Failed to execute 'insertAfter' on 'Node': The reference child is not a child of this node.`);
@@ -268,7 +268,7 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
       this.insertIndex('insertAfter', index + 1, this.toVirtualNodes(nodes));
     }
     
-    private insertIndex(method: string, index: number, nodes: Array<VirtualChildNode>): void {
+    private insertIndex(method: string, index: number, nodes: Array<VirtualChildNode & VirtualNode>): void {
       for (const node of nodes) {
         if (node.parentNode != null) {
           throw new Error(`Failed to execute '${method}' on 'Node': The new child element contains the parent.`);
@@ -282,21 +282,21 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
     }
     
     public removeChild<T extends VirtualChildNode>(child: T): T {
-      const index = this.#childNodes.indexOf(child);
+      const index = this.#childNodes.indexOf(child as any);
       if (index === -1) {
         throw new Error(`Failed to execute 'removeChild' on 'Node': The reference child is not a child of this node.`);
       }
 
-      return this.#childNodes.splice(index, 1)[0] as T;
+      return this.#childNodes.splice(index, 1)[0] as any;
     }
     
-    public replaceChild<T extends VirtualChildNode>(child: T, ...nodes: Array<VirtualChildNode | string>): T {
-      const index = this.#childNodes.indexOf(child);
+    public replaceChild<T extends VirtualChildNode>(child: T, ...nodes: Array<(VirtualChildNode & VirtualNode) | string>): T {
+      const index = this.#childNodes.indexOf(child as any);
       if (index === -1) {
         throw new Error(`Failed to execute 'replaceChild' on 'Node': The reference child is not a child of this node.`);
       }
 
-      return this.#childNodes.splice(index, 1, ...this.toVirtualNodes(nodes))[0] as T;
+      return this.#childNodes.splice(index, 1, ...this.toVirtualNodes(nodes))[0] as any;
     }
     
     public contains(other: VirtualNode): boolean {
@@ -319,11 +319,9 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
       if (!deep) {
         return;
       }
-      const clones: VirtualChildNode[] = [];
+      const clones: Array<VirtualChildNode & VirtualNode> = [];
       for (const child of original[getRawChildren]()) {
-        if (child.isNode && child.isNode()) {
-          clones.push(child.cloneNode(true));
-        }
+        clones.push(child.cloneNode(true));
       }
       this.appendChild(...clones);
     }
@@ -342,10 +340,10 @@ export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderC
   }
 }
 export interface VirtualParentNode extends VirtualBaseNode {
-  readonly childNodes: ReadonlyArray<VirtualChildNode>;
-  [getRawChildren](): ReadonlyArray<VirtualChildNode>;
-  firstChild(): VirtualChildNode;
-  lastChild(): VirtualChildNode;
+  readonly childNodes: ReadonlyArray<VirtualChildNode & VirtualNode>;
+  [getRawChildren](): ReadonlyArray<VirtualChildNode & VirtualNode>;
+  firstChild(): VirtualChildNode & VirtualNode;
+  lastChild(): VirtualChildNode & VirtualNode;
   hasChildNodes(): boolean;
   /**
    * Inserts nodes or texts after the last child of this node
@@ -356,13 +354,13 @@ export interface VirtualParentNode extends VirtualBaseNode {
    * 
    * Throws a "Error" DOMException if the constraints of the node tree are violated.
    */
-  insertBefore(child: VirtualChildNode, ...nodes: Array<VirtualChildNode | string>): void;
+  insertBefore(child: VirtualChildNode, ...nodes: Array<(VirtualChildNode & VirtualNode) | string>): void;
   /**
    * Inserts nodes or texts after the child in this node
    * 
    * Throws a "Error" DOMException if the constraints of the node tree are violated.
    */
-  insertAfter(child: VirtualChildNode, ...nodes: Array<VirtualChildNode | string>): void;
+  insertAfter(child: VirtualChildNode, ...nodes: Array<(VirtualChildNode & VirtualNode) | string>): void;
   /**
    * Inserts nodes or texts before the first child of this node
    */
@@ -374,7 +372,7 @@ export interface VirtualParentNode extends VirtualBaseNode {
   /**
    * Replace a direct child of this node with another
    */
-  replaceChild<T extends VirtualChildNode>(child: T, ...nodes: Array<VirtualChildNode | string>): T;
+  replaceChild<T extends VirtualChildNode>(child: T, ...nodes: Array<(VirtualChildNode & VirtualNode) | string>): T;
   /**
    * Return true if this node or any of it's children contain the requested node
    */
