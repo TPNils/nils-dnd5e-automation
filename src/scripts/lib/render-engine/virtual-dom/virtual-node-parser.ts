@@ -114,7 +114,6 @@ export class VirtualNodeParser {
       }
     }
   }
-//window.dev(`test <!-- comment with <input/> --> <input value="val" placeholder="yes"/> <a href="www.google.be">non bold<b>bold</b></a>`)
 
   private readAttributes(): void {
     if (!this.currentNode.isAttributeNode || !this.currentNode.isAttributeNode()) {
@@ -159,6 +158,7 @@ export class VirtualNodeParser {
 
   public static init() {
     (window as any).dev = VirtualNodeParser.parse;
+    //window.dev(`test <!-- comment with <input/> --> <input value="val" placeholder="yes"/> <a href="www.google.be">non bold<b>bold</b></a>`)
   }
 
 }
