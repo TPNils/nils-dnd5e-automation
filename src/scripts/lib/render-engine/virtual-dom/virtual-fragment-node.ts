@@ -25,7 +25,7 @@ export class VirtualFragmentNode extends VirtualParentNode() implements VirtualN
   }
 
   public isNode(): this is VirtualNode {
-    throw true;
+    return true;
   }
 
   public isAttributeNode(): this is VirtualAttributeNode {
@@ -35,7 +35,7 @@ export class VirtualFragmentNode extends VirtualParentNode() implements VirtualN
   public isChildNode(): this is VirtualChildNode {
     return false;
   }
-  
+
   public isEventNode(): this is VirtualEventNode {
     return false;
   }
