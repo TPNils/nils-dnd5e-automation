@@ -13,7 +13,9 @@ import { registerHooks as registerModularCardSrdHooks } from "./modular-card/srd
 import MyAbilityTemplate from "./pixi/ability-template";
 import { ItemSheetHooks } from "./modular-card/item-sheet-hooks";
 import { TokenImgElement } from "./elements/token-img-element";
+import { VirtualNodeParser } from "./lib/render-engine/virtual-dom/virtual-node-parser";
 
+VirtualNodeParser.init();
 TokenImgElement.registerHooks();
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
