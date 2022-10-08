@@ -1,4 +1,5 @@
 import { UtilsLog } from "../../../utils/utils-log";
+import { Template } from "../template/template";
 import { VirtualCommmentNode } from "./virtual-comment-node";
 import { VirtualFragmentNode } from "./virtual-fragment-node";
 import { VirtualHtmlNode } from "./virtual-html-node";
@@ -30,7 +31,7 @@ export class VirtualNodeParser {
   private constructor(private html: string) {
   }
 
-  private startParse(): VirtualNode[] {
+  private startParse(): VirtualNode & VirtualParentNode {
     const rootNode = new VirtualFragmentNode();
     this.currentNode = rootNode;
     let indexSnapshot: number;
@@ -45,12 +46,7 @@ export class VirtualNodeParser {
       }
     } while (this.currentIndex < this.html.length)
 
-    const children: VirtualNode[] = [];
-    for (const child of rootNode.childNodes) {
-      rootNode.removeChild(child); // Remove parent from child
-      children.push(child);
-    }
-    return children;
+    return rootNode;
   }
 
   private readTextNode(): void {
@@ -152,13 +148,37 @@ export class VirtualNodeParser {
     return true;
   }
 
-  public static parse(html: string): VirtualNode[] {
+  public static parse(html: string): VirtualNode & VirtualParentNode {
     return new VirtualNodeParser(html).startParse();
   }
 
   public static init() {
-    (window as any).dev = VirtualNodeParser.parse;
-    //window.dev(`test <!-- comment with <input/> --> <input value="val" placeholder="yes"/> <a href="www.google.be">non bold<b>bold</b></a>`)
+    (window as any).vparse = VirtualNodeParser.parse;
+    (window as any).tparse = (html: string, context: any = {}) => {
+      if (context.items == null) {
+        context.items = [1,2,3];
+      }
+      const template = new Template(VirtualNodeParser.parse(html));
+      template.setContext(context);
+      return template.render();
+    };
+    /*
+    (() => {
+      const html = `test 
+      <!-- comment with <input/> -->
+      <div *if=false>should not be rendered</div>
+      <p *for="let i of items">
+        {{i}}
+      </p>
+      <input value="val" placeholder="yes"/>
+      <a href="www.google.be">non bold<b>bold</b></a>`;
+
+      const vparse = window.vparse(html);
+      const tparse = window.tparse(html);
+      console.log(vparse, String(vparse));
+      console.log(tparse, String(tparse));
+    })()
+    */
   }
 
 }
