@@ -114,20 +114,20 @@ export class Template {
     }
     let func: Function;
     const paramValues: any[] = [];
-    if (context) {
-      const paramNames: string[] = [];
-      for (const field in context) {
-        paramNames.push(field);
-        paramValues.push(context[field]);
-      }
-      func = Function(...paramNames, `return ${expression}`);
-    } else {
-      func = Function(`return ${expression}`);
-    }
     try {
+      if (context) {
+        const paramNames: string[] = [];
+        for (const field in context) {
+          paramNames.push(field);
+          paramValues.push(context[field]);
+        }
+        func = Function(...paramNames, `return ${expression}`);
+      } else {
+        func = Function(`return ${expression}`);
+      }
       return func.apply(context, paramValues);
     } catch (e) {
-      UtilsLog.error('Error executing expression with context', {expression: expression, context: context, func: func, paramValues: paramValues})
+      UtilsLog.error('Error executing expression with context', {expression: expression, context: context, func: func})
       throw e;
     }
   }
