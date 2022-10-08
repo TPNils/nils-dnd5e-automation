@@ -7,8 +7,8 @@ import { VirtualTextNode } from "./virtual-text-node";
 
 // y flag = sticky => allow useage of lastIndex
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/sticky
-const textNodeRegex = /(.*?)(?=<)/y;
-const commentNodeRegex = /\s*<!--(.*)-->/y;
+const textNodeRegex = /(.*?)(?=<)/ys;
+const commentNodeRegex = /\s*<!--(.*)-->/ys;
 
 // https://www.ibm.com/docs/en/app-connect-pro/7.5.3?topic=schemas-valid-node-names
 const startElementPrefixRegex = /\s*<([a-zA-Z_][a-zA-Z0-9_\-\.]*)/y;
@@ -17,10 +17,10 @@ const endElementRegex = /\s*<\/([a-zA-Z_][a-zA-Z0-9_\-\.]*)>/y;
 
 // https://www.w3.org/TR/2012/WD-html-markup-20120329/syntax.html
 const attrValueNoQuoteRegex = /(?<value1>[^"'=<>`\s]+)/y;
-const attrValueDoubleQuoteRegex = /"(?<value2>.*?)(?<!\\)"/y;
-const attrValueSingleQuoteRegex = /'(?<value3>.*?)(?<!\\)'/y;
+const attrValueDoubleQuoteRegex = /"(?<value2>.*?)(?<!\\)"/ys;
+const attrValueSingleQuoteRegex = /'(?<value3>.*?)(?<!\\)'/ys;
 const attrNameRegex = /(?<name>[^\s"'>/=]+)/y;
-const attrRegex = new RegExp(`\\s*${attrNameRegex.source}(?:\\s*=(?:${attrValueNoQuoteRegex.source}|\\s*${attrValueDoubleQuoteRegex.source}|\\s*${attrValueSingleQuoteRegex.source}))?`, `y`)
+const attrRegex = new RegExp(`\\s*${attrNameRegex.source}(?:\\s*=(?:${attrValueNoQuoteRegex.source}|\\s*${attrValueDoubleQuoteRegex.source}|\\s*${attrValueSingleQuoteRegex.source}))?`, `ys`)
 
 export class VirtualNodeParser {
 
