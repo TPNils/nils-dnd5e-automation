@@ -137,7 +137,6 @@ export class VirtualHtmlNode extends VNode({attribute: true, child: true, event:
       parts.push(' ');
       parts.push(attr);
       const value = AttributeParser.serialize(this.getAttribute(attr));
-      console.log(attr, value)
       if (value) {
         parts.push('="');
         // escape \ (escape character) & " (start/end of value)
