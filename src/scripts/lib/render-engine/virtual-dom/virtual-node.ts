@@ -217,7 +217,7 @@ export interface VirtualEventNode extends VirtualBaseNode {
 const getRawChildren = Symbol('getRawChildren');
 export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualParentNode {
-    #childNodes: Array<VirtualChildNode & VirtualNode>;
+    #childNodes: Array<VirtualChildNode & VirtualNode> = [];
     get childNodes(): ReadonlyArray<VirtualChildNode & VirtualNode> {
       return [...this.#childNodes];
     }
