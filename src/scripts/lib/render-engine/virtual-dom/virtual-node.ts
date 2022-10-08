@@ -368,13 +368,6 @@ export interface VirtualParentNode extends VirtualBaseNode {
 }
 //#endregion
 
-
-class Test extends VNode({parent: true}) {
-  constructor() {
-    super();
-  }
-}
-
 export interface NodeParams {
   attribute?: boolean;
   child?: boolean;
