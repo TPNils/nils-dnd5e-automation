@@ -121,7 +121,7 @@ export class VirtualNodeParser {
       // One of the groups 2, 3 or 4 may contain a value
       for (let i = 2; i <= 4; i++) {
         if (this.regexResult[i]) {
-          value = this.regexResult.groups[i];
+          value = this.regexResult[i];
           break;
         }
       }
