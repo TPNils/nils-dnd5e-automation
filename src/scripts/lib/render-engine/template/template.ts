@@ -1,5 +1,6 @@
 import { UtilsLog } from "../../../utils/utils-log";
 import { VirtualCommmentNode } from "../virtual-dom/virtual-comment-node";
+import { VirtualFragmentNode } from "../virtual-dom/virtual-fragment-node";
 import { VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
 import { VirtualTextNode } from "../virtual-dom/virtual-text-node";
 
@@ -22,10 +23,10 @@ export class Template {
     this.#context = context;
   }
 
-  public render(): VirtualNode[] {
-    const rendered: VirtualNode[] = [];
+  public render(): VirtualNode & VirtualParentNode {
+    const root: VirtualNode & VirtualParentNode = new VirtualFragmentNode();
 
-    let pending: Array<PendingNodes> = [{template: this.template, instance: this.template.cloneNode(false), context: this.#context}];
+    let pending: Array<PendingNodes> = [{parentInstance: root, template: this.template, instance: this.template.cloneNode(false), context: this.#context}];
     while (pending.length > 0) {
       const processing = pending;
       pending = [];
@@ -129,13 +130,11 @@ export class Template {
         }
         if (process.instance.isChildNode() && process.parentInstance) {
           process.parentInstance.appendChild(process.instance);
-        } else {
-          rendered.push(process.instance);
         }
         if (process.instance.isParentNode() && process.template.isParentNode()) {
           for (const child of process.template.childNodes) {
             pending.push({
-              parentInstance: process.instance,
+              parentInstance: process.instance.isChildNode() ? process.instance : process.parentInstance,
               context: process.context,
               template: child,
               instance: child.cloneNode(false),
@@ -145,7 +144,7 @@ export class Template {
       }
     }
 
-    return rendered;
+    return root;
   }
 
   private parseExpression(expression: any, context: any): any {
