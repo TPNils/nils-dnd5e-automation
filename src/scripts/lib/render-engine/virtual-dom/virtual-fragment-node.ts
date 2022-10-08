@@ -1,6 +1,6 @@
-import { VirtualAttributeNode, VirtualChildNode, VirtualEventNode, VirtualNode, VirtualParentNode } from "./virtual-node";
+import { VirtualAttributeNode, VirtualChildNode, VirtualEventNode, VirtualNode, VNode } from "./virtual-node";
 
-export class VirtualFragmentNode extends VirtualParentNode() implements VirtualNode {
+export class VirtualFragmentNode extends VNode({parent: true}) implements VirtualNode {
 
   public constructor() {
     super();

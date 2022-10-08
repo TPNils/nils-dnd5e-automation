@@ -27,7 +27,7 @@ export interface VirtualNode extends VirtualBaseNode {
 }
 
 //#region attribute
-export function VirtualAttributeNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
+function VirtualAttributeNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualAttributeNode {
     readonly #attributes = new Map<string, string>();
 
@@ -78,7 +78,7 @@ export interface VirtualAttributeNode extends VirtualBaseNode {
 
 //#region child
 const setParentOnChild = Symbol('setParent');
-export function VirtualChildNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
+function VirtualChildNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualChildNode {
     #parentNode: VirtualParentNode;
     get parentNode(): VirtualParentNode {
@@ -175,7 +175,7 @@ export interface StoredEventCallback {
   readonly guid: number;
   readonly options?: boolean | AddEventListenerOptions;
 }
-export function VirtualEventNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
+function VirtualEventNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualEventNode {
     #callbackMap = new Map<number, StoredEventCallback>();
 
@@ -215,7 +215,7 @@ export interface VirtualEventNode extends VirtualBaseNode {
 
 //#region parent
 const getRawChildren = Symbol('getRawChildren');
-export function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
+function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualParentNode {
     #childNodes: Array<VirtualChildNode & VirtualNode> = [];
     get childNodes(): ReadonlyArray<VirtualChildNode & VirtualNode> {
@@ -367,3 +367,49 @@ export interface VirtualParentNode extends VirtualBaseNode {
   isParentNode(): this is VirtualParentNode;
 }
 //#endregion
+
+
+class Test extends VNode({parent: true}) {
+  constructor() {
+    super();
+  }
+}
+
+export interface NodeParams {
+  attribute?: boolean;
+  child?: boolean;
+  event?: boolean;
+  parent?: boolean;
+}
+export function VNode(params: {attribute: true}): ReturnType<typeof VirtualAttributeNode>
+export function VNode(params: {child: true}): ReturnType<typeof VirtualChildNode>
+export function VNode(params: {event: true}): ReturnType<typeof VirtualEventNode>
+export function VNode(params: {parent: true}): ReturnType<typeof VirtualParentNode>
+export function VNode(params: {attribute: true, child: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode>
+export function VNode(params: {attribute: true, event: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualEventNode>
+export function VNode(params: {attribute: true, parent: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {child: true, event: true}): ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode>
+export function VNode(params: {child: true, parent: true}): ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {event: true, parent: true}): ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {child: true, event: true, parent: true}): ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {attribute: true, event: true, parent: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {attribute: true, child: true, parent: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {attribute: true, child: true, event: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode>
+export function VNode(params: {attribute: true, child: true, event: true, parent: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params?: NodeParams): Constructor
+export function VNode(params: NodeParams = {}): Constructor {
+  let builderClass = PlaceholderClass;
+  if (params.child) {
+    builderClass = VirtualChildNode(builderClass);
+  }
+  if (params.event) {
+    builderClass = VirtualEventNode(builderClass);
+  }
+  if (params.parent) {
+    builderClass = VirtualParentNode(builderClass);
+  }
+  if (params.attribute) {
+    builderClass = VirtualAttributeNode(builderClass);
+  }
+  return builderClass;
+}

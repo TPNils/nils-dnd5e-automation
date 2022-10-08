@@ -1,6 +1,6 @@
-import { StoredEventCallback, VirtualAttributeNode, VirtualChildNode, VirtualEventNode, VirtualNode, VirtualParentNode } from "./virtual-node";
+import { StoredEventCallback, VirtualChildNode, VirtualNode, VNode } from "./virtual-node";
 
-export class VirtualHtmlNode extends VirtualChildNode(VirtualParentNode(VirtualEventNode(VirtualAttributeNode()))) implements VirtualNode {
+export class VirtualHtmlNode extends VNode({attribute: true, child: true, event: true, parent: true}) implements VirtualNode {
   
   public constructor(nodeName: string) {
     super();
