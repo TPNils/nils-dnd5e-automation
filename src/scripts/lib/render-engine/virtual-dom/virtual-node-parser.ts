@@ -15,11 +15,11 @@ const startElementPrefixRegex = /\s*<([a-zA-Z_][a-zA-Z0-9_\-\.]*)/y;
 const startElementSuffixRegex = /\s*(\/)?>/y;
 const endElementRegex = /\s*<\/([a-zA-Z_][a-zA-Z0-9_\-\.]*)>/y;
 
-// https://html.spec.whatwg.org/multipage/syntax.html#attributes-2
+// https://www.w3.org/TR/2012/WD-html-markup-20120329/syntax.html
 const attrValueNoQuoteRegex = /(?<value1>[^"'=<>`\s]+)/y;
 const attrValueDoubleQuoteRegex = /"(?<value2>.*?)(?<!\\)"/y;
 const attrValueSingleQuoteRegex = /'(?<value3>.*?)(?<!\\)'/y;
-const attrNameRegex = /(?<name>[a-zA-Z]+)/y;
+const attrNameRegex = /(?<name>[^\s"'>/=]+)/y;
 const attrRegex = new RegExp(`\\s*${attrNameRegex.source}(?:\\s*=(?:${attrValueNoQuoteRegex.source}|\\s*${attrValueDoubleQuoteRegex.source}|\\s*${attrValueSingleQuoteRegex.source}))?`, `y`)
 
 export class VirtualNodeParser {
