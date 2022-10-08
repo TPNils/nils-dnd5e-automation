@@ -285,7 +285,17 @@ function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as
         throw new Error(`Failed to execute 'removeChild' on 'Node': The reference child is not a child of this node.`);
       }
 
+      child[setParentOnChild](null);
       return this.#childNodes.splice(index, 1)[0] as any;
+    }
+    
+    public removeAllChildren(): Array<VirtualChildNode & VirtualNode> {
+      const children = this.#childNodes;
+      this.#childNodes = [];
+      for (const child of children) {
+        child[setParentOnChild](null);
+      }
+      return children;
     }
     
     public replaceChild<T extends VirtualChildNode>(child: T, ...nodes: Array<VirtualChildNode & VirtualNode>): T {
@@ -294,6 +304,7 @@ function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as
         throw new Error(`Failed to execute 'replaceChild' on 'Node': The reference child is not a child of this node.`);
       }
 
+      child[setParentOnChild](null);
       return this.#childNodes.splice(index, 1, ...nodes)[0] as any;
     }
     
@@ -355,6 +366,11 @@ export interface VirtualParentNode extends VirtualBaseNode {
    * Remove a direct child of this node
    */
   removeChild<T extends VirtualChildNode>(child: T): T;
+  /**
+   * Remove all direct children of this node
+   * @returns it's direct children
+   */
+  removeAllChildren(): Array<VirtualChildNode & VirtualNode>
   /**
    * Replace a direct child of this node with another
    */
