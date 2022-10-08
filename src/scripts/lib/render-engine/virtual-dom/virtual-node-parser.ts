@@ -17,10 +17,10 @@ const startElementSuffixRegex = /\s*(\/)?>/y;
 const endElementRegex = /\s*<\/([a-zA-Z_][a-zA-Z0-9_\-\.]*)>/y;
 
 // https://www.w3.org/TR/2012/WD-html-markup-20120329/syntax.html
-const attrValueNoQuoteRegex = /(?<value1>[^"'=<>`\s]+)/y;
-const attrValueDoubleQuoteRegex = /"(?<value2>.*?[^\\](?:\\\\)*)"/ys;
-const attrValueSingleQuoteRegex = /'(?<value3>.*?[^\\](?:\\\\)*)'/ys;
-const attrNameRegex = /(?<name>[^\s"'>/=]+)/y;
+const attrValueNoQuoteRegex = /([^"'=<>`\s]+)/y;
+const attrValueDoubleQuoteRegex = /"(.*?[^\\](?:\\\\)*)"/ys;
+const attrValueSingleQuoteRegex = /'(.*?[^\\](?:\\\\)*)'/ys;
+const attrNameRegex = /([^\s"'>/=]+)/y;
 const attrRegex = new RegExp(`\\s*${attrNameRegex.source}(?:\\s*=(?:${attrValueNoQuoteRegex.source}|\\s*${attrValueDoubleQuoteRegex.source}|\\s*${attrValueSingleQuoteRegex.source}))?`, `ys`)
 
 export class VirtualNodeParser {
@@ -118,13 +118,15 @@ export class VirtualNodeParser {
     let indexSnapshot: number = this.currentIndex;
     while (this.exec(attrRegex)) {
       let value = '';
-      if (this.regexResult.groups.value1) {
-        value = this.regexResult.groups.value1;
-      } else if (this.regexResult.groups.value2) {
-        value = this.regexResult.groups.value2;
+      // One of the groups 2, 3 or 4 may contain a value
+      for (let i = 2; i <= 4; i++) {
+        if (this.regexResult[i]) {
+          value = this.regexResult.groups[i];
+          break;
+        }
       }
 
-      this.currentNode.setAttribute(this.regexResult.groups.name, value);
+      this.currentNode.setAttribute(this.regexResult[1], value);
       if (indexSnapshot === this.currentIndex) {
         throw new Error(`Internal error. Could not parse html, stuck at index ${indexSnapshot}. html:\n${this.html}`)
       }
