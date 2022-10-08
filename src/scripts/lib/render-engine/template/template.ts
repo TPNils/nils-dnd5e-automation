@@ -1,7 +1,7 @@
 import { UtilsLog } from "../../../utils/utils-log";
 import { VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
 
-const forAttrRegex = /^\s*let\s+(?<letName>[^\s]+\s)+of\s(?<expr>.+)$/;
+const forAttrRegex = /^\s*let\s+([^\s]+\s)+of\s(.+)$/;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
   template: T,
   instance: T,
@@ -35,7 +35,7 @@ export class Template {
             if (!regexResult) {
               UtilsLog.error(`Unable to parse *for expression:`, process.instance.getAttribute('*for'));
             } else {
-              const resolvedExpr = this.parseExpression(regexResult.groups.expr, process.context);
+              const resolvedExpr = this.parseExpression(regexResult[2], process.context);
               if (!resolvedExpr[Symbol.iterator]) {                
                 UtilsLog.error(`The *for expression did not return an array/iterator:`, process.instance.getAttribute('*for'), resolvedExpr);
               } else {
@@ -50,7 +50,7 @@ export class Template {
                     instance: process.instance.cloneNode(false),
                     context: {
                       ...process.context,
-                      [regexResult.groups.letName]: item,
+                      [regexResult[1]]: item,
                     }
                   });
                 }
