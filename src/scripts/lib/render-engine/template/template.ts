@@ -1,5 +1,7 @@
 import { UtilsLog } from "../../../utils/utils-log";
+import { VirtualCommmentNode } from "../virtual-dom/virtual-comment-node";
 import { VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
+import { VirtualTextNode } from "../virtual-dom/virtual-text-node";
 
 const forAttrRegex = /^\s*let\s+([^\s]+\s)+of\s(.+)$/;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
@@ -84,6 +86,45 @@ export class Template {
                 process.instance.setAttribute(name.substring(1, name.length - 1), value);
               }
             }
+          }
+        }
+        if (process.instance instanceof VirtualTextNode || process.instance instanceof VirtualCommmentNode) {
+          // TODO this is currently a dumb implementation and does not account for the 'keywords' {{ and }} to be present within the expression (example: in a javascript string)
+          // Best to write an interpreter but thats a lot of work and maybe more process intensive so lets cross that bridge when we get there :)
+          let nodeValue = process.instance.nodeValue;
+          let startExpression = 0;
+          let endExpression: number;
+          while ((startExpression = nodeValue.indexOf('{{', startExpression)) !== -1) {
+            startExpression = nodeValue.indexOf('{{');
+            if (nodeValue[startExpression-1] === '\\') {
+              // escaped, please continue
+              continue;
+            }
+
+            endExpression = startExpression;
+            do {
+              endExpression = nodeValue.indexOf('}}', endExpression);
+              if (nodeValue[endExpression-1] === '\\') {
+                // escaped, please continue
+                endExpression += 2;
+              } else {
+                break;
+              }
+            } while (endExpression !== -1)
+            
+            UtilsLog.debug({nodeValue, startExpression, endExpression})
+            let originalLength = nodeValue.length;
+            nodeValue = [
+              nodeValue.substring(0, startExpression),
+              String(this.parseExpression(nodeValue.substring(startExpression+2, endExpression), process.context)),
+              nodeValue.substring(endExpression+2),
+            ].join('');
+
+            startExpression = endExpression + 2 - /*offset str length*/originalLength + nodeValue.length;
+          }
+
+          if (nodeValue !== process.instance.nodeValue) {
+            process.instance.nodeValue = nodeValue;
           }
         }
         if (process.instance.isChildNode() && process.parentInstance) {
