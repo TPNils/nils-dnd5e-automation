@@ -29,7 +29,7 @@ export interface VirtualNode extends VirtualBaseNode {
 //#region attribute
 function VirtualAttributeNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualAttributeNode {
-    readonly #attributes = new Map<string, string>();
+    readonly #attributes = new Map<string, any>();
 
     public getAttributeNames(): IterableIterator<string> {
       return this.#attributes.keys();
@@ -39,11 +39,11 @@ function VirtualAttributeNode<T extends Constructor>(clazz: T = PlaceholderClass
       return this.#attributes.has(qualifiedName?.toLowerCase());
     }
 
-    public getAttribute(qualifiedName: string): string {
+    public getAttribute(qualifiedName: string): any {
       return this.#attributes.get(qualifiedName?.toLowerCase());
     }
     
-    public setAttribute(qualifiedName: string, value: string): void {
+    public setAttribute(qualifiedName: string, value: any): void {
       if (qualifiedName == null || qualifiedName === '')  {
         throw new Error(`qualifiedName needs to have a value. Found: "${qualifiedName}"`)
       }
@@ -69,8 +69,8 @@ function VirtualAttributeNode<T extends Constructor>(clazz: T = PlaceholderClass
 export interface VirtualAttributeNode extends VirtualBaseNode {
   getAttributeNames(): IterableIterator<string>;
   hasAttribute(qualifiedName: string): boolean;
-  getAttribute(qualifiedName: string): string | null;
-  setAttribute(qualifiedName: string, value: string | null): void;
+  getAttribute(qualifiedName: string): any | null;
+  setAttribute(qualifiedName: string, value: any | null): void;
   removeAttribute(qualifiedName: string): void;
   isAttributeNode(): this is VirtualAttributeNode;
 }

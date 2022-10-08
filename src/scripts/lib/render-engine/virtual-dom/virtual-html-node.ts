@@ -1,3 +1,4 @@
+import { AttributeParser } from "../attribute-parser";
 import { StoredEventCallback, VirtualChildNode, VirtualNode, VNode } from "./virtual-node";
 
 export class VirtualHtmlNode extends VNode({attribute: true, child: true, event: true, parent: true}) implements VirtualNode {
@@ -29,7 +30,7 @@ export class VirtualHtmlNode extends VNode({attribute: true, child: true, event:
       this.#node = document.createElement(this.#nodeName);
 
       for (const attr of this.getAttributeNames()) {
-        this.#node.setAttribute(attr, this.getAttribute(attr));
+        this.#node.setAttribute(attr, AttributeParser.serialize(this.getAttribute(attr)));
       }
 
       for (const listener of this.getEventListerners()) {
