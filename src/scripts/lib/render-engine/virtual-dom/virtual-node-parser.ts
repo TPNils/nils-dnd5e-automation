@@ -18,8 +18,8 @@ const endElementRegex = /\s*<\/([a-zA-Z_][a-zA-Z0-9_\-\.]*)>/y;
 
 // https://www.w3.org/TR/2012/WD-html-markup-20120329/syntax.html
 const attrValueNoQuoteRegex = /(?<value1>[^"'=<>`\s]+)/y;
-const attrValueDoubleQuoteRegex = /"(?<value2>.*?)(?<!\\)"/ys;
-const attrValueSingleQuoteRegex = /'(?<value3>.*?)(?<!\\)'/ys;
+const attrValueDoubleQuoteRegex = /"(?<value2>.*?[^\\](?:\\\\)*)"/ys;
+const attrValueSingleQuoteRegex = /'(?<value3>.*?[^\\](?:\\\\)*)'/ys;
 const attrNameRegex = /(?<name>[^\s"'>/=]+)/y;
 const attrRegex = new RegExp(`\\s*${attrNameRegex.source}(?:\\s*=(?:${attrValueNoQuoteRegex.source}|\\s*${attrValueDoubleQuoteRegex.source}|\\s*${attrValueSingleQuoteRegex.source}))?`, `ys`)
 
@@ -122,8 +122,6 @@ export class VirtualNodeParser {
         value = this.regexResult.groups.value1;
       } else if (this.regexResult.groups.value2) {
         value = this.regexResult.groups.value2;
-      } if (this.regexResult.groups.value3) {
-        value = this.regexResult.groups.value3;
       }
 
       this.currentNode.setAttribute(this.regexResult.groups.name, value);
