@@ -40,4 +40,8 @@ export class VirtualFragmentNode extends VNode({parent: true}) implements Virtua
     return false;
   }
   
+  public toString(): string {
+    return this.getRawChildren().map(child => String(child)).join('');
+  }
+  
 }

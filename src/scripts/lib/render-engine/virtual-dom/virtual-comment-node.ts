@@ -62,5 +62,8 @@ export class VirtualCommmentNode extends VNode({child: true}) implements Virtual
     return false;
   }
 
+  public toString(): string {
+    return `<!--${this.nodeValue}-->`
+  }
   
 }

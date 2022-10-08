@@ -62,5 +62,8 @@ export class VirtualTextNode extends VNode({child: true}) implements VirtualNode
     return false;
   }
 
+  public toString(): string {
+    return this.nodeValue;
+  }
   
 }

@@ -128,5 +128,33 @@ export class VirtualHtmlNode extends VNode({attribute: true, child: true, event:
   public isNode(): this is VirtualNode {
     return true;
   }
+  
+  public toString(): string {
+    const parts: string[] = [];
+    parts.push('<');
+    parts.push(this.#nodeName.toLowerCase());
+    for (const attr of this.getAttributeNames()) {
+      parts.push(' ');
+      parts.push(attr);
+      const value = AttributeParser.serialize(this.getAttribute(attr));
+      console.log(attr, value)
+      if (value) {
+        parts.push('="');
+        // escape \ (escape character) & " (start/end of value)
+        parts.push(value.replace(/\\/g, '\\\\').replace(/"/g, '\\"'));
+        parts.push('"');
+      }
+    }
+    if (this.hasChildNodes()) {
+      parts.push('>');
+      for (const child of this.getRawChildren()) {
+        parts.push(String(child));
+      }
+      parts.push(`<${this.#nodeName.toLowerCase()}/>`);
+    } else {
+      parts.push('/>');
+    }
+    return parts.join('');
+  }
 
 }
