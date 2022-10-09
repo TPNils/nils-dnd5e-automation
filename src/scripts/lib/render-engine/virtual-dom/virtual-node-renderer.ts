@@ -26,6 +26,9 @@ type DomAction = {
   type: 'nodeValue';
   node: Node;
   value: string;
+} | {
+  type: 'removeNode';
+  node: ChildNode;
 })
 
 const stateSymbol = Symbol('domCache');
@@ -242,6 +245,10 @@ export class VirtualNodeRenderer {
               }
               case 'nodeValue': {
                 item.node.nodeValue = item.value;
+                break;
+              }
+              case 'removeNode': {
+                item.node.remove();
                 break;
               }
             }
