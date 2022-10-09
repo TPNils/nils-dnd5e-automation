@@ -1,5 +1,8 @@
 export interface SecureOptions {
+  /* Default: true */
   write?: boolean;
+  /* Default: true */
+  throw?: boolean;
 }
 
 const secureOptionsSymbol = Symbol('SecureOptions');
@@ -12,7 +15,7 @@ const securityHandler: ProxyHandler<object> = {
     if (target[secureOptionsSymbol]?.write !== false) {
       return Reflect.set(target, p, receiver);
     }
-    return false;
+    return !target[secureOptionsSymbol]?.throw;
   }
 }
 

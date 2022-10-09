@@ -221,7 +221,7 @@ export interface VirtualEventNode extends VirtualBaseNode {
 //#region parent
 function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualParentNode {
-    #childNodesSecurity: SecureOptions = {write: false};
+    #childNodesSecurity: SecureOptions = {write: false, throw: false};
     #childNodes: Array<VirtualChildNode & VirtualNode> = applySecurity([], this.#childNodesSecurity);
     get childNodes(): ReadonlyArray<VirtualChildNode & VirtualNode> {
       return this.#childNodes;
