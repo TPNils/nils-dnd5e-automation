@@ -38,7 +38,7 @@ export class VirtualHtmlNode extends VNode({attribute: true, child: true, event:
       }
       
       const children: Node[] = [];
-      for (const child of this.getRawChildren()) {
+      for (const child of this.childNodes) {
         if (child.isNode && child.isNode()) {
           this.#appliedChildren.push(child);
           children.push(child.domNode());
@@ -146,7 +146,7 @@ export class VirtualHtmlNode extends VNode({attribute: true, child: true, event:
     }
     if (this.hasChildNodes()) {
       parts.push('>');
-      for (const child of this.getRawChildren()) {
+      for (const child of this.childNodes) {
         parts.push(String(child));
       }
       parts.push(`<${this.#nodeName.toLowerCase()}/>`);

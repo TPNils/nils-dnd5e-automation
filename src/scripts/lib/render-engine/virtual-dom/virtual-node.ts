@@ -1,3 +1,5 @@
+import { applySecurity, revokeSecurity, SecureOptions } from "../secure";
+
 class PlaceholderClass {}
 type Constructor<I = PlaceholderClass> = new (...args: any[]) => I;
 
@@ -92,14 +94,14 @@ function VirtualChildNode<T extends Constructor>(clazz: T = PlaceholderClass as 
       if (!this.parentNode) {
         return undefined;
       }
-      return this.parentNode[getRawChildren]()[this.parentNode[getRawChildren]().indexOf(this as any) - 1];
+      return this.parentNode.childNodes[this.parentNode.childNodes.indexOf(this as any) - 1];
     }
 
     public nextSibling(): VirtualChildNode {
       if (!this.parentNode) {
         return undefined;
       }
-      return this.parentNode[getRawChildren]()[this.parentNode[getRawChildren]().indexOf(this as any) + 1];
+      return this.parentNode.childNodes[this.parentNode.childNodes.indexOf(this as any) + 1];
     }
 
     public getRootNode(): VirtualBaseNode {
@@ -214,19 +216,11 @@ export interface VirtualEventNode extends VirtualBaseNode {
 //#endregion
 
 //#region parent
-const getRawChildren = Symbol('getRawChildren');
 function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualParentNode {
-    #childNodes: Array<VirtualChildNode & VirtualNode> = [];
+    #childNodesSecurity: SecureOptions = {write: false};
+    #childNodes: Array<VirtualChildNode & VirtualNode> = applySecurity([], this.#childNodesSecurity);
     get childNodes(): ReadonlyArray<VirtualChildNode & VirtualNode> {
-      return [...this.#childNodes];
-    }
-
-    protected getRawChildren(): ReadonlyArray<VirtualChildNode & VirtualNode> {
-      return this.#childNodes;
-    }
-    
-    [getRawChildren](): ReadonlyArray<VirtualChildNode & VirtualNode> {
       return this.#childNodes;
     }
 
@@ -273,7 +267,9 @@ function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as
         }
       }
 
+      this.#childNodesSecurity.write = true;
       this.#childNodes.splice(index, 0, ...nodes);
+      this.#childNodesSecurity.write = false;
       for (const node of nodes) {
         node[setParentOnChild](this);
       }
@@ -286,12 +282,16 @@ function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as
       }
 
       child[setParentOnChild](null);
-      return this.#childNodes.splice(index, 1)[0] as any;
+      this.#childNodesSecurity.write = true;
+      this.#childNodes.splice(index, 1)
+      this.#childNodesSecurity.write = false;
+      return child;
     }
     
     public removeAllChildren(): Array<VirtualChildNode & VirtualNode> {
       const children = this.#childNodes;
-      this.#childNodes = [];
+      revokeSecurity(children, this.#childNodesSecurity);
+      this.#childNodes = applySecurity([], this.#childNodesSecurity);
       for (const child of children) {
         child[setParentOnChild](null);
       }
@@ -305,7 +305,10 @@ function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as
       }
 
       child[setParentOnChild](null);
-      return this.#childNodes.splice(index, 1, ...nodes)[0] as any;
+      this.#childNodesSecurity.write = true;
+      this.#childNodes.splice(index, 1, ...nodes)
+      this.#childNodesSecurity.write = false;
+      return child;
     }
     
     public contains(other: VirtualNode): boolean {
@@ -329,7 +332,7 @@ function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as
         return;
       }
       const clones: Array<VirtualChildNode & VirtualNode> = [];
-      for (const child of original[getRawChildren]()) {
+      for (const child of original.childNodes) {
         clones.push(child.cloneNode(true));
       }
       this.appendChild(...clones);
@@ -338,7 +341,6 @@ function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as
 }
 export interface VirtualParentNode extends VirtualBaseNode {
   readonly childNodes: ReadonlyArray<VirtualChildNode & VirtualNode>;
-  [getRawChildren](): ReadonlyArray<VirtualChildNode & VirtualNode>;
   firstChild(): VirtualChildNode & VirtualNode;
   lastChild(): VirtualChildNode & VirtualNode;
   hasChildNodes(): boolean;
