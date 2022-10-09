@@ -17,7 +17,7 @@ export interface VirtualNode extends VirtualBaseNode {
 
   readonly nodeName: string;
   cloneNode(deep?: boolean): this;
-  domNode(): Node;
+  domNode(): Node; // TODO be like document.createX(...params) => where we only have a createDom() method and the rest is handled outside
   executeUpdate(): void;
 
   isNode(): this is VirtualNode;
