@@ -19,8 +19,10 @@ export interface VirtualNode extends VirtualBaseNode {
 
   readonly nodeName: string;
   cloneNode(deep?: boolean): this;
-  domNode(): Node; // TODO be like document.createX(...params) => where we only have a createDom() method and the rest is handled outside
-  executeUpdate(): void;
+  /**
+   * Creates a new empty node
+   */
+  createDom(): Node;
 
   isNode(): this is VirtualNode;
   isAttributeNode(): this is VirtualAttributeNode;
@@ -422,7 +424,7 @@ export interface VirtualTextNode extends VirtualBaseNode {
 }
 //#endregion
 
-
+//#region VNode
 export interface NodeParams {
   attribute?: boolean;
   child?: boolean;
@@ -571,4 +573,5 @@ function generateVNodeContract() {
 }
 
 // generateVNodeContract();
+//#endregion
 

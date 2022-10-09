@@ -18,21 +18,8 @@ export class VirtualTextNode extends VNode({child: true, text: true}) implements
     return clone as this;
   }
 
-  #node: Text;
-  #appliedState: this;
-  public domNode(): Node {
-    if (this.#node == null) {
-      this.#node = document.createTextNode(this.getText());
-      this.#appliedState = this.cloneNode(false);
-    }
-    return this.#node;
-  }
-
-  public executeUpdate(): void {
-    if (this.#appliedState.getText() !== this.getText()) {
-      this.#node.nodeValue = this.getText();
-      this.#appliedState = this.cloneNode(false);
-    }
+  public createDom(): Node {
+    return document.createTextNode('');
   }
 
   public isNode(): this is VirtualNode {

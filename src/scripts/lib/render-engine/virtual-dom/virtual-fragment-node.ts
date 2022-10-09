@@ -16,12 +16,8 @@ export class VirtualFragmentNode extends VNode({parent: true}) implements Virtua
     return clone as this;
   }
 
-  public domNode(): Node {
-    throw new Error("Method not implemented.");
-  }
-
-  public executeUpdate(): void {
-    throw new Error("Method not implemented.");
+  public createDom(): Node {
+    return document.createDocumentFragment();
   }
 
   public isNode(): this is VirtualNode {

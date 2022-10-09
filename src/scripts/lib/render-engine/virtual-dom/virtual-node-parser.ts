@@ -4,6 +4,7 @@ import { VirtualCommmentNode } from "./virtual-comment-node";
 import { VirtualFragmentNode } from "./virtual-fragment-node";
 import { VirtualHtmlNode } from "./virtual-html-node";
 import { VirtualNode, VirtualParentNode } from "./virtual-node";
+import { VirtualNodeRenderer } from "./virtual-node-renderer";
 import { VirtualTextNode } from "./virtual-text-node";
 
 // y flag = sticky => allow useage of lastIndex
@@ -162,6 +163,7 @@ export class VirtualNodeParser {
       template.setContext(context);
       return template.render();
     };
+    (window as any).toHtml = VirtualNodeRenderer.renderDom;
     /*
     (() => {
       const html = `test 
@@ -177,6 +179,15 @@ export class VirtualNodeParser {
       const tparse = window.tparse(html);
       console.log(vparse, String(vparse));
       console.log(tparse, String(tparse));
+      let devElem = document.getElementById('nils-dev');
+      if (!devElem) {
+        devElem = document.createElement('div');
+        devElem.setAttribute('id', 'nils-dev');
+        devElem.setAttribute('style', 'display: none;');
+        document.body.prepend(devElem);
+      }
+      console.log(toHtml(tparse))
+      devElem.appendChild(toHtml(tparse))
     })()
     */
   }

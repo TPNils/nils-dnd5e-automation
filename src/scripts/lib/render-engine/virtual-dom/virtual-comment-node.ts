@@ -18,21 +18,8 @@ export class VirtualCommmentNode extends VNode({child: true, text: true}) implem
     return clone as this;
   }
 
-  #node: Comment;
-  #appliedState: this;
-  public domNode(): Node {
-    if (this.#node == null) {
-      this.#node = new Comment(this.getText());
-      this.#appliedState = this.cloneNode(false);
-    }
-    return this.#node;
-  }
-
-  public executeUpdate(): void {
-    if (this.#appliedState.getText() !== this.getText()) {
-      this.#node.nodeValue = this.getText();
-      this.#appliedState = this.cloneNode(false);
-    }
+  public createDom(): Node {
+    return document.createComment('');
   }
 
   public isNode(): this is VirtualNode {
