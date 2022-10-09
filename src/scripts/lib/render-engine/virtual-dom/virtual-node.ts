@@ -50,7 +50,7 @@ function VirtualAttributeNode<T extends Constructor>(clazz: T = PlaceholderClass
       return this.#attributes.get(qualifiedName?.toLowerCase());
     }
     
-    public setAttribute(qualifiedName: string, value: any): void {
+    public setAttribute(qualifiedName: string, value: any = ''): void {
       if (qualifiedName == null || qualifiedName === '')  {
         throw new Error(`qualifiedName needs to have a value. Found: "${qualifiedName}"`)
       }
@@ -77,7 +77,7 @@ export interface VirtualAttributeNode extends VirtualBaseNode {
   getAttributeNames(): IterableIterator<string>;
   hasAttribute(qualifiedName: string): boolean;
   getAttribute(qualifiedName: string): any | null;
-  setAttribute(qualifiedName: string, value: any | null): void;
+  setAttribute(qualifiedName: string, value?: any | null): void;
   removeAttribute(qualifiedName: string): void;
   isAttributeNode(): this is VirtualAttributeNode;
 }
