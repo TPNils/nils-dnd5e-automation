@@ -10,6 +10,7 @@ import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { MemoryStorageService } from "../../service/memory-storage-service";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
+import { UtilsLog } from "../../utils/utils-log";
 import { ChatPartEnriched, ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
@@ -95,23 +96,23 @@ function getTargetCache(cache: AttackCardData): Map<string, AttackCardData['dumm
   tag: 'Attack-CardPart',
   html: /*html*/`
     <nac-roll-d20 *for="let targetCache of this.targetCaches" *if="targetCache.isSelected$"
-      data-roll="{{JSON.serialize(this.part.data.rolls$[targetCache.selectedRoll$].roll$)}}"
-      data-bonus-formula="{{targetCache.userBonus}}"
-      data-show-bonus="{{targetCache.phase !== 'mode-select'}}"
-      data-override-max-roll="{{this.part.data.critTreshold$}}"
+      [data-roll]="this.part.data.rolls$[targetCache.selectedRoll$].roll$"
+      [data-bonus-formula]="targetCache.userBonus"
+      [data-show-bonus]="targetCache.phase !== 'mode-select'"
+      [data-override-max-roll]="this.part.data.critTreshold$"
 
-      data-interaction-permission="{{this.interactionPermission}}"
-      data-read-permission="{{this.readPermission}}"
-      data-read-hidden-display-type="{{this.readHiddenDisplayType}}"
+      [data-interaction-permission]="this.interactionPermission"
+      [data-read-permission]="this.readPermission"
+      [data-read-hidden-display-type]="this.readHiddenDisplayType"
 
-      data-selection-id="targetCache.selectionId$"
-      data-memory-context="targetCache.selectionId$"
+      [data-selection-id]="targetCache.selectionId$"
+      [data-memory-context]="targetCache.selectionId$"
       >
     </nac-roll-d20>
     <div class="host" *if="this.dataPartId">
       I am a Attack-CardPart
       <div *for="let i of [1,2,3]">{{i}}</div>
-      <label class="testing {{this.testField}}" (click)="console.log('click', $event)">dataPartId = {{this.dataPartId}}</label>
+      <label class="testing {{this.testField}}">dataPartId = {{this.dataPartId}}</label>
     </div>
   `,
   style: /*css*/`
@@ -155,6 +156,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       this.part = allParts.find(p => p.id === this.dataPartId && p.type === this.getType());
       if (this.part != null) {
         this.targetCaches = Array.from(getTargetCache(this.part.data).values()).sort((a, b) => a.name$.localeCompare(b.name$));
+        if (this.targetCaches.length === 0) {
+          this.targetCaches.push(this.part.data.dummyCache$);
+        }
       }
     }
 
@@ -444,6 +448,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           {
             const elem = document.createElement('Attack-CardPart');
             elem.setAttribute('data-part-id', attributes["data-part-id"]);
+            elem.setAttribute('data-message-id', attributes["data-message-id"]);
             elements.push(elem);
           }
           for (const targetCache of Array.from(getTargetCache(part.data).values()).sort((a, b) => a.name$.localeCompare(b.name$))) {

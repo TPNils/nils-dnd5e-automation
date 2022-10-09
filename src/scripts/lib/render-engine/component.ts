@@ -1,7 +1,10 @@
 import { staticValues } from "../../static-values";
 import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
-import { AttributeParser } from "./attribute-parser";
+import { Template } from "./template/template";
+import { VirtualNode, VirtualParentNode } from "./virtual-dom/virtual-node";
+import { VirtualNodeParser } from "./virtual-dom/virtual-node-parser";
+import { VirtualNodeRenderer } from "./virtual-dom/virtual-node-renderer";
 
 //#region Decorators
 let nextComponentId = 0;
@@ -9,7 +12,6 @@ const componentConfigSymbol = Symbol('ComponentConfig');
 const htmlElementSymbol = Symbol('HtmlElement');
 const cssComponentHostIdAttrPrefix = `${staticValues.code}-host`;
 const cssComponentIdAttrPrefix = `${staticValues.code}-cid`;
-const fieldTemplateBindRegex = /{{((?:this\.)?[a-zA-Z_$]+.*?)}}/gm;
 
 const componentInstanceProxyHandler: ProxyHandler<{[htmlElementSymbol]: ComponentElement}> = {
   set: (target: {[htmlElementSymbol]: ComponentElement}, field: string | symbol, value: any, receiver: any): boolean => {
@@ -27,7 +29,7 @@ export interface ComponentConfig {
 }
 interface ComponentConfigInternal extends ComponentConfig {
   componentId: string;
-  fieldsInHtml: string[];
+  parsedHtml?: VirtualNode & VirtualParentNode;
 }
 export function Component(config: ComponentConfig | string) {
   if (typeof config === 'string') {
@@ -43,26 +45,26 @@ export function Component(config: ComponentConfig | string) {
     const internalConfig: ComponentConfigInternal = {
       ...config as ComponentConfig,
       componentId: String(nextComponentId++),
-      fieldsInHtml: [],
     }
     internalConfig.tag = internalConfig.tag.toLowerCase();
 
     if (internalConfig.html) {
-      let regexMatch: RegExpExecArray;
-      const fieldsInHtml = new Set<string>();
-      while (regexMatch = fieldTemplateBindRegex.exec(internalConfig.html)) {
-        fieldsInHtml.add(regexMatch[1].replace(/^this\./, ''));
-      }
-      fieldTemplateBindRegex.lastIndex = 0;
-
-      internalConfig.fieldsInHtml = Array.from(fieldsInHtml);
-    }
-
-    const dummyController = new constructor();
-    // TODO find fields used in *if and *for
-    for (const field of internalConfig.fieldsInHtml) {
-      if (!(field in dummyController)) {
-        //UtilsLog.warn(`Field '${field}' expected in element ${internalConfig.tag} but was not found.`);
+      internalConfig.parsedHtml = VirtualNodeParser.parse(internalConfig.html);
+      // Mark all child nodes to be a part of this template
+      let pending: Array<VirtualNode> = [internalConfig.parsedHtml];
+      while (pending.length > 0) {
+        const processing = pending;
+        pending = [];
+        for (const process of processing) {
+          if (process.isAttributeNode()) {
+            process.setAttribute(`${cssComponentIdAttrPrefix}-${internalConfig.componentId}`)
+          }
+          if (process.isParentNode()) {
+            for (const child of process.childNodes) {
+              pending.push(child);
+            }
+          }
+        }
       }
     }
 
@@ -225,7 +227,6 @@ export function BindEvent(config: EventConfig | string) {
 }
 //#endregion
 
-const templateContextSymbol = Symbol('TemplateContext');
 class ComponentElement extends HTMLElement {
   protected controller: object;
 
@@ -260,36 +261,28 @@ class ComponentElement extends HTMLElement {
    * Mark this element as changed
    */
   public onChange(): void {
-    if (!this.connected) {
-      return; // TODO is this correct? probably not
-    }
-    // TODO this should be added to a queue to rerender
-    const html = this.generateHtml();
-    this.innerHTML = ``;
-    this.appendChild(html);
+    this.generateHtml();
   }
 
   /**
    * Invoked each time the custom element is appended into a document-connected element.
    * This will happen each time the node is moved, and may happen before the element's contents have been fully parsed. 
    */
-  private connected = false;
   public connectedCallback(): void {
-    this.connected = true;
     this.setAttribute(`${cssComponentHostIdAttrPrefix}-${this.getComponentConfig().componentId}`, '');
     if (typeof this.controller['onInit'] === 'function') {
       this.controller['onInit']();
     }
     this.innerHTML = ``;
-    this.replaceChildren(this.generateHtml());
-    this.registerEventListeners();
+    this.generateHtml().then(() => {
+      this.registerEventListeners();
+    });
   }
 
   /**
    * Invoked each time the custom element is disconnected from the document's DOM.
    */
   public disconnectedCallback(): void {
-    this.connected = false;
     this.unregisterEventListeners();
   }
 
@@ -326,128 +319,21 @@ class ComponentElement extends HTMLElement {
     this.listenersRegistered = false;
   }
 
-  private generateHtml(): DocumentFragment {
-    const fragment = document.createDocumentFragment();
-    if (this.getComponentConfig().html == null) {
-      return fragment;
-    }
-    // TODO precompile
-    const container = document.createElement('div');
-    container.innerHTML = this.getComponentConfig().html;
-    let pendingNodes: Node[] = Array.from(container.children);
-    const attrName = `${cssComponentIdAttrPrefix}-${this.getComponentConfig().componentId}`;
-    let regexMatch: RegExpExecArray;
-    while (pendingNodes.length > 0) {
-      const nodes = pendingNodes;
-      pendingNodes = [];
-      for (const node of nodes) {
-        if (node instanceof Element) {
-          if (node instanceof Element && node.hasAttribute('*for')) {
-            const forRgx = /^ *let +(.*?) +of +(.*)$/.exec(node.getAttribute('*for'));
-            if (forRgx) {
-              try {
-                const loopable = this.evalTemplate(forRgx[2], node);
-                if (loopable[Symbol.iterator] != null) {
-                  const forFragment = document.createDocumentFragment();
-                  for (const loopItem of Array.from(loopable)) {
-                    const clone = node.cloneNode(true) as Element;
-                    clone.removeAttribute('*for');
-                    let context = this.getContext(node);
-                    if (context == null) {
-                      clone[templateContextSymbol] = {
-                        [forRgx[1]]: loopItem,
-                      }
-                    } else {
-                      clone[templateContextSymbol] = {
-                        ...context,
-                        [forRgx[1]]: loopItem,
-                      }
-                    }
-                    forFragment.appendChild(clone);
-                    pendingNodes.push(clone);
-                  }
-                  node.parentNode.replaceChild(forFragment, node);
-                  continue;
-                }
-              } catch (e) {
-                UtilsLog.error(e)
-                continue;
-              }
-            }
-          }
-          if (node instanceof Element && node.hasAttribute('*if')) {
-            try {
-              const result = this.evalTemplate(node.getAttribute('*if'), node);
-              if (!AttributeParser.parseBoolean(result)) {
-                node.parentNode.removeChild(node);
-                continue;
-              }
-            } catch (e) {
-              UtilsLog.error(e)
-              continue;
-            }
-          }
-          for (const attr of Array.from(node.attributes)) {
-            while (regexMatch = fieldTemplateBindRegex.exec(attr.nodeValue)) {
-              try {
-                const result = this.evalTemplate(regexMatch[1], node);
-                attr.nodeValue = attr.nodeValue.replace(regexMatch[0], result == null ? '' : String(result));
-              } catch (e) {
-                UtilsLog.error('failed to parse expression', regexMatch[1], e)
-                continue;
-              }
-            }
-            fieldTemplateBindRegex.lastIndex = 0;
-            UtilsLog.debug(node, attr.name, attr.nodeValue)
-            if (attr.name.startsWith('(') && attr.name.endsWith(')')) {
-              const callback = Function('$event', '$element', `return ${attr.nodeValue}`);
-              node.addEventListener(attr.name.substring(1, attr.name.length - 1), event => callback.call(this.controller, event, node));
-            }
-          }
-          node.setAttribute(attrName, '');
-        }
-        
-        while (regexMatch = fieldTemplateBindRegex.exec(node.nodeValue)) {
-          try {
-            const result = this.evalTemplate(regexMatch[1], node);
-            node.nodeValue = node.nodeValue.replace(regexMatch[0], result == null ? '' : String(result));
-          } catch (e) {
-            UtilsLog.error('failed to parse expression', regexMatch[1], e)
-            continue;
-          }
-        }
-        fieldTemplateBindRegex.lastIndex = 0;
-        for (let i = 0; i < node.childNodes.length; i++) {
-          pendingNodes.push(node.childNodes[i]);
-        }
+  private template: Template;
+  private async generateHtml(): Promise<void> {
+    if (this.template === undefined) {
+      const parsedHtml = this.getComponentConfig().parsedHtml;
+      if (!parsedHtml) {
+        this.template = null;
+      } else {
+        this.template = new Template(parsedHtml, this.controller);
+        const node = await VirtualNodeRenderer.renderDom(this.template.render());
+        this.append(node);
       }
+    } else if (this.template !== null) {
+      this.template.setContext(this.controller);
+      const node = await VirtualNodeRenderer.renderDom(this.template.render());
     }
-    fragment.append(...Array.from(container.children));
-    return fragment;
-  }
-
-  private evalTemplate(js: string, contextHolder: Node): any {
-    let context = this.getContext(contextHolder);
-    if (context) {
-      const paramNames: string[] = [];
-      const paramValues: any[] = [];
-      for (const field in context) {
-        paramNames.push(field);
-        paramValues.push(context[field]);
-      }
-      return Function(...paramNames, `return ${js}`).call(this.controller, ...paramValues)
-    } else {
-      return Function(`return ${js}`).call(this.controller)
-    }
-  }
-
-  private getContext(contextHolder: Node): {[key: string]: any} {
-    let context = contextHolder?.[templateContextSymbol];
-    while (!context && contextHolder !== null) {
-      context = contextHolder[templateContextSymbol];
-      contextHolder = contextHolder.parentNode;
-    }
-    return context;
   }
 
 }
