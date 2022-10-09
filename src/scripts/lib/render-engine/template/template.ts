@@ -99,9 +99,9 @@ export class Template {
                   for (let j = i+1; j < processing.length; j++) {
                     pending.push(processing[j]);
                   }
-                  // Don't add this instance since it has been 'split' into multiple to be processed
-                  break;
                 }
+                // Don't add this instance since it has been 'split' into multiple to be processed
+                break;
               }
             }
           }
@@ -232,7 +232,7 @@ export class Template {
       }
       return func.apply(context, paramValues);
     } catch (e) {
-      UtilsLog.error('Error executing expression with context', {expression: expression, context: context, func: func})
+      UtilsLog.error('Error executing expression with context', {expression: expression, context: context, func: func, err: e})
       throw e;
     }
   }
