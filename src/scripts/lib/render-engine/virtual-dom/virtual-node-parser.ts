@@ -202,7 +202,3 @@ export class VirtualNodeParser {
   }
 
 }
-
-setInterval(() => {
-
-}, 1000);
