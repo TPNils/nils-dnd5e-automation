@@ -1,3 +1,4 @@
+import { UtilsLog } from "../../../utils/utils-log";
 import { applySecurity, revokeSecurity, SecureOptions } from "../secure";
 
 class PlaceholderClass {}
@@ -10,6 +11,7 @@ interface VirtualBaseNode {
   isChildNode?(): this is VirtualChildNode;
   isEventNode?(): this is VirtualEventNode;
   isParentNode?(): this is VirtualParentNode;
+  isTextNode?(): this is VirtualTextNode;
   
 }
 
@@ -25,6 +27,7 @@ export interface VirtualNode extends VirtualBaseNode {
   isChildNode(): this is VirtualChildNode;
   isEventNode(): this is VirtualEventNode;
   isParentNode(): this is VirtualParentNode;
+  isTextNode(): this is VirtualTextNode;
   
 }
 
@@ -386,11 +389,46 @@ export interface VirtualParentNode extends VirtualBaseNode {
 }
 //#endregion
 
+//#region text
+function VirtualTextNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
+  return class extends clazz implements VirtualTextNode {
+
+    #text = '';
+    public getText(): string {
+      return this.#text;
+    }
+
+    public setText(text: string): void {
+      if (text == null) {
+        this.#text = '';
+      } else {
+        this.#text = String(text);
+      }
+    }
+
+    public isTextNode(): this is VirtualTextNode {
+      return true;
+    }
+
+    protected startTextClone(original: VirtualTextNode, deep?: boolean) {
+      this.#text = original.getText();
+    }
+    
+  }
+}
+export interface VirtualTextNode extends VirtualBaseNode {
+  getText(): string;
+  setText(text: string): void;
+}
+//#endregion
+
+
 export interface NodeParams {
   attribute?: boolean;
   child?: boolean;
   event?: boolean;
   parent?: boolean;
+  text?: boolean;
 }
 export function VNode(params: {attribute: true}): ReturnType<typeof VirtualAttributeNode>
 export function VNode(params: {child: true}): ReturnType<typeof VirtualChildNode>
@@ -399,14 +437,25 @@ export function VNode(params: {parent: true}): ReturnType<typeof VirtualParentNo
 export function VNode(params: {attribute: true, child: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode>
 export function VNode(params: {attribute: true, event: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualEventNode>
 export function VNode(params: {attribute: true, parent: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {attribute: true, text: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualTextNode>
 export function VNode(params: {child: true, event: true}): ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode>
 export function VNode(params: {child: true, parent: true}): ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {child: true, text: true}): ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualTextNode>
 export function VNode(params: {event: true, parent: true}): ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualParentNode>
-export function VNode(params: {child: true, event: true, parent: true}): ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualParentNode>
-export function VNode(params: {attribute: true, event: true, parent: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualParentNode>
-export function VNode(params: {attribute: true, child: true, parent: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {event: true, text: true}): ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualTextNode>
 export function VNode(params: {attribute: true, child: true, event: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode>
+export function VNode(params: {attribute: true, child: true, parent: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {attribute: true, child: true, text: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualTextNode>
+export function VNode(params: {attribute: true, event: true, parent: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {attribute: true, event: true, text: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualTextNode>
+export function VNode(params: {attribute: true, parent: true, text: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualParentNode> & ReturnType<typeof VirtualTextNode>
+export function VNode(params: {child: true, event: true, parent: true}): ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {child: true, event: true, text: true}): ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualTextNode>
+export function VNode(params: {child: true, parent: true, text: true}): ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualParentNode> & ReturnType<typeof VirtualTextNode>
 export function VNode(params: {attribute: true, child: true, event: true, parent: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualParentNode>
+export function VNode(params: {attribute: true, child: true, event: true, text: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualTextNode>
+export function VNode(params: {attribute: true, child: true, parent: true, text: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode> & ReturnType<typeof VirtualParentNode> & ReturnType<typeof VirtualTextNode>
+export function VNode(params: {attribute: true, event: true, parent: true, text: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualEventNode> & ReturnType<typeof VirtualParentNode> & ReturnType<typeof VirtualTextNode>
 export function VNode(params?: NodeParams): Constructor
 export function VNode(params: NodeParams = {}): Constructor {
   let builderClass = PlaceholderClass;
@@ -422,5 +471,104 @@ export function VNode(params: NodeParams = {}): Constructor {
   if (params.attribute) {
     builderClass = VirtualAttributeNode(builderClass);
   }
+  if (params.text) {
+    builderClass = VirtualTextNode(builderClass);
+  }
   return builderClass;
 }
+
+class SimpleCombinationIterator<T> implements Iterator<Array<T>> {
+  private readonly originalVector: T[];
+  private readonly combinationLength: number;
+  private readonly bitVector: number[];
+  private endIndex = 0;
+
+  public constructor(originalVector: T[], combinationLength: number) {
+    this.originalVector = originalVector;
+    this.combinationLength = combinationLength;
+    this.bitVector = new Array(combinationLength + 1);
+
+    for(let i = 0; i <= this.combinationLength; this.bitVector[i] = i++) {
+    }
+
+    if (originalVector.length > 0) {
+      this.endIndex = 1;
+    }
+  }
+
+  public hasNext(): boolean {
+    return this.endIndex != 0 && this.combinationLength <= this.originalVector.length;
+  }
+
+  public next(): IteratorResult<T[]> {
+    let currentCombination: T[] = [];
+
+    for(let i = 1; i <= this.combinationLength; ++i) {
+      let index = this.bitVector[i] - 1;
+      if (this.originalVector.length > 0) {
+        currentCombination.push(this.originalVector[index]);
+      }
+    }
+
+    this.endIndex = this.combinationLength;
+
+    while(this.bitVector[this.endIndex] == this.originalVector.length - this.combinationLength + this.endIndex) {
+      --this.endIndex;
+      if (this.endIndex == 0) {
+        break;
+      }
+    }
+
+    this.bitVector[this.endIndex] = this.bitVector[this.endIndex]+1;
+
+    for(let i = this.endIndex + 1; i <= this.combinationLength; ++i) {
+      this.bitVector[i] = this.bitVector[i - 1] + 1;
+    }
+
+    UtilsLog.debug('currentCombination', this.hasNext(), currentCombination)
+    return {
+      done: !this.hasNext(),
+      value: currentCombination
+    };
+  }
+}
+
+function generateVNodeContract() {
+  const vnodeContract = [
+    {attrName: 'attribute', returnType: 'VirtualAttributeNode'},
+    {attrName: 'child', returnType: 'VirtualChildNode'},
+    {attrName: 'event', returnType: 'VirtualEventNode'},
+    {attrName: 'parent', returnType: 'VirtualParentNode'},
+    {attrName: 'text', returnType: 'VirtualTextNode'},
+  ];
+
+
+  const lines: string[] = [];
+  for (let i = 1; i <= vnodeContract.length; i++) {
+    const iterator = new SimpleCombinationIterator(vnodeContract, i);
+    for (let results of {[Symbol.iterator]: () => iterator}) {
+      // export function VNode(params: {attribute: true, child: true}): ReturnType<typeof VirtualAttributeNode> & ReturnType<typeof VirtualChildNode>
+      results.sort((a, b) => a.attrName.localeCompare(b.attrName));
+      const lineParts = ['export function VNode(params: {'];
+      for (const result of results) {
+        lineParts.push(result.attrName, ': true', ', ');
+      }
+      lineParts.splice(lineParts.length - 1, 1);
+      lineParts.push('}): ')
+      for (const result of results) {
+        lineParts.push('ReturnType<typeof ', result.returnType, '>', ' & ');
+      }
+      lineParts.splice(lineParts.length - 1, 1);
+      lines.push(lineParts.join(''));
+    }
+    
+  }
+
+  lines.push(`export function VNode(params?: NodeParams): Constructor`);
+  lines.push(`export function VNode(params: NodeParams = {}): Constructor {`);
+
+  UtilsLog.info('generateVNodeContract\n', lines.join('\n'))
+}
+
+// generateVNodeContract();
+

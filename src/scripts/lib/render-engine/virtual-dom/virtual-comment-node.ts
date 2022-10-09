@@ -1,30 +1,19 @@
 import { VirtualAttributeNode, VirtualEventNode, VirtualNode, VirtualParentNode, VNode } from "./virtual-node";
 
-export class VirtualCommmentNode extends VNode({child: true}) implements VirtualNode {
+export class VirtualCommmentNode extends VNode({child: true, text: true}) implements VirtualNode {
 
   public constructor(nodeValue?: string) {
     super();
-    this.nodeValue = nodeValue;
+    this.setText(nodeValue);
   }
 
   get nodeName(): string {
     return '#comment';
   }
-  #nodeValue: string = '';
-  public get nodeValue(): string {
-    return this.#nodeValue;
-  }
-  public set nodeValue(value: string) {
-    if (value == null) {
-      this.#nodeValue = '';
-    } else {
-      this.#nodeValue = String(value);
-    }
-  }
 
   public cloneNode(deep?: boolean): this {
     const clone = new VirtualCommmentNode();
-    clone.#nodeValue = this.#nodeValue;
+    clone.startTextClone(this, deep);
     clone.startChildClone(this, deep);
     return clone as this;
   }
@@ -33,15 +22,15 @@ export class VirtualCommmentNode extends VNode({child: true}) implements Virtual
   #appliedState: this;
   public domNode(): Node {
     if (this.#node == null) {
-      this.#node = new Comment(this.nodeValue);
+      this.#node = new Comment(this.getText());
       this.#appliedState = this.cloneNode(false);
     }
     return this.#node;
   }
 
   public executeUpdate(): void {
-    if (this.#appliedState.nodeValue !== this.#nodeValue) {
-      this.#node.nodeValue = this.#nodeValue;
+    if (this.#appliedState.getText() !== this.getText()) {
+      this.#node.nodeValue = this.getText();
       this.#appliedState = this.cloneNode(false);
     }
   }
@@ -63,7 +52,7 @@ export class VirtualCommmentNode extends VNode({child: true}) implements Virtual
   }
 
   public toString(): string {
-    return `<!--${this.nodeValue}-->`
+    return `<!--${this.getText()}-->`
   }
   
 }

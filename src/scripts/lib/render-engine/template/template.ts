@@ -88,10 +88,10 @@ export class Template {
             }
           }
         }
-        if (process.instance instanceof VirtualTextNode || process.instance instanceof VirtualCommmentNode) {
+        if (process.instance.isTextNode()) {
           // TODO this is currently a dumb implementation and does not account for the 'keywords' {{ and }} to be present within the expression (example: in a javascript string)
           // Best to write an interpreter but thats a lot of work and maybe more process intensive so lets cross that bridge when we get there :)
-          let nodeValue = process.instance.nodeValue;
+          let nodeValue = process.instance.getText();
           let startExpression = 0;
           let endExpression: number;
           while ((startExpression = nodeValue.indexOf('{{', startExpression)) !== -1) {
@@ -122,8 +122,8 @@ export class Template {
             startExpression = endExpression + 2 - /*offset str length*/originalLength + nodeValue.length;
           }
 
-          if (nodeValue !== process.instance.nodeValue) {
-            process.instance.nodeValue = nodeValue;
+          if (nodeValue !== process.instance.getText()) {
+            process.instance.setText(nodeValue);
           }
         }
         if (process.instance.isChildNode() && process.parentInstance) {

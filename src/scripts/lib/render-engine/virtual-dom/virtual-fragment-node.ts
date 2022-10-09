@@ -1,4 +1,4 @@
-import { VirtualAttributeNode, VirtualChildNode, VirtualEventNode, VirtualNode, VNode } from "./virtual-node";
+import { VirtualAttributeNode, VirtualChildNode, VirtualEventNode, VirtualNode, VirtualTextNode, VNode } from "./virtual-node";
 
 export class VirtualFragmentNode extends VNode({parent: true}) implements VirtualNode {
 
@@ -37,6 +37,10 @@ export class VirtualFragmentNode extends VNode({parent: true}) implements Virtua
   }
 
   public isEventNode(): this is VirtualEventNode {
+    return false;
+  }
+
+  public isTextNode(): this is VirtualTextNode {
     return false;
   }
   
