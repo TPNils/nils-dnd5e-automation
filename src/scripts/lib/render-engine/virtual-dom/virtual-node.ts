@@ -527,7 +527,6 @@ class SimpleCombinationIterator<T> implements Iterator<Array<T>> {
       this.bitVector[i] = this.bitVector[i - 1] + 1;
     }
 
-    UtilsLog.debug('currentCombination', this.hasNext(), currentCombination)
     return {
       done: !this.hasNext(),
       value: currentCombination

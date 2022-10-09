@@ -1,6 +1,32 @@
 import { AttributeParser } from "../attribute-parser";
+import { rerenderQueue } from "./render-queue";
 import { StoredEventCallback, VirtualAttributeNode, VirtualChildNode, VirtualEventNode, VirtualNode, VirtualParentNode } from "./virtual-node";
 import { VirtualTextNode } from "./virtual-text-node";
+
+type DomAction = {
+
+} & ({
+  type: 'setAttribute';
+  node: Element;
+  attrName: string;
+  value: string;
+} | {
+  type: 'removeAttribute';
+  node: Element;
+  attrName: string;
+} | {
+  type: 'addEventListener';
+  node: Node;
+  listener: StoredEventCallback;
+} | {
+  type: 'removeEventListener';
+  node: Node;
+  listener: StoredEventCallback;
+} | {
+  type: 'nodeValue';
+  node: Node;
+  value: string;
+})
 
 const stateSymbol = Symbol('domCache');
 export interface RenderState<T extends VirtualNode = VirtualNode> {
@@ -27,10 +53,12 @@ export class VirtualNodeRenderer {
    * @param deepUpdate when false and the node already exists, only update the node itself, not it's children
    * @returns Created or updated DOM element
    */
-  public static renderDom<T extends VirtualNode>(virtualNode: T, deepUpdate: boolean = false): ReturnType<T['createDom']> {
+  public static async renderDom<T extends VirtualNode>(virtualNode: T, deepUpdate: boolean = false): Promise<ReturnType<T['createDom']>> {
     let pending: Array<{parent?: VirtualParentNode, node: VirtualNode}> = [{
       node: virtualNode,
     }];
+    const allDomActions: DomAction[] = [];
+    
     while (pending.length > 0) {
       const processing = pending;
       pending = [];
@@ -64,20 +92,27 @@ export class VirtualNodeRenderer {
 
           state.lastRenderSelfState = process.node.cloneNode(false);
         } else {
-          let stateChanged = false;
+          const domActions: DomAction[] = [];
           if (process.node.isAttributeNode()) {
             for (const attr of process.node.getAttributeNames()) {
               const value = process.node.getAttribute(attr);
               if ((state.lastRenderSelfState as VirtualAttributeNode & VirtualNode).getAttribute(attr) !== value) {
-                (state.domNode as Element).setAttribute(attr, value);
-                stateChanged = true;
+                domActions.push({
+                  type: 'setAttribute',
+                  node: (state.domNode as Element),
+                  attrName: attr,
+                  value: value
+                });
               }
             }
             
             for (const attr of (state.lastRenderSelfState as VirtualAttributeNode & VirtualNode).getAttributeNames()) {
               if (!process.node.hasAttribute(attr)) {
-                (state.domNode as Element).removeAttribute(attr);
-                stateChanged = true;
+                domActions.push({
+                  type: 'removeAttribute',
+                  node: (state.domNode as Element),
+                  attrName: attr,
+                });
               }
             }
           }
@@ -92,25 +127,34 @@ export class VirtualNodeRenderer {
               if (oldListeners.has(listener.guid)) {
                 oldListeners.delete(listener.guid);
               } else {
-                state.domNode.addEventListener(listener.type, listener.callback, listener.options);
-                stateChanged = true;
+                domActions.push({
+                  type: 'addEventListener',
+                  node: state.domNode,
+                  listener: listener,
+                });
               }
             }
 
             for (const listener of oldListeners.values()) {
-              state.domNode.removeEventListener(listener.type, listener.callback, listener.options);
-              stateChanged = true;
+              domActions.push({
+                type: 'removeEventListener',
+                node: state.domNode,
+                listener: listener,
+              });
             }
           }
           
           if (process.node.isTextNode()) {
             if (process.node.getText() !== (state.lastRenderSelfState as VirtualTextNode & VirtualNode).getText()) {
-              state.domNode.nodeValue = process.node.getText();
-              stateChanged = true;
+              domActions.push({
+                type: 'nodeValue',
+                node: state.domNode,
+                value: process.node.getText(),
+              });
             }
           }
 
-          if (stateChanged) {
+          if (domActions.length > 0) {
             state.lastRenderSelfState = process.node.cloneNode(false);
           }
           
@@ -121,10 +165,90 @@ export class VirtualNodeRenderer {
               pending.push({parent: process.node, node: child});
             }
           }
+
+          allDomActions.push(...domActions);
         }
       }
     }
-    return VirtualNodeRenderer.getOrNewState(virtualNode).domNode;
+    if (allDomActions.length > 0) {
+      VirtualNodeRenderer.queuedDomActions.push(...allDomActions);
+      return rerenderQueue.add(VirtualNodeRenderer, VirtualNodeRenderer.processDomActions).then(() => {
+        return VirtualNodeRenderer.getOrNewState(virtualNode).domNode;
+      });
+    }
+    return Promise.resolve(VirtualNodeRenderer.getOrNewState(virtualNode).domNode);
+  }
+
+  private static queuedDomActions: DomAction[] = [];
+  private static processDomActions = () => {
+    const queuedDomActions = VirtualNodeRenderer.queuedDomActions;
+    VirtualNodeRenderer.queuedDomActions = [];
+
+    // Resolve sequential actions on the same property
+    const actionMap = new Map<any, any>();
+    let actionPathMap: Map<any, any>;
+    let actionKey: any[];
+    for (const action of queuedDomActions) {
+      // Actions are listed from earliest to latest added
+      switch (action.type) {
+        case 'addEventListener':
+        case 'removeEventListener': {
+          actionKey = [action.node, 'event', action.type, action.listener];
+          break;
+        }
+        case 'setAttribute': 
+        case 'removeAttribute': {
+          actionKey = [action.node, 'attribute', action.attrName];
+          break;
+        }
+        default: {
+          actionKey = [action.node, action.type];
+        }
+      }
+
+      actionPathMap = actionMap;
+      for (let i = 0; i < actionKey.length - 1; i++) {
+        actionPathMap.set(actionKey[i], new Map());
+        actionPathMap = actionPathMap.get(actionKey[i]);
+      }
+      actionPathMap.set(actionKey[actionKey.length - 1], action);
+    }
+
+    let pending: Array<Map<any, any>> = [actionMap];
+    while (pending.length > 0) {
+      const processing = pending;
+      pending = [];
+      for (const process of processing) {
+        for (const item of process.values() as IterableIterator<Map<any, any> | DomAction>) {
+          if (item instanceof Map) {
+            pending.push(item);
+          } else {
+            switch (item.type) {
+              case 'addEventListener': {
+                item.node.addEventListener(item.listener.type, item.listener.callback, item.listener.options);
+                break;
+              }
+              case 'removeEventListener': {
+                item.node.removeEventListener(item.listener.type, item.listener.callback, item.listener.options);
+                break;
+              }
+              case 'setAttribute': {
+                item.node.setAttribute(item.attrName, item.value);
+                break;
+              }
+              case 'removeAttribute': {
+                item.node.removeAttribute(item.attrName);
+                break;
+              }
+              case 'nodeValue': {
+                item.node.nodeValue = item.value;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   private static getOrNewState<T extends VirtualNode>(virtualNode: T): RenderState<T> {

@@ -2,62 +2,6 @@ import { UtilsLog } from "../../../utils/utils-log";
 import { VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
 
-class RerenderQueue {
-  private queueNextAnimationFrame = window.requestAnimationFrame.bind(window) || ((cb: () => void) => setTimeout(cb, 16/*~60fps*/));
-  private queueKeys: Array<any> = [];
-  private queueExecs: Array<() => any> = [];
-  private promiseResolvers: Array<{resolve: (value: any) => void, reject: (err: any) => void}> = [];
-  private promises: Array<Promise<any>> = [];
-
-  public add<T extends () => R, R>(dedupeKey: any, exec: T): Promise<R> {
-    let index = this.queueKeys.indexOf(dedupeKey);
-    if (index === -1) {
-      index = this.queueKeys.length;
-      this.queueKeys.push(dedupeKey);
-      this.queueExecs.push(exec);
-      this.promises.push(new Promise<R>((resolve, reject) => this.promiseResolvers[index] = {resolve, reject}));
-    }
-    if (index === 0) {
-      this.queueNextAnimationFrame(() => this.processQueue());
-    }
-    return this.promises[index];
-  }
-
-  public isInQueue(dedupeKey: any): boolean {
-    return this.queueKeys.includes(dedupeKey);
-  }
-
-  public delete(dedupeKey: any): void {
-    let index = this.queueKeys.indexOf(dedupeKey);
-    if (index > -1) {
-      this.queueKeys.splice(index, 1);
-      this.queueExecs.splice(index, 1);
-      this.promiseResolvers.splice(index, 1);
-      this.promises.splice(index, 1);
-    }
-  }
-
-  private processQueue(): void {
-    const queue = this.queueExecs;
-    const promiseResolvers = this.promiseResolvers;
-    this.queueKeys = [];
-    this.queueExecs = [];
-    this.promiseResolvers = [];
-    this.promises = [];
-
-    for (let i = 0; i < queue.length; i++) {
-      try {
-        promiseResolvers[i].resolve(queue[i]());
-      } catch (e) {
-        promiseResolvers[i].reject(e);
-      }
-    }
-  }
-
-}
-
-const rerenderQueue = new RerenderQueue();
-
 const forAttrRegex = /^\s*let\s+([^\s]+\s)+of\s(.+)$/;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
   template: T;
@@ -78,27 +22,17 @@ export class Template {
     this.setContext(context);
   }
 
-  private queueCallback = () => {
-    this.calcVirtualNode();
-    return this;
-  }
-
   #context: any;
   /**
    * @param context The new context to render the template
    * @returns A promise when the change has been applied returning itself
    */
-  public setContext(context: any): Promise<this> {
+  public setContext(context: any): void {
     this.#context = context;
-    return rerenderQueue.add(this, this.queueCallback);
+    this.calcVirtualNode();
   }
 
   public render(): VirtualNode & VirtualParentNode {
-    if (rerenderQueue.isInQueue(this)) {
-      rerenderQueue.delete(this);
-      this.calcVirtualNode();
-    }
-    
     return this.#processedVirtualNode;
   }
 
