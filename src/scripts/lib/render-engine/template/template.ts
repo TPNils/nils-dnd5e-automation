@@ -113,6 +113,15 @@ export class Template {
               process.instance.removeAttribute('*if');
             }
           }
+          if (process.instance.isEventNode()) {
+            for (const name of process.instance.getAttributeNames()) {
+              if (name.length > 2 && name.startsWith('(') && name.endsWith(')')) {
+                const value = process.instance.getAttribute(name);
+                process.instance.addEventListener(name.substring(1, name.length - 1), this.parseEvent(value, process.context));
+                process.instance.removeAttribute(name);
+              }
+            }
+          }
           for (const name of process.instance.getAttributeNames()) {
             if (name.length > 2 && name.startsWith('[') && name.endsWith(']')) {
               const value =  process.instance.getAttribute(name);
@@ -231,6 +240,30 @@ export class Template {
         func = Function(`return ${expression}`);
       }
       return func.apply(context, paramValues);
+    } catch (e) {
+      UtilsLog.error('Error executing expression with context', {expression: expression, context: context, func: func, err: e})
+      throw e;
+    }
+  }
+
+  private parseEvent(expression: any, context: any): () => any {
+    if (typeof expression !== 'string') {
+      // If expression is not a string, assume its the result
+      return expression;
+    }
+    let func: Function;
+    try {
+      if (context) {
+        func = Function('$event', `
+          for (const key of Object.keys(this)) {
+            eval(\`var \${key} = this[\${key}];\`);
+          }
+          return ${expression}
+        `);
+      } else {
+        func = Function('$event', `return ${expression}`);
+      }
+      return func.bind(context);
     } catch (e) {
       UtilsLog.error('Error executing expression with context', {expression: expression, context: context, func: func, err: e})
       throw e;
