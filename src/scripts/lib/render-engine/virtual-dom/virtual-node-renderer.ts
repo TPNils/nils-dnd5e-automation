@@ -18,6 +18,10 @@ export class VirtualNodeRenderer {
     virtualNode[stateSymbol] = domNode;
   }
   
+  public static clearState<T extends VirtualNode>(virtualNode: T): void {
+    delete virtualNode[stateSymbol];
+  }
+  
   /**
    * @param virtualNode The virtual node that needs to be converted to a DOM element
    * @param deepUpdate when false and the node already exists, only update the node itself, not it's children

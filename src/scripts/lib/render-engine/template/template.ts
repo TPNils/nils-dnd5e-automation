@@ -1,32 +1,53 @@
 import { UtilsLog } from "../../../utils/utils-log";
-import { VirtualCommmentNode } from "../virtual-dom/virtual-comment-node";
 import { VirtualFragmentNode } from "../virtual-dom/virtual-fragment-node";
 import { VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
-import { VirtualTextNode } from "../virtual-dom/virtual-text-node";
+import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
 
 const forAttrRegex = /^\s*let\s+([^\s]+\s)+of\s(.+)$/;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
-  template: T,
-  instance: T,
-  context: any, 
-  parentInstance?: VirtualParentNode
+  template: T;
+  instance: T;
+  context: any;
+  parentInstance?: VirtualParentNode;
+  pathContext: {
+    parentPrefix: string;
+    siblings: {[nodeName: string]: number}
+  };
 }
 export class Template {
   
   public constructor (
     private readonly template: VirtualNode & VirtualParentNode,
+    context: any
   ) {
+    this.setContext(context);
   }
 
   #context: any;
   public setContext(context: any): void {
     this.#context = context;
+    this.calcVirtualNode();
   }
 
   public render(): VirtualNode & VirtualParentNode {
-    const root: VirtualNode & VirtualParentNode = new VirtualFragmentNode();
+    return this.#processedVirtualNode;
+  }
 
-    let pending: Array<PendingNodes> = [{parentInstance: root, template: this.template, instance: this.template.cloneNode(false), context: this.#context}];
+  #processedVirtualNode: VirtualNode & VirtualParentNode;
+  #processedVirtualNodesMap = new Map<string, VirtualNode>();
+  private calcVirtualNode(): void {
+    const rootInstance: VirtualNode & VirtualParentNode = this.template.cloneNode(false);
+    const createdNodesByMap = new Map<string, VirtualNode>();
+
+    let pending: Array<PendingNodes> = [{
+      template: this.template,
+      instance: rootInstance,
+      context: this.#context,
+      pathContext: {
+        parentPrefix: '',
+        siblings: {}
+      }
+    }];
     while (pending.length > 0) {
       const processing = pending;
       pending = [];
@@ -53,7 +74,8 @@ export class Template {
                     context: {
                       ...process.context,
                       [regexResult[1]]: item,
-                    }
+                    },
+                    pathContext: process.pathContext,
                   });
                 }
 
@@ -129,20 +151,50 @@ export class Template {
         if (process.instance.isChildNode() && process.parentInstance) {
           process.parentInstance.appendChild(process.instance);
         }
+        
+        let siblingIndex = 0;
+        if (process.pathContext.siblings[process.instance.nodeName]) {
+          siblingIndex = process.pathContext.siblings[process.instance.nodeName];
+        }
+        process.pathContext.siblings[process.instance.nodeName] = siblingIndex + 1;
+        const path = process.pathContext.parentPrefix + process.instance.nodeName + siblingIndex;
         if (process.instance.isParentNode() && process.template.isParentNode()) {
+          const pathContext = {
+            parentPrefix: path + '.',
+            siblings: {}
+          };
           for (const child of process.template.childNodes) {
             pending.push({
-              parentInstance: process.instance.isChildNode() ? process.instance : process.parentInstance,
+              parentInstance: process.instance,
               context: process.context,
               template: child,
               instance: child.cloneNode(false),
+              pathContext: pathContext, // Same path context intsnace needs to be shared by all children/siblings
             })
           }
         }
+        // Move the previous rendered state to the new node
+        if (this.#processedVirtualNodesMap.has(path)) {
+          const original = this.#processedVirtualNodesMap.get(path);
+          const originalState = VirtualNodeRenderer.getState(original);
+          if (originalState) {
+            VirtualNodeRenderer.setState(process.instance, originalState);
+            VirtualNodeRenderer.clearState(original);
+          }
+        }
+        createdNodesByMap.set(path, process.instance);
       }
     }
 
-    return root;
+    // Remove items which don't exist anymore
+    for (const [path, instance] of this.#processedVirtualNodesMap.entries()) {
+      if (!createdNodesByMap.has(path) && instance.isChildNode()) {
+        instance.remove();
+      }
+    }
+
+    this.#processedVirtualNode = rootInstance;
+    this.#processedVirtualNodesMap = createdNodesByMap;
   }
 
   private parseExpression(expression: any, context: any): any {

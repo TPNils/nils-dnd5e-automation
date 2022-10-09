@@ -159,9 +159,7 @@ export class VirtualNodeParser {
       if (context.items == null) {
         context.items = [1,2,3];
       }
-      const template = new Template(VirtualNodeParser.parse(html));
-      template.setContext(context);
-      return template.render();
+      return new Template(VirtualNodeParser.parse(html), context);
     };
     (window as any).toHtml = VirtualNodeRenderer.renderDom;
     /*
@@ -169,6 +167,7 @@ export class VirtualNodeParser {
       const html = `test 
       <!-- comment with <input/> -->
       <div *if=false>should not be rendered</div>
+      {{i}}
       <p *for="let i of items">
         {{i}}
       </p>
@@ -176,20 +175,34 @@ export class VirtualNodeParser {
       <a href="www.google.be">non bold<b>bold</b></a>`;
 
       const vparse = window.vparse(html);
-      const tparse = window.tparse(html);
+      const tparse = window.tparse(html, {doRender: true, i: 'hi'});
       console.log(vparse, String(vparse));
-      console.log(tparse, String(tparse));
+      console.log(tparse.render(), String(tparse.render()));
       let devElem = document.getElementById('nils-dev');
       if (!devElem) {
         devElem = document.createElement('div');
         devElem.setAttribute('id', 'nils-dev');
         devElem.setAttribute('style', 'display: none;');
         document.body.prepend(devElem);
+      } else {
+        devElem.innerHTML = '';
       }
-      console.log(toHtml(tparse))
-      devElem.appendChild(toHtml(tparse))
+      console.log(toHtml(tparse.render()))
+      devElem.appendChild(toHtml(tparse.render()))
+      let index = 1;
+      //setInterval(() => {
+        tparse.setContext({i: `hi` + `!`.repeat(index++), items: [1,2,3]});
+        console.log(String(tparse.render()))
+				toHtml(tparse.render())
+      	console.log(devElem.innerHTML)
+      //}, 1000);
+      
     })()
     */
   }
 
 }
+
+setInterval(() => {
+
+}, 1000);
