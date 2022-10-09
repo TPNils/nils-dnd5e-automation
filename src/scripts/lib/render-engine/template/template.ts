@@ -1,4 +1,5 @@
 import { UtilsLog } from "../../../utils/utils-log";
+import { VirtualFragmentNode } from "../virtual-dom/virtual-fragment-node";
 import { VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
 
@@ -17,9 +18,11 @@ export class Template {
   
   public constructor (
     private readonly template: VirtualNode & VirtualParentNode,
-    context: any
+    context?: any
   ) {
-    this.setContext(context);
+    if (context != null) {
+      this.setContext(context);
+    }
   }
 
   #context: any;
@@ -29,10 +32,19 @@ export class Template {
    */
   public setContext(context: any): void {
     this.#context = context;
-    this.calcVirtualNode();
+    if (this.#processedVirtualNode != null) {
+      this.calcVirtualNode();
+    }
   }
 
   public render(): VirtualNode & VirtualParentNode {
+    if (this.#processedVirtualNode == null) {
+      if (this.#context) {
+        this.calcVirtualNode();
+      } else {
+        this.#processedVirtualNode = new VirtualFragmentNode();
+      }
+    }
     return this.#processedVirtualNode;
   }
 
