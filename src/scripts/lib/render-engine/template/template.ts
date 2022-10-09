@@ -43,7 +43,6 @@ export class Template {
                 UtilsLog.error(`The *for expression did not return an array/iterator:`, process.instance.getAttribute('*for'), resolvedExpr);
               } else {
                 process.instance.removeAttribute('*for');
-                UtilsLog.debug('*for after delete', process.instance.getAttribute('*for'))
                 let hasAnItem = false;
                 for (const item of resolvedExpr) {
                   hasAnItem = true;
@@ -113,7 +112,6 @@ export class Template {
               }
             } while (endExpression !== -1)
             
-            UtilsLog.debug({nodeValue, startExpression, endExpression})
             let originalLength = nodeValue.length;
             nodeValue = [
               nodeValue.substring(0, startExpression),
