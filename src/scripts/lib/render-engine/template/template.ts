@@ -123,51 +123,25 @@ export class Template {
             }
           }
           for (const name of process.instance.getAttributeNames()) {
+            const value = process.instance.getAttribute(name);
             if (name.length > 2 && name.startsWith('[') && name.endsWith(']')) {
-              const value =  process.instance.getAttribute(name);
               process.instance.removeAttribute(name);
               if (typeof value === 'string') {
                 process.instance.setAttribute(name.substring(1, name.length - 1), this.parseExpression(value, process.context));
               } else {
                 process.instance.setAttribute(name.substring(1, name.length - 1), value);
               }
+            } else if (typeof value === 'string') {
+              UtilsLog.debug(name, value, process.context)
+              const processedValue = this.processBindableString(value, process.context);
+              if (value !== processedValue) {
+                process.instance.setAttribute(name, processedValue);
+              }
             }
           }
         }
         if (process.instance.isTextNode()) {
-          // TODO this is currently a dumb implementation and does not account for the 'keywords' {{ and }} to be present within the expression (example: in a javascript string)
-          // Best to write an interpreter but thats a lot of work and maybe more process intensive so lets cross that bridge when we get there :)
-          let nodeValue = process.instance.getText();
-          let startExpression = 0;
-          let endExpression: number;
-          while ((startExpression = nodeValue.indexOf('{{', startExpression)) !== -1) {
-            startExpression = nodeValue.indexOf('{{');
-            if (nodeValue[startExpression-1] === '\\') {
-              // escaped, please continue
-              continue;
-            }
-
-            endExpression = startExpression;
-            do {
-              endExpression = nodeValue.indexOf('}}', endExpression);
-              if (nodeValue[endExpression-1] === '\\') {
-                // escaped, please continue
-                endExpression += 2;
-              } else {
-                break;
-              }
-            } while (endExpression !== -1)
-            
-            let originalLength = nodeValue.length;
-            nodeValue = [
-              nodeValue.substring(0, startExpression),
-              String(this.parseExpression(nodeValue.substring(startExpression+2, endExpression), process.context)),
-              nodeValue.substring(endExpression+2),
-            ].join('');
-
-            startExpression = endExpression + 2 - /*offset str length*/originalLength + nodeValue.length;
-          }
-
+          let nodeValue = this.processBindableString(process.instance.getText(), process.context);
           if (nodeValue !== process.instance.getText()) {
             process.instance.setText(nodeValue);
           }
@@ -219,6 +193,41 @@ export class Template {
 
     this.#processedVirtualNode = rootInstance;
     this.#processedVirtualNodesMap = createdNodesByMap;
+  }
+
+  private processBindableString(value: string, context: any): string {
+    // TODO this is currently a dumb implementation and does not account for the 'keywords' {{ and }} to be present within the expression (example: in a javascript string)
+    // Best to write an interpreter but thats a lot of work and maybe more process intensive so lets cross that bridge when we get there :)
+    let startExpression = 0;
+    let endExpression: number;
+    while ((startExpression = value.indexOf('{{', startExpression)) !== -1) {
+      startExpression = value.indexOf('{{');
+      if (value[startExpression-1] === '\\') {
+        // escaped, please continue
+        continue;
+      }
+
+      endExpression = startExpression;
+      do {
+        endExpression = value.indexOf('}}', endExpression);
+        if (value[endExpression-1] === '\\') {
+          // escaped, please continue
+          endExpression += 2;
+        } else {
+          break;
+        }
+      } while (endExpression !== -1)
+      
+      let originalLength = value.length;
+      value = [
+        value.substring(0, startExpression),
+        String(this.parseExpression(value.substring(startExpression+2, endExpression), context)),
+        value.substring(endExpression+2),
+      ].join('');
+
+      startExpression = endExpression + 2 - /*offset str length*/originalLength + value.length;
+    }
+    return value;
   }
 
   private parseExpression(expression: any, context: any): any {
