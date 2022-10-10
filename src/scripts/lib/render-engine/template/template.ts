@@ -132,7 +132,6 @@ export class Template {
                 process.instance.setAttribute(name.substring(1, name.length - 1), value);
               }
             } else if (typeof value === 'string') {
-              UtilsLog.debug(name, value, process.context)
               const processedValue = this.processBindableString(value, process.context);
               if (value !== processedValue) {
                 process.instance.setAttribute(name, processedValue);
