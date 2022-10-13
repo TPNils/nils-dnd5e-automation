@@ -12,13 +12,15 @@ import { ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
 import { ActiveEffectCardPart } from "./active-effect-card-part";
-import { AttackCardPart } from "./attack-card-part";
-import { CheckCardPart } from "./check-card-part";
-import { DamageCardPart } from "./damage-card-part";
+import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { CheckCardData, CheckCardPart } from "./check-card-part";
+import { DamageCardData, DamageCardPart } from "./damage-card-part";
+import { ResourceCardData, ResourceCardPart } from "./resources-card-part";
 
 export interface TargetCardData {
   selected: Array<{selectionId: string, tokenUuid: string;}>;
   calc$: {
+    autoChangeTarget: boolean;
     actorUuid?: string;
     tokenUuid?: string;
     targetDefinition?: MyItemData['data']['target'];
@@ -114,6 +116,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     const target: TargetCardData = {
       selected: [],
       calc$: {
+        autoChangeTarget: true,
         actorUuid: actor?.uuid,
         tokenUuid: token?.uuid,
         targetDefinition: deepClone(item.data.data.target),
@@ -210,6 +213,24 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
         .setExecute(async ({messageId, part, allCardParts, deleteUuid, userId}) => {
           part.data.selected = part.data.selected.filter(s => s.selectionId !== deleteUuid);
           await this.fireEvent('undo', [deleteUuid], part.data, messageId, allCardParts, userId);
+          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        })
+      )
+      .addListener(new ElementCallbackBuilder()
+        .setEvent('click')
+        .addSelectorFilter('[data-action="refresh-targets"]')
+        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
+        .addSerializer(ItemCardHelpers.getUserIdSerializer())
+        .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
+        .setPermissionCheck(createPermissionCheck<{part: {data: TargetCardData}}>(({part}) => {
+          const documents: CreatePermissionCheckArgs['documents'] = [];
+          if (part.data.calc$.actorUuid) {
+            documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
+          }
+          return {documents: documents};
+        }))
+        .setExecute(async ({messageId, part, allCardParts, userId}) => {
+          await setTargetsFromUser(part.data, game.users.get(userId));
           return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
         })
       )
@@ -453,6 +474,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
           data: {
             tableHeader: htmlTableHeader,
             tableBody: htmlTableBody,
+            autoChangeTarget: part.data.calc$.autoChangeTarget,
           },
           actorUuid: part.data.calc$.actorUuid,
           moduleName: staticValues.moduleName
@@ -521,9 +543,70 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
 
 class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardData>> {
 
+  //#region beforeUpsert
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): boolean | void {
+    this.calcAutoChangeTarget(context);
+  }
+
+  private calcAutoChangeTarget(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): void {
+    rowLoop: for (const {newRow} of context.rows) {
+      if (!newRow.part.data.calc$.autoChangeTarget) {
+        continue;
+      }
+
+      let attackCardData: AttackCardData;
+      let checkCardData: CheckCardData;
+      let damageCardData: DamageCardData;
+      let resourceCardData: ResourceCardData;
+      for (const part of newRow.allParts) {
+        const handler = ModularCard.getTypeHandler(part.type);
+        if (handler instanceof AttackCardPart) {
+          attackCardData = part.data;
+        } else if (handler instanceof CheckCardPart) {
+          checkCardData = part.data;
+        } else if (handler instanceof DamageCardPart) {
+          damageCardData = part.data;
+        } else if (handler instanceof ResourceCardPart) {
+          resourceCardData = part.data;
+        }
+      }
+
+      if (damageCardData != null && damageCardData.phase === 'result') {
+        newRow.part.data.calc$.autoChangeTarget = false;
+        continue rowLoop;
+      }
+      if (attackCardData != null) {
+        for (const cache of attackCardData.targetCaches$) {
+          if (cache.phase === 'result') {
+            newRow.part.data.calc$.autoChangeTarget = false;
+            continue rowLoop;
+          }
+        }
+      }
+      if (checkCardData != null) {
+        for (const cache of checkCardData.targetCaches$) {
+          if (cache.phase === 'result') {
+            newRow.part.data.calc$.autoChangeTarget = false;
+            continue rowLoop;
+          }
+        }
+      }
+      if (resourceCardData != null) {
+        for (const cache of resourceCardData.consumeResources) {
+          if (cache.calc$.appliedChange > 0) {
+            newRow.part.data.calc$.autoChangeTarget = false;
+            continue rowLoop;
+          }
+        }
+      }
+    }
+  }
+  //#endregion
+
   //#region afterCreate
   public async afterCreate(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     await this.setTargets(context);
+    await this.markOlderAutoChangeTarget(context);
   }
   
   private async setTargets(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
@@ -561,11 +644,6 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         continue;
       }
 
-      const token = await UtilsDocument.tokenFromUuid(newRow.part.data.calc$.tokenUuid);
-      if (token == null) {
-        continue;
-      }
-
       if (newRow.part.data.calc$.targetDefinition.type === 'self') {
         await UtilsDocument.setTargets({tokenUuids: [newRow.part.data.calc$.tokenUuid]});
         return;
@@ -581,6 +659,11 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         }
       });
       if (!template) {
+        continue;
+      }
+
+      const token = await UtilsDocument.tokenFromUuid(newRow.part.data.calc$.tokenUuid);
+      if (token == null) {
         continue;
       }
       template.document.data.update({
@@ -607,6 +690,41 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       await UtilsDocument.setTargets({tokenUuids: autoTargetTokens});
       return;
     }
+  }
+
+  private async markOlderAutoChangeTarget(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
+    const timestamps: number[] = [];
+    const excludeMessageIds = new Set<string>();
+    for (const {newRow} of context.rows) {
+      excludeMessageIds.add(newRow.messageId);
+      timestamps.push(game.messages.get(newRow.messageId).data.timestamp);
+    }
+    const newestMessageCreatedDate = timestamps.sort()[timestamps.length - 1];
+    
+    const bulkUpdateRequest: Parameters<typeof ModularCard.setBulkCardPartDatas>[0] = [];
+    for (let messageIndex = game.messages.contents.length - 1; messageIndex >= 0; messageIndex--) {
+      const chatMessage = game.messages.contents[messageIndex];
+      if (chatMessage.data.timestamp <= newestMessageCreatedDate || excludeMessageIds.has(chatMessage.id)) {
+        continue;
+      }
+      const parts = ModularCard.getCardPartDatas(chatMessage);
+      if (!parts) {
+        continue;
+      }
+
+      const targetIndex = parts.findIndex(part => ModularCard.getTypeHandler(part.type) instanceof TargetCardPart);
+      if (targetIndex) {
+        if ((parts[targetIndex].data as TargetCardData).calc$.autoChangeTarget) {
+          const partsClone = deepClone(parts);
+          (partsClone[targetIndex].data as TargetCardData).calc$.autoChangeTarget = false;
+          bulkUpdateRequest.push({message: chatMessage, data: partsClone});
+        } else {
+          // Once you find 1 which is marked false, assume all of the previous have aswel
+          break;
+        }
+      }
+    }
+    ModularCard.setBulkCardPartDatas(bulkUpdateRequest);
   }
   //#endregion
 
@@ -699,57 +817,64 @@ class DmlTriggerUser implements IDmlTrigger<User> {
       if (!parts) {
         continue;
       }
-      // To allow editing, need to clone parts so its not updating the instance which is in the message itself
-      // Otherwise when updating, change detection won't pick it up
-      // TODO This should be improved by not updating this instance, but since saving does some custom stuff, it makes it tricky
-      parts = deepClone(parts);
 
-      targetData = parts.find(part => ModularCard.getTypeHandler(part.type) instanceof TargetCardPart)?.data;
-      if (targetData) {
+      const targetIndex = parts.findIndex(part => ModularCard.getTypeHandler(part.type) instanceof TargetCardPart);
+      if (targetIndex) {
+        // To allow editing, need to clone parts so its not updating the instance which is in the message itself
+        // Otherwise when updating, change detection won't pick it up
+        // TODO This should be improved by not updating this instance, but since saving does some custom stuff, it makes it tricky
+        parts = deepClone(parts);
+        targetData = parts[targetIndex].data;
         break;
       }
     }
 
-    if (!targetData || chatMessage.data.user !== game.userId) {
+    if (!targetData || !targetData.calc$.autoChangeTarget || chatMessage.data.user !== game.userId) {
       return;
     }
     
-    // Re-evaluate the targets, the user may have changed targets
-    const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
-
     // Assume targets did not changes when non are selected at this time
-    if (currentTargetUuids.size !== 0) {
-      const itemTargetUuids = new Set<string>(targetData.selected.map(s => s.tokenUuid));
-      let targetsChanged = itemTargetUuids.size !== currentTargetUuids.size;
-      
-      if (!targetsChanged) {
-        for (const uuid of itemTargetUuids.values()) {
-          if (!currentTargetUuids.has(uuid)) {
-            targetsChanged = true;
-            break;
-          }
-        }
-      }
+    if (game.user.targets.size === 0) {
+      return;
+    }
 
-      if (targetsChanged) {
-        const targetsUuids: string[] = [];
-        for (const selected of targetData.selected) {
-          // The same target could have been originally targeted twice, keep that amount
-          if (currentTargetUuids.has(selected.tokenUuid)) {
-            targetsUuids.push(selected.tokenUuid);
-          }
-        }
-        for (const currentTargetUuid of currentTargetUuids) {
-          if (!targetsUuids.includes(currentTargetUuid)) {
-            targetsUuids.push(currentTargetUuid);
-          }
-        }
-        targetData.selected = uuidsToSelected(targetsUuids);
-        
-        await ModularCard.setCardPartDatas(chatMessage, parts);
+    // Don't auto change targets after
+    await setTargetsFromUser(targetData, game.user);
+    await ModularCard.setCardPartDatas(chatMessage, parts);
+  }
+  
+}
+
+async function setTargetsFromUser(targetData: TargetCardData, user: User): Promise<void> {
+    
+  // Re-evaluate the targets, the user may have changed targets
+  const currentTargetUuids = new Set<string>(Array.from(game.user.targets).map(token => token.document.uuid));
+
+  const itemTargetUuids = new Set<string>(targetData.selected.map(s => s.tokenUuid));
+  let targetsChanged = itemTargetUuids.size !== currentTargetUuids.size;
+  
+  if (!targetsChanged) {
+    for (const uuid of itemTargetUuids.values()) {
+      if (!currentTargetUuids.has(uuid)) {
+        targetsChanged = true;
+        break;
       }
     }
   }
-  
 
+  if (targetsChanged) {
+    const targetsUuids: string[] = [];
+    for (const selected of targetData.selected) {
+      // The same target could have been originally targeted twice, keep that amount
+      if (currentTargetUuids.has(selected.tokenUuid)) {
+        targetsUuids.push(selected.tokenUuid);
+      }
+    }
+    for (const currentTargetUuid of currentTargetUuids) {
+      if (!targetsUuids.includes(currentTargetUuid)) {
+        targetsUuids.push(currentTargetUuid);
+      }
+    }
+    targetData.selected = uuidsToSelected(targetsUuids);
+  }
 }

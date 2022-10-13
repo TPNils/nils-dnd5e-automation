@@ -306,6 +306,9 @@ export class UtilsDocument {
   }
 
   public static async bulkUpdate(inputDocuments: Array<{document: FoundryDocument, data: any}>): Promise<void> {
+    if (inputDocuments.length === 0) {
+      return;
+    }
     const documentsByUuid = new Map<string, {document: FoundryDocument, data: any}>();
     for (const document of inputDocuments) {
       document.data._id = document.data._id ?? document.document.id;
