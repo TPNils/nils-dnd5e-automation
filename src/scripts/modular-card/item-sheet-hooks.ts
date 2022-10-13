@@ -1,10 +1,11 @@
 import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
-import { MyActor, MyItem, MyItemData } from "../types/fixed-types";
+import { MyItem, MyItemData } from "../types/fixed-types";
 
-const hasInitDataSymbol = Symbol('actor data has been init')
-
+/**
+ * Implement formulas for amount og targets
+ */
 export class ItemSheetHooks {
   
   @RunOnce()
