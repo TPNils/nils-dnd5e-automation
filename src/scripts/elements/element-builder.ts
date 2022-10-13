@@ -29,7 +29,7 @@ interface SerializerArgs<E extends Event> {
   element: HTMLElement
 }
 
-type ExecuteResponse = {success: true;} | {success: false; errorMessage: string, stackTrace?: string[], errorType: 'warn' | 'error'}
+type ExecuteResponse = {success: true;} | {success: false; errorMessage: any[], stackTrace?: string[], errorType: 'warn' | 'error'}
 function isExecuteResponse(value: any): value is ExecuteResponse {
   if (typeof value !== 'object' || Array.isArray(value)) {
     return false;
@@ -62,13 +62,13 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
       // When no serializers are provided, only allow local runs
       return provider.getSocket().then(socket => socket.executeAsGM(callback.id, serializedData));
     } else {
-      return {success: false, errorType: 'warn', errorMessage: `Missing permission for action ${callback.id}. Data: ${JSON.stringify(enrichedData)}`};
+      return {success: false, errorType: 'warn', errorMessage: [`Missing permission for action ${callback.id}. Data:`, enrichedData]};
     }
   } catch (err) {
     if (err instanceof Error) {
       return {
         success: false,
-        errorMessage: err.message,
+        errorMessage: [err.message],
         stackTrace: err.stack.split('\n'),
         errorType: 'error'
       }
@@ -77,7 +77,7 @@ async function executeIfAllowed(callback: DynamicElementCallback, serializedData
     } else {
       return {
         success: false,
-        errorMessage: String(err),
+        errorMessage: [String(err)],
         errorType: 'error'
       }
     }
@@ -246,11 +246,11 @@ export class DynamicElement extends HTMLElement {
         if (response.success === false) {
           if (response.errorType === 'warn') {
             console.warn(response);
-            ui.notifications.warn(response.errorMessage);
+            ui.notifications.warn(response.errorMessage.join(' '));
           }
           if (response.errorType === 'error') {
             console.error(response);
-            ui.notifications.error(response.errorMessage);
+            ui.notifications.error(response.errorMessage.join(' '));
           }
         }
       }

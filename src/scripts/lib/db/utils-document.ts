@@ -11,9 +11,10 @@ interface DocumentsByContext<T extends foundry.abstract.Document<any, FoundryDoc
 }
 
 type EntityPermission = keyof typeof foundry.CONST.ENTITY_PERMISSIONS;
+const dmlPermissions = ['create', 'update', 'delete'] as const;
 export interface PermissionCheck<T = any> {
   uuid: string;
-  permission: string;
+  permission: EntityPermission | typeof dmlPermissions[number] | string;
   user: User;
   meta?: T;
 }
