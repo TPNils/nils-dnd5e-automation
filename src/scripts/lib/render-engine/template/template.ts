@@ -37,13 +37,15 @@ export class Template {
     }
   }
 
-  public render(): VirtualNode & VirtualParentNode {
+  public render(options: {force?: boolean} = {}): VirtualNode & VirtualParentNode {
     if (this.#processedVirtualNode == null) {
       if (this.#context) {
         this.calcVirtualNode();
       } else {
         this.#processedVirtualNode = new VirtualFragmentNode();
       }
+    } else if (options.force) {
+      this.calcVirtualNode();
     }
     return this.#processedVirtualNode;
   }
