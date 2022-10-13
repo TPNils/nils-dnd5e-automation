@@ -62,12 +62,14 @@ function setTargetCache(cache: DamageCardData, targetCache: TargetCache): void {
   if (!cache.calc$.targetCaches) {
     cache.calc$.targetCaches = [];
   }
-  if (targetCache.appliedHpChange === targetCache.calcHpChange && targetCache.appliedTmpHpChange === targetCache.calcAddTmpHp) {
-    targetCache.smartState = 'applied';
-  } else if (targetCache.appliedHpChange === 0 && targetCache.appliedTmpHpChange === 0) {
-    targetCache.smartState = 'not-applied';
-  } else {
-    targetCache.smartState = 'partial-applied';
+  if (targetCache.smartState == null) {
+    if (targetCache.appliedHpChange === targetCache.calcHpChange && targetCache.appliedTmpHpChange === targetCache.calcAddTmpHp) {
+      targetCache.smartState = 'applied';
+    } else if (targetCache.appliedHpChange === 0 && targetCache.appliedTmpHpChange === 0) {
+      targetCache.smartState = 'not-applied';
+    } else {
+      targetCache.smartState = 'partial-applied';
+    }
   }
   for (let i = 0; i < cache.calc$.targetCaches.length; i++) {
     if (cache.calc$.targetCaches[i].selectionId === targetCache.selectionId) {
@@ -440,7 +442,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       for (const dmg of damagesCards) {
         const cache = deepClone(getTargetCache(dmg.data, targetEvent.selected.selectionId));
         let apply = false;
-        cache.smartState = 'not-applied';
+        delete cache.smartState;
         switch (targetEvent.apply) {
           case 'smart-apply': {
             const allHit = attackCards.every(attack => {
@@ -491,7 +493,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
             ...cache,
             selectionId: targetEvent.selected.selectionId,
             targetUuid: targetEvent.selected.tokenUuid,
-            smartState: 'applied',
             appliedState: 'applied',
             appliedHpChange: hpDiff,
             appliedTmpHpChange: tempHpDiff,
@@ -550,14 +551,14 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
       for (const targetCache of part.data.calc$.targetCaches) {
         if (!states.has(targetCache.selectionId)) {
-          states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, hpDiff: 0, state: 'not-applied', smartState: 'not-applied', hidden: false});
+          states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, hpDiff: 0, hidden: false});
         }
         const state = states.get(targetCache.selectionId);
         if (state.state == null) {
           state.state = targetCache.appliedState;
         }
         if (state.smartState == null) {
-          state.state = targetCache.smartState;
+          state.smartState = targetCache.smartState;
         }
         
         if (state.state !== targetCache.appliedState) {
