@@ -1,14 +1,14 @@
 import { staticValues } from "../../static-values";
-import { UtilsFoundry } from "../../utils/utils-foundry";
-import { UtilsLog } from "../../utils/utils-log";
 import { buffer } from "../decorator/buffer";
 import { RunOnce } from "../decorator/run-once";
 import { Stoppable } from "../utils/stoppable";
 import { UtilsCompare } from "../utils/utils-compare";
 import { FoundryDocument } from "./utils-document";
 
-const supportedAfterDocumentNames = UtilsFoundry.getDocumentTypes();
-const supportedAfterDocumentCollections = supportedAfterDocumentNames.map(name => game.collections.get(name)).filter(value => value != null);
+const unsupportedAfterDocuments = [
+  FogExploration, // Old document is only available on the client
+];
+const unsupportedAfterDocumentNames = unsupportedAfterDocuments.map(doc => doc.documentName);
 
 export interface ITrigger<T> {
 
@@ -251,26 +251,26 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   
     // after
     if (typeof trigger.afterCreate === 'function') {
-      if (!supportedAfterDocumentNames.includes(this.documentName)) {
+      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
       unregisterTriggers.push(this.afterCallbackGroups.get('create').register(trigger.afterCreate.bind(trigger)));
     }
     if (typeof trigger.afterUpdate === 'function') {
-      if (!supportedAfterDocumentNames.includes(this.documentName)) {
+      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
       unregisterTriggers.push(this.afterCallbackGroups.get('update').register(trigger.afterUpdate.bind(trigger)));
     }
     if (typeof trigger.afterUpsert === 'function') {
-      if (!supportedAfterDocumentNames.includes(this.documentName)) {
+      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
       unregisterTriggers.push(this.afterCallbackGroups.get('create').register(trigger.afterUpsert.bind(trigger)));
       unregisterTriggers.push(this.afterCallbackGroups.get('update').register(trigger.afterUpsert.bind(trigger)));
     }
     if (typeof trigger.afterDelete === 'function') {
-      if (!supportedAfterDocumentNames.includes(this.documentName)) {
+      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
       unregisterTriggers.push(this.afterCallbackGroups.get('delete').register(trigger.afterDelete.bind(trigger)));
@@ -356,7 +356,14 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     // @ts-ignore
     ClientDatabaseBackend.prototype._postUpdateDocumentCallbacks = function (...args: any[]): void {
       const collection = args[0];
-      if (supportedAfterDocumentCollections.includes(collection)) {
+      let canInject = true;
+      for (const unsupportedAfterDocument of unsupportedAfterDocuments) {
+        if (game.collections.get(unsupportedAfterDocument.documentName) === collection) {
+          canInject = false;
+          break;
+        }
+      }
+      if (canInject) {
         const results: any[] = args[1];
         const options: any = args[2].options;
   
@@ -365,7 +372,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           const currentDocument = collection.get(result._id);
           if (currentDocument == null) {
             // Found 1 instance, can happen when updating fog of war. Not really sure what to do with this though...
-            UtilsLog.error('missing currentDocument for some reason?', collection, result);
+            console.error('missing currentDocument for some reason?', collection, result);
             continue;
           }
           oldDocuments[currentDocument.uuid] = new currentDocument.constructor(currentDocument.toObject(), {parent: currentDocument.parent, pack: currentDocument.pack});
@@ -488,7 +495,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const diff = UtilsCompare.findDiff(document.data, documentSnapshot.data);
       if (diff.changed) {
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
-          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff});
+          console.error('Infinite update loop. Stopping any further updates.', {diff: diff});
         } else {
           await document.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}});
         }
@@ -542,7 +549,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
       if (diff.changed) {
         if (outputDiff) {
-          UtilsLog.debug('trigger diff', {
+          console.debug('trigger diff', {
             documentName: document.collectionName,
             uuid: (document as any).uuid,
             diff: diff,
@@ -550,7 +557,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           });
         }
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
-          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff});
+          console.error('Infinite update loop. Stopping any further updates.', {diff: diff});
           outputDiff = true;
         } else {
           await modifiedDocument.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}});
