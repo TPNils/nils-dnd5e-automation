@@ -1,89 +1,51 @@
-import { DynamicElement, ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
+import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
 import { RollD20Element } from "../../elements/roll-d20-element";
 import { TokenImgElement } from "../../elements/token-img-element";
+import { UtilsElement } from "../../elements/utils-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
-import { Attribute, BindEvent, Component } from "../../lib/render-engine/component.js";
+import { Attribute, Component } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { MemoryStorageService } from "../../service/memory-storage-service";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
-import { UtilsLog } from "../../utils/utils-log";
-import { ChatPartEnriched, ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
+import { ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type RollPhase = 'mode-select' | 'bonus-input' | 'result';
-const modeOrder: Array<TargetCache['mode']> = ['disadvantage', 'normal', 'advantage'];
-
-interface RollModifierSource {
-  uuid$: string;
-  name$: string;
-  image$: string;
-}
-
-interface AttackRoll {
-  initialSelectionId$: string;
-  roll$: RollData;
-  isCrit$?: boolean;
-}
+const modeOrder: Array<AttackCardData['mode']> = ['disadvantage', 'normal', 'advantage'];
 
 interface TargetCache {
-  phase: RollPhase;
-  mode: 'normal' | 'advantage' | 'disadvantage';
-  userBonus: string;
-  
-  /** Is currently selected */
-  isSelected$: boolean;
-  selectedRoll$?: number;
-  requestRollFormula$?: string;
-  /** Advantage sources which apply to only this target */
-  advantageSources$: Array<RollModifierSource>;
-  /** Disdvantage sources which apply to only this target */
-  disadvantageSources$: Array<RollModifierSource>;
-
-  targetUuid$?: string;
-  selectionId$: string;
-  name$: string;
-  actorUuid$?: string;
-  ac$?: number;
+  targetUuid$: string;
+  actorUuid$: string;
+  ac$: number;
   resultType$?: 'hit' | 'critical-hit' | 'mis' | 'critical-mis';
 }
 
 export interface AttackCardData {
+  phase: RollPhase;
+  mode: 'normal' | 'advantage' | 'disadvantage';
+  userBonus: string;
   actorUuid$?: string;
-  /** Advantage sources which apply to all targets */
-  advantageSources$: Array<RollModifierSource>;
-  /** Disdvantage sources which apply to all targets */
-  disadvantageSources$: Array<RollModifierSource>;
+  advantageSources$: Array<{$uuid: string, $name: string, $image: string}>;
+  disadvantageSources$: Array<{$uuid: string, $name: string, $image: string}>;
   hasHalflingLucky$: boolean;
   elvenAccuracy$: boolean;
   rollBonus$?: string;
+  requestRollFormula$?: string;
+  roll$?: RollData;
   critTreshold$: number;
-  rolls$: AttackRoll[];
-  targetCaches$: TargetCache[];
-  dummyCache$: TargetCache;
+  isCrit$?: boolean;
+  targetCaches$: TargetCache[]
 }
-
-function getTargetCache(cache: AttackCardData): Map<string, AttackCardData['dummyCache$']> {
-  const cacheMap = new Map<string, AttackCardData['dummyCache$']>();
-  if (!cache) {
-    return cacheMap;
-  }
-  for (const targetCache of cache.targetCaches$) {
-    cacheMap.set(targetCache.selectionId$, targetCache);
-  }
-  if (cache.dummyCache$) {
-    cacheMap.set(cache.dummyCache$.selectionId$, cache.dummyCache$);
-  }
-  return cacheMap;
-}
-
 /**
+ * // TODO when expanding attack card, show the user bonus, which can be edited
+ *     UI => can probably solve this with slots
  * Most attack items only have 1 target.
  * However there are a few with multiple targets and I could not find a written rule to handle those.
  * So I decided that you need to roll an attack for each target based on multiple spells/feats RAW
@@ -95,18 +57,15 @@ function getTargetCache(cache: AttackCardData): Map<string, AttackCardData['dumm
 @Component({
   tag: 'Attack-CardPart',
   html: /*html*/`
-    <nac-roll-d20 *for="let targetCache of this.targetCaches" *if="targetCache.isSelected$"
-      [data-roll]="this.part.data.rolls$[targetCache.selectedRoll$].roll$"
-      [data-bonus-formula]="targetCache.userBonus"
-      [data-show-bonus]="targetCache.phase !== 'mode-select'"
+    <nac-roll-d20
+      [data-roll]="this.part.data.roll$"
+      [data-bonus-formula]="this.part.data.userBonus"
+      [data-show-bonus]="this.part.data.phase !== 'mode-select'"
       [data-override-max-roll]="this.part.data.critTreshold$"
 
       [data-interaction-permission]="this.interactionPermission"
       [data-read-permission]="this.readPermission"
       [data-read-hidden-display-type]="this.readHiddenDisplayType"
-
-      [data-selection-id]="targetCache.selectionId$"
-      [data-memory-context]="targetCache.selectionId$"
       >
     </nac-roll-d20>
     <div class="host" *if="this.dataPartId">
@@ -140,26 +99,17 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   public dataPartId: string;
   @Attribute('data-message-id')
   public dataMessageId: string;
-  @Attribute('data-target-id')
-  public dataTargetId: string;
 
   public part: ModularCardPartData<AttackCardData>;
-  public targetCaches: TargetCache[] = [];
   public interactionPermission: string;
   public readPermission: string;
   public readHiddenDisplayType: string;
 
   public onInit(): void {
-    this.targetCaches = [];
     const allParts = ModularCard.getCardPartDatas(game.messages.get(this.dataMessageId));
     if (allParts != null) {
       this.part = allParts.find(p => p.id === this.dataPartId && p.type === this.getType());
-      if (this.part != null) {
-        this.targetCaches = Array.from(getTargetCache(this.part.data).values()).sort((a, b) => a.name$.localeCompare(b.name$));
-        if (this.targetCaches.length === 0) {
-          this.targetCaches.push(this.part.data.dummyCache$);
-        }
-      }
+      this.part.data.roll$
     }
 
     if (this.part != null) {
@@ -211,18 +161,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       }
     }
     const attack: AttackCardData = {
+      mode: 'normal',
+      phase: 'mode-select',
+      userBonus: "",
       targetCaches$: [],
-      dummyCache$: {
-        phase: 'mode-select',
-        mode: 'normal',
-        userBonus: '',
-        isSelected$: true,
-        advantageSources$: [],
-        disadvantageSources$: [],
-        selectionId$: 'dummy',
-        name$: 'dummy',
-      },
-      rolls$: [],
       advantageSources$: [],
       disadvantageSources$: [],
       elvenAccuracy$: actor?.getFlag("dnd5e", "elvenAccuracy") === true && ["dex", "int", "wis", "cha"].includes(item.abilityMod),
@@ -243,12 +185,76 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     attack.critTreshold$ = critTreshold;
 
     {
-      const modeSources = this.getModeSources({
-        actor: actor,
-        suffixes: ['all', null, item.data.data.actionType, item.abilityMod]
-      });
-      attack.advantageSources$ = modeSources.advantage;
-      attack.disadvantageSources$ = modeSources.disadvantage;
+      let suffixes = ['all', item.data.data.actionType, item.abilityMod];
+      if (actor) {
+        if (actor.type === 'character') {
+          suffixes.push('humanoid');
+        } else if (actor.type === 'npc' && actor.data.data.details?.type) {
+          suffixes.push(actor.data.data.details.type.custom);
+          suffixes.push(actor.data.data.details.type.value);
+        }
+      }
+      suffixes = suffixes.filter(suffix => !!suffix);
+      
+      {
+        // TODO could also detect midi flags => should probably contact the author for permission
+        let advantage = false;
+        let disadvantage = false;
+        for (const suffix of suffixes) {
+          if (getProperty(actor.data._source, `flags.${staticValues.moduleName}.attack.advantage.${suffix}`) > 0) {
+            advantage = true;
+          }
+          if (getProperty(actor.data._source, `flags.${staticValues.moduleName}.attack.disadvantage.${suffix}`) > 0) {
+            disadvantage = true;
+          }
+        }
+        
+        if (advantage) {
+          attack.advantageSources$.push({
+            $uuid: actor.uuid,
+            $image: actor.img,
+            $name: actor.data.name,
+          });
+        }
+        if (disadvantage) {
+          attack.disadvantageSources$.push({
+            $uuid: actor.uuid,
+            $image: actor.img,
+            $name: actor.data.name,
+          });
+        }
+      }
+
+      for (const effect of actor.getEmbeddedCollection(ActiveEffect.name) as any as Array<ActiveEffect>) {
+        let advantage = false;
+        let disadvantage = false;
+  
+        for (const suffix of suffixes) {
+          for (const change of effect.data.changes) {
+            if (change.key === `data.flags.${staticValues.moduleName}.attack.advantage.${suffix}`) {
+              advantage = true;
+            }
+            if (change.key === `data.flags.${staticValues.moduleName}.attack.disadvantage.${suffix}`) {
+              disadvantage = true;
+            }
+          }
+        }
+  
+        if (advantage) {
+          attack.advantageSources$.push({
+            $uuid: effect.uuid,
+            $image: effect.data.icon,
+            $name: effect.sourceName ?? effect.name,
+          });
+        }
+        if (disadvantage) {
+          attack.disadvantageSources$.push({
+            $uuid: effect.uuid,
+            $image: effect.data.icon,
+            $name: effect.sourceName ?? effect.name,
+          });
+        }
+      }
     }
 
     return attack;
@@ -267,12 +273,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     const result: Partial<AttackCardData> = deepClone(oldData);
     const newKeys = new Set<keyof AttackCardData>();
     for (const key of Object.keys(oldData) as Array<keyof AttackCardData>) {
-      if (key.endsWith('$')) {
+      if (key.startsWith('$')) {
         newKeys.add(key);
       }
     }
-    newKeys.delete('rolls$');// contains already rolled dice which should not be discarded
-    newKeys.delete('targetCaches$'); // will be handled seperately
+    newKeys.delete('roll$');// contains already rolled dice which should not be discarded
     
     const oldKeys = new Set<keyof AttackCardData>();
     for (const key of Object.keys(oldData) as Array<keyof AttackCardData>) {
@@ -291,14 +296,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     for (const key of oldKeys as Set<string>) {
       result[key] = deepClone(oldData[key]);
     }
-
-    for (const targetCache of result.targetCaches$) {
-      for (const key of Object.keys(targetCache)) {
-        if (key.endsWith('$')) {
-          delete targetCache[key];
-        }
-      }
-    }
     return result as AttackCardData;
   }
 
@@ -314,34 +311,25 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     new ElementBuilder()
       .listenForAttribute('data-part-id', 'string')
       .listenForAttribute('data-message-id', 'string')
-      .listenForAttribute('data-target-id', 'string')
-      .setCss(/*css*/`
-        ${TokenImgElement.selector()} {
-          margin-right: 2px;
-          width: 1em;
-          height: 1em;
-        }
-      `)
       .addListener(new ElementCallbackBuilder()
         .setEvent('click')
         .addSelectorFilter('[data-action="roll"]')
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addSerializer(this.getTargetSerializer)
         .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
-        .addEnricher(this.getTargetCacheEnricher)
         .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, click, allCardParts, targetCaches}) => {
-          for (const targetCache of targetCaches) {
-            const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
-            if (click.shiftKey) {
-              targetCache.phase = orderedPhases[orderedPhases.length - 1];
-            } else {
-              targetCache.phase = orderedPhases[orderedPhases.indexOf(targetCache.phase) + 1];
-            }
+        .setExecute(({messageId, part, click, allCardParts}) => {
+          if (part.data.phase === 'result') {
+            return;
           }
-
+      
+          const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
+          if (click.shiftKey) {
+            part.data.phase = orderedPhases[orderedPhases.length - 1];
+          } else {
+            part.data.phase = orderedPhases[orderedPhases.indexOf(part.data.phase) + 1];
+          }
           return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
         })
       )
@@ -357,22 +345,18 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         })
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(this.getTargetSerializer)
         .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
         .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
-        .addEnricher(this.getTargetCacheEnricher)
         .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, targetCaches, inputValue}) => {
+        .setExecute(({messageId, allCardParts, part, inputValue}) => {
           if (inputValue && !Roll.validate(inputValue)) {
             // Only show error on key press
             throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
           }
-          for (const targetCache of targetCaches) {
-            if (targetCache.phase === 'bonus-input') {
-              targetCache.phase = 'mode-select';
-            }
-            targetCache.userBonus = inputValue ?? '';
+          if (part.data.phase === 'bonus-input') {
+            part.data.phase = 'mode-select';
           }
+          part.data.userBonus = inputValue ?? '';
           return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
         })
       )
@@ -383,28 +367,20 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(ItemCardHelpers.getKeyEventSerializer())
         .addSerializer(ItemCardHelpers.getInputSerializer())
-        .addSerializer(this.getTargetSerializer)
         .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
-        .addEnricher(this.getTargetCacheEnricher)
         .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, targetCaches, keyEvent, inputValue}) => {
+        .setExecute(({messageId, allCardParts, part, keyEvent, inputValue}) => {
           if (keyEvent.key === 'Enter') {
-            for (const targetCache of targetCaches) {
-              const userBonus = inputValue == null ? '' : inputValue;
-              if (userBonus && !Roll.validate(userBonus)) {
-                // Only show error on key press
-                throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-              }
-              targetCache.phase = 'result';
-              targetCache.userBonus = userBonus;
+            const userBonus = inputValue == null ? '' : inputValue;
+            if (userBonus && !Roll.validate(userBonus)) {
+              // Only show error on key press
+              throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
             }
+            part.data.phase = 'result';
+            part.data.userBonus = userBonus;
             return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-          } else if (keyEvent.key === 'Escape') {
-            for (const targetCache of targetCaches) {
-              if (targetCache.phase === 'bonus-input') {
-                targetCache.phase = 'mode-select';
-              }
-            }
+          } else if (keyEvent.key === 'Escape' && part.data.phase === 'bonus-input') {
+            part.data.phase = 'mode-select';
             return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
           }
         })
@@ -415,12 +391,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
         .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addSerializer(this.getTargetSerializer)
         .addSerializer(ItemCardHelpers.getActionSerializer())
         .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
-        .addEnricher(this.getTargetCacheEnricher)
         .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, targetCaches, click, action}) => {
+        .setExecute(({messageId, allCardParts, part, click, action}) => {
           let modifier = action === 'mode-plus' ? 1 : -1;
           if (click.shiftKey && modifier > 0) {
             modifier++;
@@ -428,86 +402,18 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             modifier--;
           }
           
-          for (const targetCache of targetCaches) {
-            const newIndex = Math.max(0, Math.min(modeOrder.length-1, modeOrder.indexOf(targetCache.mode) + modifier));
-            if (targetCache.mode === modeOrder[newIndex]) {
-              return;
-            }
-            targetCache.mode = modeOrder[newIndex];
-  
-            if (click.shiftKey) {
-              targetCache.phase = 'result';
-            }
+          const newIndex = Math.max(0, Math.min(modeOrder.length-1, modeOrder.indexOf(part.data.mode) + modifier));
+          if (part.data.mode === modeOrder[newIndex]) {
+            return;
+          }
+          part.data.mode = modeOrder[newIndex];
+
+          if (click.shiftKey) {
+            part.data.phase = 'result';
           }
           return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
         })
       )
-      .addOnAttributeChange(async ({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData<AttackCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
-          const elements: Element[] = [];
-          {
-            const elem = document.createElement('Attack-CardPart');
-            elem.setAttribute('data-part-id', attributes["data-part-id"]);
-            elem.setAttribute('data-message-id', attributes["data-message-id"]);
-            elements.push(elem);
-          }
-          for (const targetCache of Array.from(getTargetCache(part.data).values()).sort((a, b) => a.name$.localeCompare(b.name$))) {
-            if (!targetCache.isSelected$) {
-              continue;
-            }
-
-            const d20Element = document.createElement(RollD20Element.selector()) as DynamicElement;
-            const label = document.createElement('div');
-            label.style.display = 'contents';
-            label.setAttribute('slot', 'label');
-            let labelText: string;
-            switch (targetCache.mode) {
-              case 'disadvantage':
-              case 'advantage': {
-                labelText = `DND5E.${targetCache.mode.capitalize()}`;
-                break;
-              }
-              default: {
-                labelText = `DND5E.Attack`;
-                break;
-              }
-            }
-            if (targetCache.targetUuid$) {
-              const tokenImg = document.createElement(TokenImgElement.selector()) as DynamicElement;
-              tokenImg.setInput({
-                'data-token-uuid': targetCache.targetUuid$
-              })
-              label.append(tokenImg);
-            }
-            label.append(game.i18n.localize(labelText));
-            d20Element.appendChild(label);
-            elements.push(d20Element);
-          }
-
-          if (elements.length === 0) {
-            const d20attributes = {
-              ['data-roll']: part.data.rolls$[part.data.dummyCache$.selectedRoll$].roll$,
-              ['data-bonus-formula']: part.data.dummyCache$.userBonus,
-              ['data-show-bonus']: part.data.dummyCache$.phase !== 'mode-select',
-              ['data-override-max-roll']: part.data.critTreshold$,
-            };
-            if (part.data.actorUuid$) {
-              d20attributes['data-interaction-permission'] = `OwnerUuid:${part.data.actorUuid$}`;
-              d20attributes['data-read-permission'] = `${staticValues.code}ReadAttackUuid:${part.data.actorUuid$}`;
-              d20attributes['data-read-hidden-display-type'] = game.settings.get(staticValues.moduleName, 'attackHiddenRoll');
-            }
-
-            const d20Element = document.createElement(RollD20Element.selector()) as DynamicElement;
-            d20Element.setAttribute('data-selection-id', 'dummy');
-            d20Element.setAttribute('data-memory-context', 'dummy');
-            await d20Element.setInput(d20attributes);
-            elements.push(d20Element);
-          }
-
-          // @ts-ignore
-          element.replaceChildren(...elements);
-        }});
-      })
       .build(this.getSelector())
     
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
@@ -522,97 +428,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     return this.constructor.name;
   }
 
-  private getModeSources({actor, prefixes, suffixes}: {actor: MyActor, prefixes?: Array<string | null>, suffixes?: Array<string | null>}): {advantage: RollModifierSource[], disadvantage: RollModifierSource[]} {
-    if (prefixes == null) {
-      prefixes = [null];
-    }
-    if (suffixes == null) {
-      suffixes = [null];
-    }
-    const advantageSources: RollModifierSource[] = [];
-    const disadvantageSources: RollModifierSource[] = [];
-
-    if (actor) {
-      if (actor.type === 'character') {
-        suffixes.push('humanoid');
-      } else if (actor.type === 'npc' && actor.data.data.details?.type) {
-        suffixes.push(actor.data.data.details.type.custom);
-        suffixes.push(actor.data.data.details.type.value);
-      }
-    }
-    prefixes = prefixes.map(prefix => prefix ? `${prefix}.` : '');
-    suffixes = suffixes.map(suffix => suffix ? `.${suffix}` : '');
-    
-    {
-      // TODO could also detect midi flags => should probably contact the author for permission
-      let advantage = false;
-      let disadvantage = false;
-      for (const prefix of prefixes) {
-        for (const suffix of suffixes) {
-          if (getProperty(actor.data._source, `flags.${staticValues.moduleName}.attack.${prefix}advantage${suffix}`) > 0) {
-            advantage = true;
-          }
-          if (getProperty(actor.data._source, `flags.${staticValues.moduleName}.attack.${prefix}disadvantage${suffix}`) > 0) {
-            disadvantage = true;
-          }
-        }
-      }
-      
-      if (advantage) {
-        advantageSources.push({
-          uuid$: actor.uuid,
-          image$: actor.img,
-          name$: actor.data.name,
-        });
-      }
-      if (disadvantage) {
-        disadvantageSources.push({
-          uuid$: actor.uuid,
-          image$: actor.img,
-          name$: actor.data.name,
-        });
-      }
-    }
-
-    for (const effect of actor.getEmbeddedCollection(ActiveEffect.name) as any as Array<ActiveEffect>) {
-      let advantage = false;
-      let disadvantage = false;
-
-      for (const prefix of prefixes) {
-        for (const suffix of suffixes) {
-          for (const change of effect.data.changes) {
-            if (change.key === `data.flags.${staticValues.moduleName}.attack.${prefix}advantage${suffix}`) {
-              advantage = true;
-            }
-            if (change.key === `data.flags.${staticValues.moduleName}.attack.${prefix}disadvantage${suffix}`) {
-              disadvantage = true;
-            }
-          }
-        }
-      }
-
-      if (advantage) {
-        advantageSources.push({
-          uuid$: effect.uuid,
-          image$: effect.data.icon,
-          name$: effect.sourceName ?? effect.name,
-        });
-      }
-      if (disadvantage) {
-        disadvantageSources.push({
-          uuid$: effect.uuid,
-          image$: effect.data.icon,
-          name$: effect.sourceName ?? effect.name,
-        });
-      }
-    }
-
-    return {
-      advantage: advantageSources,
-      disadvantage: disadvantageSources,
-    }
-  }
-
   //#region Front end
   public getSelector(): string {
     return `${staticValues.code}-attack-part`;
@@ -621,20 +436,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   public getHtml(data: HtmlContext): string {
     // TODO technically, you would roll an attack for each target
     //  UI idea: unrolled keep it as is, once rolled (1 button for multiple rolls) show a list below for each target
-    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
-  }
-  
-  private getTargetSerializer({event}: {event: Event}): {selectionId: string} {
-    return {
-      selectionId: (event.target as Element).closest('[data-selection-id]')?.getAttribute('data-selection-id'),
-    }
-  }
-  
-  private readonly getTargetCacheEnricher = (data: ChatPartIdData & ChatPartEnriched<AttackCardData> & {selectionId: string}): {targetCaches: TargetCache[]} => {
-    if (data.selectionId === '*') {
-      return {targetCaches: Array.from(getTargetCache(data.part.data).values())};
-    }
-    return {targetCaches: [getTargetCache(data.part.data).get(data.selectionId)]};
+    return `<Attack-CardPart data-part-id="${data.partId}" data-message-id="${data.messageId}"></Attack-CardPart>`
   }
   //#endregion
 
@@ -642,14 +444,14 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   private getTargetState(context: StateContext): VisualState[] {
     const visualStates: VisualState[] = [];
 
-    const attackParts: ModularCardPartData<AttackCardData>[] = context.allMessageParts.filter(part => part.type === this.getType() && ModularCard.getTypeHandler(part.type) instanceof AttackCardPart);
-    if (attackParts.length === 0) {
+    const rolledAttacks: ModularCardPartData<AttackCardData>[] = context.allMessageParts.filter(part => part.type === this.getType() && ModularCard.getTypeHandler(part.type) instanceof AttackCardPart);
+    if (rolledAttacks.length === 0) {
       return [];
     }
 
-    for (let i = 0; i < attackParts.length; i++) {
-      const attack = attackParts[i];
-      const cache = getTargetCache(attack.data);
+    const cache = this.getTargetCache(rolledAttacks.map(attack => attack.data));
+    for (let i = 0; i < rolledAttacks.length; i++) {
+      const attack = rolledAttacks[i];
       for (const selected of context.selected) {
         let rowValue: string;
         const canReadAttack = UtilsDocument.hasPermissions([{
@@ -658,10 +460,9 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           permission: `${staticValues.code}ReadAttack`,
         }], {sync: true}).every(permission => permission.result);
         let canSeeAc: boolean;
-        const targetCache = cache.get(selected.selectionId);
-        if (targetCache) {
+        if (cache.has(selected.tokenUuid)) {
           canSeeAc = UtilsDocument.hasPermissions([{
-            uuid: targetCache.actorUuid$,
+            uuid: cache.get(selected.tokenUuid).actorUuid$,
             user: game.user,
             permission: `Observer`,
           }], {sync: true}).every(permission => permission.result);
@@ -669,13 +470,17 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           canSeeAc = false;
         }
         const canSeeTotal = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') === 'total';
-        if (!attack.data.rolls$[targetCache?.selectedRoll$]?.roll$?.evaluated || !canSeeAc) {
-          rowValue = '';
+        if (!attack.data.roll$?.evaluated || !canSeeAc) {
+          if (attack.data.roll$?.evaluated) {
+            rowValue = '';
+          } else {
+            rowValue = '';
+          }
         } else if (!canReadAttack && !canSeeTotal) {
           rowValue = '';
         } else {
           const styles = ['text-align: center'];
-          let resultType = targetCache?.resultType$;
+          let resultType = cache.get(selected.tokenUuid).resultType$;
           if (!canReadAttack && canSeeTotal) {
             if (resultType === 'critical-hit') {
               resultType = 'hit';
@@ -683,7 +488,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
               resultType = 'mis';
             }
           }
-          const roll = attack.data.rolls$[targetCache?.selectedRoll$]?.roll$;
           switch (resultType) {
             case 'critical-hit': {
               styles.push('color: green');
@@ -698,12 +502,12 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             }
             case 'hit': {
               styles.push('color: green');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.selectionId).ac$} <= ${roll?.total}">✓</div>`;
+              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac$} <= ${attack.data.roll$?.total}">✓</div>`;
               break;
             }
             case 'mis': {
               styles.push('color: red');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.selectionId).ac$} <= ${roll?.total}">✗</div>`;
+              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac$} <= ${attack.data.roll$?.total}">✗</div>`;
               break;
             }
           }
@@ -717,7 +521,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             <svg height="1em" width="1em">
               <use xlink:href="/modules/${staticValues.moduleName}/assets/icons/sword.svg#sword"/>
             </svg>
-            </div> ${(attackParts.length === 1) ? '' : ` ${i+1}`}`,
+            </div> ${(rolledAttacks.length === 1) ? '' : ` ${i+1}`}`,
             rowValue: rowValue,
           }],
         })
@@ -725,6 +529,16 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     }
 
     return visualStates;
+  }
+
+  private getTargetCache(caches: AttackCardData[]): Map<string, TargetCache> {
+    const cacheByUuid = new Map<string, TargetCache>();
+    for (const cache of caches) {
+      for (const targetCache of cache.targetCaches$) {
+        cacheByUuid.set(targetCache.targetUuid$, targetCache);
+      }
+    }
+    return cacheByUuid;
   }
   //#endregion
 
@@ -739,26 +553,23 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
   private async addTargetCache(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const missingTargetUuids = new Set<string>();
     for (const {newRow} of context.rows) {
-      const allSelectionIds = new Set<string>();
-      const cachedSelectionIds = new Set<string>();
+      const allTargetUuids = new Set<string>();
+      const cachedTargetUuids = new Set<string>();
       for (const selected of newRow.part.data.selected) {
-        allSelectionIds.add(selected.selectionId);
+        allTargetUuids.add(selected.tokenUuid);
       }
       for (const part of newRow.allParts) {
         if (!ModularCard.isType<AttackCardData>(AttackCardPart.instance, part)) {
           continue;
         }
-        // Dummy is only selected when no real targets are selected
-        part.data.dummyCache$.isSelected$ = allSelectionIds.size === 0;
         for (const target of part.data.targetCaches$) {
-          target.isSelected$ = allSelectionIds.has(target.selectionId$);
-          cachedSelectionIds.add(target.selectionId$);
+          cachedTargetUuids.add(target.targetUuid$);
         }
       }
 
-      for (const selected of newRow.part.data.selected) {
-        if (!cachedSelectionIds.has(selected.selectionId)) {
-          missingTargetUuids.add(selected.tokenUuid);
+      for (const expectedUuid of allTargetUuids) {
+        if (!cachedTargetUuids.has(expectedUuid)) {
+          missingTargetUuids.add(expectedUuid);
         }
       }
     }
@@ -770,33 +581,29 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     // Cache the values of the tokens
     const tokens = await UtilsDocument.tokenFromUuid(missingTargetUuids);
     for (const {newRow} of context.rows) {
+      const allTargetUuids = new Set<string>();
+      for (const selected of newRow.part.data.selected) {
+        allTargetUuids.add(selected.tokenUuid);
+      }
 
       for (const part of newRow.allParts) {
         if (!ModularCard.isType<AttackCardData>(AttackCardPart.instance, part)) {
           continue;
         }
-        const cachedSelectionIds = new Set<string>();
+        const cachedTargetUuids = new Set<string>();
         for (const target of part.data.targetCaches$) {
-          cachedSelectionIds.add(target.selectionId$);
+          cachedTargetUuids.add(target.targetUuid$);
         }
 
-        for (const selected of newRow.part.data.selected) {
-          if (!cachedSelectionIds.has(selected.selectionId)) {
-            const actor = (tokens.get(selected.tokenUuid).getActor() as MyActor);
+        for (const expectedUuid of allTargetUuids) {
+          if (!cachedTargetUuids.has(expectedUuid)) {
+            const actor = (tokens.get(expectedUuid).getActor() as MyActor);
             part.data.targetCaches$.push({
-              phase: 'mode-select',
-              mode: 'normal',
-              userBonus: '',
-              isSelected$: true,
-              advantageSources$: [],
-              disadvantageSources$: [],
-              targetUuid$: selected.tokenUuid,
-              selectionId$: selected.selectionId,
+              targetUuid$: expectedUuid,
               actorUuid$: actor.uuid,
               ac$: actor.data.data.attributes.ac.value,
-              name$: tokens.get(selected.tokenUuid).name,
             });
-            cachedSelectionIds.add(selected.selectionId);
+            cachedTargetUuids.add(expectedUuid);
           }
         }
       }
@@ -813,37 +620,30 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
     this.calcIsCrit(context);
     this.setDamageAsCrit(context);
     this.calcResultCache(context);
-    this.linkTargetsWithRolls(context);
-    this.calcAttackRoll(context);
   }
 
   private calcIsCrit(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow} of context.rows) {
-      for (const roll of newRow.part.data.rolls$) {
-        if (!roll.roll$.evaluated) {
-          roll.isCrit$ = false;
-        } else {
-          const baseRollResult = roll.roll$.terms[0].results.filter(result => result.active)[0];
-          roll.isCrit$ = baseRollResult?.result >= newRow.part.data.critTreshold$;
-        }
+      if (!newRow.part.data.roll$?.evaluated) {
+        newRow.part.data.isCrit$ = false;
+        continue;
       }
 
+      const baseRollResult = newRow.part.data.roll$.terms[0].results.filter(result => result.active)[0];
+      newRow.part.data.isCrit$ = baseRollResult?.result >= newRow.part.data.critTreshold$;
     }
   }
 
   private setDamageAsCrit(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
-      // TODO change when damage is also per target
-      const isCrit = newRow.part.data.rolls$.every(roll => roll.isCrit$);
-      const wasCrit = oldRow == null ? false : oldRow.part.data.rolls$.every(roll => roll.isCrit$);
-      if (isCrit !== wasCrit) {
+      if (newRow.part.data.isCrit$ !== oldRow?.part?.data?.isCrit$) {
         for (const part of newRow.allParts) {
           if (!ModularCard.isType<DamageCardData>(DamageCardPart.instance, part)) {
             continue;
           }
           
           if (part.data.phase === 'mode-select') {
-            if (isCrit) {
+            if (newRow.part.data.isCrit$) {
               part.data.mode = 'critical';
             } else {
               part.data.mode = 'normal';
@@ -856,13 +656,12 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
 
   private calcResultCache(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow} of context.rows) {
-      for (const targetCache of getTargetCache(newRow.part.data).values()) {
-        const roll = newRow.part.data.rolls$[targetCache.selectedRoll$];
-        const firstRoll = roll?.roll$?.terms?.[0]?.results?.find(r => r.active);
-        if (roll?.roll$?.evaluated && firstRoll) {
-          if (firstRoll.result === 20 || targetCache.ac$ <= roll.roll$.total) {
+      for (const targetCache of newRow.part.data.targetCaches$) {
+        if (newRow.part.data.roll$?.evaluated) {
+          const firstRoll = newRow.part.data.roll$.terms[0].results.find(r => r.active);
+          if (firstRoll.result === 20 || targetCache.ac$ <= newRow.part.data.roll$.total) {
             // 20 always hits, lower crit treshold does not
-            if (roll.isCrit$) {
+            if (firstRoll.result >= newRow.part.data.critTreshold$) {
               targetCache.resultType$ = 'critical-hit';
             } else {
               targetCache.resultType$ = 'hit';
@@ -881,169 +680,83 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
 
   private calcRollMode(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
-      for (const targetCache of getTargetCache(newRow.part.data).values()) {
-        const newMode = this.calcAutoMode(newRow.part.data, targetCache);
-        if (oldRow) {
-          if (newMode !== this.calcAutoMode(oldRow.part.data, targetCache)) {
-            targetCache.mode = newMode;
-          }
-        } else {
-          targetCache.mode = newMode;
+      const newMode = this.calcAutoMode(newRow.part.data);
+      if (oldRow) {
+        if (newMode !== this.calcAutoMode(oldRow.part.data)) {
+          newRow.part.data.mode = newMode;
         }
+      } else {
+        newRow.part.data.mode = newMode;
       }
     }
   }
 
-  private calcAutoMode(data: AttackCardData, target: TargetCache): TargetCache['mode'] {
+  private calcAutoMode(data: AttackCardData): AttackCardData['mode'] {
     let modeIndex = 1;
-    const advantageSources = data.advantageSources$.length + target.advantageSources$.length;
-    if (advantageSources > 0) {
+    if (data.advantageSources$.length > 0) {
       modeIndex++;
     }
-    const disadvantageSources = data.disadvantageSources$.length + target.disadvantageSources$.length;
-    if (disadvantageSources > 0) {
+    if (data.disadvantageSources$.length > 0) {
       modeIndex--;
     }
     return modeOrder[modeIndex];
-  }
-
-  private linkTargetsWithRolls(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
-    for (const {newRow} of context.rows) {
-      const matchWithRolls: TargetCache[] = [];
-      const activeCacheIds = [];
-      for (const cache of getTargetCache(newRow.part.data).values()) {
-        if (cache.isSelected$) {
-          matchWithRolls.push(cache);
-          activeCacheIds.push(cache.selectionId$);
-        } else {
-          delete cache.selectedRoll$;
-        }
-      }
-
-      const rollPriorityMap = new Map<number, string>();
-      // Prio 1: initial roll
-      for (let i = 0; i < newRow.part.data.rolls$.length; i++) {
-        if (activeCacheIds.includes(newRow.part.data.rolls$[i].initialSelectionId$)) {
-          rollPriorityMap.set(i, newRow.part.data.rolls$[i].initialSelectionId$);
-        }
-      }
-      // Prio 2: retain if already linked
-      let assignedSelectionIds = Array.from(rollPriorityMap.values());
-      let pendingRollMatches = matchWithRolls.filter(cache => !assignedSelectionIds.includes(cache.selectionId$));
-      for (const cache of pendingRollMatches) {
-        if (cache.selectedRoll$ == null) {
-          continue;
-        }
-        if (!rollPriorityMap.has(cache.selectedRoll$)) {
-          rollPriorityMap.set(cache.selectedRoll$, cache.selectionId$);
-        }
-      }
-      // Prio 3: Find any remaining rolls
-      assignedSelectionIds = Array.from(rollPriorityMap.values());
-      pendingRollMatches = matchWithRolls.filter(cache => !assignedSelectionIds.includes(cache.selectionId$));
-      for (let i = 0; i < newRow.part.data.rolls$.length; i++) {
-        if (pendingRollMatches.length === 0) {
-          break;
-        }
-        if (rollPriorityMap.has(i)) {
-          continue;
-        }
-        rollPriorityMap.set(i, pendingRollMatches.splice(0, 1)[0].selectionId$);
-      }
-
-      // Prio 4: No rolls can be reused => new roll
-      for (const cache of pendingRollMatches) {
-        const roll: AttackRoll = {
-          initialSelectionId$: cache.selectionId$,
-          roll$: UtilsRoll.toRollData(new Roll('0')), // placeholder
-        };
-        newRow.part.data.rolls$.push(roll);
-        rollPriorityMap.set(newRow.part.data.rolls$.length-1, cache.selectionId$);
-      }
-
-      // Assign rolls
-      const rollPriorityInvertedMap = new Map<string, number>();
-      for (const [key, value] of rollPriorityMap.entries()) {
-        rollPriorityInvertedMap.set(value, key);
-      }
-
-      for (const cache of matchWithRolls) {
-        cache.selectedRoll$ = rollPriorityInvertedMap.get(cache.selectionId$);
-        // If the initial selection was the dummy, move it to a real target
-        if (newRow.part.data.rolls$[cache.selectedRoll$].initialSelectionId$ === newRow.part.data.dummyCache$.selectionId$) {
-          newRow.part.data.rolls$[cache.selectedRoll$].initialSelectionId$ === cache.selectionId$;
-        }
-      }
-    }
-  }
-
-  private calcAttackRoll(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
-    for (const {newRow} of context.rows) {
-      for (const targetCache of getTargetCache(newRow.part.data).values()) {
-        if (!targetCache.isSelected$) {
-          delete targetCache.requestRollFormula$;
-          continue;
-        }
-
-        let baseRoll = new Die({faces: 20, number: 1});
-        if (newRow.part.data.hasHalflingLucky$) {
-          // reroll a base roll 1 once
-          // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
-          // second 2 = reroll when the roll result is equal to 1 (=1)
-          baseRoll.modifiers.push('r1=1');
-        }
-        switch (targetCache.mode) {
-          case 'advantage': {
-            if (newRow.part.data.elvenAccuracy$) {
-              baseRoll.number = 3;
-            } else {
-              baseRoll.number = 2;
-            }
-            baseRoll.modifiers.push('kh');
-            break;
-          }
-          case 'disadvantage': {
-            baseRoll.number = 2;
-            baseRoll.modifiers.push('kl');
-            break;
-          }
-        }
-        const parts: string[] = [baseRoll.formula];
-        if (newRow.part.data.rollBonus$) {
-          parts.push(newRow.part.data.rollBonus$);
-        }
-        
-        if (targetCache.userBonus && Roll.validate(targetCache.userBonus)) {
-          parts.push(targetCache.userBonus);
-        }
-
-        targetCache.requestRollFormula$ = UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).formula;
-      }
-    }
   }
   //#endregion
 
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
+    await this.calcAttackRoll(context);
     await this.rollAttack(context);
+  }
+
+  private async calcAttackRoll(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
+    for (const {newRow} of context.rows) {
+      let baseRoll = new Die({faces: 20, number: 1});
+      if (newRow.part.data.hasHalflingLucky$) {
+        // reroll a base roll 1 once
+        // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
+        // second 2 = reroll when the roll result is equal to 1 (=1)
+        baseRoll.modifiers.push('r1=1');
+      }
+      switch (newRow.part.data.mode) {
+        case 'advantage': {
+          if (newRow.part.data.elvenAccuracy$) {
+            baseRoll.number = 3;
+          } else {
+            baseRoll.number = 2;
+          }
+          baseRoll.modifiers.push('kh');
+          break;
+        }
+        case 'disadvantage': {
+          baseRoll.number = 2;
+          baseRoll.modifiers.push('kl');
+          break;
+        }
+      }
+      const parts: string[] = [baseRoll.formula];
+      if (newRow.part.data.rollBonus$) {
+        parts.push(newRow.part.data.rollBonus$);
+      }
+      
+      if (newRow.part.data.userBonus && Roll.validate(newRow.part.data.userBonus)) {
+        parts.push(newRow.part.data.userBonus);
+      }
+
+      newRow.part.data.requestRollFormula$ = UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).formula;
+    }
   }
 
   private async rollAttack(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
     const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
-      const oldTargets = new Map<string, TargetCache>();
-      for (const targetCache of getTargetCache(oldRow?.part?.data).values()) {
-        oldTargets.set(targetCache.selectionId$, targetCache)
-      }
-      for (const targetCache of getTargetCache(newRow.part.data).values()) {
-        const attackRoll = newRow.part.data.rolls$[targetCache.selectedRoll$];
-        if (!attackRoll) {
-          continue;
-        }
-        if (targetCache.requestRollFormula$ !== oldTargets.get(targetCache.selectionId$)?.requestRollFormula$) {
-          const oldRoll = UtilsRoll.fromRollData(attackRoll.roll$);
-          const result = await UtilsRoll.setRoll(oldRoll, targetCache.requestRollFormula$);
-          attackRoll.roll$ = UtilsRoll.toRollData(result.result);
+      if (newRow.part.data.requestRollFormula$ !== oldRow?.part?.data?.requestRollFormula$) {
+        if (!newRow.part.data.roll$) {
+          newRow.part.data.roll$ = UtilsRoll.toRollData(new Roll(newRow.part.data.requestRollFormula$));
+        } else {
+          const oldRoll = UtilsRoll.fromRollData(newRow.part.data.roll$);
+          const result = await UtilsRoll.setRoll(oldRoll, newRow.part.data.requestRollFormula$);
+          newRow.part.data.roll$ = UtilsRoll.toRollData(result.result);
           if (result.rollToDisplay) {
             // Auto rolls if original roll was already evaluated
             for (const user of game.users.values()) {
@@ -1058,20 +771,20 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
             }
           }
         }
+      }
 
-        // Execute initial roll
-        if ((targetCache.phase === 'result') && attackRoll.roll$.evaluated !== true) {
-          const roll = UtilsRoll.fromRollData(attackRoll.roll$);
-          attackRoll.roll$ = UtilsRoll.toRollData(await roll.roll({async: true}));
-          for (const user of game.users.values()) {
-            if (user.active) {
-              showRolls.push({
-                uuid: newRow.part.data.actorUuid$,
-                permission: `${staticValues.code}ReadCheck`,
-                user: user,
-                meta: roll,
-              });
-            }
+      // Execute initial roll
+      if ((newRow.part.data.phase === 'result') && newRow.part.data.roll$?.evaluated !== true) {
+        const roll = UtilsRoll.fromRollData(newRow.part.data.roll$);
+        newRow.part.data.roll$ = UtilsRoll.toRollData(await roll.roll({async: true}));
+        for (const user of game.users.values()) {
+          if (user.active) {
+            showRolls.push({
+              uuid: newRow.part.data.actorUuid$,
+              permission: `${staticValues.code}ReadCheck`,
+              user: user,
+              meta: roll,
+            });
           }
         }
       }
@@ -1107,16 +820,9 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
       if (changedByUserId !== game.userId) {
         continue;
       }
-      const oldTargets = new Map<string, TargetCache>();
-      for (const targetCache of getTargetCache(oldRow?.part?.data).values()) {
-        oldTargets.set(targetCache.selectionId$, targetCache)
-      }
-      for (const targetCache of getTargetCache(newRow.part.data).values()) {
-        const oldTargetCache = oldTargets.get(targetCache.selectionId$);
-        if (targetCache.phase === 'bonus-input' && oldTargetCache?.phase !== 'bonus-input') {
-          MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] [data-selection-id="${targetCache.selectionId$}"] input.user-bonus`);
-          return;
-        }
+      if (newRow.part.data.phase === 'bonus-input' && (oldRow?.part?.data as AttackCardData)?.phase !== 'bonus-input') {
+        MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
+        return;
       }
     }
   }

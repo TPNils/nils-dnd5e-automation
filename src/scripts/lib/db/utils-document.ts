@@ -11,9 +11,10 @@ interface DocumentsByContext<T extends foundry.abstract.Document<any, FoundryDoc
 }
 
 type EntityPermission = keyof typeof foundry.CONST.ENTITY_PERMISSIONS;
+const dmlPermissions = ['create', 'update', 'delete'] as const;
 export interface PermissionCheck<T = any> {
   uuid: string;
-  permission: string;
+  permission: EntityPermission | typeof dmlPermissions[number] | string;
   user: User;
   meta?: T;
 }
@@ -305,6 +306,9 @@ export class UtilsDocument {
   }
 
   public static async bulkUpdate(inputDocuments: Array<{document: FoundryDocument, data: any}>): Promise<void> {
+    if (inputDocuments.length === 0) {
+      return;
+    }
     const documentsByUuid = new Map<string, {document: FoundryDocument, data: any}>();
     for (const document of inputDocuments) {
       document.data._id = document.data._id ?? document.document.id;

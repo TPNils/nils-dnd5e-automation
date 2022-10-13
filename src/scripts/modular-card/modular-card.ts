@@ -1,6 +1,7 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { TransformTrigger } from "../lib/db/transform-trigger";
+import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
@@ -340,6 +341,24 @@ export class ModularCard {
       cards = cardsArray;
     }
     return cards;
+  }
+  
+  public static async setBulkCardPartDatas(updates: Array<{message: ChatMessage, data: Array<ModularCardPartData>}>): Promise<void> {
+    const bulkUpdateRequest: Parameters<typeof UtilsDocument.bulkUpdate>[0] = [];
+    for (const update of updates) {
+      if (update.message == null) {
+        continue;
+      }
+  
+      const cardsObj = ModularCard.createFlagObject(update.data);
+      const originalCards = update.message.getFlag(staticValues.moduleName, 'modularCardData');
+      if (UtilsCompare.deepEquals(originalCards, cardsObj)) {
+        continue;
+      }
+      UtilsObject.injectDeleteForDml(originalCards, cardsObj);
+      bulkUpdateRequest.push({document: update.message, data: {[`flags.${staticValues.moduleName}.modularCardData`]: cardsObj}});
+    }
+    return UtilsDocument.bulkUpdate(bulkUpdateRequest);
   }
 
   public static setCardPartDatas(message: ChatMessage, data: Array<ModularCardPartData>): Promise<ChatMessage> {

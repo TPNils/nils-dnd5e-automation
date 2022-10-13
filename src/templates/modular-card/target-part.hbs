@@ -1,7 +1,7 @@
 {{#if data.tableBody.length}}
 <div class="table target-table" style="grid-template-columns: max-content 25px {{#if data.tableHeader.row.length}}repeat({{data.tableHeader.row.length}}, min-content){{/if}} auto max-content;">
   {{!header}}
-  <div class="header-cell">{{! copy/delete }}</div>
+  <div class="header-cell">{{#if (not data.autoChangeTarget) }}<button {{#if (nacMisPerm (nacConcat 'OwnerUuid:' @root.actorUuid))}}disabled{{/if}} data-action="refresh-targets" class="icon-button copy"><i class="fas fa-bullseye"></i></button>{{/if}}</div>
   <div class="header-cell target-amount-summary">{{data.tableHeader.currentTargets}}{{#if data.tableHeader.expectedTargets}}/{{data.tableHeader.expectedTargets}}{{/if}}</div>
   {{#each data.tableHeader.row}}
     <div class="header-cell">{{{this}}}</div>

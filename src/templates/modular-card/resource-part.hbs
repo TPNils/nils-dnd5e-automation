@@ -20,8 +20,8 @@
           <td>{{nacTranslateUsage consumeResource}}</td>
           <td>-{{consumeResource.calc$.calcChange}}</td>
           <td>
-            <button data-action="manual-apply" data-resource-index="{{consumeResourceIndex}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
-            <button data-action="undo" data-resource-index="{{consumeResourceIndex}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
+            <button style="display: inline-block" data-action="manual-apply" data-resource-index="{{consumeResourceIndex}}" class="{{@root.moduleName}}-apply"><i class="fas fa-check"></i></button>
+            <button style="display: inline-block" data-action="undo" data-resource-index="{{consumeResourceIndex}}" class="{{@root.moduleName}}-undo"><i class="fas fa-undo"></i></button>
           </td>
         </tr>
       {{/each}}
