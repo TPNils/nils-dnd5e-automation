@@ -575,13 +575,9 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         newRow.part.data.calc$.autoChangeTarget = false;
         continue rowLoop;
       }
-      if (attackCardData != null) {
-        for (const cache of attackCardData.targetCaches$) {
-          if (cache.phase === 'result') {
-            newRow.part.data.calc$.autoChangeTarget = false;
-            continue rowLoop;
-          }
-        }
+      if (attackCardData != null && attackCardData.phase === 'result') {
+        newRow.part.data.calc$.autoChangeTarget = false;
+        continue rowLoop;
       }
       if (checkCardData != null) {
         for (const cache of checkCardData.targetCaches$) {

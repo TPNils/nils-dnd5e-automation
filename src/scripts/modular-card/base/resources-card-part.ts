@@ -150,7 +150,7 @@ function getMessageState(allParts: ModularCardPartData[]): MessageState {
   for (const part of allParts) {
     if (ModularCard.isType<AttackCardData>(AttackCardPart.instance, part)) {
       messageState.hasStates.add('attack');
-      if (part.data.targetCaches$.some(cache => cache.phase === 'result')) {
+      if (part.data.phase === 'result') {
         messageState.completedStates.add('attack');
       }
     }
