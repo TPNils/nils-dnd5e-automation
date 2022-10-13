@@ -26,9 +26,9 @@ interface TargetCache {
   smartState: State['state'];
   appliedState: State['state'];
   // What has actually been applied, accounting the current hp at the time when applied
-  appliedFailedDeathSaved?: number;
-  appliedHpChange?: number;
-  appliedTmpHpChange?: number;
+  appliedFailedDeathSaved: number;
+  appliedHpChange: number;
+  appliedTmpHpChange: number;
   // What a calculation thinks should be applied, not accounting for current hp
   calcFailedDeathSaved: number;
   calcHpChange: number;
@@ -61,6 +61,13 @@ const rollBaseKeys = ['normalBaseRoll', 'versatileBaseRoll'] as const;
 function setTargetCache(cache: DamageCardData, targetCache: TargetCache): void {
   if (!cache.calc$.targetCaches) {
     cache.calc$.targetCaches = [];
+  }
+  if (targetCache.appliedHpChange === targetCache.calcHpChange && targetCache.appliedTmpHpChange === targetCache.calcAddTmpHp) {
+    targetCache.smartState = 'applied';
+  } else if (targetCache.appliedHpChange === 0 && targetCache.appliedTmpHpChange === 0) {
+    targetCache.smartState = 'not-applied';
+  } else {
+    targetCache.smartState = 'partial-applied';
   }
   for (let i = 0; i < cache.calc$.targetCaches.length; i++) {
     if (cache.calc$.targetCaches[i].selectionId === targetCache.selectionId) {
@@ -424,15 +431,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         if (!cache) {
           continue;
         }
-        if (cache.appliedHpChange) {
-          tokenHp.hp -= cache.appliedHpChange;
-        }
-        if (cache.appliedTmpHpChange) {
-          tokenHp.tempHp -= cache.appliedTmpHpChange;
-        }
-        if (cache.appliedFailedDeathSaved) {
-          tokenHp.failedDeathSaves -= cache.appliedFailedDeathSaved;
-        }
+        tokenHp.hp -= cache.appliedHpChange;
+        tokenHp.tempHp -= cache.appliedTmpHpChange;
+        tokenHp.failedDeathSaves -= cache.appliedFailedDeathSaved;
       }
 
       // Calculate (new) damage
@@ -490,6 +491,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
             ...cache,
             selectionId: targetEvent.selected.selectionId,
             targetUuid: targetEvent.selected.tokenUuid,
+            smartState: 'applied',
             appliedState: 'applied',
             appliedHpChange: hpDiff,
             appliedTmpHpChange: tempHpDiff,
@@ -689,6 +691,9 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
           calcAddTmpHp: 0,
           calcFailedDeathSaved: 0,
           calcHpChange: 0,
+          appliedTmpHpChange: 0,
+          appliedFailedDeathSaved: 0,
+          appliedHpChange: 0,
         }
       }
 
