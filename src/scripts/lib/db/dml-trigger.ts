@@ -1,4 +1,5 @@
 import { staticValues } from "../../static-values";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 import { UtilsLog } from "../../utils/utils-log";
 import { buffer } from "../decorator/buffer";
 import { RunOnce } from "../decorator/run-once";
@@ -6,10 +7,8 @@ import { Stoppable } from "../utils/stoppable";
 import { UtilsCompare } from "../utils/utils-compare";
 import { FoundryDocument } from "./utils-document";
 
-const unsupportedAfterDocuments = [
-  FogExploration, // Old document is only available on the client
-];
-const unsupportedAfterDocumentNames = unsupportedAfterDocuments.map(doc => doc.documentName);
+const supportedAfterDocumentNames = UtilsFoundry.getDocumentTypes();
+const supportedAfterDocumentCollections = supportedAfterDocumentNames.map(name => game.collections.get(name)).filter(value => value != null);
 
 export interface ITrigger<T> {
 
@@ -252,26 +251,26 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   
     // after
     if (typeof trigger.afterCreate === 'function') {
-      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
+      if (!supportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
       unregisterTriggers.push(this.afterCallbackGroups.get('create').register(trigger.afterCreate.bind(trigger)));
     }
     if (typeof trigger.afterUpdate === 'function') {
-      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
+      if (!supportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
       unregisterTriggers.push(this.afterCallbackGroups.get('update').register(trigger.afterUpdate.bind(trigger)));
     }
     if (typeof trigger.afterUpsert === 'function') {
-      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
+      if (!supportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
       unregisterTriggers.push(this.afterCallbackGroups.get('create').register(trigger.afterUpsert.bind(trigger)));
       unregisterTriggers.push(this.afterCallbackGroups.get('update').register(trigger.afterUpsert.bind(trigger)));
     }
     if (typeof trigger.afterDelete === 'function') {
-      if (unsupportedAfterDocumentNames.includes(this.documentName)) {
+      if (!supportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
       unregisterTriggers.push(this.afterCallbackGroups.get('delete').register(trigger.afterDelete.bind(trigger)));
@@ -357,14 +356,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     // @ts-ignore
     ClientDatabaseBackend.prototype._postUpdateDocumentCallbacks = function (...args: any[]): void {
       const collection = args[0];
-      let canInject = true;
-      for (const unsupportedAfterDocument of unsupportedAfterDocuments) {
-        if (game.collections.get(unsupportedAfterDocument.documentName) === collection) {
-          canInject = false;
-          break;
-        }
-      }
-      if (canInject) {
+      if (supportedAfterDocumentCollections.includes(collection)) {
         const results: any[] = args[1];
         const options: any = args[2].options;
   
