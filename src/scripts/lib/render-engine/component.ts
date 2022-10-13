@@ -225,10 +225,58 @@ export function BindEvent(config: EventConfig | string) {
     targetPrototype[eventConfigSymbol].byProperty[internalConfig.propertyKey].push(internalConfig);
   };
 }
+export interface OutputConfig {
+  eventName?: string;
+  bubbels?: boolean;
+}
+interface OutputConfigInternal {
+  eventName: string;
+  bubbels: boolean;
+}
+export function Output(config?: string | OutputConfig) {
+  return function (targetPrototype: any, propertyKey: string, descriptor?: PropertyDescriptor) {
+    const configInternal: OutputConfigInternal = {
+      eventName: propertyKey,
+      bubbels: false,
+    }
+    if (typeof config === 'string') {
+      configInternal.eventName = config;
+    } else {
+      if (config.eventName != null) {
+        configInternal.eventName = config.eventName;
+      }
+      if (config.bubbels != null) {
+        configInternal.bubbels = config.bubbels;
+      }
+    }
+    const setFunction = function (this: {[elementSymbol]: ComponentElement}, value: any): void {
+      UtilsLog.debug('setFunction', configInternal.eventName, value, this)
+      this[elementSymbol].dispatchEvent(new CustomEvent(configInternal.eventName, {detail: value, cancelable: false, bubbles: configInternal.bubbels}));
+    };
+    if (descriptor) {
+      descriptor.set = setFunction;
+    } else {
+      Reflect.defineProperty(targetPrototype, propertyKey, {
+        set: setFunction,
+      })
+    }
+  };
+}
 //#endregion
 
+const elementSymbol = Symbol('element');
 class ComponentElement extends HTMLElement {
-  protected controller: object;
+  #controller: object
+  protected get controller(): object {
+    return this.#controller;
+  }
+  protected set controller(value: object) {
+    if (this.#controller) {
+      delete this.#controller[elementSymbol]
+    }
+    this.#controller = value;
+    this.#controller[elementSymbol] = this;
+  }
 
   private getComponentConfig(): ComponentConfigInternal {
     return this.controller.constructor.prototype[componentConfigSymbol];
