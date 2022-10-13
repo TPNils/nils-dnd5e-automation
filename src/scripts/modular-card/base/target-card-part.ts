@@ -225,11 +225,9 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
           };
         })
         .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
-        .setPermissionCheck(createPermissionCheck<{part: {data: TargetCardData}}>(({part}) => {
+        .setPermissionCheck(createPermissionCheck<{part: {data: TargetCardData}, targetUuid: string}>(({part, targetUuid}) => {
           const documents: CreatePermissionCheckArgs['documents'] = [];
-          if (part.data.calc$.actorUuid) {
-            documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
-          }
+          documents.push({uuid: part.data.selected.find(s => s.selectionId === targetUuid).tokenUuid, permission: 'update', security: true});
           return {documents: documents};
         }))
         .setExecute(async ({messageId, part, allCardParts, action, targetUuid, userId}) => {
