@@ -53,6 +53,200 @@ for (const perm of (['create', 'update', 'delete'] as const)) {
   }
 }
 
+interface DmlUpdateRequest {
+  document: FoundryDocument;
+  data: any;
+};
+
+/**
+ * This prevents updating the same record at the same time, but only for the local client, not for others
+ */
+class UpdateQueue {
+  private uuidLocks = new Set<string>();
+  private nextQueueId = 0;
+  private queue = new Map<number, DmlUpdateRequest & {queuedAt: number}>();
+  private resolves: Array<{resolve: () => void, reject: (err: any) => void, queueIds: number[]}> = [];
+  private rootUuidRegex = /^([^\.]+\.[^\.]+)/i;
+
+  public add(inputDocuments: Array<DmlUpdateRequest>): Promise<void> {
+    if (inputDocuments.length === 0) {
+      return Promise.resolve();
+    }
+
+    const queueIds: number[] = [];
+    const now = Date.now();
+    for (const input of inputDocuments) {
+      queueIds.push(this.nextQueueId);
+      this.queue.set(this.nextQueueId++, {...input, queuedAt: now});
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      this.resolves.push({resolve, reject, queueIds});
+      this.execQueue();
+    });
+  }
+
+  private queueRunning = false;
+  public async execQueue(): Promise<void> {
+    if (this.queue.size === 0) {
+      return;
+    }
+
+    if (this.queueRunning) {
+      return;
+    }
+
+    try {
+      this.queueRunning = true;
+      while (this.queue.size > 0) {
+        const thisContextLocks = new Map<string, 'self' | 'child'>();
+        const selectedQueueIds: number[] = [];
+        try {
+          for (const [id, queueItem] of this.queue.entries()) {
+            const rootUuid = this.rootUuidRegex.exec(queueItem.document.uuid)[1];
+            const uuidType = rootUuid === queueItem.document.uuid ? 'self' : 'child';
+            // A record can either update itself or it's children. I assume both at the same time will cause problems
+            if (thisContextLocks.get(rootUuid) === uuidType || !this.uuidLocks.has(rootUuid)) {
+              thisContextLocks.set(rootUuid, uuidType);
+              selectedQueueIds.push(id);
+              this.uuidLocks.add(rootUuid);
+            }
+          }
+  
+          if (selectedQueueIds.length === 0) {
+            return;
+          }
+  
+          const documentsByUuid = new Map<string, DmlUpdateRequest>();
+          const dmlUpdateRequests: DmlUpdateRequest[] = [];
+          for (const queueId of selectedQueueIds) {
+            const request = this.queue.get(queueId);
+            request.data._id = request.data._id ?? request.document.id;
+            documentsByUuid.set(request.document.uuid, request);
+            dmlUpdateRequests.push(request);
+          }
+  
+          const updatesPerDocumentName = this.groupDocumentsForDml(dmlUpdateRequests);
+  
+          const promises: Promise<any>[] = [];
+          for (const documentName of updatesPerDocumentName.keys()) {
+            const updatesByUuid = updatesPerDocumentName.get(documentName);
+            const documentClass: {updateDocuments: (rows: FoundryDocument[], options?: any) => Promise<any>} = CONFIG[documentName].documentClass;
+            const rootRows: FoundryDocument[] = [];
+  
+            for (const bulkEntry of updatesByUuid.values()) {
+              if (bulkEntry.data != null) {
+                rootRows.push(bulkEntry.data);
+              }
+  
+              const embededByDocumentName = new Map<string, any[]>();
+              for (const embeded of bulkEntry.embededDocuments) {
+                if (!embededByDocumentName.has(embeded.document.documentName)) {
+                  embededByDocumentName.set(embeded.document.documentName, []);
+                }
+                embededByDocumentName.get(embeded.document.documentName).push(embeded.data);
+              }
+              for (const embededDocumentName of embededByDocumentName.keys()) {
+                let parentDocument: foundry.abstract.Document<any, any> | Promise<foundry.abstract.Document<any, any>> = documentsByUuid.get(bulkEntry.uuid)?.document;
+                if (parentDocument == null) {
+                  parentDocument = fromUuid(bulkEntry.uuid);
+                }
+                promises.push(Promise.resolve(parentDocument).then(doc => doc.updateEmbeddedDocuments(embededDocumentName, embededByDocumentName.get(embededDocumentName))));
+              }
+            }
+  
+            if (rootRows.length > 0) {
+              promises.push(documentClass.updateDocuments(rootRows));
+            }
+          }
+  
+          await Promise.all(promises);
+          // TODO error checking and reject the right resolves
+        } finally {
+          for (const id of selectedQueueIds) {
+            this.queue.delete(id);
+          }
+          for (const rootUuid of thisContextLocks.keys()) {
+            this.uuidLocks.delete(rootUuid);
+          }
+  
+          const incompleteResolves = [];
+          const resolves = this.resolves;
+          this.resolves = [];
+          for (const resolve of resolves) {
+            let hasQueued = false;
+            for (const id of resolve.queueIds) {
+              if (this.queue.has(id)) {
+                hasQueued = true;
+                break;
+              }
+            }
+            if (hasQueued) {
+              incompleteResolves.push(resolve);
+            } else {
+              resolve.resolve();
+            }
+          }
+          this.resolves.push(...incompleteResolves);
+        }
+      }
+    } finally {
+      this.queueRunning = false;
+    }
+  }
+
+  private groupDocumentsForDml(inputDocuments: Array<DmlUpdateRequest>): Map<string, Map<string, BulkEntry>> {
+    const documentsByUuid = new Map<string, {document: FoundryDocument, data?: any}>();
+    for (const document of inputDocuments) {
+      documentsByUuid.set(document.document.uuid, document);
+    }
+
+    const dmlsPerDocumentName = new Map<string, Map<string, BulkEntry>>();
+    for (let documentWrapper of documentsByUuid.values()) {
+      // Special use case for actors since they are not an embeded entity
+      if (documentWrapper.document.documentName === 'Actor' && (documentWrapper.document as FoundryDocument & MyActor).isToken) {
+        documentWrapper.document = documentWrapper.document.parent;
+        if (documentWrapper.data) {
+          documentWrapper.data = {
+            _id: documentWrapper.document.id,
+            actorData: documentWrapper.data
+          };
+        }
+      }
+
+      if (documentWrapper.document.parent == null) {
+        if (!dmlsPerDocumentName.has(documentWrapper.document.documentName)) {
+          dmlsPerDocumentName.set(documentWrapper.document.documentName, new Map<string, BulkEntry>());
+        }
+        const dmlsByUuid = dmlsPerDocumentName.get(documentWrapper.document.documentName);
+        
+        if (!dmlsByUuid.has(documentWrapper.document.uuid)) {
+          dmlsByUuid.set(documentWrapper.document.uuid, {
+            uuid: documentWrapper.document.uuid,
+            embededDocuments: [],
+          });
+        }
+        dmlsByUuid.get(documentWrapper.document.uuid).data = documentWrapper.data;
+      } else {
+        if (!dmlsPerDocumentName.has(documentWrapper.document.parent.documentName)) {
+          dmlsPerDocumentName.set(documentWrapper.document.parent.documentName, new Map<string, BulkEntry>());
+        }
+        const dmlsByUuid = dmlsPerDocumentName.get(documentWrapper.document.parent.documentName);
+        if (!dmlsByUuid.has(documentWrapper.document.parent.uuid)) {
+          dmlsByUuid.set(documentWrapper.document.parent.uuid, {
+            uuid: documentWrapper.document.parent.uuid,
+            embededDocuments: [],
+          });
+        }
+        dmlsByUuid.get(documentWrapper.document.parent.uuid).embededDocuments.push(documentWrapper);
+      }
+    }
+
+     return dmlsPerDocumentName;
+  }
+
+}
+
 export class UtilsDocument {
 
   //#region query
@@ -305,51 +499,9 @@ export class UtilsDocument {
     return Promise.all(promises).then(values => values.deepFlatten());
   }
 
-  public static async bulkUpdate(inputDocuments: Array<{document: FoundryDocument, data: any}>): Promise<void> {
-    if (inputDocuments.length === 0) {
-      return;
-    }
-    const documentsByUuid = new Map<string, {document: FoundryDocument, data: any}>();
-    for (const document of inputDocuments) {
-      document.data._id = document.data._id ?? document.document.id;
-      documentsByUuid.set(document.document.uuid, document);
-    }
-
-    const updatesPerDocumentName = UtilsDocument.groupDocumentsForDml(inputDocuments);
-
-    const promises: Promise<any>[] = [];
-    for (const documentName of updatesPerDocumentName.keys()) {
-      const updatesByUuid = updatesPerDocumentName.get(documentName);
-      const documentClass: {updateDocuments: (rows: FoundryDocument[], options?: any) => Promise<any>} = CONFIG[documentName].documentClass;
-      const rootRows: FoundryDocument[] = [];
-
-      for (const bulkEntry of updatesByUuid.values()) {
-        if (bulkEntry.data != null) {
-          rootRows.push(bulkEntry.data);
-        }
-
-        const embededByDocumentName = new Map<string, any[]>();
-        for (const embeded of bulkEntry.embededDocuments) {
-          if (!embededByDocumentName.has(embeded.document.documentName)) {
-            embededByDocumentName.set(embeded.document.documentName, []);
-          }
-          embededByDocumentName.get(embeded.document.documentName).push(embeded.data);
-        }
-        for (const embededDocumentName of embededByDocumentName.keys()) {
-          let parentDocument: foundry.abstract.Document<any, any> | Promise<foundry.abstract.Document<any, any>> = documentsByUuid.get(bulkEntry.uuid)?.document;
-          if (parentDocument == null) {
-            parentDocument = fromUuid(bulkEntry.uuid);
-          }
-          promises.push(Promise.resolve(parentDocument).then(doc => doc.updateEmbeddedDocuments(embededDocumentName, embededByDocumentName.get(embededDocumentName))));
-        }
-      }
-
-      if (rootRows.length > 0) {
-        promises.push(documentClass.updateDocuments(rootRows));
-      }
-    }
-
-    return Promise.all(promises).then();
+  private static updateQueue = new UpdateQueue();
+  public static async bulkUpdate(inputDocuments: Array<DmlUpdateRequest>): Promise<void> {
+    return this.updateQueue.add(inputDocuments);
   }
 
   public static async bulkDelete(inputs: Iterable<string | FoundryDocument>): Promise<void> {
@@ -438,56 +590,6 @@ export class UtilsDocument {
     }
 
     return Array.from(responsesByKey.values());
-  }
-  
-  private static groupDocumentsForDml(inputDocuments: Array<{document: FoundryDocument, data?: any}>): Map<string, Map<string, BulkEntry>> {
-    const documentsByUuid = new Map<string, {document: FoundryDocument, data?: any}>();
-    for (const document of inputDocuments) {
-      documentsByUuid.set(document.document.uuid, document);
-    }
-
-    const dmlsPerDocumentName = new Map<string, Map<string, BulkEntry>>();
-    for (let documentWrapper of documentsByUuid.values()) {
-      // Special use case for actors since they are not an embeded entity
-      if (documentWrapper.document.documentName === 'Actor' && (documentWrapper.document as FoundryDocument & MyActor).isToken) {
-        documentWrapper.document = documentWrapper.document.parent;
-        if (documentWrapper.data) {
-          documentWrapper.data = {
-            _id: documentWrapper.document.id,
-            actorData: documentWrapper.data
-          };
-        }
-      }
-
-      if (documentWrapper.document.parent == null) {
-        if (!dmlsPerDocumentName.has(documentWrapper.document.documentName)) {
-          dmlsPerDocumentName.set(documentWrapper.document.documentName, new Map<string, BulkEntry>());
-        }
-        const dmlsByUuid = dmlsPerDocumentName.get(documentWrapper.document.documentName);
-        
-        if (!dmlsByUuid.has(documentWrapper.document.uuid)) {
-          dmlsByUuid.set(documentWrapper.document.uuid, {
-            uuid: documentWrapper.document.uuid,
-            embededDocuments: [],
-          });
-        }
-        dmlsByUuid.get(documentWrapper.document.uuid).data = documentWrapper.data;
-      } else {
-        if (!dmlsPerDocumentName.has(documentWrapper.document.parent.documentName)) {
-          dmlsPerDocumentName.set(documentWrapper.document.parent.documentName, new Map<string, BulkEntry>());
-        }
-        const dmlsByUuid = dmlsPerDocumentName.get(documentWrapper.document.parent.documentName);
-        if (!dmlsByUuid.has(documentWrapper.document.parent.uuid)) {
-          dmlsByUuid.set(documentWrapper.document.parent.uuid, {
-            uuid: documentWrapper.document.parent.uuid,
-            embededDocuments: [],
-          });
-        }
-        dmlsByUuid.get(documentWrapper.document.parent.uuid).embededDocuments.push(documentWrapper);
-      }
-    }
-
-     return dmlsPerDocumentName;
   }
   //#endregion
 

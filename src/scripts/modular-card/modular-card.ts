@@ -361,21 +361,8 @@ export class ModularCard {
     return UtilsDocument.bulkUpdate(bulkUpdateRequest);
   }
 
-  public static setCardPartDatas(message: ChatMessage, data: Array<ModularCardPartData>): Promise<ChatMessage> {
-    if (message == null) {
-      return Promise.resolve(message);
-    }
-
-    const cardsObj = ModularCard.createFlagObject(data);
-    const originalCards = message.getFlag(staticValues.moduleName, 'modularCardData');
-    if (UtilsCompare.deepEquals(originalCards, cardsObj)) {
-      return Promise.resolve(message);
-    }
-    UtilsObject.injectDeleteForDml(originalCards, cardsObj);
-    
-    return message.update({
-      [`flags.${staticValues.moduleName}.modularCardData`]: cardsObj
-    });
+  public static setCardPartDatas(message: ChatMessage, data: Array<ModularCardPartData>): Promise<void> {
+    return ModularCard.setBulkCardPartDatas([{message, data}])
   }
 
   /**
