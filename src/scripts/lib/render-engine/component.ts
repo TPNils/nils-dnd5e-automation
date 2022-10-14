@@ -3,7 +3,7 @@ import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
-import { VirtualNode, VirtualParentNode } from "./virtual-dom/virtual-node";
+import { VirtualAttributeNode, VirtualNode, VirtualParentNode } from "./virtual-dom/virtual-node";
 import { VirtualNodeParser } from "./virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "./virtual-dom/virtual-node-renderer";
 
@@ -47,7 +47,6 @@ function adjustCssSelector(selector: string, componentId: string): string {
         rule.substring(0, ruleIndex-1),
         adjustCssSelector(rule.substring(ruleIndex), componentId),
       ].join(' ');
-      UtilsLog.debug('host context compound selector', rule.substring(0, ruleIndex-1), 'result:', selector);
     }
   } else if (selector.toLowerCase().startsWith(':host')) {
     let parts = [`[${cssComponentHostIdAttrPrefix}-${componentId}]`];
@@ -64,7 +63,6 @@ function adjustCssSelector(selector: string, componentId: string): string {
       .join(' ');
   }
 
-  UtilsLog.debug('selector result', selector);
   return selector;
 }
 
@@ -79,12 +77,13 @@ const componentInstanceProxyHandler: ProxyHandler<{[htmlElementSymbol]: Componen
 }
 export interface ComponentConfig {
   tag: string;
-  html?: string; // TODO
-  style?: string; // TODO
+  html?: string;
+  style?: string;
 }
 interface ComponentConfigInternal extends ComponentConfig {
   componentId: string;
   parsedHtml?: VirtualNode & VirtualParentNode;
+  hasHtmlSlots: boolean;
 }
 export function Component(config: ComponentConfig | string) {
   if (typeof config === 'string') {
@@ -100,6 +99,7 @@ export function Component(config: ComponentConfig | string) {
     const internalConfig: ComponentConfigInternal = {
       ...config as ComponentConfig,
       componentId: String(nextComponentId++),
+      hasHtmlSlots: false,
     }
     internalConfig.tag = internalConfig.tag.toLowerCase();
 
@@ -111,6 +111,9 @@ export function Component(config: ComponentConfig | string) {
         const processing = pending;
         pending = [];
         for (const process of processing) {
+          if (process.nodeName === 'SLOT') {
+            internalConfig.hasHtmlSlots = true;
+          }
           if (process.isAttributeNode()) {
             process.setAttribute(`${cssComponentIdAttrPrefix}-${internalConfig.componentId}`)
           }
@@ -166,7 +169,6 @@ export function Component(config: ComponentConfig | string) {
         // Not all browsers (firefox) support :host-context() https://developer.mozilla.org/en-US/docs/Web/CSS/:host-context
         // But all browsers do support :is() https://developer.mozilla.org/en-US/docs/Web/CSS/:is
         sheetFriendlyStyle = sheetFriendlyStyle.replace(/:host-context\(/ig, `:is(${randomHostContextReplacementString}`);
-        UtilsLog.debug('sheetFriendlyStyle', sheetFriendlyStyle)
       }
       // @ts-ignore
       dummyStyleSheet.replaceSync(sheetFriendlyStyle);
@@ -423,7 +425,7 @@ export class ComponentElement extends HTMLElement {
     if (typeof this.#controller['onInit'] === 'function') {
       this.#controller['onInit']();
     }
-    this.innerHTML = ``;
+    //this.innerHTML = ``;
     this.generateHtml().then(() => {
       this.registerEventListeners();
     });
@@ -478,10 +480,77 @@ export class ComponentElement extends HTMLElement {
       } else {
         this.template = new Template(parsedHtml, this.#controller);
         const node = await VirtualNodeRenderer.renderDom(this.template.render());
-        this.append(node);
+        this.findSlots();
+        this.overrideSlots();
+        this.prepend(node);
       }
     } else if (this.template !== null) {
       await VirtualNodeRenderer.renderDom(this.template.render({force: true}), true);
+      // TODO for now, only support on init 
+      // this.findSlots();
+    }
+  }
+  
+  private elementsBySlotName = new Map<string, Array<VirtualNode & VirtualAttributeNode>>();
+  private findSlots(): void {
+    if (!this.getComponentConfig().hasHtmlSlots || !this.template) {
+      return;
+    }
+    const root = this.template.render();
+    for (const slotName of this.elementsBySlotName.keys()) {
+      const filteredNodes = [];
+      for (const node of this.elementsBySlotName.get(slotName)) {
+        if (root.contains(node)) {
+          filteredNodes.push(node);
+        }
+      }
+      this.elementsBySlotName.set(slotName, filteredNodes);
+      // TODO what about removed slots?
+    }
+    let pending: Array<VirtualNode> = [root];
+    while (pending.length > 0) {
+      const processing = pending;
+      pending = [];
+      for (const process of processing) {
+        if (process.isAttributeNode() && process.nodeName === 'SLOT') {
+          let slotName = AttributeParser.parseString(process.getAttribute('name'));
+          if (slotName == null) {
+            slotName = '';
+          }
+
+          if (!this.elementsBySlotName.has(slotName)) {
+            this.elementsBySlotName.set(slotName, []);
+          }
+          if (!this.elementsBySlotName.get(slotName).includes(process)) {
+            this.elementsBySlotName.get(slotName).push(process);
+          }
+        }
+        if (process.isParentNode()) {
+          for (const child of process.childNodes) {
+            pending.push(child);
+          }
+        }
+      }
+    }
+  }
+
+  private overrideSlots(): void {
+    if (this.elementsBySlotName.size === 0) {
+      return
+    }
+    const componentId = this.getComponentConfig().componentId;
+    for (const slotName of this.elementsBySlotName.keys()) {
+      const slots = this.elementsBySlotName.get(slotName).filter(elem => VirtualNodeRenderer.getState(elem)?.domNode != null);
+      const replaceElements = this.querySelectorAll(`:scope > [slot="${slotName}"]:not([${cssComponentIdAttrPrefix}-${componentId}])`);
+      if (slots.length > 0 && replaceElements.length > 0) {
+        // Only support unique slot names so we can move the replacement element
+        const slotElement = VirtualNodeRenderer.getState(slots[0]).domNode as Element;
+        for (let i = replaceElements.length - 1; i >= 0; i--) {
+          replaceElements[i].remove()
+          slotElement.parentElement.insertBefore(replaceElements[i], slotElement);
+        }
+        slotElement.parentElement.removeChild(slotElement);
+      }
     }
   }
 
