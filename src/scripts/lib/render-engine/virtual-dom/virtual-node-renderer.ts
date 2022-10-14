@@ -61,7 +61,8 @@ export class VirtualNodeRenderer {
     let pending: Array<{parent?: VirtualParentNode, node: VirtualNode}> = [{
       node: virtualNode,
     }];
-    const allDomActions: DomAction[] = [];
+    const allSyncDomActions: DomAction[] = [];
+    const allAsyncDomActions: DomAction[] = [];
     
     while (pending.length > 0) {
       const processing = pending;
@@ -72,22 +73,31 @@ export class VirtualNodeRenderer {
           // First time render
           if (process.node.isAttributeNode()) {
             for (const attr of process.node.getAttributeNames()) {
-              if (Component.isComponentElement(state.domNode)) {
-                state.domNode.setInput(attr, process.node.getAttribute(attr));
-              } else {
-                (state.domNode as Element).setAttribute(attr, AttributeParser.serialize(process.node.getAttribute(attr)));
-              }
+              allSyncDomActions.push({
+                type: 'setAttribute',
+                node: (state.domNode as Element),
+                attrName: attr,
+                value: process.node.getAttribute(attr)
+              });
             }
           }
     
           if (process.node.isEventNode()) {
             for (const listener of process.node.getEventListerners()) {
-              state.domNode.addEventListener(listener.type, listener.callback, listener.options);
+              allSyncDomActions.push({
+                type: 'addEventListener',
+                node: state.domNode,
+                listener: listener,
+              });
             }
           }
     
           if (process.node.isTextNode()) {
-            state.domNode.nodeValue = process.node.getText();
+            allSyncDomActions.push({
+              type: 'nodeValue',
+              node: state.domNode,
+              value: process.node.getText(),
+            });
           }
           
           if (process.node.isParentNode()) {
@@ -174,13 +184,16 @@ export class VirtualNodeRenderer {
             }
           }
 
-          allDomActions.push(...domActions);
+          allAsyncDomActions.push(...domActions);
         }
       }
     }
-    if (allDomActions.length > 0) {
-      VirtualNodeRenderer.queuedDomActions.push(...allDomActions);
-      return rerenderQueue.add(VirtualNodeRenderer, VirtualNodeRenderer.processDomActions).then(() => {
+    if (allSyncDomActions.length > 0) {
+      VirtualNodeRenderer.processDomActions(allSyncDomActions);
+    }
+    if (allAsyncDomActions.length > 0) {
+      VirtualNodeRenderer.queuedDomActions.push(...allAsyncDomActions);
+      return rerenderQueue.add(VirtualNodeRenderer, VirtualNodeRenderer.processDomActionQueue).then(() => {
         return VirtualNodeRenderer.getOrNewState(virtualNode).domNode;
       });
     }
@@ -188,15 +201,19 @@ export class VirtualNodeRenderer {
   }
 
   private static queuedDomActions: DomAction[] = [];
-  private static processDomActions = () => {
+  private static processDomActionQueue = () => {
     const queuedDomActions = VirtualNodeRenderer.queuedDomActions;
     VirtualNodeRenderer.queuedDomActions = [];
 
+    VirtualNodeRenderer.processDomActions(queuedDomActions);
+  }
+  
+  private static processDomActions(domActions: DomAction[]) {
     // Resolve sequential actions on the same property
     const actionMap = new Map<any, any>();
     let actionPathMap: Map<any, any>;
     let actionKey: any[];
-    for (const action of queuedDomActions) {
+    for (const action of domActions) {
       // Actions are listed from earliest to latest added
       switch (action.type) {
         case 'addEventListener':
@@ -246,7 +263,12 @@ export class VirtualNodeRenderer {
                 if (Component.isComponentElement(item.node)) {
                   item.node.setInput(item.attrName, item.value);
                 } else {
-                  item.node.setAttribute(item.attrName, AttributeParser.serialize(item.value));
+                  if (item.value === false) {
+                    // disabled="false" is still disabled => don't set false attributes
+                    item.node.removeAttribute(item.attrName);
+                  } else {
+                    item.node.setAttribute(item.attrName, AttributeParser.serialize(item.value));
+                  }
                 }
                 break;
               }

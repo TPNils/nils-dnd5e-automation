@@ -369,6 +369,12 @@ export class ComponentElement extends HTMLElement {
     if (this.setControllerFromAttribute(name, newValue)) {
       this.skipAttrCallback = true;
     }
+    if (newValue === false) {
+      // disabled="false" is still disabled => don't set false attributes
+      this.removeAttribute(name);
+    } else {
+      this.setAttribute(name, AttributeParser.serialize(newValue));
+    }
     this.setAttribute(name, AttributeParser.serialize(newValue));
     this.skipAttrCallback = false;
   }
