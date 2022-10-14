@@ -28,54 +28,8 @@ export class UtilsHandlebars {
     return args.join('');
   }
 
-  private static documentPermission = /^(.+?)(uuid|actorid):(.*)/i;
   private static hasPermissionCheck(secretFilters: string[]): boolean {
-    // no filters = always visible
-    if (secretFilters.length === 0) {
-      return true;
-    }
-
-    const permissionChecks: PermissionCheck[] = [];
-    for (const filter of secretFilters) {
-      if ((filter.toLowerCase() === 'gm' || filter.toLowerCase() === 'dm') && game.user.isGM) {
-        return true;
-      }
-      if (filter.toLowerCase() === 'player' && !game.user.isGM) {
-        return true;
-      }
-      if (filter.toLowerCase().startsWith('user:') && filter.substring(5) === game.userId) {
-        return true;
-      }
-      const documentMatch = UtilsHandlebars.documentPermission.exec(filter);
-      if (documentMatch) {
-        const matchType = documentMatch[2].toLowerCase();
-        const matchValue = documentMatch[3];
-        let uuid: string;
-
-        switch (matchType) {
-          case 'uuid': {
-            uuid = matchValue;
-            break;
-          }
-          case 'actorid': {
-            uuid = game.actors.get(matchValue).uuid;
-            break;
-          }
-        }
-        if (document == null) {
-          // always show invalid parts to GM
-          return game.user.isGM;
-        }
-        
-        permissionChecks.push({
-          permission: documentMatch[1],
-          uuid: uuid,
-          user: game.user,
-        });
-      }
-    }
-
-    return UtilsDocument.hasPermissions(permissionChecks, {sync: true}).find(response => response.result) != null;
+    return UtilsDocument.hasPermissionsFromString(secretFilters, {sync: true}).find(response => response.result) != null;
   }
 
   public static hasPermission(...args: any[]): any {

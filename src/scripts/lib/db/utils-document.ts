@@ -13,7 +13,7 @@ interface DocumentsByContext<T extends foundry.abstract.Document<any, FoundryDoc
 type EntityPermission = keyof typeof foundry.CONST.ENTITY_PERMISSIONS;
 const dmlPermissions = ['create', 'update', 'delete'] as const;
 export interface PermissionCheck<T = any> {
-  uuid: string;
+  uuid?: string;
   permission: EntityPermission | typeof dmlPermissions[number] | string;
   user: User;
   meta?: T;
@@ -52,6 +52,10 @@ for (const perm of (['create', 'update', 'delete'] as const)) {
     return document.canUserModify(user, perm);
   }
 }
+defaultPermissionChecks['GM'] = ({user}) => {
+  return user.isGM;
+}
+defaultPermissionChecks['DM'] = defaultPermissionChecks['GM'];
 
 interface DmlUpdateRequest {
   document: FoundryDocument;
@@ -606,9 +610,57 @@ export class UtilsDocument {
   public static getPermissionHandler(permissionName: string): PermissionCheckHandler {
     return UtilsDocument.permissionChecks[permissionName.toUpperCase()];
   }
+  
+  public static hasPermissionsFromString(stringChecks: string[]): Promise<PermissionResponse[]>
+  public static hasPermissionsFromString(stringChecks: string[], options: {sync: true}): PermissionResponse[]
+  public static hasPermissionsFromString(stringChecks: string[], options: {sync?: boolean}): PermissionResponse[] | Promise<PermissionResponse[]>
+  public static hasPermissionsFromString(stringChecks: string[], options: {sync?: boolean} = {}): PermissionResponse[] | Promise<PermissionResponse[]> {
+    const permissionChecks: PermissionCheck[] = [];
+    for (const check of stringChecks) {
+      const documentMatch = /^(.+?)(uuid|actorid):(.*)/i.exec(check);
+      if (documentMatch) {
+        const matchType = documentMatch[2].toLowerCase();
+        const matchValue = documentMatch[3];
+        let uuid: string;
+
+        switch (matchType) {
+          case 'uuid': {
+            uuid = matchValue;
+            break;
+          }
+          case 'actorid': {
+            uuid = game.actors.get(matchValue).uuid;
+            break;
+          }
+        }
+        if (uuid == null) {
+          // always show invalid parts to GM
+          permissionChecks.push({
+            permission: 'GM',
+            user: game.user,
+          });
+        } else {
+          permissionChecks.push({
+            permission: documentMatch[1],
+            uuid: uuid,
+            user: game.user,
+          });
+        }
+        
+      } else {
+        permissionChecks.push({
+          permission: check,
+          user: game.user,
+        });
+      }
+    }
+
+    return UtilsDocument.hasPermissions(permissionChecks, options);
+  }
 
   public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<PermissionResponse<T>[]>
   public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync: true}): PermissionResponse<T>[]
+  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean}): PermissionResponse<T>[] | Promise<PermissionResponse<T>[]>
   public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): PermissionResponse<T>[] | Promise<PermissionResponse<T>[]> {
     permissionChecks = permissionChecks.filter(check => check != null);
     const response: PermissionResponse[] = [];
@@ -620,7 +672,7 @@ export class UtilsDocument {
         if (permissionCheck.user.isGM) {
           response.push({
             requestedCheck: permissionCheck,
-            result: true,
+            result: permissionCheck.permission !== 'player',
           })
         } else {
           permissionChecks.push(permissionCheck);
