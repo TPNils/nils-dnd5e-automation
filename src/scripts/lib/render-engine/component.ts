@@ -472,6 +472,7 @@ export class ComponentElement extends HTMLElement {
   }
 
   private template: Template;
+  private templateRenderResult: VirtualNode & VirtualParentNode;
   private async generateHtml(): Promise<void> {
     if (this.template === undefined) {
       const parsedHtml = this.getComponentConfig().parsedHtml;
@@ -479,13 +480,15 @@ export class ComponentElement extends HTMLElement {
         this.template = null;
       } else {
         this.template = new Template(parsedHtml, this.#controller);
-        const node = await VirtualNodeRenderer.renderDom(this.template.render());
+        this.templateRenderResult = await this.template.render();
+        const node = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
         this.findSlots();
         this.overrideSlots();
         this.prepend(node);
       }
     } else if (this.template !== null) {
-      await VirtualNodeRenderer.renderDom(this.template.render({force: true}), true);
+      this.templateRenderResult = await this.template.render({force: true});
+      await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
       // TODO for now, only support on init 
       // this.findSlots();
     }
@@ -496,18 +499,17 @@ export class ComponentElement extends HTMLElement {
     if (!this.getComponentConfig().hasHtmlSlots || !this.template) {
       return;
     }
-    const root = this.template.render();
     for (const slotName of this.elementsBySlotName.keys()) {
       const filteredNodes = [];
       for (const node of this.elementsBySlotName.get(slotName)) {
-        if (root.contains(node)) {
+        if (this.templateRenderResult.contains(node)) {
           filteredNodes.push(node);
         }
       }
       this.elementsBySlotName.set(slotName, filteredNodes);
       // TODO what about removed slots?
     }
-    let pending: Array<VirtualNode> = [root];
+    let pending: Array<VirtualNode> = [this.templateRenderResult];
     while (pending.length > 0) {
       const processing = pending;
       pending = [];

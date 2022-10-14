@@ -1,5 +1,6 @@
 import { UtilsLog } from "../../../utils/utils-log";
 import { UtilsCompare } from "../../utils/utils-compare";
+import { rerenderQueue } from "../virtual-dom/render-queue";
 import { VirtualFragmentNode } from "../virtual-dom/virtual-fragment-node";
 import { VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
@@ -39,21 +40,25 @@ export class Template {
   public setContext(context: any): void {
     this.#context = context;
     if (this.#processedVirtualNode != null) {
-      this.calcVirtualNode();
+      this.render({force: true});
     }
   }
 
-  public render(options: {force?: boolean} = {}): VirtualNode & VirtualParentNode {
+  public async render(options: {force?: boolean} = {}): Promise<VirtualNode & VirtualParentNode> {
     if (this.#processedVirtualNode == null) {
       if (this.#context) {
-        this.calcVirtualNode();
+        await rerenderQueue.add(this.rerenderCallback, this.rerenderCallback);
       } else {
         this.#processedVirtualNode = new VirtualFragmentNode();
       }
     } else if (options.force) {
-      this.calcVirtualNode();
+      await rerenderQueue.add(this.rerenderCallback, this.rerenderCallback);
     }
     return this.#processedVirtualNode;
+  }
+
+  public rerenderCallback = () => {
+    this.calcVirtualNode();
   }
 
   #processedVirtualNode: VirtualNode & VirtualParentNode;
