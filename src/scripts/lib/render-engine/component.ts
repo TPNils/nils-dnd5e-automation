@@ -147,9 +147,11 @@ Component.isComponentElement = (element: any): element is ComponentElement => {
 const attributeConfigSymbol = Symbol('AttributeConfigs');
 export interface AttributeConfig {
   name: string;
+  dataType?: 'string' | 'number' | 'boolean' | 'object';
 }
 interface AttributeConfigInternal {
   attribute: string;
+  dataType?: AttributeConfig['dataType'];
   propertyKey: string;
   descriptor?: PropertyDescriptor;
 }
@@ -173,6 +175,7 @@ export function Attribute(config?: AttributeConfig | string) {
     }
     const internalConfig: AttributeConfigInternal = {
       attribute: (config as AttributeConfig).name,
+      dataType: (config as AttributeConfig).dataType ?? 'string',
       propertyKey: propertyKey,
       descriptor: descriptor,
     }
@@ -230,6 +233,7 @@ export function BindEvent(config: EventConfig | string) {
 }
 export interface OutputConfig {
   eventName?: string;
+  /* default: false */
   bubbels?: boolean;
 }
 interface OutputConfigInternal {
@@ -294,27 +298,56 @@ export class ComponentElement extends HTMLElement {
   /**
    * Invoked each time one of the custom element's attributes is added, removed, or changed. Which attributes to notice change for is specified in a static get 
    */
+  private skipAttrCallback = false;
   public attributeChangedCallback(name: string, oldValue: string, newValue: string): void {
+    if (this.skipAttrCallback) {
+      return;
+    }
     if (newValue !== oldValue) {
-      const attrConfigs = this.getAttributeConfigs();
-      if (attrConfigs.byAttribute[name]) {
-        for (const config of attrConfigs.byAttribute[name]) {
-          this.#controller[config.propertyKey] = newValue;
-        }
-      }
+      this.setControllerFromAttribute(name, newValue);
     }
   }
 
   public setInput(name: string, newValue: any) {
+    if (this.setControllerFromAttribute(name, newValue)) {
+      this.skipAttrCallback = true;
+    }
+    this.setAttribute(name, AttributeParser.serialize(newValue));
+    this.skipAttrCallback = false;
+  }
+
+  /**
+   * @returns if the controller is listening to changes of that attribute
+   */
+  private setControllerFromAttribute(name: string, value: any): boolean {
     name = name.toLowerCase();
     const attrConfigs = this.getAttributeConfigs();
     if (attrConfigs.byAttribute[name]) {
       for (const config of attrConfigs.byAttribute[name]) {
-        this.#controller[config.propertyKey] = newValue;
+        let normalizedValue = value;
+        switch (config.dataType) {
+          case 'string': {
+            normalizedValue = AttributeParser.parseString(normalizedValue);
+            break;
+          }
+          case 'number': {
+            normalizedValue = AttributeParser.parseNumber(normalizedValue);
+            break;
+          }
+          case 'boolean': {
+            normalizedValue = AttributeParser.parseBoolean(normalizedValue);
+            break;
+          }
+          case 'object': {
+            normalizedValue = AttributeParser.parseObject(normalizedValue);
+            break;
+          }
+        }
+        this.#controller[config.propertyKey] = normalizedValue;
       }
-    } else {
-      this.setAttribute(name, AttributeParser.serialize(newValue));
+      return true;
     }
+    return false;
   }
 
   /**
