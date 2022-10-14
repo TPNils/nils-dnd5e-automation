@@ -1,4 +1,5 @@
 import { UtilsLog } from "../../../utils/utils-log";
+import { UtilsCompare } from "../../utils/utils-compare";
 import { VirtualFragmentNode } from "../virtual-dom/virtual-fragment-node";
 import { VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
@@ -7,13 +8,18 @@ const forAttrRegex = /^\s*let\s+([^\s]+\s)+of\s(.+)$/;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
   template: T;
   instance: T;
-  context: any;
+  localVars: any;
   parentInstance?: VirtualParentNode;
   pathContext: {
     parentPrefix: string;
     siblings: {[nodeName: string]: number}
   };
 }
+type ParsedExpression = (...args: any[]) => any;
+interface ParsedEventExpression {
+  readonly localVars: any | null;
+  readonly exec: (event: Event) => any
+};
 export class Template {
   
   public constructor (
@@ -59,7 +65,7 @@ export class Template {
     let pending: Array<PendingNodes> = [{
       template: this.template,
       instance: rootInstance,
-      context: this.#context,
+      localVars: {},
       pathContext: {
         parentPrefix: '',
         siblings: {}
@@ -76,7 +82,7 @@ export class Template {
             if (!regexResult) {
               UtilsLog.error(`Unable to parse *for expression:`, process.instance.getAttribute('*for'));
             } else {
-              const resolvedExpr = this.parseExpression(regexResult[2], process.context);
+              const resolvedExpr = this.parseExpression(regexResult[2], process.localVars);
               if (!resolvedExpr[Symbol.iterator]) {                
                 UtilsLog.error(`The *for expression did not return an array/iterator:`, process.instance.getAttribute('*for'), resolvedExpr);
               } else {
@@ -88,8 +94,8 @@ export class Template {
                     parentInstance: process.parentInstance,
                     template: process.template,
                     instance: process.instance.cloneNode(false),
-                    context: {
-                      ...process.context,
+                    localVars: {
+                      ...process.localVars,
                       [regexResult[1]]: item,
                     },
                     pathContext: process.pathContext,
@@ -108,7 +114,7 @@ export class Template {
             }
           }
           if (process.instance.hasAttribute('*if')) {
-            const resolvedExpr = this.parseExpression(process.instance.getAttribute('*if'), process.context);
+            const resolvedExpr = this.parseExpression(process.instance.getAttribute('*if'), process.localVars);
             if (!resolvedExpr) {
               continue; // Don't render
             } else {
@@ -119,7 +125,7 @@ export class Template {
             for (const name of process.instance.getAttributeNames()) {
               if (name.length > 2 && name.startsWith('(') && name.endsWith(')')) {
                 const value = process.instance.getAttribute(name);
-                process.instance.addEventListener(name.substring(1, name.length - 1), this.parseEvent(value, process.context));
+                process.instance.addEventListener(name.substring(1, name.length - 1), this.parseEvent(value, process.localVars));
                 process.instance.removeAttribute(name);
               }
             }
@@ -129,12 +135,12 @@ export class Template {
             if (name.length > 2 && name.startsWith('[') && name.endsWith(']')) {
               process.instance.removeAttribute(name);
               if (typeof value === 'string') {
-                process.instance.setAttribute(name.substring(1, name.length - 1), this.parseExpression(value, process.context));
+                process.instance.setAttribute(name.substring(1, name.length - 1), this.parseExpression(value, process.localVars));
               } else {
                 process.instance.setAttribute(name.substring(1, name.length - 1), value);
               }
             } else if (typeof value === 'string') {
-              const processedValue = this.processBindableString(value, process.context);
+              const processedValue = this.processBindableString(value, process.localVars);
               if (value !== processedValue) {
                 process.instance.setAttribute(name, processedValue);
               }
@@ -142,7 +148,7 @@ export class Template {
           }
         }
         if (process.instance.isTextNode()) {
-          let nodeValue = this.processBindableString(process.instance.getText(), process.context);
+          let nodeValue = this.processBindableString(process.instance.getText(), process.localVars);
           if (nodeValue !== process.instance.getText()) {
             process.instance.setText(nodeValue);
           }
@@ -165,7 +171,7 @@ export class Template {
           for (const child of process.template.childNodes) {
             pending.push({
               parentInstance: process.instance,
-              context: process.context,
+              localVars: process.localVars,
               template: child,
               instance: child.cloneNode(false),
               pathContext: pathContext, // Same path context intsnace needs to be shared by all children/siblings
@@ -196,7 +202,7 @@ export class Template {
     this.#processedVirtualNodesMap = createdNodesByMap;
   }
 
-  private processBindableString(value: string, context: any): string {
+  private processBindableString(value: string, localVars: any | null): string {
     // TODO this is currently a dumb implementation and does not account for the 'keywords' {{ and }} to be present within the expression (example: in a javascript string)
     // Best to write an interpreter but thats a lot of work and maybe more process intensive so lets cross that bridge when we get there :)
     let startExpression = 0;
@@ -222,7 +228,7 @@ export class Template {
       let originalLength = value.length;
       value = [
         value.substring(0, startExpression),
-        String(this.parseExpression(value.substring(startExpression+2, endExpression), context)),
+        String(this.parseExpression(value.substring(startExpression+2, endExpression), localVars)),
         value.substring(endExpression+2),
       ].join('');
 
@@ -231,59 +237,84 @@ export class Template {
     return value;
   }
 
-  private parseExpression(expression: any, context: any): any {
+  private parsedExpressions = new Map<string, ParsedExpression>();
+  private parseExpression(expression: any, localVars: any | null): any {
     if (typeof expression !== 'string') {
       // If expression is not a string, assume its the result
       return expression;
     }
-    let func: Function;
+    const paramNames: string[] = [];
     const paramValues: any[] = [];
     try {
-      if (context) {
-        const paramNames: string[] = [];
-        for (const field in context) {
-          paramNames.push(field);
-          paramValues.push(context[field]);
+      if (localVars) {
+        for (const field in localVars) {
+          let index = paramNames.indexOf(field);
+          if (index === -1) {
+            paramNames.push(field);
+            paramValues.push(localVars[field]);
+          } else {
+            paramValues[index] = localVars[field];
+          }
         }
-        func = Function(...paramNames, `return ${expression}`);
-      } else {
-        func = Function(`return ${expression}`);
       }
-      return func.apply(context, paramValues);
+      const funcKey = `${expression}(${paramNames.join(',')})`;
+      if (!this.parsedExpressions.has(funcKey)) {
+        this.parsedExpressions.set(funcKey, Function(...paramNames, `return ${expression}`) as ParsedExpression);
+      }
+      return this.parsedExpressions.get(funcKey).apply(this.#context, paramValues);
     } catch (e) {
-      UtilsLog.error('Error executing expression with context', {expression: expression, context: context, func: func, err: e})
+      UtilsLog.error('Error executing expression with context', {expression: expression, thisContext: this.#context, localVars: localVars, err: e})
       throw e;
     }
   }
 
   // Use the same cached function so the change detection knows no new event listeners are made
-  private parsedWithoutExpressions = new Map<string, (event: Event) => any>();
-  private parsedWithExpressions = new Map<string, (event: Event) => any>();
-  private parseEvent(expression: any, context: any): (event: Event) => any {
+  private parsedEventExpressions = new Map<string, Array<ParsedEventExpression>>();
+  private parseEvent(expression: any, localVars: object | null): (event: Event) => any {
     if (typeof expression !== 'string') {
       // If expression is not a string, assume its the result
       return expression;
     }
     try {
-      if (context) {
-        if (!this.parsedWithExpressions.has(expression)) {
-          this.parsedWithExpressions.set(expression, Function('$event', `
-            for (const key of Object.keys(this)) {
-              eval(\`var \${key} = this[\${key}];\`);
-            }
-            return ${expression}
-            `).bind(context)
-          );
-        }
-        return this.parsedWithExpressions.get(expression);
-      } else {
-        if (!this.parsedWithoutExpressions.has(expression)) {
-          this.parsedWithoutExpressions.set(expression, Function('$event', `return ${expression}`).bind(context));
-        }
-        return this.parsedWithoutExpressions.get(expression);
+      if (!this.parsedEventExpressions.has(expression)) {
+        this.parsedEventExpressions.set(expression, []);
       }
+      let alreadyParsedExpression: ParsedEventExpression;
+      for (const parsed of this.parsedEventExpressions.get(expression)) {
+        if (UtilsCompare.deepEquals(parsed.localVars, localVars)) {
+          alreadyParsedExpression = parsed;
+          break;
+        }
+      }
+      if (!alreadyParsedExpression) {
+        const paramNames: string[] = ['$event'];
+        const paramValues: any[] = [null];
+        
+        if (localVars) {
+          for (const field in localVars) {
+            let index = paramNames.indexOf(field);
+            if (index === -1) {
+              paramNames.push(field);
+              paramValues.push(localVars[field]);
+            } else {
+              paramValues[index] = localVars[field];
+            }
+          }
+        }
+        paramValues.splice(0, 1); // remove $event
+
+        const exprFunc = Function(...paramNames, `return ${expression}`).bind(this.#context);
+
+        alreadyParsedExpression = {
+          localVars: localVars == null ? {} : deepClone(localVars),
+          exec: (event: Event) => {
+            return exprFunc(event, ...paramValues);
+          }
+        }
+      }
+      return alreadyParsedExpression.exec;
     } catch (e) {
-      UtilsLog.error('Error parsing expression with context', {expression: expression, context: context, err: e})
+      UtilsLog.error('Error parsing expression with context', {expression: expression, thisContext: this.#context, localVars: localVars, err: e})
       throw e;
     }
   }
