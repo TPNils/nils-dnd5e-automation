@@ -256,26 +256,34 @@ export class Template {
     }
   }
 
-  private parseEvent(expression: any, context: any): () => any {
+  // Use the same cached function so the change detection knows no new event listeners are made
+  private parsedWithoutExpressions = new Map<string, (event: Event) => any>();
+  private parsedWithExpressions = new Map<string, (event: Event) => any>();
+  private parseEvent(expression: any, context: any): (event: Event) => any {
     if (typeof expression !== 'string') {
       // If expression is not a string, assume its the result
       return expression;
     }
-    let func: Function;
     try {
       if (context) {
-        func = Function('$event', `
-          for (const key of Object.keys(this)) {
-            eval(\`var \${key} = this[\${key}];\`);
-          }
-          return ${expression}
-        `);
+        if (!this.parsedWithExpressions.has(expression)) {
+          this.parsedWithExpressions.set(expression, Function('$event', `
+            for (const key of Object.keys(this)) {
+              eval(\`var \${key} = this[\${key}];\`);
+            }
+            return ${expression}
+            `).bind(context)
+          );
+        }
+        return this.parsedWithExpressions.get(expression);
       } else {
-        func = Function('$event', `return ${expression}`);
+        if (!this.parsedWithoutExpressions.has(expression)) {
+          this.parsedWithoutExpressions.set(expression, Function('$event', `return ${expression}`).bind(context));
+        }
+        return this.parsedWithoutExpressions.get(expression);
       }
-      return func.bind(context);
     } catch (e) {
-      UtilsLog.error('Error executing expression with context', {expression: expression, context: context, func: func, err: e})
+      UtilsLog.error('Error parsing expression with context', {expression: expression, context: context, err: e})
       throw e;
     }
   }
