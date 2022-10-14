@@ -1,5 +1,6 @@
 import { staticValues } from "../../static-values";
 import { Stoppable } from "../utils/stoppable";
+import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
 import { VirtualNode, VirtualParentNode } from "./virtual-dom/virtual-node";
 import { VirtualNodeParser } from "./virtual-dom/virtual-node-parser";
@@ -139,6 +140,9 @@ export function Component(config: ComponentConfig | string) {
     }
   };
 }
+Component.isComponentElement = (element: any): element is ComponentElement => {
+  return element instanceof ComponentElement;
+}
 
 const attributeConfigSymbol = Symbol('AttributeConfigs');
 export interface AttributeConfig {
@@ -262,7 +266,7 @@ export function Output(config?: string | OutputConfig) {
 }
 //#endregion
 
-class ComponentElement extends HTMLElement {
+export class ComponentElement extends HTMLElement {
   #controller: object
   protected get controller(): object {
     return this.#controller;
@@ -295,10 +299,21 @@ class ComponentElement extends HTMLElement {
       const attrConfigs = this.getAttributeConfigs();
       if (attrConfigs.byAttribute[name]) {
         for (const config of attrConfigs.byAttribute[name]) {
-          // TODO support functions?
           this.#controller[config.propertyKey] = newValue;
         }
       }
+    }
+  }
+
+  public setInput(name: string, newValue: any) {
+    name = name.toLowerCase();
+    const attrConfigs = this.getAttributeConfigs();
+    if (attrConfigs.byAttribute[name]) {
+      for (const config of attrConfigs.byAttribute[name]) {
+        this.#controller[config.propertyKey] = newValue;
+      }
+    } else {
+      this.setAttribute(name, AttributeParser.serialize(newValue));
     }
   }
 

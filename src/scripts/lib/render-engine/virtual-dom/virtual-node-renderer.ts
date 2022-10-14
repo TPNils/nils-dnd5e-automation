@@ -1,4 +1,5 @@
 import { AttributeParser } from "../attribute-parser";
+import { Component } from "../component";
 import { rerenderQueue } from "./render-queue";
 import { StoredEventCallback, VirtualAttributeNode, VirtualChildNode, VirtualEventNode, VirtualNode, VirtualParentNode } from "./virtual-node";
 import { VirtualTextNode } from "./virtual-text-node";
@@ -9,7 +10,7 @@ type DomAction = {
   type: 'setAttribute';
   node: Element;
   attrName: string;
-  value: string;
+  value: any;
 } | {
   type: 'removeAttribute';
   node: Element;
@@ -71,7 +72,11 @@ export class VirtualNodeRenderer {
           // First time render
           if (process.node.isAttributeNode()) {
             for (const attr of process.node.getAttributeNames()) {
-              (state.domNode as Element).setAttribute(attr, AttributeParser.serialize(process.node.getAttribute(attr)));
+              if (Component.isComponentElement(state.domNode)) {
+                state.domNode.setInput(attr, process.node.getAttribute(attr));
+              } else {
+                (state.domNode as Element).setAttribute(attr, AttributeParser.serialize(process.node.getAttribute(attr)));
+              }
             }
           }
     
@@ -238,7 +243,11 @@ export class VirtualNodeRenderer {
                 break;
               }
               case 'setAttribute': {
-                item.node.setAttribute(item.attrName, item.value);
+                if (Component.isComponentElement(item.node)) {
+                  item.node.setInput(item.attrName, item.value);
+                } else {
+                  item.node.setAttribute(item.attrName, AttributeParser.serialize(item.value));
+                }
                 break;
               }
               case 'removeAttribute': {
