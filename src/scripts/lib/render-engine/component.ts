@@ -1,5 +1,4 @@
 import { staticValues } from "../../static-values";
-import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { Template } from "./template/template";
 import { VirtualNode, VirtualParentNode } from "./virtual-dom/virtual-node";
@@ -16,7 +15,7 @@ const cssComponentIdAttrPrefix = `${staticValues.code}-cid`;
 const componentInstanceProxyHandler: ProxyHandler<{[htmlElementSymbol]: ComponentElement}> = {
   set: (target: {[htmlElementSymbol]: ComponentElement}, field: string | symbol, value: any, receiver: any): boolean => {
     const allowed = Reflect.set(target, field, value, receiver);
-    if (allowed) {
+    if (allowed && field !== htmlElementSymbol) {
       target[htmlElementSymbol]?.onChange();
     }
     return allowed;
@@ -249,9 +248,8 @@ export function Output(config?: string | OutputConfig) {
         configInternal.bubbels = config.bubbels;
       }
     }
-    const setFunction = function (this: {[elementSymbol]: ComponentElement}, value: any): void {
-      UtilsLog.debug('setFunction', configInternal.eventName, value, this)
-      this[elementSymbol].dispatchEvent(new CustomEvent(configInternal.eventName, {detail: value, cancelable: false, bubbles: configInternal.bubbels}));
+    const setFunction = function (this: {[htmlElementSymbol]: ComponentElement}, value: any): void {
+      this[htmlElementSymbol].dispatchEvent(new CustomEvent(configInternal.eventName, {detail: value, cancelable: false, bubbles: configInternal.bubbels}));
     };
     if (descriptor) {
       descriptor.set = setFunction;
@@ -264,7 +262,6 @@ export function Output(config?: string | OutputConfig) {
 }
 //#endregion
 
-const elementSymbol = Symbol('element');
 class ComponentElement extends HTMLElement {
   #controller: object
   protected get controller(): object {
@@ -272,22 +269,22 @@ class ComponentElement extends HTMLElement {
   }
   protected set controller(value: object) {
     if (this.#controller) {
-      delete this.#controller[elementSymbol]
+      delete this.#controller[htmlElementSymbol];
     }
     this.#controller = value;
-    this.#controller[elementSymbol] = this;
+    this.#controller[htmlElementSymbol] = this;
   }
 
   private getComponentConfig(): ComponentConfigInternal {
-    return this.controller.constructor.prototype[componentConfigSymbol];
+    return this.#controller.constructor.prototype[componentConfigSymbol];
   }
 
   private getAttributeConfigs(): AttributeConfigsInternal {
-    return this.controller.constructor.prototype[attributeConfigSymbol];
+    return this.#controller.constructor.prototype[attributeConfigSymbol];
   }
 
   private getEventConfigs(): EventConfigsInternal {
-    return this.controller.constructor.prototype[eventConfigSymbol];
+    return this.#controller.constructor.prototype[eventConfigSymbol];
   }
 
   /**
@@ -299,7 +296,7 @@ class ComponentElement extends HTMLElement {
       if (attrConfigs.byAttribute[name]) {
         for (const config of attrConfigs.byAttribute[name]) {
           // TODO support functions?
-          this.controller[config.propertyKey] = newValue;
+          this.#controller[config.propertyKey] = newValue;
         }
       }
     }
@@ -309,7 +306,9 @@ class ComponentElement extends HTMLElement {
    * Mark this element as changed
    */
   public onChange(): void {
-    this.generateHtml();
+    if (this.isConnected) {
+      this.generateHtml();
+    }
   }
 
   /**
@@ -318,8 +317,8 @@ class ComponentElement extends HTMLElement {
    */
   public connectedCallback(): void {
     this.setAttribute(`${cssComponentHostIdAttrPrefix}-${this.getComponentConfig().componentId}`, '');
-    if (typeof this.controller['onInit'] === 'function') {
-      this.controller['onInit']();
+    if (typeof this.#controller['onInit'] === 'function') {
+      this.#controller['onInit']();
     }
     this.innerHTML = ``;
     this.generateHtml().then(() => {
@@ -351,7 +350,7 @@ class ComponentElement extends HTMLElement {
     for (const configs of Object.values(eventConfigs.byEventName)) {
       for (const config of configs) {
         const listener: EventListenerOrEventListenerObject = event => {
-          this.controller[config.propertyKey](event);
+          this.#controller[config.propertyKey](event);
         }
         this.addEventListener(config.eventName, listener);
         this.unregisters.push({stop: () => this.removeEventListener(config.eventName, listener)});
@@ -374,13 +373,12 @@ class ComponentElement extends HTMLElement {
       if (!parsedHtml) {
         this.template = null;
       } else {
-        this.template = new Template(parsedHtml, this.controller);
+        this.template = new Template(parsedHtml, this.#controller);
         const node = await VirtualNodeRenderer.renderDom(this.template.render());
         this.append(node);
       }
     } else if (this.template !== null) {
-      this.template.setContext(this.controller);
-      const node = await VirtualNodeRenderer.renderDom(this.template.render());
+      await VirtualNodeRenderer.renderDom(this.template.render({force: true}), true);
     }
   }
 
