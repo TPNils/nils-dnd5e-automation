@@ -34,20 +34,22 @@ class RerenderQueue {
   }
 
   private processQueue(): void {
-    const queue = this.queueExecs;
-    const promiseResolvers = this.promiseResolvers;
-    this.queueKeys = [];
-    this.queueExecs = [];
-    this.promiseResolvers = [];
-    this.promises = [];
+    while (this.queueExecs.length > 0) {
+      const queue = this.queueExecs;
+      const promiseResolvers = this.promiseResolvers;
+      this.queueKeys = [];
+      this.queueExecs = [];
+      this.promiseResolvers = [];
+      this.promises = [];
 
-    for (let i = 0; i < queue.length; i++) {
-      try {
-        promiseResolvers[i].resolve(queue[i]());
-      } catch (e) {
-        promiseResolvers[i].reject(e);
+      for (let i = 0; i < queue.length; i++) {
+        try {
+          promiseResolvers[i].resolve(queue[i]());
+        } catch (e) {
+          promiseResolvers[i].reject(e);
+        }
       }
-    }
+    } 
   }
 
 }
