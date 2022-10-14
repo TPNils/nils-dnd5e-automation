@@ -153,7 +153,8 @@ export class Template {
             process.instance.setText(nodeValue);
           }
         }
-        if (process.instance.isChildNode() && process.parentInstance) {
+        const createDom = process.instance.nodeName !== 'VIRTUAL'; // TODO Don't create <virtual> dom nodes like angular <ng-container>. this may need to be tweaked
+        if (process.instance.isChildNode() && process.parentInstance && createDom) {
           process.parentInstance.appendChild(process.instance);
         }
         
@@ -170,7 +171,7 @@ export class Template {
           };
           for (const child of process.template.childNodes) {
             pending.push({
-              parentInstance: process.instance,
+              parentInstance: createDom ? process.instance : process.parentInstance,
               localVars: process.localVars,
               template: child,
               instance: child.cloneNode(false),
