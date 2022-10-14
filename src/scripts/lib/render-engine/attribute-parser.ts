@@ -1,8 +1,10 @@
 import { UtilsLog } from "../../utils/utils-log";
 
 export interface InputParseOptions {
-  executeFunctions: boolean;
+  executeFunctions?: boolean;
 }
+
+const defaultOptions: InputParseOptions = {};
 
 const emptyString = '';
 export class AttributeParser {
@@ -32,8 +34,8 @@ export class AttributeParser {
     throw new Error(`Can't serialize type ${typeof value}`);
   }
 
-  public static parseBoolean(value: any, options?: InputParseOptions): boolean | null {
-    if (options.executeFunctions) {
+  public static parseBoolean(value: any, options: InputParseOptions = defaultOptions): boolean | null {
+    if (options?.executeFunctions) {
       while (typeof value === 'function') {
         value = value();
       }
@@ -54,8 +56,8 @@ export class AttributeParser {
     return !!value;
   }
 
-  public static parseNumber(value: any, options?: InputParseOptions): number | null {
-    if (options.executeFunctions) {
+  public static parseNumber(value: any, options: InputParseOptions = defaultOptions): number | null {
+    if (options?.executeFunctions) {
       while (typeof value === 'function') {
         value = value();
       }
@@ -67,8 +69,8 @@ export class AttributeParser {
     return Number(value);
   }
 
-  public static parseString(value: any, options?: InputParseOptions): string | null {
-    if (options.executeFunctions) {
+  public static parseString(value: any, options: InputParseOptions = defaultOptions): string | null {
+    if (options?.executeFunctions) {
       while (typeof value === 'function') {
         value = value();
       }
@@ -80,9 +82,9 @@ export class AttributeParser {
     return String(value);
   }
 
-  public static parseObject<T extends object>(value: any, options?: InputParseOptions & {strict?: true}): T | null {
+  public static parseObject<T extends object>(value: any, options: InputParseOptions & {strict?: true} = defaultOptions): T | null {
     const inputValue = value;
-    if (options.executeFunctions) {
+    if (options?.executeFunctions) {
       while (typeof value === 'function') {
         value = value();
       }
