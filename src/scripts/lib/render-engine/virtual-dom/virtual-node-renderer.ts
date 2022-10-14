@@ -211,7 +211,9 @@ export class VirtualNodeRenderer {
 
       actionPathMap = actionMap;
       for (let i = 0; i < actionKey.length - 1; i++) {
-        actionPathMap.set(actionKey[i], new Map());
+        if (!actionPathMap.has(actionKey[i])) {
+          actionPathMap.set(actionKey[i], new Map());
+        }
         actionPathMap = actionPathMap.get(actionKey[i]);
       }
       actionPathMap.set(actionKey[actionKey.length - 1], action);
