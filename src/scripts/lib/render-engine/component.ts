@@ -464,7 +464,45 @@ export class ComponentElement extends HTMLElement {
     if (typeof this.#controller['onInit'] === 'function') {
       this.#controller['onInit']();
     }
-    //this.innerHTML = ``;
+
+    if (this.getComponentConfig().hasHtmlSlots) {
+      // Create an observer instance linked to the callback function
+      const observer = new MutationObserver((mutationList) => {
+        for (const mutation of mutationList) {
+          switch (mutation.type) {
+            case 'childList': {
+              for (let i = 0; i < mutation.addedNodes.length; i++) {
+                const node = mutation.addedNodes.item(i);
+                if (node instanceof HTMLElement && node.hasAttribute('slot')) {
+                  this.applySlots();
+                  return;
+                }
+              }
+              for (let i = 0; i < mutation.removedNodes.length; i++) {
+                const node = mutation.removedNodes.item(i);
+                if (node instanceof HTMLElement && node.hasAttribute('slot')) {
+                  this.applySlots();
+                  return;
+                }
+              }
+              break;
+            }
+            case 'attributes': {
+              // TODO move to new slot / root
+              this.applySlots();
+              return;
+            }
+          }
+        }
+      });
+
+      // Start observing the target node for configured mutations
+      observer.observe(this, { childList: true, subtree: true, attributeFilter: ['slot'], attributeOldValue: true });
+
+      // Later, you can stop observing
+      this.unregisters.push({stop: () => observer.disconnect()})
+    }
+
     this.generateHtml().then(() => {
       this.registerEventListeners();
     });
@@ -522,14 +560,13 @@ export class ComponentElement extends HTMLElement {
         this.templateRenderResult = await this.template.render();
         const node = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
         this.findSlots();
-        this.overrideSlots();
+        this.applySlots();
         this.prepend(node);
       }
     } else if (this.template !== null) {
       this.templateRenderResult = await this.template.render({force: true});
       await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
-      // TODO for now, only support on init 
-      // this.findSlots();
+      this.findSlots();
     }
   }
   
@@ -575,22 +612,48 @@ export class ComponentElement extends HTMLElement {
     }
   }
 
-  private overrideSlots(): void {
-    if (this.elementsBySlotName.size === 0) {
-      return
-    }
+  private slotsToReplacements = new Map<HTMLSlotElement, {placeholder: Comment; elements: Array<Element>;}>();
+  private applySlots(): void {
     const componentId = this.getComponentConfig().componentId;
     for (const slotName of this.elementsBySlotName.keys()) {
       const slots = this.elementsBySlotName.get(slotName).filter(elem => VirtualNodeRenderer.getState(elem)?.domNode != null);
-      const replaceElements = this.querySelectorAll(`:scope > [slot="${slotName}"]:not([${cssComponentIdAttrPrefix}-${componentId}])`);
-      if (slots.length > 0 && replaceElements.length > 0) {
+      if (slots.length > 0) {
         // Only support unique slot names so we can move the replacement element
-        const slotElement = VirtualNodeRenderer.getState(slots[0]).domNode as Element;
-        for (let i = replaceElements.length - 1; i >= 0; i--) {
-          replaceElements[i].remove()
-          slotElement.parentElement.insertBefore(replaceElements[i], slotElement);
+        const slotElement = VirtualNodeRenderer.getState(slots[0]).domNode as HTMLSlotElement;
+        const isSlotInDom = !this.slotsToReplacements.has(slotElement);
+        let referenceInsertBeforeNode: Node;
+        let newReplaceElements: Array<Element> = Array.from(this.querySelectorAll(`:scope > [slot="${slotName}"]:not([${cssComponentIdAttrPrefix}-${componentId}])`));
+        if (isSlotInDom && newReplaceElements.length > 0) {
+          const placeholder = document.createComment(`slot placeholder`);
+          slotElement.parentElement.insertBefore(placeholder, slotElement);
+          this.slotsToReplacements.set(slotElement, {
+            placeholder: placeholder,
+            elements: newReplaceElements,
+          });
+          referenceInsertBeforeNode = placeholder;
+        } else if (!isSlotInDom) {
+          const replacements = this.slotsToReplacements.get(slotElement);
+          // Verify if these elements still exist
+          replacements.elements = replacements.elements.filter(elem => this.contains(elem));
+          newReplaceElements = newReplaceElements.filter(elem => !replacements.elements.includes(elem));
+          for (const elem of newReplaceElements) {
+            replacements.elements.push(elem);
+          }
         }
-        slotElement.parentElement.removeChild(slotElement);
+
+        for (let i = newReplaceElements.length - 1; i >= 0; i--) {
+          newReplaceElements[i].remove()
+          referenceInsertBeforeNode.parentElement.insertBefore(newReplaceElements[i], referenceInsertBeforeNode);
+        }
+
+        if (isSlotInDom && newReplaceElements.length > 0 && this.slotsToReplacements.get(slotElement).elements.length > 0) {
+          slotElement.parentElement.removeChild(slotElement);
+        } else if (!isSlotInDom && this.slotsToReplacements.get(slotElement).elements.length === 0) {
+          const replacements = this.slotsToReplacements.get(slotElement);
+          replacements.placeholder.parentElement.insertBefore(slotElement, replacements.placeholder);
+          replacements.placeholder.remove();
+          this.slotsToReplacements.delete(slotElement);
+        }
       }
     }
   }
