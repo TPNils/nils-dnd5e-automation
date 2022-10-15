@@ -29,10 +29,20 @@ type DomAction = {
   value: string;
 } | {
   type: 'removeNode';
-  node: ChildNode;
+  node: Node;
+} | {
+  type: 'addNodeToEnd';
+  node: Node;
+  parent: Node;
+} | {
+  type: 'addNodeBefore';
+  node: Node;
+  parent: Node;
+  addBefore: Node;
 })
 
 const stateSymbol = Symbol('domCache');
+const rerenderIdSymbol = Symbol('rerenderId');
 export interface RenderState<T extends VirtualNode = VirtualNode> {
   domNode: ReturnType<T['createDom']>;
   lastRenderSelfState?: T;
@@ -46,10 +56,6 @@ export class VirtualNodeRenderer {
   
   public static setState<T extends VirtualNode>(virtualNode: T, domNode: RenderState<T>): void {
     virtualNode[stateSymbol] = domNode;
-  }
-  
-  public static clearState<T extends VirtualNode>(virtualNode: T): void {
-    delete virtualNode[stateSymbol];
   }
   
   /**
@@ -176,8 +182,46 @@ export class VirtualNodeRenderer {
             state.lastRenderSelfState = process.node.cloneNode(false);
           }
           
-          // TODO new/deleted children
+          // add/delete children
+          if (deepUpdate && process.node.isParentNode()) {
+            const currentChildrenByNode = new Map<Node, VirtualNode>();
+            for (const child of process.node.childNodes) {
+              currentChildrenByNode.set(VirtualNodeRenderer.getOrNewState(child).domNode, child);
+            }
+
+            const previousChildNodes: Node[] = [];
+            for (const child of state.lastRenderChildrenState) {
+              const childDomNode = VirtualNodeRenderer.getOrNewState(child).domNode;
+              previousChildNodes.push(childDomNode);
+              if (!currentChildrenByNode.has(childDomNode)) {
+                domActions.push({
+                  type: 'removeNode',
+                  node: childDomNode,
+                })
+              }
+            }
+            for (let i = process.node.childNodes.length - 1; i >= 0; i--) {
+              const childDomNode = VirtualNodeRenderer.getOrNewState(process.node.childNodes[i]).domNode;
+              if (!previousChildNodes.includes(childDomNode)) {
+                if (i === process.node.childNodes.length - 1) {
+                  domActions.push({
+                    type: 'addNodeToEnd',
+                    node: childDomNode,
+                    parent: state.domNode
+                  });
+                } else {
+                  domActions.push({
+                    type: 'addNodeBefore',
+                    node: childDomNode,
+                    parent: state.domNode,
+                    addBefore: VirtualNodeRenderer.getState(process.node.childNodes[i+1]).domNode,
+                  });
+                }
+              }
+            }
+          }
           
+          // add children to the process queue
           if (deepUpdate && process.node.isParentNode()) {
             for (const child of process.node.childNodes) {
               pending.push({parent: process.node, node: child});
@@ -225,6 +269,11 @@ export class VirtualNodeRenderer {
         case 'removeAttribute': {
           actionKey = [action.node, 'attribute', action.attrName];
           break;
+        }
+        case 'addNodeBefore':
+        case 'addNodeToEnd':
+        case 'removeNode': {
+          actionKey = [action.node, 'dml'];
         }
         default: {
           actionKey = [action.node, action.type];
@@ -281,7 +330,17 @@ export class VirtualNodeRenderer {
                 break;
               }
               case 'removeNode': {
-                item.node.remove();
+                if (item.node.parentNode) {
+                  item.node.parentNode.removeChild(item.node)
+                }
+                break;
+              }
+              case 'addNodeBefore': {
+                item.parent.insertBefore(item.node, item.addBefore);
+                break;
+              }
+              case 'addNodeToEnd': {
+                item.parent.appendChild(item.node);
                 break;
               }
             }
