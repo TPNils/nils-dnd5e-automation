@@ -1,5 +1,4 @@
 import { staticValues } from "../../static-values";
-import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
@@ -27,6 +26,9 @@ const cssComponentHostIdAttrPrefix = `${staticValues.code}-host`;
 const cssComponentIdAttrPrefix = `${staticValues.code}-cid`;
 function adjustCssSelector(selector: string, componentId: string): string {
   selector = selector.trim();
+  if (selector.length === 0) {
+    return selector;
+  }
   const hostContextPrefix = browserSupportHostContext ? ':host-context(' : `:is(${randomHostContextReplacementString}`;
   if (selector.toLowerCase().startsWith(hostContextPrefix)) {
     const rule = selector.substring(hostContextPrefix.length);
@@ -43,7 +45,7 @@ function adjustCssSelector(selector: string, componentId: string): string {
       }
     }
     if (remainingOpenBrackets === 0) {
-      selector = [
+      return [
         rule.substring(0, ruleIndex-1),
         adjustCssSelector(rule.substring(ruleIndex), componentId),
       ].join(' ');
@@ -54,10 +56,10 @@ function adjustCssSelector(selector: string, componentId: string): string {
       parts.push(' ');
     }
     parts.push(adjustCssSelector(selector.substring(5), componentId));
-    selector = parts.join('');
+    return parts.join('');
   } else {
     // TODO this doesnt cover selectors like :is(span, div)
-    selector = selector
+    return selector
       .split(' ')
       .map(part => `${part}[${cssComponentIdAttrPrefix}-${componentId}]`)
       .join(' ');
