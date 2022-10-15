@@ -13,7 +13,6 @@ type PendingNodes<T extends VirtualNode = VirtualNode> = {
   parentInstance?: VirtualParentNode;
   pathContext: {
     parentPrefix: string;
-    siblings: {[nodeName: string]: number}
   };
 }
 type ParsedExpression = (...args: any[]) => any;
@@ -21,12 +20,34 @@ interface ParsedEventExpression {
   readonly localVars: any | null;
   readonly exec: (event: Event) => any
 };
+const nodeIdSymbol = Symbol('nodeId');
 export class Template {
   
+  private readonly template: VirtualNode & VirtualParentNode;
   public constructor (
-    private readonly template: VirtualNode & VirtualParentNode,
+    template: VirtualNode & VirtualParentNode,
     context?: any
   ) {
+    this.template = template.cloneNode(true);
+    const nextIdByParent = new Map<VirtualParentNode, number>();
+    let pending: Array<VirtualNode> = [this.template];
+    while (pending.length > 0) {
+      const processing = pending;
+      pending = [];
+      for (const process of processing) {
+        let parent: VirtualParentNode = process.isChildNode() ? process.parentNode : null;
+        if (!nextIdByParent.has(parent)) {
+          nextIdByParent.set(parent, 0);
+        }
+        let nextNodeId = nextIdByParent.get(parent);
+        process[nodeIdSymbol] = String(nextNodeId);
+        nextIdByParent.set(parent, nextNodeId+1);
+        if (process.isParentNode()) {
+          pending.push(...process.childNodes);
+        }
+      }
+    }
+
     if (context != null) {
       this.setContext(context);
     }
@@ -73,7 +94,6 @@ export class Template {
       localVars: {},
       pathContext: {
         parentPrefix: '',
-        siblings: {}
       }
     }];
     while (pending.length > 0) {
@@ -92,9 +112,8 @@ export class Template {
                 UtilsLog.error(`The *for expression did not return an array/iterator:`, process.instance.getAttribute('*for'), resolvedExpr);
               } else {
                 process.instance.removeAttribute('*for');
-                let hasAnItem = false;
+                let forIndex = 0;
                 for (const item of resolvedExpr) {
-                  hasAnItem = true;
                   pending.push({
                     parentInstance: process.parentInstance,
                     template: process.template,
@@ -103,11 +122,14 @@ export class Template {
                       ...process.localVars,
                       [regexResult[1]]: item,
                     },
-                    pathContext: process.pathContext,
+                    pathContext: {
+                      parentPrefix: process.pathContext.parentPrefix + `${forIndex}.`
+                    },
                   });
+                  forIndex++;
                 }
 
-                if (hasAnItem) {
+                if (forIndex > 0) {
                   // The newly added items need to be processed before the rest of the queue
                   for (let j = i+1; j < processing.length; j++) {
                     pending.push(processing[j]);
@@ -163,15 +185,10 @@ export class Template {
           process.parentInstance.appendChild(process.instance);
         }
         
-        let siblingIndex = 0;
-        if (process.pathContext.siblings[process.instance.nodeName]) {
-          siblingIndex = process.pathContext.siblings[process.instance.nodeName];
-        }
-        process.pathContext.siblings[process.instance.nodeName] = siblingIndex + 1;
-        const path = process.pathContext.parentPrefix + process.instance.nodeName + siblingIndex;
+        const path = process.pathContext.parentPrefix + process.template[nodeIdSymbol]
         if (process.instance.isParentNode() && process.template.isParentNode()) {
           const pathContext = {
-            parentPrefix: path + '.',
+            parentPrefix: path + '-',
             siblings: {}
           };
           for (const child of process.template.childNodes) {
@@ -190,7 +207,6 @@ export class Template {
           const originalState = VirtualNodeRenderer.getState(original);
           if (originalState) {
             VirtualNodeRenderer.setState(process.instance, originalState);
-            VirtualNodeRenderer.clearState(original);
           }
         }
         createdNodesByMap.set(path, process.instance);
@@ -203,6 +219,11 @@ export class Template {
         instance.remove();
       }
     }
+
+    UtilsLog.debug('template', {
+      new: createdNodesByMap,
+      old: this.#processedVirtualNodesMap,
+    })
 
     this.#processedVirtualNode = rootInstance;
     this.#processedVirtualNodesMap = createdNodesByMap;

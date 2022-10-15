@@ -177,10 +177,6 @@ export class VirtualNodeRenderer {
               });
             }
           }
-
-          if (domActions.length > 0) {
-            state.lastRenderSelfState = process.node.cloneNode(false);
-          }
           
           // add/delete children
           if (deepUpdate && process.node.isParentNode()) {
@@ -219,6 +215,15 @@ export class VirtualNodeRenderer {
                 }
               }
             }
+
+            state.lastRenderChildrenState = [];
+            for (const child of process.node.childNodes) {
+              state.lastRenderChildrenState.push(child);
+            }
+          }
+
+          if (domActions.length > 0) {
+            state.lastRenderSelfState = process.node.cloneNode(false);
           }
           
           // add children to the process queue
