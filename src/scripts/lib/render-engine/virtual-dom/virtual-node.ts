@@ -119,18 +119,30 @@ function VirtualChildNode<T extends Constructor>(clazz: T = PlaceholderClass as 
     }
 
     public after(...nodes: Array<VirtualChildNode & VirtualNode>): void {
+      if (!this.parentNode) {
+        return;
+      }
       this.parentNode.insertAfter(this, ...nodes);
     }
 
     public before(...nodes: Array<VirtualChildNode & VirtualNode>): void {
+      if (!this.parentNode) {
+        return;
+      }
       this.parentNode.insertBefore(this, ...nodes);
     }
 
     public remove(): void {
+      if (!this.parentNode) {
+        return;
+      }
       this.parentNode.removeChild(this);
     }
 
     public replaceWith(...nodes: Array<VirtualChildNode & VirtualNode>): void {
+      if (!this.parentNode) {
+        return;
+      }
       this.parentNode.replaceChild(this, ...nodes);
     }
 
