@@ -292,16 +292,20 @@ export interface OutputConfig {
   eventName?: string;
   /* default: false */
   bubbels?: boolean;
+  /* default: false. Won't emit if the last emit was the same */
+  deduplicate?: boolean;
 }
 interface OutputConfigInternal {
   eventName: string;
   bubbels: boolean;
+  deduplicate: boolean;
 }
 export function Output(config?: string | OutputConfig) {
   return function (targetPrototype: any, propertyKey: string, descriptor?: PropertyDescriptor) {
     const configInternal: OutputConfigInternal = {
       eventName: propertyKey,
       bubbels: false,
+      deduplicate: false,
     }
     if (typeof config === 'string') {
       configInternal.eventName = config;
@@ -312,14 +316,41 @@ export function Output(config?: string | OutputConfig) {
       if (config.bubbels != null) {
         configInternal.bubbels = config.bubbels;
       }
+      if (config.deduplicate != null) {
+        configInternal.deduplicate = config.deduplicate;
+      }
     }
+    let lastEmitValue: any;
     const setFunction = function (this: {[htmlElementSymbol]: ComponentElement}, value: any): void {
+      if (configInternal.deduplicate && lastEmitValue === value) {
+        return;
+      }
+      lastEmitValue = value;
+
+      if (this[htmlElementSymbol] == null) {
+        // htmlElement is init after the constructor has finished
+        return;
+      }
       this[htmlElementSymbol].dispatchEvent(new CustomEvent(configInternal.eventName, {detail: value, cancelable: false, bubbles: configInternal.bubbels}));
     };
     if (descriptor) {
-      descriptor.set = setFunction;
+      if (descriptor.set) {
+        const originalSet = descriptor.set;
+        descriptor.set = function(this: {[htmlElementSymbol]: ComponentElement}, value: any) {
+          originalSet.call(this, value);
+          setFunction.call(this, value);
+        };
+      } else {
+        descriptor.get = function (this: {[htmlElementSymbol]: ComponentElement}): void {
+          return lastEmitValue;
+        };
+        descriptor.set = setFunction;
+      }
     } else {
       Reflect.defineProperty(targetPrototype, propertyKey, {
+        get: function (this: {[htmlElementSymbol]: ComponentElement}): void {
+          return lastEmitValue;
+        },
         set: setFunction,
       })
     }
