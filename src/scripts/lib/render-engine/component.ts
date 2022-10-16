@@ -2,6 +2,7 @@ import { staticValues } from "../../static-values";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
+import { rerenderQueue } from "./virtual-dom/render-queue";
 import { VirtualAttributeNode, VirtualNode, VirtualParentNode } from "./virtual-dom/virtual-node";
 import { VirtualNodeParser } from "./virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "./virtual-dom/virtual-node-renderer";
@@ -451,7 +452,7 @@ export class ComponentElement extends HTMLElement {
    */
   public onChange(): void {
     if (this.isConnected) {
-      this.generateHtml();
+      this.generateHtmlQueue();
     }
   }
 
@@ -488,7 +489,6 @@ export class ComponentElement extends HTMLElement {
               break;
             }
             case 'attributes': {
-              // TODO move to new slot / root
               this.applySlots();
               return;
             }
@@ -497,13 +497,13 @@ export class ComponentElement extends HTMLElement {
       });
 
       // Start observing the target node for configured mutations
-      observer.observe(this, { childList: true, subtree: true, attributeFilter: ['slot'], attributeOldValue: true });
+      observer.observe(this, { childList: true, subtree: true, attributeFilter: ['slot'] });
 
       // Later, you can stop observing
       this.unregisters.push({stop: () => observer.disconnect()})
     }
 
-    this.generateHtml().then(() => {
+    this.generateHtmlQueue().then(() => {
       this.registerEventListeners();
     });
   }
@@ -550,7 +550,7 @@ export class ComponentElement extends HTMLElement {
 
   private template: Template;
   private templateRenderResult: VirtualNode & VirtualParentNode;
-  private async generateHtml(): Promise<void> {
+  private generateHtmlExec = async (): Promise<void> =>  {
     if (this.template === undefined) {
       const parsedHtml = this.getComponentConfig().parsedHtml;
       if (!parsedHtml) {
@@ -567,7 +567,12 @@ export class ComponentElement extends HTMLElement {
       this.templateRenderResult = await this.template.render({force: true});
       await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
       this.findSlots();
+      this.applySlots();
     }
+  }
+
+  private generateHtmlQueue(): Promise<void> {
+    return rerenderQueue.add(this.generateHtmlExec, this.generateHtmlExec);
   }
   
   private elementsBySlotName = new Map<string, Array<VirtualNode & VirtualAttributeNode>>();
@@ -575,6 +580,7 @@ export class ComponentElement extends HTMLElement {
     if (!this.getComponentConfig().hasHtmlSlots || !this.template) {
       return;
     }
+    const deleteKeys = new Set<string>();
     for (const slotName of this.elementsBySlotName.keys()) {
       const filteredNodes = [];
       for (const node of this.elementsBySlotName.get(slotName)) {
@@ -582,8 +588,14 @@ export class ComponentElement extends HTMLElement {
           filteredNodes.push(node);
         }
       }
-      this.elementsBySlotName.set(slotName, filteredNodes);
-      // TODO what about removed slots?
+      if (filteredNodes.length === 0) {
+        deleteKeys.add(slotName);
+      } else {
+        this.elementsBySlotName.set(slotName, filteredNodes);
+      }
+    }
+    for (const slotName of deleteKeys) {
+      this.elementsBySlotName.delete(slotName);
     }
     let pending: Array<VirtualNode> = [this.templateRenderResult];
     while (pending.length > 0) {
@@ -612,27 +624,51 @@ export class ComponentElement extends HTMLElement {
     }
   }
 
-  private slotsToReplacements = new Map<HTMLSlotElement, {placeholder: Comment; elements: Array<Element>;}>();
+  private slotsToReplacements = new Map<string, {placeholder: Comment; elements: Array<Element>;}>();
   private applySlots(): void {
+    if (!this.getComponentConfig().hasHtmlSlots || !this.template) {
+      return;
+    }
     const componentId = this.getComponentConfig().componentId;
+
+    const replacementElementsBySlotName = new Map<string, Array<Element>>();
+    for (const slotName of this.elementsBySlotName.keys()) {
+      replacementElementsBySlotName.set(slotName, Array.from(this.querySelectorAll(`:scope > [slot="${slotName}"]:not([${cssComponentIdAttrPrefix}-${componentId}])`)));
+    }
+    
+    // Check if the target slots still match
+    for (const slotName of this.slotsToReplacements.keys()) {
+      const filteredElements: Element[] = [];
+      for (const elem of this.slotsToReplacements.get(slotName).elements) {
+        const slotAttr = elem.getAttribute('slot');
+        if (slotAttr === slotName && this.elementsBySlotName.has(slotName)) {
+          filteredElements.push(elem);
+        } else {
+          if (!replacementElementsBySlotName.has(slotAttr)) {
+            replacementElementsBySlotName.set(slotAttr, []);
+          }
+          replacementElementsBySlotName.get(slotAttr).push(elem);
+        }
+      }
+      this.slotsToReplacements.get(slotName).elements = filteredElements;
+    }
+
+    // Apply replacements to slots or restore slots if no replacements found
     for (const slotName of this.elementsBySlotName.keys()) {
       const slots = this.elementsBySlotName.get(slotName).filter(elem => VirtualNodeRenderer.getState(elem)?.domNode != null);
       if (slots.length > 0) {
         // Only support unique slot names so we can move the replacement element
         const slotElement = VirtualNodeRenderer.getState(slots[0]).domNode as HTMLSlotElement;
-        const isSlotInDom = !this.slotsToReplacements.has(slotElement);
-        let referenceInsertBeforeNode: Node;
-        let newReplaceElements: Array<Element> = Array.from(this.querySelectorAll(`:scope > [slot="${slotName}"]:not([${cssComponentIdAttrPrefix}-${componentId}])`));
-        if (isSlotInDom && newReplaceElements.length > 0) {
+        let newReplaceElements = replacementElementsBySlotName.get(slotName);
+        if (!this.slotsToReplacements.has(slotName) && newReplaceElements.length > 0) {
           const placeholder = document.createComment(`slot placeholder`);
           slotElement.parentElement.insertBefore(placeholder, slotElement);
-          this.slotsToReplacements.set(slotElement, {
+          this.slotsToReplacements.set(slotName, {
             placeholder: placeholder,
             elements: newReplaceElements,
           });
-          referenceInsertBeforeNode = placeholder;
-        } else if (!isSlotInDom) {
-          const replacements = this.slotsToReplacements.get(slotElement);
+        } else if (this.slotsToReplacements.has(slotName)) {
+          const replacements = this.slotsToReplacements.get(slotName);
           // Verify if these elements still exist
           replacements.elements = replacements.elements.filter(elem => this.contains(elem));
           newReplaceElements = newReplaceElements.filter(elem => !replacements.elements.includes(elem));
@@ -641,18 +677,33 @@ export class ComponentElement extends HTMLElement {
           }
         }
 
+        let referenceInsertBeforeNode: Node = this.slotsToReplacements.get(slotName)?.placeholder ?? slotElement;
         for (let i = newReplaceElements.length - 1; i >= 0; i--) {
           newReplaceElements[i].remove()
           referenceInsertBeforeNode.parentElement.insertBefore(newReplaceElements[i], referenceInsertBeforeNode);
         }
-
-        if (isSlotInDom && newReplaceElements.length > 0 && this.slotsToReplacements.get(slotElement).elements.length > 0) {
+        const isSlotInDom = this.contains(slotElement);
+        if (isSlotInDom && newReplaceElements.length > 0 && this.slotsToReplacements.get(slotName).elements.length > 0) {
           slotElement.parentElement.removeChild(slotElement);
-        } else if (!isSlotInDom && this.slotsToReplacements.get(slotElement).elements.length === 0) {
-          const replacements = this.slotsToReplacements.get(slotElement);
+        } else if (!isSlotInDom && this.slotsToReplacements.has(slotName) && this.slotsToReplacements.get(slotName).elements.length === 0) {
+          const replacements = this.slotsToReplacements.get(slotName);
           replacements.placeholder.parentElement.insertBefore(slotElement, replacements.placeholder);
           replacements.placeholder.remove();
-          this.slotsToReplacements.delete(slotElement);
+          this.slotsToReplacements.delete(slotName);
+        }
+      }
+    }
+
+    // Handle replacements for non-supported slots
+    for (const slotName of replacementElementsBySlotName.keys()) {
+      const slots = this.elementsBySlotName.get(slotName)?.filter(elem => VirtualNodeRenderer.getState(elem)?.domNode != null);
+      if (!slots?.length) {
+        for (const elem of replacementElementsBySlotName.get(slotName)) {
+          if (elem.parentElement !== this) {
+            // Move element back to it's original position
+            elem.remove();
+            this.appendChild(elem);
+          }
         }
       }
     }
