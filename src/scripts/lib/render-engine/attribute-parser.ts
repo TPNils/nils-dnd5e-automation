@@ -94,6 +94,9 @@ export class AttributeParser {
     }
 
     while (typeof value === 'string') {
+      if (value === '') {
+        return null;
+      }
       value = JSON.parse(value);
     }
     if (options.strict && typeof value !== 'object') {
