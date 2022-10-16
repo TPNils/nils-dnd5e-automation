@@ -3,6 +3,7 @@ import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from
 import { TransformTrigger } from "../lib/db/transform-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
+import { Component } from "../lib/render-engine/component";
 import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
@@ -194,6 +195,93 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
   return wrapped(args);
 }
 
+async function updateMessage(this: ChatLog, wrapped: (...args: any) => any, ...args: any[]): Promise<void> {
+  const message: ChatMessage = args[0];
+  const clientTemplateData = ModularCard.getCardPartDatas(message);
+  if (!clientTemplateData) {
+    // Lets not mess with other messages. If there is am internal bug, don't affect them
+    return wrapped(args);
+  }
+
+  const notify: boolean = args[1];
+  let li = this.element.find(`.message[data-message-id="${message.id}"]`);
+  if (li.length) {
+    const updatedHtml = await message.getHTML();
+    const updatedContent = updatedHtml.children(`.message-content`)[0].querySelector(`:scope > .${staticValues.moduleName}-item-card`);
+    const currentContent = li.children(`.message-content`)[0].querySelector(`:scope > .${staticValues.moduleName}-item-card`);
+    const updatedContentChildren = Array.from(updatedContent.childNodes);
+    const currentContentChildren = Array.from(currentContent.childNodes);
+
+    let sameTopLevelLayout = updatedContentChildren.length === currentContentChildren.length;
+    if (sameTopLevelLayout) {
+      for (let i = 0; i < currentContentChildren.length; i++) {
+        // isEqualNode does a deep compare => make shallow copies
+        if (!currentContentChildren[i].cloneNode(false).isEqualNode(updatedContentChildren[i].cloneNode(false))) {
+          sameTopLevelLayout = false;
+          break;
+        }
+      }
+    }
+
+    if (sameTopLevelLayout) {
+      // replace message content
+      for (let i = 0; i < currentContentChildren.length; i++) {
+        if (Component.isComponentElement(currentContentChildren[i])) {
+          // Don't need to change anything
+        } else {
+          currentContentChildren[i].replaceWith(updatedContentChildren[i]);
+        }
+      }
+
+      // Replace non message content
+      let messageContentElement: HTMLElement;
+      const currentNonContentElements = Array.from(li[0].childNodes);
+      for (let i = 0; i < currentNonContentElements.length; i++) {
+        const element = currentNonContentElements[i];
+        if (element instanceof HTMLElement && element.classList.contains('message-content')) {
+          messageContentElement = element;
+          continue;
+        }
+        element.remove();
+      }
+      let isBeforeMessageContent = true;
+      const updatedNonContentElements = Array.from(updatedHtml[0].childNodes);
+      for (let i = 0; i < updatedNonContentElements.length; i++) {
+        const element = updatedNonContentElements[i];
+        if (element instanceof HTMLElement && element.classList.contains('message-content')) {
+          isBeforeMessageContent = false;
+          continue;
+        }
+
+        if (isBeforeMessageContent) {
+          li[0].insertBefore(element, messageContentElement);
+        } else {
+          li[0].append(element);
+        }
+      }
+    } else {
+      // sameTopLevelLayout should always be true, but just in case have a fallback
+      // Default behaviour isn foundry V9
+      li.replaceWith(updatedHtml);
+    }
+  } else {
+    await this.postOne(message, false);
+  }
+
+  // Post notification of update
+  if (notify) {
+    this.notify(message);
+  }
+
+  // Update popout tab
+  if (this._popout) {
+    await this._popout.updateMessage(message, false);
+  }
+  if (this.popOut) {
+    this.setPosition();
+  }
+}
+
 const chatMessageTransformerMap = new Map<string, ChatMessageTransformer<any>>();
 
 export class ModularCard {
@@ -319,6 +407,7 @@ export class ModularCard {
     DmlTrigger.registerTrigger(new ChatMessageTrigger());
     Hooks.on('setup', () => {
       libWrapper.register(staticValues.moduleName, 'ChatMessage.prototype.getHTML', getHTML, 'WRAPPER');
+      libWrapper.register(staticValues.moduleName, 'ChatLog.prototype.updateMessage', updateMessage, 'MIXED');
     });
   }
 
@@ -410,13 +499,7 @@ export class ModularCard {
     const htmlParts: string[] = [];
     htmlParts.push(`<div class="${staticValues.moduleName}-item-card">`);
     for (const part of await Promise.all(htmlParts$)) {
-      if (typeof part.html !== 'string' || part.html === '') {
-        continue;
-      }
-      // TODO should not have to be wrapped anymore
-      htmlParts.push(`<div data-part-id="${part.id}">`);
       htmlParts.push(TextEditor.enrichHTML(part.html, enrichOptions as any))
-      htmlParts.push(`</div>`);
     }
     htmlParts.push(`</div>`);
     return htmlParts.join('');
