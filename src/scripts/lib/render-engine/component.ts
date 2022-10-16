@@ -1,4 +1,5 @@
 import { staticValues } from "../../static-values";
+import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
@@ -137,6 +138,12 @@ export function Component(config: ComponentConfig | string) {
     }
     if (constructor.prototype[eventConfigSymbol] == null) {
       constructor.prototype[eventConfigSymbol] = {
+        byEventName: {},
+        byProperty: {},
+      };
+    }
+    if (constructor.prototype[outputConfigSymbol] == null) {
+      constructor.prototype[outputConfigSymbol] = {
         byEventName: {},
         byProperty: {},
       };
@@ -291,6 +298,9 @@ export function BindEvent(config: EventConfig | string) {
     targetPrototype[eventConfigSymbol].byProperty[internalConfig.propertyKey].push(internalConfig);
   };
 }
+
+const fromAttrChangeSymbol = Symbol('fromAttrChange');
+const outputConfigSymbol = Symbol('OutputConfig');
 export interface OutputConfig {
   eventName?: string;
   /* default: false */
@@ -303,32 +313,58 @@ interface OutputConfigInternal {
   bubbels: boolean;
   deduplicate: boolean;
 }
+interface OutputConfigsInternal {
+  byEventName: {[attr: string]: OutputConfigInternal[]};
+  byProperty: {[prop: string]: OutputConfigInternal[]};
+}
 export function Output(config?: string | OutputConfig) {
   return function (targetPrototype: any, propertyKey: string, descriptor?: PropertyDescriptor) {
-    const configInternal: OutputConfigInternal = {
+    if (targetPrototype[outputConfigSymbol] == null) {
+      targetPrototype[outputConfigSymbol] = {
+        byEventName: {},
+        byProperty: {},
+      };
+    }
+    const internalConfig: OutputConfigInternal = {
       eventName: propertyKey,
       bubbels: false,
       deduplicate: false,
     }
+
+    // Add to configs list
+    if (targetPrototype[outputConfigSymbol].byEventName[internalConfig.eventName] == null) {
+      targetPrototype[outputConfigSymbol].byEventName[internalConfig.eventName] = [];
+    }
+    targetPrototype[outputConfigSymbol].byEventName[internalConfig.eventName].push(internalConfig);
+    
+    if (targetPrototype[outputConfigSymbol].byProperty[propertyKey] == null) {
+      targetPrototype[outputConfigSymbol].byProperty[propertyKey] = [];
+    }
+    targetPrototype[outputConfigSymbol].byProperty[propertyKey].push(internalConfig);
+
+    // Apply output emitters
     if (typeof config === 'string') {
-      configInternal.eventName = config;
+      internalConfig.eventName = config;
     } else {
       if (config.eventName != null) {
-        configInternal.eventName = config.eventName;
+        internalConfig.eventName = config.eventName;
       }
       if (config.bubbels != null) {
-        configInternal.bubbels = config.bubbels;
+        internalConfig.bubbels = config.bubbels;
       }
       if (config.deduplicate != null) {
-        configInternal.deduplicate = config.deduplicate;
+        internalConfig.deduplicate = config.deduplicate;
       }
     }
     let lastEmitValue: any;
-    const setFunction = function (this: {[htmlElementSymbol]: ComponentElement}, value: any): void {
-      if (configInternal.deduplicate && lastEmitValue === value) {
+    const setFunction = function (this: {[htmlElementSymbol]: ComponentElement}, value: any, disable?: any): void {
+      if (internalConfig.deduplicate && lastEmitValue === value) {
         return;
       }
       lastEmitValue = value;
+      if (disable === fromAttrChangeSymbol) {
+        return;
+      }
 
       if (this[htmlElementSymbol] == null) {
         // htmlElement is init after the constructor has finished
@@ -337,15 +373,15 @@ export function Output(config?: string | OutputConfig) {
       if (value instanceof Event) {
         this[htmlElementSymbol].dispatchEvent(value);
       } else {
-        this[htmlElementSymbol].dispatchEvent(new CustomEvent(configInternal.eventName, {detail: value, cancelable: false, bubbles: configInternal.bubbels}));
+        this[htmlElementSymbol].dispatchEvent(new CustomEvent(internalConfig.eventName, {detail: value, cancelable: false, bubbles: internalConfig.bubbels}));
       }
     };
     if (descriptor) {
       if (descriptor.set) {
         const originalSet = descriptor.set;
-        descriptor.set = function(this: {[htmlElementSymbol]: ComponentElement}, value: any) {
-          originalSet.call(this, value);
-          setFunction.call(this, value);
+        descriptor.set = function(this: {[htmlElementSymbol]: ComponentElement}, ...args: any[]) {
+          originalSet.call(this, ...args);
+          setFunction.call(this, ...args);
         };
       } else {
         descriptor.get = function (this: {[htmlElementSymbol]: ComponentElement}): void {
@@ -388,6 +424,10 @@ export class ComponentElement extends HTMLElement {
 
   private getEventConfigs(): EventConfigsInternal {
     return this.#controller.constructor.prototype[eventConfigSymbol];
+  }
+
+  private getOutputConfigs(): OutputConfigsInternal {
+    return this.#controller.constructor.prototype[outputConfigSymbol];
   }
 
   /**
@@ -444,7 +484,13 @@ export class ComponentElement extends HTMLElement {
             break;
           }
         }
-        this.#controller[config.propertyKey] = normalizedValue;
+        if (this.getOutputConfigs().byProperty[config.propertyKey]) {
+          const descriptor = Reflect.getOwnPropertyDescriptor(Reflect.getPrototypeOf(this.#controller), config.propertyKey);
+          descriptor.set.call(this.#controller, normalizedValue, fromAttrChangeSymbol);
+          //this.#controller[config.propertyKey] = normalizedValue;
+        } else {
+          this.#controller[config.propertyKey] = normalizedValue;
+        }
       }
       return true;
     }
