@@ -1,5 +1,4 @@
 import { staticValues } from "../../static-values";
-import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
@@ -24,9 +23,8 @@ let browserSupportHostContext = false;
 let nextComponentId = 0;
 const componentConfigSymbol = Symbol('ComponentConfig');
 const htmlElementSymbol = Symbol('HtmlElement');
-const cssComponentHostIdAttrPrefix = `${staticValues.code}-host`;
 const cssComponentIdAttrPrefix = `${staticValues.code}-cid`;
-function adjustCssSelector(selector: string, componentId: string): string {
+function adjustCssSelector(selector: string, config: ComponentConfigInternal): string {
   selector = selector.trim();
   if (selector.length === 0) {
     return selector;
@@ -49,21 +47,21 @@ function adjustCssSelector(selector: string, componentId: string): string {
     if (remainingOpenBrackets === 0) {
       return [
         rule.substring(0, ruleIndex-1),
-        adjustCssSelector(rule.substring(ruleIndex), componentId),
+        adjustCssSelector(rule.substring(ruleIndex), config),
       ].join(' ');
     }
   } else if (selector.toLowerCase().startsWith(':host')) {
-    let parts = [`[${cssComponentHostIdAttrPrefix}-${componentId}]`];
+    let parts = [config.tag];
     if (selector[5] === ' ') {
       parts.push(' ');
     }
-    parts.push(adjustCssSelector(selector.substring(5), componentId));
+    parts.push(adjustCssSelector(selector.substring(5), config));
     return parts.join('');
   } else {
     // TODO this doesnt cover selectors like :is(span, div)
     return selector
       .split(' ')
-      .map(part => `${part}[${cssComponentIdAttrPrefix}-${componentId}]`)
+      .map(part => `${part}[${cssComponentIdAttrPrefix}-${config.componentId}]`)
       .join(' ');
   }
 
@@ -192,7 +190,7 @@ export function Component(config: ComponentConfig | string) {
 
           // TODO this doesnt cover selectors like :is(span, div)
           for (let selector of cssRule.selectorText.split(',')) {
-            modifiedSelectors.push(adjustCssSelector(selector, internalConfig.componentId));
+            modifiedSelectors.push(adjustCssSelector(selector, internalConfig));
           }
 
           ruleString = modifiedSelectors.join(',') + ' ' + cssRule.cssText.substring(cssRule.cssText.indexOf('{'));
@@ -521,7 +519,6 @@ export class ComponentElement extends HTMLElement {
    * This will happen each time the node is moved, and may happen before the element's contents have been fully parsed. 
    */
   public connectedCallback(): void {
-    this.setAttribute(`${cssComponentHostIdAttrPrefix}-${this.getComponentConfig().componentId}`, '');
     if (typeof this.#controller['onInit'] === 'function') {
       this.#controller['onInit']();
     }
