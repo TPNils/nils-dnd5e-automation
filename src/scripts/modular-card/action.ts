@@ -76,7 +76,6 @@ export class Action<ClientData, ServerData extends object = object> {
           // await in loop => wait before the next is called as it might depend on the previous enriched data
           enrichedData = {...enrichedData, ...await enricher(enrichedData)};
         }
-        UtilsLog.debug(this.name, enrichedData)
         
         if (this.permissionCheckFunc && !user.isGM) {
           const permissionResponse = await this.permissionCheckFunc(enrichedData, user);
