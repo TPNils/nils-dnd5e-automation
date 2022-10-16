@@ -220,11 +220,6 @@ export class Template {
       }
     }
 
-    UtilsLog.debug('template', {
-      new: createdNodesByMap,
-      old: this.#processedVirtualNodesMap,
-    })
-
     this.#processedVirtualNode = rootInstance;
     this.#processedVirtualNodesMap = createdNodesByMap;
   }
