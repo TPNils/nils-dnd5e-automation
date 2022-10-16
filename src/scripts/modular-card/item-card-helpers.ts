@@ -5,7 +5,7 @@ import { ModularCardPart } from "./modular-card-part";
 export interface ChatPartIdData {
   readonly partId: string;
   readonly messageId: string;
-  readonly subType: string | null;
+  readonly subType?: string | null;
 }
 
 export interface ChatPartEnriched<T> {
@@ -79,6 +79,18 @@ export class ItemCardHelpers {
         subType: element.getAttribute('data-sub-type'),
       }
     }
+  }
+
+  public static getRawSerializer<T, K extends keyof T>(field: K): (arg: T) => {[P in K]: T[P]} {
+    return (arg: T) => {
+      return <any>{
+        [field]: arg[field]
+      }
+    }
+  }
+
+  public static getCustomEventSerializer<T>(): ({event}: {event: CustomEvent<T>}) => {event: T} {
+    return ({event}) => ({event: event.detail});
   }
 
   public static getMouseEventSerializer(): ({event}: {event: MouseEvent}) => ClickData {
