@@ -305,13 +305,13 @@ export interface OutputConfig {
   eventName?: string;
   /* default: false */
   bubbels?: boolean;
-  /* default: false. Won't emit if the last emit was the same */
-  deduplicate?: boolean;
+  /* default: false. Won't emit if the last emit was the same. If it's a function, return true of the values are the same */
+  deduplicate?: boolean | ((oldValue: any, newValue: any) => boolean);
 }
 interface OutputConfigInternal {
-  eventName: string;
-  bubbels: boolean;
-  deduplicate: boolean;
+  eventName: OutputConfig['eventName'];
+  bubbels: OutputConfig['bubbels'];
+  deduplicate: OutputConfig['deduplicate'];
 }
 interface OutputConfigsInternal {
   byEventName: {[attr: string]: OutputConfigInternal[]};
@@ -357,10 +357,16 @@ export function Output(config?: string | OutputConfig) {
       }
     }
     let lastEmitValue: any;
+    let hasEmit = false;
     const setFunction = function (this: {[htmlElementSymbol]: ComponentElement}, value: any, disable?: any): void {
-      if (internalConfig.deduplicate && lastEmitValue === value) {
-        return;
+      if (hasEmit && internalConfig.deduplicate) {
+        if (typeof internalConfig.deduplicate === 'function' && internalConfig.deduplicate(lastEmitValue, value)) {
+          return;
+        } else if (lastEmitValue === value) {
+          return;
+        }
       }
+      hasEmit = true;
       lastEmitValue = value;
       if (disable === fromAttrChangeSymbol) {
         return;
@@ -370,6 +376,7 @@ export function Output(config?: string | OutputConfig) {
         // htmlElement is init after the constructor has finished
         return;
       }
+      
       if (value instanceof Event) {
         this[htmlElementSymbol].dispatchEvent(value);
       } else {
