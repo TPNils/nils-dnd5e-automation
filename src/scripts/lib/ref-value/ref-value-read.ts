@@ -1,8 +1,13 @@
 import { Stoppable } from "../utils/stoppable";
 import { RefValueWrite } from "./ref-value-write";
 
+
+type RefValueType<T> = T extends null | undefined ? T :
+  T extends RefValueRead & { get(): infer F } ? 
+    RefValueType<F> : T;
+
 type ObjectWithRefReturnTypes<T> = {
-  [P in keyof T]: RefValueRead<T[P]>
+  [P in keyof T]: RefValueType<T[P]>;
 };
 
 export abstract class RefValueRead<T = any> {
