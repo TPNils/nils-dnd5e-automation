@@ -373,7 +373,7 @@ export function Output(config?: string | OutputConfig) {
       if (value instanceof Event) {
         this[htmlElementSymbol].dispatchEvent(value);
       } else {
-        this[htmlElementSymbol].dispatchEvent(new CustomEvent(internalConfig.eventName, {detail: value, cancelable: false, bubbles: internalConfig.bubbels}));
+        this[htmlElementSymbol].dispatchEvent(new CustomEvent(internalConfig.eventName.toLowerCase(), {detail: value, cancelable: false, bubbles: internalConfig.bubbels}));
       }
     };
     if (descriptor) {
