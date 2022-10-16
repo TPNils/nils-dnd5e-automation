@@ -1,7 +1,5 @@
-import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
-import { RollD20Element } from "../../elements/roll-d20-element";
+import { RollD20EventData, RollMode } from "../../elements/roll-d20-element";
 import { TokenImgElement } from "../../elements/token-img-element";
-import { UtilsElement } from "../../elements/utils-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
@@ -11,9 +9,10 @@ import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { MemoryStorageService } from "../../service/memory-storage-service";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
-import { ItemCardHelpers } from "../item-card-helpers";
+import { Action } from "../action";
+import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
@@ -43,6 +42,7 @@ export interface AttackCardData {
   isCrit$?: boolean;
   targetCaches$: TargetCache[]
 }
+
 /**
  * // TODO when expanding attack card, show the user bonus, which can be edited
  *     UI => can probably solve this with slots
@@ -53,9 +53,8 @@ export interface AttackCardData {
  * - Scorching Ray
  * - Eldritch Blast
  */
-
 @Component({
-  tag: 'Attack-CardPart',
+  tag: AttackCardPartComponent.getSelector(),
   html: /*html*/`
     <nac-roll-d20
       [data-roll]="this.part.data.roll$"
@@ -66,49 +65,96 @@ export interface AttackCardData {
       [data-interaction-permission]="this.interactionPermission"
       [data-read-permission]="this.readPermission"
       [data-read-hidden-display-type]="this.readHiddenDisplayType"
+
+      (bonusFormula)="this.onBonusChange($event)"
+      (rollClick)="this.onRollClick($event)"
+      (rollMode)="this.onRollMode($event)"
       >
     </nac-roll-d20>
-    <div class="host" *if="this.dataPartId">
-      I am a Attack-CardPart
-      <div *for="let i of [1,2,3]">{{i}}</div>
-      <label class="testing {{this.testField}}" (click)="console.log('click', $event)">dataPartId = {{this.dataPartId}}</label>
-    </div>
-  `,
-  style: /*css*/`
-    ${TokenImgElement.selector()} {
-      margin-right: 2px;
-      width: 1em;
-      height: 1em;
-    }
-
-    /* testing */
-    :host {
-      display: block;
-    }
-
-    .host label {
-      color: red;
-    }
   `,
 })
-export class AttackCardPart implements ModularCardPart<AttackCardData> {
+class AttackCardPartComponent {
+  //#region actions
+  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: AttackCardData}}>(({part}) => {
+    const documents: CreatePermissionCheckArgs['documents'] = [];
+    if (part.data.actorUuid$) {
+      documents.push({uuid: part.data.actorUuid$, permission: 'OWNER', security: true});
+    }
+    return {documents: documents};
+  });
+  private static rollClick = new Action<{event: MouseEvent} & ChatPartIdData>('AttackOnRollClick')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
+    .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
+    .build(({messageId, part, click, allCardParts}) => {
+      if (part.data.phase === 'result') {
+        return;
+      }
 
-  public static readonly instance = new AttackCardPart();
+      const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
+      if (click.shiftKey) {
+        part.data.phase = orderedPhases[orderedPhases.length - 1];
+      } else {
+        part.data.phase = orderedPhases[orderedPhases.indexOf(part.data.phase) + 1];
+      }
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    });
+  private static bonusChange = new Action<{bonus?: string} & ChatPartIdData>('AttackOnBonusChange')
+    /*.addFilter(({event}) => {
+      if (event.relatedTarget instanceof HTMLElement) {
+        // Do not fire this if roll is pressed (focusout triggers first)
+        return event.relatedTarget.closest(`[data-action="roll"]`) != null;
+      }
+      return false;
+    })*/
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('bonus'))
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
+    .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
+    .build(({messageId, allCardParts, part, bonus}) => {
+      part.data.userBonus = bonus ?? '';
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    });
+  private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>} & ChatPartIdData>('AttackOnModeChange')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getCustomEventSerializer())
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
+    .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
+    .build(({messageId, allCardParts, part, event}) => {
+      if (part.data.mode === event.data) {
+        return;
+      }
+
+      part.data.mode = event.data;
+      if (event.quickRoll) {
+        part.data.phase = 'result';
+      }
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    });
+  //#endregion
+
+  public static getSelector(): string {
+    return `${staticValues.code}-attack-part`;
+  }
 
   @Attribute('data-part-id')
-  public dataPartId: string;
+  public partId: string;
   @Attribute('data-message-id')
-  public dataMessageId: string;
-
+  public messageId: string;
+  
   public part: ModularCardPartData<AttackCardData>;
   public interactionPermission: string;
   public readPermission: string;
   public readHiddenDisplayType: string;
-
+  
   public onInit(): void {
-    const allParts = ModularCard.getCardPartDatas(game.messages.get(this.dataMessageId));
+    const allParts = ModularCard.getCardPartDatas(game.messages.get(this.messageId));
     if (allParts != null) {
-      this.part = allParts.find(p => p.id === this.dataPartId && p.type === this.getType());
+      this.part = allParts.find(p => p.id === this.partId && p.type === AttackCardPart.instance.getType());
       this.part.data.roll$
     }
 
@@ -118,6 +164,24 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
     }
   }
+
+  public onRollClick(event: MouseEvent): void {
+    AttackCardPartComponent.rollClick({event, partId: this.partId, messageId: this.messageId});
+  }
+
+  public onBonusChange(event: CustomEvent<RollD20EventData<string>>): void {
+    AttackCardPartComponent.bonusChange({bonus: event.detail.data, partId: this.partId, messageId: this.messageId});
+  }
+
+  public onRollMode(event: CustomEvent<RollD20EventData<RollMode>>): void {
+    AttackCardPartComponent.modeChange({event, partId: this.partId, messageId: this.messageId});
+  }
+}
+
+export class AttackCardPart implements ModularCardPart<AttackCardData> {
+
+  public static readonly instance = new AttackCardPart();
+  private constructor() {}
 
   public create({item, actor}: ModularCardCreateArgs): AttackCardData {
     if (!['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
@@ -301,121 +365,6 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck<{part: {data: AttackCardData}}>(({part}) => {
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (part.data.actorUuid$) {
-        documents.push({uuid: part.data.actorUuid$, permission: 'OWNER', security: true});
-      }
-      return {documents: documents};
-    })
-    new ElementBuilder()
-      .listenForAttribute('data-part-id', 'string')
-      .listenForAttribute('data-message-id', 'string')
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="roll"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, part, click, allCardParts}) => {
-          if (part.data.phase === 'result') {
-            return;
-          }
-      
-          const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
-          if (click.shiftKey) {
-            part.data.phase = orderedPhases[orderedPhases.length - 1];
-          } else {
-            part.data.phase = orderedPhases[orderedPhases.indexOf(part.data.phase) + 1];
-          }
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('focusout')
-        .addSelectorFilter('input[data-action="user-bonus"]')
-        .addFilter(({event}) => {
-          if (event.relatedTarget instanceof HTMLElement) {
-            // Do not fire this if roll is pressed (focusout triggers first)
-            return event.relatedTarget.closest(`[data-action="roll"]`) != null;
-          }
-          return false;
-        })
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, part, inputValue}) => {
-          if (inputValue && !Roll.validate(inputValue)) {
-            // Only show error on key press
-            throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-          }
-          if (part.data.phase === 'bonus-input') {
-            part.data.phase = 'mode-select';
-          }
-          part.data.userBonus = inputValue ?? '';
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('keyup')
-        .addSelectorFilter('input[data-action="user-bonus"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getKeyEventSerializer())
-        .addSerializer(ItemCardHelpers.getInputSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, part, keyEvent, inputValue}) => {
-          if (keyEvent.key === 'Enter') {
-            const userBonus = inputValue == null ? '' : inputValue;
-            if (userBonus && !Roll.validate(userBonus)) {
-              // Only show error on key press
-              throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-            }
-            part.data.phase = 'result';
-            part.data.userBonus = userBonus;
-            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-          } else if (keyEvent.key === 'Escape' && part.data.phase === 'bonus-input') {
-            part.data.phase = 'mode-select';
-            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-          }
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="mode-minus"], [data-action="mode-plus"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addSerializer(ItemCardHelpers.getActionSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, part, click, action}) => {
-          let modifier = action === 'mode-plus' ? 1 : -1;
-          if (click.shiftKey && modifier > 0) {
-            modifier++;
-          } else if (click.shiftKey && modifier < 0) {
-            modifier--;
-          }
-          
-          const newIndex = Math.max(0, Math.min(modeOrder.length-1, modeOrder.indexOf(part.data.mode) + modifier));
-          if (part.data.mode === modeOrder[newIndex]) {
-            return;
-          }
-          part.data.mode = modeOrder[newIndex];
-
-          if (click.shiftKey) {
-            part.data.phase = 'result';
-          }
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .build(this.getSelector())
-    
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new AttackCardTrigger());
     ModularCard.registerModularCardTrigger(TargetCardPart.instance, new TargetCardTrigger());
@@ -429,14 +378,11 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   //#region Front end
-  public getSelector(): string {
-    return `${staticValues.code}-attack-part`;
-  }
 
   public getHtml(data: HtmlContext): string {
     // TODO technically, you would roll an attack for each target
     //  UI idea: unrolled keep it as is, once rolled (1 button for multiple rolls) show a list below for each target
-    return `<Attack-CardPart data-part-id="${data.partId}" data-message-id="${data.messageId}"></Attack-CardPart>`
+    return `<${AttackCardPartComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${AttackCardPartComponent.getSelector()}>`
   }
   //#endregion
 
@@ -809,23 +755,5 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
     });
   }
   //#endregion
-
-  //#region afterUpdate
-  public afterUpdate(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): void | Promise<void> {
-    this.onBonusChange(context);
-  }
-  
-  private onBonusChange(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
-    for (const {newRow, oldRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId) {
-        continue;
-      }
-      if (newRow.part.data.phase === 'bonus-input' && (oldRow?.part?.data as AttackCardData)?.phase !== 'bonus-input') {
-        MemoryStorageService.setFocusedElementSelector(`${AttackCardPart.instance.getSelector()}[data-message-id="${newRow.messageId}"][data-part-id="${newRow.part.id}"] input.user-bonus`);
-        return;
-      }
-    }
-  }
-  //#endregion 
 
 }

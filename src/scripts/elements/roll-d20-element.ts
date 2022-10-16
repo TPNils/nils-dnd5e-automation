@@ -7,14 +7,28 @@ import { staticValues } from "../static-values";
 const rollModeOrder = ['disadvantage', 'normal', 'advantage'] as const;
 export type RollMode = typeof rollModeOrder[number];
 
+export interface RollD20EventData<T> {
+  quickRoll: boolean;
+  data: T;
+}
+
+const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20EventData<string>) => {
+ return oldValue?.data === newValue?.data;   
+}
+
 const userBonus = /*html*/`
-<input *if="this.showBonus && this.hasInteractPermission" class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}" type="text" value="{{this.bonusFormula}}" (blur)="this.onBonusChange($event)" data-action="user-bonus"/>
+  <input *if="this.showBonus && this.hasInteractPermission"
+    class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
+    type="text"
+    value="{{this.bonusFormula}}"
+    (blur)="this.onBonusBlur($event)"
+    (keyup)="this.onBonusKeyUp($event)"/>
 `;
 @Component({
   tag: RollD20Element.selector(),
   html: /*html*/`
     <div class="flavor">
-      <slot name="label" *if="this.roll.total != null">
+      <slot name="label" *if="this.roll?.total != null">
         {{ this.rollModeLabel }}
       </slot>
     </div>
@@ -30,13 +44,13 @@ const userBonus = /*html*/`
         </div>
       </nac-roll-result>
 
-      <div class="bonus-container" *if="this.roll.total == null">
-        <button data-action="roll" class="roll-button" [disabled]="!this.hasInteractPermission">
+      <div class="bonus-container" *if="this.roll?.total == null">
+        <button class="roll-button" [disabled]="!this.hasInteractPermission" (click)="this.onRollClick($event)">
           <slot name="label">
             <virtual *if="this.label && this.mode === 'normal'">
               {{ this.label }}
             </virtual>
-            <virtual *if="this.label && this.mode !== 'normal'">
+            <virtual *if="!this.label || this.mode !== 'normal'">
               {{ this.rollModeLabel }}
             </virtual>
             <virtual *if="!this.label">
@@ -186,6 +200,8 @@ export class RollD20Element {
   public set roll(value: Roll | RollData) {
     if (value instanceof Roll) {
       this._roll = value;
+    } else if (value == null) {
+      this._roll = null;
     } else {
       this._roll = UtilsRoll.fromRollData(value);
     }
@@ -205,7 +221,6 @@ export class RollD20Element {
   public showBonus: string;
 
   @Attribute({name: 'data-bonus-formula', dataType: 'string'})
-  @Output({eventName: 'data-bonus-formula', deduplicate: true})
   public bonusFormula: string = '';
 
   @Attribute({name: 'data-override-formula', dataType: 'string'})
@@ -284,13 +299,42 @@ export class RollD20Element {
   }
 
   //#region template callbacks
-  public onBonusChange(event: FocusEvent): void {
+  @Output({eventName: 'bonusFormula', deduplicate: dedupeEventData})
+  private bonusFormulaChange: RollD20EventData<string>;
+  public onBonusBlur(event: FocusEvent): void {
     if (event.target instanceof HTMLInputElement) {
-      this.bonusFormula = event.target.value;
+      const userBonus = event.target.value == null ? '' : event.target.value;
+      if (userBonus && !Roll.validate(userBonus)) {
+        ui.notifications.error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+        event.target.value = this.bonusFormula;
+        return;
+      }
+      this.bonusFormulaChange = {
+        quickRoll: false,
+        data: userBonus,
+      };
     }
   }
-  @Output('roll-mode')
-  public rollModeEmitter: RollMode;
+  public onBonusKeyUp(event: KeyboardEvent): void {
+    if (event.target instanceof HTMLInputElement) {
+      if (event.key === 'Enter') {
+        const userBonus = event.target.value == null ? '' : event.target.value;
+        if (userBonus && !Roll.validate(userBonus)) {
+          ui.notifications.error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+          event.target.value = this.bonusFormula;
+          return;
+        }
+        this.bonusFormulaChange = {
+          quickRoll: event.shiftKey,
+          data: userBonus,
+        };
+        event.target.blur();
+      }
+    }
+  }
+
+  @Output({eventName: 'rollMode', deduplicate: dedupeEventData})
+  private rollModechange: RollD20EventData<RollMode>;
   public onModeChange(event: MouseEvent, action: '+' | '-'): void {
     let modifier = action === '+' ? 1 : -1;
     if (event.shiftKey && modifier > 0) {
@@ -303,7 +347,16 @@ export class RollD20Element {
     if (this.rollMode === rollModeOrder[newIndex]) {
       return;
     }
-    this.rollModeEmitter = rollModeOrder[newIndex];
+    this.rollModechange = {
+      quickRoll: event.shiftKey,
+      data: rollModeOrder[newIndex],
+    };
+  }
+
+  @Output('rollClick')
+  public rollClickEmitter: MouseEvent;
+  public onRollClick(event: MouseEvent): void {
+    this.rollClickEmitter = event;
   }
   //#endregion
 
