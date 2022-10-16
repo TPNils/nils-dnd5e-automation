@@ -210,6 +210,9 @@ export function Component(config: ComponentConfig | string) {
 Component.isComponentElement = (element: any): element is ComponentElement => {
   return element instanceof ComponentElement;
 }
+Component.getTag = (constructor: ConstructorOf<any>): string | null => {
+  return (constructor.prototype[componentConfigSymbol] as ComponentConfigInternal)?.tag;
+}
 
 const attributeConfigSymbol = Symbol('AttributeConfigs');
 export interface AttributeConfig {
