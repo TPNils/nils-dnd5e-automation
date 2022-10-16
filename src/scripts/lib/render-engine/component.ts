@@ -334,7 +334,11 @@ export function Output(config?: string | OutputConfig) {
         // htmlElement is init after the constructor has finished
         return;
       }
-      this[htmlElementSymbol].dispatchEvent(new CustomEvent(configInternal.eventName, {detail: value, cancelable: false, bubbles: configInternal.bubbels}));
+      if (value instanceof Event) {
+        this[htmlElementSymbol].dispatchEvent(value);
+      } else {
+        this[htmlElementSymbol].dispatchEvent(new CustomEvent(configInternal.eventName, {detail: value, cancelable: false, bubbles: configInternal.bubbels}));
+      }
     };
     if (descriptor) {
       if (descriptor.set) {
