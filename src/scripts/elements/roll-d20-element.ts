@@ -55,15 +55,15 @@ const userBonus = /*html*/`
             </virtual>
             <virtual *if="!this.label">
               <svg class="advantage-icon" *if="this.mode === 'advantage'">
-                <use class="d20" xlink:href="/modules/{{@root.moduleName}}/assets/icons/d20.svg#d20"/>
-                <use class="arrow-up" xlink:href="/modules/{{@root.moduleName}}/assets/icons/arrow-up.svg#arrow-up"  width=".9em" height=".9em"></use>
+                <use class="d20" xlink:href="/modules/${staticValues.moduleName}/assets/icons/d20.svg#d20"/>
+                <use class="arrow-up" xlink:href="/modules/${staticValues.moduleName}/assets/icons/arrow-up.svg#arrow-up"  width=".9em" height=".9em"></use>
               </svg>
               <svg class="disadvantage-icon" *if="this.mode === 'disadvantage'">
-                <use class="d20" xlink:href="/modules/{{@root.moduleName}}/assets/icons/d20.svg#d20"/>
-                <use class="arrow-down" xlink:href="/modules/{{@root.moduleName}}/assets/icons/arrow-up.svg#arrow-up"  width=".9em" height=".9em"></use>
+                <use class="d20" xlink:href="/modules/${staticValues.moduleName}/assets/icons/d20.svg#d20"/>
+                <use class="arrow-down" xlink:href="/modules/${staticValues.moduleName}/assets/icons/arrow-up.svg#arrow-up"  width=".9em" height=".9em"></use>
               </svg>
               <svg class="normal-mode-icon" *if="this.mode === 'normal'">
-                <use class="d20" xlink:href="/modules/{{@root.moduleName}}/assets/icons/d20.svg#d20"/>
+                <use class="d20" xlink:href="/modules/${staticValues.moduleName}/assets/icons/d20.svg#d20"/>
               </svg>
             </virtual>
           </slot>
