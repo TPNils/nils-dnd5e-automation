@@ -2,6 +2,7 @@ import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-b
 import { DmlTrigger, ITrigger, IAfterDmlContext, IDmlTrigger, IDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
 import MyAbilityTemplate from "../../pixi/ability-template";
 import { staticValues } from "../../static-values";
@@ -10,6 +11,7 @@ import { UtilsTemplate } from "../../utils/utils-template";
 import { ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardTriggerData, ModularCardPartData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
+import { BaseCardComponent } from "./base-card-component";
 import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-part";
 
 export interface TemplateCardData {
@@ -20,6 +22,76 @@ export interface TemplateCardData {
     target: MyItemData['data']['target'];
     rangeUnit?: MyItemData['data']['range']['units'];
   }
+}
+
+@Component({
+  tag: TemplateCardComponent.getSelector(),
+  html: /*html*/`
+  <div class="section">
+    <button data-action="item-template" [disabled]="!this.hasPermission" (click)="this.startPlace()">
+      {{this.placeTemplateLocale}}
+    </button> 
+  </div>
+  `,
+  style: /*css*/`
+    .section {
+      margin: 5px 0;
+    }
+  `
+})
+export class TemplateCardComponent extends BaseCardComponent implements OnInit {
+
+  public static getSelector(): string {
+    return `${staticValues.code}-template-part`;
+  }
+
+  public placeTemplateLocale = game.i18n.localize('DND5E.PlaceTemplate');
+  public onInit(args: OnInitParam) {
+    args.addStoppable(
+      this.getData().listen(data => this.setData(data.message, data.partId))
+    );
+  }
+
+  public hasPermission = false;
+  private target: TemplateCardData['calc$']['target'];
+  private async setData(message: ChatMessage, partId: string) {
+    const allParts = ModularCard.getCardPartDatas(message);
+    let part: ModularCardPartData<TemplateCardData>;
+    if (allParts != null) {
+      part = allParts.find(p => p.id === partId && p.type === TemplateCardPart.instance.getType());
+    }
+
+    if (part) {
+      const checks = await UtilsDocument.hasPermissions([
+        {
+          uuid: part.data.calc$.actorUuid,
+          permission: 'Owner',
+          user: game.user,
+        }
+      ]);
+  
+      this.hasPermission = checks.every(check => check.result);
+      this.target = part.data.calc$.target;
+    } else {
+      this.hasPermission = false;
+    }
+  }
+
+  public startPlace() {
+    const template = MyAbilityTemplate.fromItem({
+      target: this.target,
+      flags: {
+        [staticValues.moduleName]: {
+          dmlCallbackMessageId: this.messageId,
+          dmlCallbackPartId: this.partId,
+        }
+      }
+    });
+    if ((template as MyAbilityTemplate)?.drawPreview) {
+      (template as MyAbilityTemplate).drawPreview();
+    }
+  }
+
 }
 
 export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
@@ -61,50 +133,6 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck<{part: {data: TemplateCardData}}>(({part}) => {
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (part.data.calc$.actorUuid) {
-        documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
-      }
-      return {documents: documents, updatesMessage: false};
-    })
-
-    new ElementBuilder()
-      .listenForAttribute('data-part-id', 'string')
-      .listenForAttribute('data-message-id', 'string')
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="item-template"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<TemplateCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, partId, part}) => {
-          const template = MyAbilityTemplate.fromItem({
-            target: part.data.calc$.target,
-            flags: {
-              [staticValues.moduleName]: {
-                dmlCallbackMessageId: messageId,
-                dmlCallbackPartId: partId,
-              }
-            }
-          });
-          if ((template as MyAbilityTemplate)?.drawPreview) {
-            (template as MyAbilityTemplate).drawPreview();
-          }
-        })
-      )
-      .addOnAttributeChange(({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
-          element.innerHTML = await renderTemplate(
-            `modules/${staticValues.moduleName}/templates/modular-card/template-part.hbs`, {
-              data: part.data,
-              moduleName: staticValues.moduleName
-          });
-        }});
-      })
-      .build(this.getSelector())
-    
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new TemplateCardTrigger());
     DmlTrigger.registerTrigger(new DmlTriggerTemplate());
@@ -115,12 +143,8 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   }
 
   //#region Front end
-  public getSelector(): string {
-    return `${staticValues.code}-template-part`;
-  }
-
   public getHtml(data: HtmlContext): string {
-    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
+    return `<${TemplateCardComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${TemplateCardComponent.getSelector()}>`
   }
   //#endregion
 
