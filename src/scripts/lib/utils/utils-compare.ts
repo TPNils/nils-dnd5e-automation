@@ -26,7 +26,11 @@ export class UtilsCompare {
       for (const key of keys) {
         const itemResult = UtilsCompare.findDiff(original[key], override[key]);
         if (itemResult.changed) {
-          diff[key] = itemResult.diff;
+          if (itemResult.diff === undefined) {
+            diff[`-=${key}`] = null;
+          } else {
+            diff[key] = itemResult.diff;
+          }
         }
       }
       if (Object.keys(diff).length > 0) {
