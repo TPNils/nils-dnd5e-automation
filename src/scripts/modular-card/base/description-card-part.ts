@@ -3,7 +3,6 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Attribute, Component, OnInitParam } from "../../lib/render-engine/component";
 import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { UtilsLog } from "../../utils/utils-log";
 import { ModularCard, ModularCardPartData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
 
@@ -110,7 +109,6 @@ export class DescriptionCardComponent {
           if (allParts != null) {
             part = allParts.find(p => p.id === partId && p.type === DescriptionCardPart.instance.getType());
           }
-          UtilsLog.debug(part, allParts, partId)
           
           this.name = part?.data?.name$;
           this.image = part?.data?.img$;
