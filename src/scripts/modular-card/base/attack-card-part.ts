@@ -142,6 +142,7 @@ class AttackCardPartComponent implements OnInit {
     return `${staticValues.code}-attack-part`;
   }
 
+  //#region input
   private _partId = new ValueProvider<string>();
   @Attribute('data-part-id')
   public get partId(): string {
@@ -159,6 +160,7 @@ class AttackCardPartComponent implements OnInit {
   public set messageId(v: string) {
     this._messageId.set(v);
   }
+  //#endregion
   
   public part: ModularCardPartData<AttackCardData>;
   public interactionPermission: string;
