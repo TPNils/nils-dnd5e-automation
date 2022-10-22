@@ -67,24 +67,6 @@
   [data-#{$module-name}-action="toggle-collapse"] {
     cursor: pointer;
   }
-
-  .#{$module-name}-header {
-    padding: 3px 0;
-    border-top: 2px groove #FFFFFF;
-    border-bottom: 2px groove #FFFFFF;
-    display: flex;
-    gap: 4px;
-
-    .#{$module-name}-item-name {
-      flex: 1;
-      margin: 0;
-      line-height: 36px;
-      font-family: "Modesto Condensed", "Palatino Linotype", serif;
-      font-size: 20px;
-      font-weight: 700;
-      color: #4b4a44;
-    }
-  }
   
   .#{$module-name}-attack,
   .#{$module-name}-first-dmg {
@@ -182,10 +164,6 @@
       color: inherit;
       opacity: .5;
     }
-  }
-
-  .#{$module-name}-header, .#{$module-name}-section {
-    margin: 5px 0;
   }
   
   .#{$module-name}-apply,
