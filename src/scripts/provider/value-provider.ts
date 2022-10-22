@@ -1,35 +1,52 @@
 import { Stoppable } from "../lib/utils/stoppable";
 
+export type ValueReaderType<T> = T extends null | undefined ? T :
+  T extends ValueProvider & { get(): infer F } ? 
+    ValueReader<F> : T;
+
+export abstract class ValueReader<T> implements ValueReader<T> {
+  public listenFirst(): Promise<T> {
+    return new Promise((resolve) => {
+      let shouldStop = false;
+      const stoppable = this.listen(value => {
+        shouldStop = true;
+        if (stoppable != null) {
+          stoppable.stop();
+        }
+        resolve(value);
+      });
+      if (shouldStop) {
+        stoppable.stop();
+      }
+    });
+  }
+  public abstract get(): T;
+  public abstract isSet(): boolean;
+  public abstract listen(callback: (value?: T) => void): Stoppable;
+
+  public switchMap<R>(transformer: (value: T) => ValueReader<R>): ValueReader<R> {
+    return new SwitchMap<T, R>(this, transformer);
+  }
+
+  public map<R>(transformer: (value: T) => R): ValueReader<R> {
+    return new Mapper<T, R>(this, transformer);
+  }
+
+}
+
 /**
  * Allow to request a value before it may have been initialized, queueing the requests if the value is missing
  */
- export class ValueProvider<T = any> {
+export class ValueProvider<T = any> extends ValueReader<T> {
   private nextListenerId = 0;
   private listeners = new Map<number, (value?: T) => void>();
   private valueProvided = false;
   private value: T;
-  private requestFirstQueue: Array<(value?: T) => void> = [];
 
   constructor(value?: T) {
+    super();
     this.value = value;
     this.valueProvided = value !== undefined;
-  }
-
-  public listenFirst(): Promise<T> {
-    if (this.valueProvided) {
-      return new Promise((resolve) => {
-        resolve(this.value);
-      });
-    } else {
-      return new Promise((resolve) => {
-        // I believe, in theory, the value could be set before this callback function is executed
-        if (this.valueProvided) {
-          resolve(this.value);
-        } else {
-          this.requestFirstQueue.push(resolve);
-        }
-      });
-    }
   }
 
   public get(): T {
@@ -43,13 +60,9 @@ import { Stoppable } from "../lib/utils/stoppable";
   public set(value: T): void {
     this.valueProvided = true;
     this.value = value;
-    for (const callback of this.requestFirstQueue) {
-      callback(value);
-    }
     for (const callback of this.listeners.values()) {
       callback(value);
     }
-    this.requestFirstQueue = [];
   }
 
   public listen(callback: (value?: T) => void): Stoppable {
@@ -63,5 +76,64 @@ import { Stoppable } from "../lib/utils/stoppable";
         this.listeners.delete(id);
       }
     }
+  }
+
+}
+
+class SwitchMap<D, T> extends ValueReader<T> {
+  constructor(
+    private readonly delegate: ValueReader<D>,
+    private readonly transformer: (value: D) => ValueReader<T>
+  ){
+    super();
+  }
+
+  public async listenFirst(): Promise<T> {
+    const value = await this.delegate.listenFirst();
+    return this.transformer(value).listenFirst();
+  }
+
+  public get(): T {
+    const value = this.delegate.get();
+    return this.transformer(value).get();
+  }
+
+  public isSet(): boolean {
+    throw this.delegate.isSet();
+  }
+
+  public listen(callback: (value?: T) => void): Stoppable {
+    return this.delegate.listen(async value => {
+      callback(await this.transformer(value).listenFirst());
+    })
+  }
+}
+
+class Mapper<D, T> extends ValueReader<T> {
+  constructor(
+    private readonly delegate: ValueReader<D>,
+    private readonly transformer: (value: D) => T
+  ){
+    super();
+  }
+
+  public async listenFirst(): Promise<T> {
+    const value = await this.delegate.listenFirst();
+    return this.transformer(value);
+  }
+
+  public get(): T {
+    const value = this.delegate.get();
+    return this.transformer(value);
+  }
+
+  public isSet(): boolean {
+    throw this.delegate.isSet();
+  }
+
+  public listen(callback: (value?: T) => void): Stoppable {
+    return this.delegate.listen(async value => {
+      callback(await this.transformer(value));
+    })
   }
 }

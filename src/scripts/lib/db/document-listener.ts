@@ -1,4 +1,4 @@
-import { ValueProvider } from "../../provider/value-provider";
+import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { Stoppable } from "../utils/stoppable";
 import { DmlTrigger, IAfterDmlContext, IDmlTrigger } from "./dml-trigger";
 import { FoundryDocument, UtilsDocument } from "./utils-document";
@@ -7,17 +7,42 @@ const triggersByDocumentType = new Map<string, {trigger: CallbackTrigger<any>, s
 type FoundryDocumentClass<T extends FoundryDocument> = {new(...args: any[]): T; documentName: string;};
 
 class CallbackTrigger<T extends FoundryDocument> implements IDmlTrigger<T> {
-  public callbacksByUuid = new Map<string, DocumentListener<T>>();
+  private callbacksByUuid = new Map<string, Map<number, (value?: T) => void>>();
   
   constructor(
     public readonly type: FoundryDocumentClass<T>
   ) {
   }
 
+  private nextId = 0;
+  public addListener(uuid: string, callback: (value?: T) => void): Stoppable {
+    if (!this.callbacksByUuid.has(uuid)) {
+      this.callbacksByUuid.set(uuid, new Map());
+    }
+    const id = this.nextId++;
+    this.callbacksByUuid.get(uuid).set(id, callback);
+    return {
+      stop: () => {
+        const callbacks = this.callbacksByUuid.get(uuid);
+        if (callbacks) {
+          callbacks.delete(id);
+          if (callbacks.size === 0) {
+            this.callbacksByUuid.delete(uuid);
+          }
+          if (this.callbacksByUuid.size === 0) {
+            triggersByDocumentType.get(this.type.documentName).stoppable.stop();
+          }
+        }
+      }
+    }
+  }
+
   public afterUpsert(context: IAfterDmlContext<T>): void | Promise<void> {
     for (const row of context.rows) {
       if (this.callbacksByUuid.has(row.newRow.uuid)) {
-        this.callbacksByUuid.get(row.newRow.uuid).provider.set(row.newRow);
+        for (const callback of this.callbacksByUuid.get(row.newRow.uuid).values()) {
+          callback(row.newRow);
+        }
       }
     }
   }
@@ -25,60 +50,47 @@ class CallbackTrigger<T extends FoundryDocument> implements IDmlTrigger<T> {
   public afterDelete(context: IAfterDmlContext<T>): void | Promise<void> {
     for (const row of context.rows) {
       if (this.callbacksByUuid.has(row.oldRow.uuid)) {
-        this.callbacksByUuid.get(row.oldRow.uuid).provider.set(null);
+        for (const callback of this.callbacksByUuid.get(row.newRow.uuid).values()) {
+          callback(null);
+        }
       }
     }
   }
 }
 
-export class DocumentListener<T extends FoundryDocument> implements Stoppable {
-  public provider = new ValueProvider<T>();
+export class DocumentListener<T extends FoundryDocument> extends ValueReader<T> {
 
+  private readonly documentType: string;
   private constructor(
     private readonly uuid: string,
   ) {
-    // Load initial value
-    UtilsDocument.fromUuid(uuid).then(doc => this.provider.set(doc as T));
-  }
-
-  public listenFirst(): Promise<T> {
-    return this.provider.listenFirst();
+    super();
+    const uuidParts = uuid.split('.');
+    this.documentType = uuidParts[uuidParts.length - 2];
   }
 
   public get(): T {
-    return this.provider.get();
+    return UtilsDocument.fromUuid(this.uuid, {sync: true}) as T;
+  }
+
+  public isSet(): boolean {
+    return this.get() !== undefined;
   }
 
   public listen(callback: (value?: T) => void): Stoppable {
-    return this.provider.listen(callback);
-  }
-
-  public stop(): void {
-    const uuidParts = this.uuid.split('.');
-    const documentType: string = uuidParts[uuidParts.length - 2];
-    const trigger = triggersByDocumentType.get(documentType);
-    trigger.trigger.callbacksByUuid.delete(this.uuid);
-    if (trigger.trigger.callbacksByUuid.size === 0) {
-      trigger.stoppable.stop();
-      triggersByDocumentType.delete(documentType);
-    }
-  }
-
-  public static listenUuid<T extends FoundryDocument>(uuid: string): DocumentListener<T> {
-    // TODO add listener as 2nd callback & return stoppable
-    // TODO make sure CONFIG[documentType].documentClass happens when they are init
-    const uuidParts = uuid.split('.');
-    const documentType: string = uuidParts[uuidParts.length - 2];
-
-    let trigger = triggersByDocumentType.get(documentType)?.trigger;
+    UtilsDocument.fromUuid(this.uuid).then(init => callback(init as T));
+    
+    let trigger = triggersByDocumentType.get(this.documentType)?.trigger;
     if (trigger == null) {
-      trigger = new CallbackTrigger(CONFIG[documentType].documentClass);
+      // TODO make sure CONFIG[documentType].documentClass happens when they are init
+      trigger = new CallbackTrigger(CONFIG[this.documentType].documentClass);
       const stoppable = DmlTrigger.registerTrigger(trigger);
-      triggersByDocumentType.set(documentType, {trigger, stoppable});
+      triggersByDocumentType.set(this.documentType, {trigger, stoppable});
     }
-    if (!trigger.callbacksByUuid.has(uuid)) {
-      trigger.callbacksByUuid.set(uuid, new DocumentListener<T>(uuid));
-    }
-    return trigger.callbacksByUuid.get(uuid);
+    return trigger.addListener(this.uuid, callback);
+  }
+
+  public static listenUuid<T extends FoundryDocument>(uuid: string): ValueReader<T> {
+    return new DocumentListener(uuid);
   }
 }
