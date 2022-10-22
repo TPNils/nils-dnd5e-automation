@@ -19,8 +19,8 @@ const endElementRegex = /\s*<\/([a-zA-Z_][a-zA-Z0-9_\-\.]*)>/y;
 
 // https://www.w3.org/TR/2012/WD-html-markup-20120329/syntax.html
 const attrValueNoQuoteRegex = /([^"'=<>`\s]+)/y;
-const attrValueDoubleQuoteRegex = /"(.*?[^\\](?:\\\\)*)"/ys;
-const attrValueSingleQuoteRegex = /'(.*?[^\\](?:\\\\)*)'/ys;
+const attrValueDoubleQuoteRegex = /""|"(.*?[^\\](?:\\\\)*)"/ys;
+const attrValueSingleQuoteRegex = /''|'(.*?[^\\](?:\\\\)*)'/ys;
 const attrNameRegex = /([^\s"'>/=]+)/y;
 const attrRegex = new RegExp(`\\s*${attrNameRegex.source}(?:\\s*=(?:${attrValueNoQuoteRegex.source}|\\s*${attrValueDoubleQuoteRegex.source}|\\s*${attrValueSingleQuoteRegex.source}))?`, `ys`)
 
