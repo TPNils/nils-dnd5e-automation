@@ -50,7 +50,7 @@ class CallbackTrigger<T extends FoundryDocument> implements IDmlTrigger<T> {
   public afterDelete(context: IAfterDmlContext<T>): void | Promise<void> {
     for (const row of context.rows) {
       if (this.callbacksByUuid.has(row.oldRow.uuid)) {
-        for (const callback of this.callbacksByUuid.get(row.newRow.uuid).values()) {
+        for (const callback of this.callbacksByUuid.get(row.oldRow.uuid).values()) {
           callback(null);
         }
       }
