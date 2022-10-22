@@ -23,7 +23,7 @@ function getDefaultCardCollpased(): boolean {
   html: /*html*/`
   <div class="header" (click)="this.toggleCollapsed()">
     <img [src]="this.image" [title]="this.name" width="36" height="36"/>
-    <h3 class="item-name">{{this.name}}</h3>
+    <h3 class="name">{{this.name}}</h3>
   </div>
 
   <div class="section description {{this.collapsed ? '' : 'open'}}">
@@ -49,7 +49,7 @@ function getDefaultCardCollpased(): boolean {
     }
     
 
-    .header .item-name {
+    .header .name {
       flex: 1;
       margin: 0;
       line-height: 36px;
