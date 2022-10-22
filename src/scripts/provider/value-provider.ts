@@ -30,7 +30,7 @@ export abstract class ValueReader<T> implements ValueReader<T> {
     return new Mapper<T, R>(this, transformer);
   }
 
-  public static mergeObject<T extends { [key: string]: ValueReader<any> }>(obj: T): ValueReader<ObjectWithRefReturnTypes<T>> {
+  public static mergeObject<T extends { [key: string]: ValueReader<any> | any }>(obj: T): ValueReader<ObjectWithRefReturnTypes<T>> {
     return new MergeObject<T>(obj);
   }
 
@@ -148,13 +148,22 @@ class MergeObject<T extends { [key: string]: ValueReader<any> }> extends ValueRe
     const pendingKeys = new Set<keyof ObjectWithRefReturnTypes<T>>(Object.keys(this.obj));
     let compoundValue = {} as ObjectWithRefReturnTypes<T>;
     for (const key of pendingKeys) {
-      stoppables.push(this.obj[key].listen(value => {
+      const value = this.obj[key];
+      if (value instanceof ValueReader) {
+        stoppables.push(this.obj[key].listen(value => {
+          compoundValue[key] = value;
+          pendingKeys.delete(key);
+          if (pendingKeys.size === 0) {
+            callback({...compoundValue});
+          }
+        }));
+      } else {
         compoundValue[key] = value;
         pendingKeys.delete(key);
         if (pendingKeys.size === 0) {
           callback({...compoundValue});
         }
-      }));
+      }
     }
 
     return {

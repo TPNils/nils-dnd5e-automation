@@ -1,11 +1,15 @@
-import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
-import { UtilsDocument } from "../../lib/db/utils-document";
+import { DocumentListener } from "../../lib/db/document-listener";
+import { FoundryDocument, UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
+import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { SpellData, MyActor } from "../../types/fixed-types";
-import { ItemCardHelpers } from "../item-card-helpers";
+import { SpellData, MyActor, MyItem } from "../../types/fixed-types";
+import { Action } from "../action";
+import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
+import { BaseCardComponent } from "./base-card-component";
 
 interface SpellLevelCardData {
   selectedLevel: number | 'pact';
@@ -13,6 +17,7 @@ interface SpellLevelCardData {
     tokenUuid?: string;
     actorUuid: string;
     itemUuid: string;
+    originalLevel: number;
     spellSlots: Array<{
       type: 'pact' | 'spell';
       level: number;
@@ -23,6 +28,163 @@ interface SpellLevelCardData {
 }
 
 const originalLevelSymbol = Symbol('Original level');
+@Component({
+  tag: SpellLevelCardComponent.getSelector(),
+  html: /*html*/`
+  <select class="form-fields" [disabled]="this.spellSlotOptions.length <= 1" (change)="this.onSelectChange($event)">
+    <option *for="let option of this.spellSlotOptions" [selected]="option.selected" [value]="option.value">{{ option.label }}</option>
+  </select>
+  `,
+})
+export class SpellLevelCardComponent extends BaseCardComponent implements OnInit {
+  //#region actions
+  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: SpellLevelCardData}}>(({part}) => {
+    const documents: CreatePermissionCheckArgs['documents'] = [];
+    if (part.data.calc$.actorUuid) {
+      documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
+    }
+    return {documents: documents};
+  });
+  private static selectChange = new Action<{event: Event} & ChatPartIdData>('SpellLevelCardChangeLevel')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getInputSerializer())
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<SpellLevelCardData>())
+    .setPermissionCheck(SpellLevelCardComponent.actionPermissionCheck)
+    .build(async ({messageId, part, inputValue, allCardParts}) => {
+      part.data.selectedLevel = inputValue === 'pact' ? inputValue : Number.parseInt(inputValue);
+      let level: number;
+      if (part.data.selectedLevel === 'pact') {
+        const actor = await UtilsDocument.actorFromUuid(part.data.calc$.actorUuid);
+        level = actor.data.data.spells.pact.level;
+      } else {
+        level = part.data.selectedLevel;
+      }
+  
+      let [item, actor, token] = await Promise.all([
+        UtilsDocument.itemFromUuid(part.data.calc$.itemUuid),
+        UtilsDocument.actorFromUuid(part.data.calc$.actorUuid),
+        part.data.calc$.tokenUuid == null ? Promise.resolve(null) : UtilsDocument.tokenFromUuid(part.data.calc$.tokenUuid)
+      ]);
+  
+      if (item.data.data.level !== level) {
+        const originalLevel = item.data.data.level;
+        item = item.clone({data: {level: level}}, {keepId: true});
+        item.prepareFinalAttributes(); // Spell save DC, etc...
+        item[originalLevelSymbol] = originalLevel;
+      }
+  
+      const responses: Array<Promise<ModularCardPartData>> = [];
+      const partsById = new Map<string, ModularCardPartData>();
+      for (const part of allCardParts) {
+        partsById.set(part.id, part);
+        const typeHandler = ModularCard.getTypeHandler(part.type);
+        const response = typeHandler.refresh(part.data, {item, actor, token});
+        if (response instanceof Promise) {
+          responses.push(response.then(r => ({
+            id: part.id,
+            type: part.type,
+            data: r
+          })));
+        } else {
+          responses.push(Promise.resolve({
+            id: part.id,
+            type: part.type,
+            data: response
+          }));
+        }
+      }
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), await Promise.all(responses));
+    });
+  //#endregion
+
+  public static getSelector(): string {
+    return `${staticValues.code}-spell-level-part`;
+  }
+  
+  public spellSlotOptions: Array<{label: string; value: string; selected: boolean}> = [];
+  public onInit(args: OnInitParam): void {
+    args.addStoppable(
+      this.getData().switchMap(({message, partId}) => {
+        const allParts = ModularCard.getCardPartDatas(message);
+        let part: ModularCardPartData<SpellLevelCardData>;
+        if (allParts != null) {
+          part = allParts.find(p => p.id === partId && p.type === SpellLevelCardPart.instance.getType());
+        }
+        return ValueReader.mergeObject({
+          part,
+          actor: part == null ? null : DocumentListener.listenUuid<MyActor & FoundryDocument>(part.data.calc$.actorUuid)
+        })
+      }).listen(async ({part, actor}) => this.setData(part, actor)),
+    )
+  }
+
+  private async setData(part: ModularCardPartData<SpellLevelCardData>, actor: MyActor) {
+    this.spellSlotOptions = [];
+    if (part) {
+      const permissionResponse = await SpellLevelCardComponent.actionPermissionCheck({
+        part: part,
+        partId: this.partId,
+        messageId: this.messageId,
+      }, game.user)
+      const isOwner = permissionResponse !== 'prevent-action';
+      if (actor) {
+        for (const spellData of part.data.calc$.spellSlots) {
+          // const spellData: SpellData = actor.data.data.spells[spellKey];
+          // if (spellData.max <= 0) {
+          //   continue;
+          // }
+          if (spellData.type === 'spell') {
+            // const spellLevel = Number.parseInt(spellKey.substring(5));
+            const spellLevel = spellData.level;
+            const availableSlots = spellData.availableSlots;
+            this.spellSlotOptions.push({
+              label: game.i18n.format("DND5E.SpellLevelSlot", {level: game.i18n.localize(`DND5E.SpellLevel${spellLevel}`), n: isOwner ? availableSlots : '?'}),
+              value: String(spellLevel),
+              selected: part.data.selectedLevel === spellLevel,
+            });
+          } else if (spellData.type === 'pact') {
+            // const spellLevel = (spellData as MyActor['data']['data']['spells']['pact']).level;
+            // const availableSlots = spellData.value;
+            const spellLevel = spellData.level;
+            const availableSlots = spellData.availableSlots;
+            this.spellSlotOptions.push({
+              label: game.i18n.format("DND5E.SpellLevelPact", {level: spellLevel, n: isOwner ? availableSlots : '?'}),
+              value: spellData.type,
+              selected: part.data.selectedLevel === spellLevel,
+            });
+          }
+        }
+      } else if (part.data.selectedLevel === 'pact') {
+        this.spellSlotOptions.push({
+          label: game.i18n.format("DND5E.SpellLevelPact", {level: '?', n: '?'}),
+          value: part.data.selectedLevel,
+          selected: true,
+        });
+      } else {
+        this.spellSlotOptions.push({
+          label: game.i18n.format("DND5E.SpellLevelSlot", {level: game.i18n.localize(`DND5E.SpellLevel${part.data.selectedLevel}`), n: '?'}),
+          value: String(part.data.selectedLevel),
+          selected: true,
+        });
+      }
+      
+      if (!isOwner) {
+        // Only show the selected slot
+        this.spellSlotOptions = this.spellSlotOptions.filter(option => option.selected);
+      }
+    }
+  }
+
+  public onSelectChange(event: Event) {
+    SpellLevelCardComponent.selectChange({
+      event,
+      partId: this.partId,
+      messageId: this.messageId,
+    })
+  }
+
+}
 
 export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
 
@@ -94,6 +256,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
         itemUuid: item.uuid,
         tokenUuid: token?.uuid,
         spellSlots: spellSlots,
+        originalLevel: originalLevel,
       }
     };
   }
@@ -118,88 +281,6 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck<{part: {data: SpellLevelCardData}}>(({part}) => {
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (part.data.calc$.actorUuid) {
-        documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
-      }
-      return {documents: documents};
-    })
-
-    new ElementBuilder()
-      .listenForAttribute('data-part-id', 'string')
-      .listenForAttribute('data-message-id', 'string')
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('change')
-        .addSelectorFilter('[data-action="spell-level-change"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getInputSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<SpellLevelCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(async ({messageId, part, allCardParts, inputValue}) => {
-          if (inputValue === 'pact') {
-            part.data.selectedLevel = 'pact';
-          } else if (!Number.isNaN(Number(inputValue))) {
-            part.data.selectedLevel = Number(inputValue);
-          }
-          const spellSlot = part.data.calc$.spellSlots.find(slot => slot.type === inputValue || slot.level === Number(inputValue));
-          if (!spellSlot) {
-            // Selected an invalid spell slot (too low of a level or has no pact slots)
-            return;
-          }
-      
-          let [item, actor, token] = await Promise.all([
-            UtilsDocument.itemFromUuid(part.data.calc$.itemUuid),
-            UtilsDocument.actorFromUuid(part.data.calc$.actorUuid),
-            part.data.calc$.tokenUuid == null ? Promise.resolve(null) : UtilsDocument.tokenFromUuid(part.data.calc$.tokenUuid)
-          ]);
-      
-          if (item.data.data.level !== spellSlot.level) {
-            const originalLevel = item.data.data.level;
-            item = item.clone({data: {level: spellSlot.level}}, {keepId: true});
-            item.prepareFinalAttributes(); // Spell save DC, etc...
-            item[originalLevelSymbol] = originalLevel;
-          }
-      
-          const responses: Array<Promise<ModularCardPartData>> = [];
-          const partsById = new Map<string, ModularCardPartData>();
-          for (const part of allCardParts) {
-            partsById.set(part.id, part);
-            const typeHandler = ModularCard.getTypeHandler(part.type);
-            const response = typeHandler.refresh(part.data, {item, actor, token});
-            if (response instanceof Promise) {
-              responses.push(response.then(r => ({
-                id: part.id,
-                type: part.type,
-                data: r
-              })));
-            } else {
-              responses.push(Promise.resolve({
-                id: part.id,
-                type: part.type,
-                data: response
-              }));
-            }
-          }
-      
-          // TODO should also be able to 'add' new types
-          //  Idea: have item templates which need to be registered
-          //  They contain all the types which should be used and in what order they are
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), await Promise.all(responses));
-        })
-      )
-      .addOnAttributeChange(({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
-          element.innerHTML = await renderTemplate(
-            `modules/${staticValues.moduleName}/templates/modular-card/spell-level-part.hbs`, {
-              data: part.data,
-              moduleName: staticValues.moduleName
-          });
-        }});
-      })
-      .build(this.getSelector())
-
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
   }
 
@@ -208,12 +289,8 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
   }
 
   //#region Front end
-  public getSelector(): string {
-    return `${staticValues.code}-spell-level-part`;
-  }
-
   public getHtml(data: HtmlContext): string {
-    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
+    return `<${SpellLevelCardComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${SpellLevelCardComponent.getSelector()}>`
   }
   //#endregion
 
