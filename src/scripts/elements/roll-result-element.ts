@@ -306,6 +306,8 @@ export class RollResultElement {
       this.rollCssClass = 'success';
     } else if (min) {
       this.rollCssClass = 'failure';
+    } else {
+      this.rollCssClass = '';
     }
   }
 
