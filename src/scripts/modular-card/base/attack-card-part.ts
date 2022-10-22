@@ -1,10 +1,12 @@
 import { RollD20EventData, RollMode } from "../../elements/roll-d20-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
+import { DocumentListener } from "../../lib/db/document-listener";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
-import { Attribute, Component } from "../../lib/render-engine/component";
+import { Attribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
+import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
 import { Action } from "../action";
@@ -55,6 +57,7 @@ export interface AttackCardData {
   tag: AttackCardPartComponent.getSelector(),
   html: /*html*/`
     <nac-roll-d20
+      *if="this.part?.data?.roll$ != null"
       [data-roll]="this.part.data.roll$"
       [data-bonus-formula]="this.part.data.userBonus"
       [data-show-bonus]="this.part.data.phase !== 'mode-select'"
@@ -71,7 +74,7 @@ export interface AttackCardData {
     </nac-roll-d20>
   `,
 })
-class AttackCardPartComponent {
+class AttackCardPartComponent implements OnInit {
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{part: {data: AttackCardData}}>(({part}) => {
     const documents: CreatePermissionCheckArgs['documents'] = [];
@@ -139,28 +142,49 @@ class AttackCardPartComponent {
     return `${staticValues.code}-attack-part`;
   }
 
+  private _partId = new ValueProvider<string>();
   @Attribute('data-part-id')
-  public partId: string;
+  public get partId(): string {
+    return this._partId.get();
+  }
+  public set partId(v: string) {
+    this._partId.set(v);
+  }
+  
+  private _messageId = new ValueProvider<string>();
   @Attribute('data-message-id')
-  public messageId: string;
+  public get messageId(): string {
+    return this._messageId.get();
+  }
+  public set messageId(v: string) {
+    this._messageId.set(v);
+  }
   
   public part: ModularCardPartData<AttackCardData>;
   public interactionPermission: string;
   public readPermission: string;
   public readHiddenDisplayType: string;
   
-  public onInit(): void {
-    const allParts = ModularCard.getCardPartDatas(game.messages.get(this.messageId));
-    if (allParts != null) {
-      this.part = allParts.find(p => p.id === this.partId && p.type === AttackCardPart.instance.getType());
-      this.part.data.roll$
-    }
-
-    if (this.part != null) {
-      this.interactionPermission = `OwnerUuid:${this.part.data.actorUuid$}`;
-      this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.data.actorUuid$}`;
-      this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
-    }
+  public onInit(args: OnInitParam): void {
+    args.addStoppable(
+      this._messageId
+        .switchMap(id => ValueReader.mergeObject({
+          message: DocumentListener.listenUuid<ChatMessage>(`ChatMessage.${id}`),
+          partId: this._partId
+        }))
+        .listen(({message, partId}) => {
+          const allParts = ModularCard.getCardPartDatas(message);
+          if (allParts != null) {
+            this.part = allParts.find(p => p.id === partId && p.type === AttackCardPart.instance.getType());
+          }
+      
+          if (this.part != null) {
+            this.interactionPermission = `OwnerUuid:${this.part.data.actorUuid$}`;
+            this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.data.actorUuid$}`;
+            this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
+          }
+        })
+    )
   }
 
   public onRollClick(event: MouseEvent): void {

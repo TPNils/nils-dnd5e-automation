@@ -1,4 +1,4 @@
-import { ValueProvider, ValueReader } from "../../provider/value-provider";
+import { ValueReader } from "../../provider/value-provider";
 import { Stoppable } from "../utils/stoppable";
 import { DmlTrigger, IAfterDmlContext, IDmlTrigger } from "./dml-trigger";
 import { FoundryDocument, UtilsDocument } from "./utils-document";
@@ -69,14 +69,6 @@ export class DocumentListener<T extends FoundryDocument> extends ValueReader<T> 
     this.documentType = uuidParts[uuidParts.length - 2];
   }
 
-  public get(): T {
-    return UtilsDocument.fromUuid(this.uuid, {sync: true}) as T;
-  }
-
-  public isSet(): boolean {
-    return this.get() !== undefined;
-  }
-
   public listen(callback: (value?: T) => void): Stoppable {
     UtilsDocument.fromUuid(this.uuid).then(init => callback(init as T));
     
@@ -90,7 +82,7 @@ export class DocumentListener<T extends FoundryDocument> extends ValueReader<T> 
     return trigger.addListener(this.uuid, callback);
   }
 
-  public static listenUuid<T extends FoundryDocument>(uuid: string): ValueReader<T> {
-    return new DocumentListener(uuid);
+  public static listenUuid<T extends FoundryDocument = FoundryDocument>(uuid: string): ValueReader<T> {
+    return new DocumentListener<T>(uuid);
   }
 }
