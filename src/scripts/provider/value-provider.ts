@@ -1,8 +1,8 @@
 import { Stoppable } from "../lib/utils/stoppable";
 
 export type ValueReaderType<T> = T extends null | undefined ? T :
-  T extends ValueProvider & { get(): infer F } ? 
-    ValueReader<F> : T;
+  T extends ValueReader<any> & { listenFirst(): infer F } ? 
+    Awaited<F> : T;
 
 export abstract class ValueReader<T> implements ValueReader<T> {
   public listenFirst(): Promise<T> {
@@ -20,8 +20,6 @@ export abstract class ValueReader<T> implements ValueReader<T> {
       }
     });
   }
-  public abstract get(): T;
-  public abstract isSet(): boolean;
   public abstract listen(callback: (value?: T) => void): Stoppable;
 
   public switchMap<R>(transformer: (value: T) => ValueReader<R>): ValueReader<R> {
@@ -30,6 +28,10 @@ export abstract class ValueReader<T> implements ValueReader<T> {
 
   public map<R>(transformer: (value: T) => R): ValueReader<R> {
     return new Mapper<T, R>(this, transformer);
+  }
+
+  public static mergeObject<T extends { [key: string]: ValueReader<any> }>(obj: T): ValueReader<ObjectWithRefReturnTypes<T>> {
+    return new MergeObject<T>(obj);
   }
 
 }
@@ -125,18 +127,43 @@ class Mapper<D, T> extends ValueReader<T> {
     return this.transformer(value);
   }
 
-  public get(): T {
-    const value = this.delegate.get();
-    return this.transformer(value);
-  }
-
-  public isSet(): boolean {
-    throw this.delegate.isSet();
-  }
-
   public listen(callback: (value?: T) => void): Stoppable {
     return this.delegate.listen(async value => {
       callback(await this.transformer(value));
     })
   }
+}
+
+type ObjectWithRefReturnTypes<T> = {
+  [P in keyof T]: ValueReaderType<T[P]>;
+};
+class MergeObject<T extends { [key: string]: ValueReader<any> }> extends ValueReader<ObjectWithRefReturnTypes<T>> {
+
+  constructor(private readonly obj: T) {
+    super();
+  }
+
+  public listen(callback: (value?: ObjectWithRefReturnTypes<T>) => void): Stoppable {
+    const stoppables: Stoppable[] = [];
+    const pendingKeys = new Set<keyof ObjectWithRefReturnTypes<T>>(Object.keys(this.obj));
+    let compoundValue = {} as ObjectWithRefReturnTypes<T>;
+    for (const key of pendingKeys) {
+      stoppables.push(this.obj[key].listen(value => {
+        compoundValue[key] = value;
+        pendingKeys.delete(key);
+        if (pendingKeys.size === 0) {
+          callback({...compoundValue});
+        }
+      }));
+    }
+
+    return {
+      stop: () => {
+        for (const stoppable of stoppables) {
+          stoppable.stop();
+        }
+      }
+    }
+  }
+
 }
