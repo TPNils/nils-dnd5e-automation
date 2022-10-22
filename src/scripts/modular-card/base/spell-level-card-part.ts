@@ -5,12 +5,11 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { SpellData, MyActor, MyItem } from "../../types/fixed-types";
-import { UtilsLog } from "../../utils/utils-log";
+import { SpellData, MyActor } from "../../types/fixed-types";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
 interface SpellLevelCardData {
@@ -274,7 +273,6 @@ class SpellLevelCardTrigger implements ITrigger<ModularCardTriggerData<SpellLeve
       }
     }
 
-    UtilsLog.debug(recalcByMessageId, spellLevelsByMessageId)
     const promises: Array<Promise<any>> = [];
     for (const [id, parts] of recalcByMessageId.entries()) {
       const part = spellLevelsByMessageId.get(id);
