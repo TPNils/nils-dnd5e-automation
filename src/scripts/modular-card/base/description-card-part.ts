@@ -1,10 +1,11 @@
 import { DocumentListener } from "../../lib/db/document-listener";
 import { RunOnce } from "../../lib/decorator/run-once";
-import { Attribute, Component, OnInitParam } from "../../lib/render-engine/component";
+import { Attribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { ModularCard, ModularCardPartData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
+import { BaseCardComponent } from "./base-card-component";
 
 interface DescriptionCardData {
   name$: string;
@@ -64,46 +65,21 @@ function getDefaultCardCollpased(): boolean {
     }
   `
 })
-export class DescriptionCardComponent {
+export class DescriptionCardComponent extends BaseCardComponent implements OnInit {
 
   public static getSelector(): string {
     return `${staticValues.code}-description-part`;
   }
   
-  //#region input
-  private _partId = new ValueProvider<string>();
-  @Attribute('data-part-id')
-  public get partId(): string {
-    return this._partId.get();
-  }
-  public set partId(v: string) {
-    this._partId.set(v);
-  }
-  
-  private _messageId = new ValueProvider<string>();
-  @Attribute('data-message-id')
-  public get messageId(): string {
-    return this._messageId.get();
-  }
-  public set messageId(v: string) {
-    this._messageId.set(v);
-  }
-  //#endregion
-  
   public collapsed = getDefaultCardCollpased();
   public localeRequiredMaterials = game.i18n.localize('DND5E.RequiredMaterials')
   public name: string = '';
-  public image: string;
+  public image: string = '';
   public description: string;
   public materials: string;
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this._messageId
-        .switchMap(id => ValueReader.mergeObject({
-          message: DocumentListener.listenUuid<ChatMessage>(`ChatMessage.${id}`),
-          partId: this._partId
-        }))
-        .listen(({message, partId}) => {
+      this.getData().listen(({message, partId}) => {
           const allParts = ModularCard.getCardPartDatas(message);
           let part: ModularCardPartData<DescriptionCardData>;
           if (allParts != null) {

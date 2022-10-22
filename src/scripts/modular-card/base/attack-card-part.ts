@@ -13,6 +13,7 @@ import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
+import { BaseCardComponent } from "./base-card-component";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
@@ -74,7 +75,7 @@ export interface AttackCardData {
     </nac-roll-d20>
   `,
 })
-class AttackCardPartComponent implements OnInit {
+class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{part: {data: AttackCardData}}>(({part}) => {
     const documents: CreatePermissionCheckArgs['documents'] = [];
@@ -141,26 +142,6 @@ class AttackCardPartComponent implements OnInit {
   public static getSelector(): string {
     return `${staticValues.code}-attack-part`;
   }
-
-  //#region input
-  private _partId = new ValueProvider<string>();
-  @Attribute('data-part-id')
-  public get partId(): string {
-    return this._partId.get();
-  }
-  public set partId(v: string) {
-    this._partId.set(v);
-  }
-  
-  private _messageId = new ValueProvider<string>();
-  @Attribute('data-message-id')
-  public get messageId(): string {
-    return this._messageId.get();
-  }
-  public set messageId(v: string) {
-    this._messageId.set(v);
-  }
-  //#endregion
   
   public part: ModularCardPartData<AttackCardData>;
   public interactionPermission: string;
@@ -169,12 +150,7 @@ class AttackCardPartComponent implements OnInit {
   
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this._messageId
-        .switchMap(id => ValueReader.mergeObject({
-          message: DocumentListener.listenUuid<ChatMessage>(`ChatMessage.${id}`),
-          partId: this._partId
-        }))
-        .listen(({message, partId}) => {
+      this.getData().listen(({message, partId}) => {
           const allParts = ModularCard.getCardPartDatas(message);
           if (allParts != null) {
             this.part = allParts.find(p => p.id === partId && p.type === AttackCardPart.instance.getType());
