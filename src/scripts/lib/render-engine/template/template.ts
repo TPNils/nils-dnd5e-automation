@@ -2,7 +2,8 @@ import { UtilsLog } from "../../../utils/utils-log";
 import { UtilsCompare } from "../../utils/utils-compare";
 import { rerenderQueue } from "../virtual-dom/render-queue";
 import { VirtualFragmentNode } from "../virtual-dom/virtual-fragment-node";
-import { VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
+import { isVirtualNode, VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
+import { VirtualNodeParser } from "../virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
 
 const forAttrRegex = /^\s*let\s+([^\s]+\s)+of\s(.+)$/;
@@ -157,14 +158,41 @@ export class Template {
               }
             }
           }
-          for (const name of process.instance.getAttributeNames()) {
-            const value = process.instance.getAttribute(name);
+          for (let name of process.instance.getAttributeNames()) {
+            let value = process.instance.getAttribute(name);
+            let updateValue = false;
             if (name.length > 2 && name.startsWith('[') && name.endsWith(']')) {
               process.instance.removeAttribute(name);
-              if (typeof value === 'string') {
-                process.instance.setAttribute(name.substring(1, name.length - 1), this.parseExpression(value, process.localVars));
-              } else {
-                process.instance.setAttribute(name.substring(1, name.length - 1), value);
+              updateValue = true;
+              name = name.substring(1, name.length - 1);
+              switch (name) {
+                case 'innerhtml': {
+                  if (process.instance.isParentNode()) {
+                    let nodeValue = value;
+                    if (typeof value === 'string') {
+                      nodeValue = VirtualNodeParser.parse(this.parseExpression(value, process.localVars));
+                    }
+                    if (isVirtualNode(nodeValue)) {
+                      if (nodeValue.isChildNode()) {
+                        process.instance.appendChild(nodeValue);
+                      } else if (nodeValue.isParentNode()) {
+                        for (const child of nodeValue.childNodes) {
+                          child.remove();
+                          process.instance.appendChild(child);
+                        }
+                      }
+                      continue;
+                    }
+                  }
+                }
+                default: {
+                  if (typeof value === 'string') {
+                    process.instance.setAttribute(name, this.parseExpression(value, process.localVars));
+                  } else {
+                    process.instance.setAttribute(name, value);
+                  }
+                  break;
+                }
               }
             } else if (typeof value === 'string') {
               const processedValue = this.processBindableString(value, process.localVars);

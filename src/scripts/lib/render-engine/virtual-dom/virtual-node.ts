@@ -33,6 +33,16 @@ export interface VirtualNode extends VirtualBaseNode {
   
 }
 
+export function isVirtualNode(value: any): value is VirtualNode {
+  if (value == null || typeof value !== 'object') {
+    return false;
+  }
+  if (typeof value.isNode !== 'function' || typeof value.createDom !== 'function' || typeof value.nodeName !== 'string') {
+    return false;
+  }
+  return value.isNode();
+}
+
 //#region attribute
 function VirtualAttributeNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualAttributeNode {
