@@ -409,6 +409,14 @@ export function Output(config?: string | OutputConfig) {
 }
 //#endregion
 
+export interface OnInit {
+  onInit(args: OnInitParam): void | any;
+}
+
+export interface OnInitParam {
+  addStoppable(...stoppable: Stoppable[]): void;
+}
+
 export class ComponentElement extends HTMLElement {
   #controller: object
   protected get controller(): object {
@@ -519,8 +527,12 @@ export class ComponentElement extends HTMLElement {
    * This will happen each time the node is moved, and may happen before the element's contents have been fully parsed. 
    */
   public connectedCallback(): void {
-    if (typeof this.#controller['onInit'] === 'function') {
-      this.#controller['onInit']();
+    if (ComponentElement.isOnInit(this.#controller)) {
+      this.#controller.onInit({
+        addStoppable: (...stoppable: Stoppable[]) => {
+          this.unregisters.push(...stoppable);
+        }
+      });
     }
 
     if (this.getComponentConfig().hasHtmlSlots) {
@@ -764,6 +776,10 @@ export class ComponentElement extends HTMLElement {
         }
       }
     }
+  }
+
+  private static isOnInit(value: any): value is OnInit {
+    return typeof value === 'object' && typeof value.onInit === 'function';
   }
 
 }
