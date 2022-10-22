@@ -93,19 +93,22 @@ class SwitchMap<D, T> extends ValueReader<T> {
     return this.transformer(value).listenFirst();
   }
 
-  public get(): T {
-    const value = this.delegate.get();
-    return this.transformer(value).get();
-  }
-
-  public isSet(): boolean {
-    throw this.delegate.isSet();
-  }
-
   public listen(callback: (value?: T) => void): Stoppable {
-    return this.delegate.listen(async value => {
-      callback(await this.transformer(value).listenFirst());
-    })
+    let lastStoppable: Stoppable
+    const delegateStoppable = this.delegate.listen(async value => {
+      if (lastStoppable != null) {
+        lastStoppable.stop();
+      }
+      lastStoppable = this.transformer(value).listen(callback)
+    });
+    return {
+      stop: () => {
+        delegateStoppable.stop();
+        if (lastStoppable) {
+          lastStoppable.stop();
+        }
+      }
+    }
   }
 }
 
