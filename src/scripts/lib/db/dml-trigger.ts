@@ -1,4 +1,5 @@
 import { staticValues } from "../../static-values";
+import { UtilsLog } from "../../utils/utils-log";
 import { buffer } from "../decorator/buffer";
 import { RunOnce } from "../decorator/run-once";
 import { Stoppable } from "../utils/stoppable";
@@ -372,7 +373,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           const currentDocument = collection.get(result._id);
           if (currentDocument == null) {
             // Found 1 instance, can happen when updating fog of war. Not really sure what to do with this though...
-            console.error('missing currentDocument for some reason?', collection, result);
+            UtilsLog.error('missing currentDocument for some reason?', collection, result);
             continue;
           }
           oldDocuments[currentDocument.uuid] = new currentDocument.constructor(currentDocument.toObject(), {parent: currentDocument.parent, pack: currentDocument.pack});
@@ -495,7 +496,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const diff = UtilsCompare.findDiff(document.data, documentSnapshot.data);
       if (diff.changed) {
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
-          console.error('Infinite update loop. Stopping any further updates.', {diff: diff});
+          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff});
         } else {
           await document.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}});
         }
@@ -549,7 +550,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
       if (diff.changed) {
         if (outputDiff) {
-          console.debug('trigger diff', {
+          UtilsLog.debug('trigger diff', {
             documentName: document.collectionName,
             uuid: (document as any).uuid,
             diff: diff,
@@ -557,7 +558,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           });
         }
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
-          console.error('Infinite update loop. Stopping any further updates.', {diff: diff});
+          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff});
           outputDiff = true;
         } else {
           await modifiedDocument.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}});
