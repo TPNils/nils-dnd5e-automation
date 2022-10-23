@@ -24,6 +24,9 @@ const attrValueSingleQuoteRegex = /''|'(.*?[^\\](?:\\\\)*)'/ys;
 const attrNameRegex = /([^\s"'>/=]+)/y;
 const attrRegex = new RegExp(`\\s*${attrNameRegex.source}(?:\\s*=(?:${attrValueNoQuoteRegex.source}|\\s*${attrValueDoubleQuoteRegex.source}|\\s*${attrValueSingleQuoteRegex.source}))?`, `ys`)
 
+// https://html.spec.whatwg.org/multipage/syntax.html#void-elements
+const voidElementsTags = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'].map(tag => tag.toUpperCase());
+
 export class VirtualNodeParser {
 
   private currentIndex = 0;
@@ -83,7 +86,7 @@ export class VirtualNodeParser {
       if (!this.exec(startElementSuffixRegex)) {
         throw new Error(`Invalid html. Did not find closure for node '${node.nodeName}' around character index ${this.currentIndex}. html:\n${this.html}`)
       }
-      if (this.regexResult[1] != null) {
+      if (voidElementsTags.includes(node.nodeName) || this.regexResult[1] != null) {
         // Element is self closed
         this.currentNode = node.parentNode as typeof this.currentNode;
       }

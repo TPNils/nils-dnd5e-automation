@@ -1,5 +1,5 @@
 import { AttributeParser } from "../attribute-parser";
-import { StoredEventCallback, VirtualChildNode, VirtualNode, VirtualTextNode, VNode } from "./virtual-node";
+import { VirtualNode, VirtualTextNode, VNode } from "./virtual-node";
 
 export class VirtualHtmlNode extends VNode({attribute: true, child: true, event: true, parent: true}) implements VirtualNode {
   
