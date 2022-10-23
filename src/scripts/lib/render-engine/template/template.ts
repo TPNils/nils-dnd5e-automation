@@ -121,6 +121,9 @@ export class Template {
                     instance: process.instance.cloneNode(false),
                     localVars: {
                       ...process.localVars,
+                      $index: forIndex,
+                      $last: false, // set later
+                      $first: forIndex === 0,
                       [regexResult[1]]: item,
                     },
                     pathContext: {
@@ -129,6 +132,7 @@ export class Template {
                   });
                   forIndex++;
                 }
+                pending[pending.length - 1].localVars.$last = true;
 
                 if (forIndex > 0) {
                   // The newly added items need to be processed before the rest of the queue
