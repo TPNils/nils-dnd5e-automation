@@ -1,18 +1,195 @@
-import { ElementBuilder, ElementCallbackBuilder } from "../../../elements/element-builder";
+import { ifError } from "assert";
 import { IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
-import { UtilsDocument } from "../../../lib/db/utils-document";
 import { RunOnce } from "../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
 import { UtilsRoll } from "../../../lib/roll/utils-roll";
 import { staticValues } from "../../../static-values";
+import { Action } from "../../action";
+import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ResourceCardData, ResourceCardPart, TargetCardData, TargetCardPart } from "../../base/index";
-import { ItemCardHelpers } from "../../item-card-helpers";
-import { ModularCard, ModularCardTriggerData } from "../../modular-card";
-import { createPermissionCheck, CreatePermissionCheckArgs, ModularCardCreateArgs } from "../../modular-card-part";
+import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
+import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../../modular-card";
+import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs } from "../../modular-card-part";
 
 export interface LayOnHandsCardData extends DamageCardData {
   heal: number;
   cure: number;
   maxUsage: number;
+}
+
+@Component({
+  tag: LayOnHandsComponent.getSelector(),
+  html: /*html*/`
+  <div class="loh-grid">
+    <label>{{this.localeHealing}}:</label>
+    <input name="heal-amount" type="number" min="0" [max]="this.maxHeal" [value]="this.currentHeal" [disabled]="this.missingPermission" (keyup)="this.heal($event)" (blur)="this.heal($event)">
+    <label>{{this.localeCure}}:</label>
+    <input name="cure-amount" type="number" min="0" [max]="this.maxCure" [value]="this.currentCure" [disabled]="this.missingPermission" (keyup)="this.cure($event)" (blur)="this.cure($event)">
+  </div>
+  `,
+  style: /*css*/`
+    .loh-grid {
+      display: grid;
+      grid-template-columns: max-content auto;
+    }
+
+    .loh-grid label {
+      display: flex;
+      align-items: center;
+    }
+
+    .loh-grid input {
+      margin-left: 3px;
+    }
+  `
+})
+export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
+
+  //#region actions
+  private static readonly permissionCheck = createPermissionCheckAction<{part: {data: DamageCardData}}>(({part}) => {
+    const documents: CreatePermissionCheckArgs['documents'] = [];
+    if (part.data.calc$.actorUuid) {
+      documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
+    }
+    return {documents: documents};
+  });
+  private static readonly setHealAndCure = new Action<ChatPartIdData & {heal?: number; cure?: number;}>('LayOnHandsHeal')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('cure'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('heal'))
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<LayOnHandsCardData>())
+    .setPermissionCheck(LayOnHandsComponent.permissionCheck)
+    .build(async ({messageId, part, allCardParts, heal, cure}) => {
+      if (heal != null) {
+        part.data.heal = heal;
+      }
+      if (cure != null) {
+        part.data.cure = cure;
+      }
+      if ((part.data.heal + (part.data.cure * 5)) > part.data.maxUsage) {
+        return;
+      }
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    });
+  //#endregion
+  
+  public static getSelector(): string {
+    return `${staticValues.code}-lay-on-hands-part`;
+  }
+
+  public onInit(args: OnInitParam) {
+    args.addStoppable(
+      this.getData().listen(({message, partId}) => this.setData(message, partId))
+    );
+  }
+
+  public localeHealing = game.i18n.localize('DND5E.Healing');
+  public localeCure = 'Cure'; // TODO translate
+  public currentHeal = 0;
+  public currentCure = 0;
+  public maxHeal = 0;
+  public maxCure = 0;
+  public missingPermission = true;
+  private async setData(message: ChatMessage, partId: string) {
+    const allParts = ModularCard.getCardPartDatas(message);
+    let part: ModularCardPartData<LayOnHandsCardData>;
+    if (allParts != null) {
+      part = allParts.find(p => p.id === partId && p.type === LayOnHandsCardPart.instance.getType());
+    }
+
+    let hasPermission = false;
+    if (part) {
+      const result = await LayOnHandsComponent.permissionCheck({
+        messageId: message.id,
+        partId: partId,
+        part: part
+      }, game.user);
+      hasPermission = result !== 'prevent-action';
+    }
+    this.missingPermission = !hasPermission;
+
+    if (!part || this.missingPermission) {
+      this.currentHeal = 0;
+      this.currentCure = 0;
+      this.maxHeal = 0;
+      this.maxCure = 0;
+      return;
+    }
+
+    this.currentHeal = part.data.heal;
+    this.currentCure = part.data.cure;
+    const remainingUsage = part.data.maxUsage - this.currentHeal - (this.currentCure * 5);
+    this.maxHeal = this.currentHeal + remainingUsage;
+    this.maxCure = this.currentCure + Math.floor(remainingUsage / 5);
+  }
+
+  public heal(event: Event) {
+    if (!(event.target instanceof HTMLInputElement)) {
+      return;
+    }
+    const inputValue = Number(event.target.value);
+    let value = Math.max(0, Math.min(this.maxHeal, inputValue));
+    if (event instanceof KeyboardEvent) {
+      if (Number.isNaN(inputValue)) {
+        // Don't allow invalid characters
+        event.preventDefault();
+        event.target.value = String(value);
+        return;
+      }
+      if (inputValue !== value) {
+        // Keep value between min/max range
+        event.preventDefault();
+        event.target.value = String(value);
+      }
+      if (event.key !== 'Enter') {
+        return;
+      }
+    }
+    if (Number.isNaN(inputValue)) {
+      return;
+    }
+
+    LayOnHandsComponent.setHealAndCure({
+      messageId: this.messageId,
+      partId: this.partId,
+      heal: value
+    });
+  }
+
+  public cure(event: Event) {
+    if (!(event.target instanceof HTMLInputElement)) {
+      return;
+    }
+    const inputValue = Number(event.target.value);
+    let value = Math.max(0, Math.min(this.maxCure, inputValue));
+    if (event instanceof KeyboardEvent) {
+      if (Number.isNaN(inputValue)) {
+        // Don't allow invalid characters
+        event.preventDefault();
+        event.target.value = String(value);
+        return;
+      }
+      if (inputValue !== value) {
+        // Keep value between min/max range
+        event.preventDefault();
+        event.target.value = String(value);
+      }
+      if (event.key !== 'Enter') {
+        return;
+      }
+    }
+    if (Number.isNaN(inputValue)) {
+      return;
+    }
+
+    LayOnHandsComponent.setHealAndCure({
+      messageId: this.messageId,
+      partId: this.partId,
+      cure: value
+    });
+  }
+
 }
 
 export class LayOnHandsCardPart extends DamageCardPart {
@@ -45,97 +222,13 @@ export class LayOnHandsCardPart extends DamageCardPart {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck<{part: {data: DamageCardData}}>(({part}) => {
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (part.data.calc$.actorUuid) {
-        documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
-      }
-      return {documents: documents};
-    })
-    const elementBuilder = new ElementBuilder()
-      .listenForAttribute('data-part-id', 'string')
-      .listenForAttribute('data-message-id', 'string')
-      
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('keypress')
-        .addSelectorFilter('input[name="heal-amount"]')
-        .addFilter(({event}) => event.key !== 'Enter')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getInputSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<LayOnHandsCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(async ({messageId, part, allCardParts, inputValue}) => {
-          const newValue = Math.min(part.data.maxUsage, Number.isNaN(Number(inputValue)) ? 0 : Number(inputValue));
-          if (part.data.heal !== newValue) {
-            part.data.heal = newValue;
-            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-          }
-        })
-      )
-      .addOnAttributeChange(async ({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData<LayOnHandsCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
-          const hasPermission = await UtilsDocument.hasAllPermissions([{
-            uuid: part.data.calc$.actorUuid,
-            permission: 'OWNER',
-            user: game.user,
-          }]);
-          // TODO translate cure
-          element.innerHTML = /*html*/`
-          <div style="display:grid; grid-template-columns:max-content auto;">
-            <label style="display: flex; align-items: center;">${game.i18n.localize('DND5E.Healing')}:</label>
-            <input style="margin-left: 3px;" name="heal-amount" type="number" min="0" max="${part.data.maxUsage}" value="${part.data.heal}" ${hasPermission ? '' : 'disabled'}>
-            <label style="display: flex; align-items: center;">Cure:</label>
-            <input style="margin-left: 3px;" name="cure-amount" type="number" min="0" max="${Math.floor(part.data.maxUsage / 5)}" value="${part.data.cure}" ${hasPermission ? '' : 'disabled'}>
-          </div>`;
-        }});
-      });
-
-    for (const eventName of ['focusout', 'keypress']) {
-      elementBuilder.addListener(new ElementCallbackBuilder()
-      .setEvent(eventName)
-      .addSelectorFilter('input[name="heal-amount"]')
-      .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-      .addSerializer(ItemCardHelpers.getUserIdSerializer())
-      .addSerializer(ItemCardHelpers.getInputSerializer())
-      .addEnricher(ItemCardHelpers.getChatPartEnricher<LayOnHandsCardData>())
-      .setPermissionCheck(permissionCheck)
-      .setExecute(async ({messageId, part, allCardParts, inputValue}) => {
-        const newValue = Math.min(part.data.maxUsage, Number.isNaN(Number(inputValue)) ? 0 : Number(inputValue));
-        if (part.data.heal !== newValue) {
-          part.data.heal = newValue;
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        }
-      }))
-    }
-    for (const eventName of ['focusout', 'keypress']) {
-      elementBuilder.addListener(new ElementCallbackBuilder()
-      .setEvent(eventName)
-      .addSelectorFilter('input[name="cure-amount"]')
-      .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-      .addSerializer(ItemCardHelpers.getUserIdSerializer())
-      .addSerializer(ItemCardHelpers.getInputSerializer())
-      .addEnricher(ItemCardHelpers.getChatPartEnricher<LayOnHandsCardData>())
-      .setPermissionCheck(permissionCheck)
-      .setExecute(async ({messageId, part, allCardParts, inputValue}) => {
-        const newValue = Math.min(part.data.maxUsage, Number.isNaN(Number(inputValue)) ? 0 : Number(inputValue));
-        if (part.data.cure !== newValue) {
-          part.data.cure = newValue;
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        }
-      }))
-    }
-    elementBuilder.build(this.getSelector());
-
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new LayOnHandsCardTrigger());
   }
-  
-  //#region Front end
-  public getSelector(): string {
-    return `${staticValues.code}-lay-on-hands-part`;
+
+  public getHtml(data: HtmlContext<any>): string {
+    return `<${LayOnHandsComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${LayOnHandsComponent.getSelector()}>`
   }
-  //#endregion
   
 }
 
