@@ -574,20 +574,20 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         if (part.data.calc$.actorUuid) {
           canSeeDamage = game.settings.get(staticValues.moduleName, 'damageHiddenRoll') === 'total';
           if (!canSeeDamage) {
-            UtilsDocument.hasPermissions([{
+            UtilsDocument.hasAllPermissions([{
               uuid: part.data.calc$.actorUuid,
               permission: `${staticValues.code}ReadDamage`,
               user: game.user,
-            }], {sync: true}).every(result => result.result)
+            }], {sync: true});
           }
         } else {
           canSeeDamage = game.user.isGM;
         }
-        const canSeeTarget = UtilsDocument.hasPermissions([{
+        const canSeeTarget = UtilsDocument.hasAllPermissions([{
           uuid: targetCache.actorUuid,
           permission: `${staticValues.code}ReadImmunity`,
           user: game.user,
-        }], {sync: true}).every(result => result.result);
+        }], {sync: true});
         if (canSeeDamage && canSeeTarget) {
           state.hpDiff += (targetCache.calcHpChange ?? 0);
           state.hpDiff += (targetCache.calcAddTmpHp ?? 0);

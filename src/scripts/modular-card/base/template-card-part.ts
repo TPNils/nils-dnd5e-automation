@@ -1,4 +1,3 @@
-import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
 import { DmlTrigger, ITrigger, IAfterDmlContext, IDmlTrigger, IDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
@@ -8,9 +7,8 @@ import MyAbilityTemplate from "../../pixi/ability-template";
 import { staticValues } from "../../static-values";
 import { MyItemData } from "../../types/fixed-types";
 import { UtilsTemplate } from "../../utils/utils-template";
-import { ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardTriggerData, ModularCardPartData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-part";
 
@@ -62,15 +60,11 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
     }
 
     if (part) {
-      const checks = await UtilsDocument.hasPermissions([
-        {
-          uuid: part.data.calc$.actorUuid,
-          permission: 'Owner',
-          user: game.user,
-        }
-      ]);
-  
-      this.hasPermission = checks.every(check => check.result);
+      this.hasPermission = await UtilsDocument.hasAllPermissions([{
+        uuid: part.data.calc$.actorUuid,
+        permission: 'Owner',
+        user: game.user,
+      }]);
       this.target = part.data.calc$.target;
     } else {
       this.hasPermission = false;

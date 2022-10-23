@@ -75,7 +75,7 @@ export class LayOnHandsCardPart extends DamageCardPart {
       )
       .addOnAttributeChange(async ({element, attributes}) => {
         return ItemCardHelpers.ifAttrData<LayOnHandsCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
-          const hasPermission = await UtilsDocument.hasPermissions([{
+          const hasPermission = await UtilsDocument.hasAllPermissions([{
             uuid: part.data.calc$.actorUuid,
             permission: 'OWNER',
             user: game.user,
@@ -84,9 +84,9 @@ export class LayOnHandsCardPart extends DamageCardPart {
           element.innerHTML = /*html*/`
           <div style="display:grid; grid-template-columns:max-content auto;">
             <label style="display: flex; align-items: center;">${game.i18n.localize('DND5E.Healing')}:</label>
-            <input style="margin-left: 3px;" name="heal-amount" type="number" min="0" max="${part.data.maxUsage}" value="${part.data.heal}" ${hasPermission[0].result ? '' : 'disabled'}>
+            <input style="margin-left: 3px;" name="heal-amount" type="number" min="0" max="${part.data.maxUsage}" value="${part.data.heal}" ${hasPermission ? '' : 'disabled'}>
             <label style="display: flex; align-items: center;">Cure:</label>
-            <input style="margin-left: 3px;" name="cure-amount" type="number" min="0" max="${Math.floor(part.data.maxUsage / 5)}" value="${part.data.cure}" ${hasPermission[0].result ? '' : 'disabled'}>
+            <input style="margin-left: 3px;" name="cure-amount" type="number" min="0" max="${Math.floor(part.data.maxUsage / 5)}" value="${part.data.cure}" ${hasPermission ? '' : 'disabled'}>
           </div>`;
         }});
       });

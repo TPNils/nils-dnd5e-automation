@@ -295,11 +295,11 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
             })
           }
           
-          const canReadCheckDc = part.data.actorUuid$ != null && UtilsDocument.hasPermissions([{
+          const canReadCheckDc = part.data.actorUuid$ != null && UtilsDocument.hasAllPermissions([{
             uuid: part.data.actorUuid$,
             user: game.user,
             permission: `${staticValues.code}ReadCheckDc`,
-          }], {sync: true}).every(permission => permission.result);
+          }], {sync: true});
           const visualState = visualStatesBySelectionId.get(selected.selectionId);
           visualState.columns.push({
             key: `${this.getType()}-check-${partNr}`,

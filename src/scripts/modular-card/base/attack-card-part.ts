@@ -400,18 +400,18 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       const attack = rolledAttacks[i];
       for (const selected of context.selected) {
         let rowValue: string;
-        const canReadAttack = UtilsDocument.hasPermissions([{
+        const canReadAttack = UtilsDocument.hasAllPermissions([{
           uuid: attack.data.actorUuid$,
           user: game.user,
           permission: `${staticValues.code}ReadAttack`,
-        }], {sync: true}).every(permission => permission.result);
+        }], {sync: true});
         let canSeeAc: boolean;
         if (cache.has(selected.tokenUuid)) {
-          canSeeAc = UtilsDocument.hasPermissions([{
+          canSeeAc = UtilsDocument.hasAllPermissions([{
             uuid: cache.get(selected.tokenUuid).actorUuid$,
             user: game.user,
             permission: `Observer`,
-          }], {sync: true}).every(permission => permission.result);
+          }], {sync: true});
         } else {
           canSeeAc = false;
         }

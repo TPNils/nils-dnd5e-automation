@@ -657,6 +657,30 @@ export class UtilsDocument {
 
     return UtilsDocument.hasPermissions(permissionChecks, options);
   }
+  
+  public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<boolean>
+  public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync: true}): boolean
+  public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean}): boolean | Promise<boolean>
+  public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): boolean | Promise<boolean> {
+    const response = UtilsDocument.hasPermissions(permissionChecks, options);
+    if (response instanceof Promise) {
+      return response.then(r => r.some(check => check.result));
+    } else {
+      return response.some(check => check.result);
+    }
+  }
+  
+  public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<boolean>
+  public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync: true}): boolean
+  public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean}): boolean | Promise<boolean>
+  public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): boolean | Promise<boolean> {
+    const response = UtilsDocument.hasPermissions(permissionChecks, options);
+    if (response instanceof Promise) {
+      return response.then(r => r.every(check => check.result));
+    } else {
+      return response.every(check => check.result);
+    }
+  }
 
   public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<PermissionResponse<T>[]>
   public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync: true}): PermissionResponse<T>[]
