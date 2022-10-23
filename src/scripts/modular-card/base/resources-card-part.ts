@@ -1,12 +1,15 @@
 import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
-import { DmlTrigger, IDmlTrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
+import { DmlTrigger, IDmlTrigger, IDmlContext, IAfterDmlContext, ITrigger } from "../../lib/db/dml-trigger";
 import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { staticValues } from "../../static-values";
-import { ItemCardHelpers } from "../item-card-helpers";
-import { ModularCardPartData, ModularCard } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
+import { Action } from "../action";
+import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
+import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { BaseCardComponent } from "./base-card-component";
 import { CheckCardData, CheckCardPart } from "./check-card-part";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { TemplateCardData, TemplateCardPart } from "./template-card-part";
@@ -26,7 +29,6 @@ export interface ResourceCardData {
   }[];
   calc$: {
     actorUuid: string;
-    allConsumeResourcesApplied: boolean;
   }
 }
 
@@ -180,6 +182,227 @@ function getMessageState(allParts: ModularCardPartData[]): MessageState {
   return messageState;
 }
 
+@Component({
+  tag: ResourceCardComponent.getSelector(),
+  html: /*html*/`
+    <table *if="this.consumeResources.length > 0">
+      <thead>
+        <tr>
+          <th>{{ this.localeResources }}</th>
+          <th>{{ this.localeUses }}</th>
+          <th class="button-column {{this.allConsumeResourcesApplied ? 'applied' : ''}}">
+            <div style="display: flex;" title="All" *if="this.consumeResources.length > 1">
+              <button (click)="this.apply('*')" class="apply"><i class="fas fa-check"></i></button>
+              <button (click)="this.undo('*')" class="undo"><i class="fas fa-undo"></i></button>
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *for="let consumeResource of this.consumeResources" class="{{consumeResource.calc$.calcChange === consumeResource.calc$.appliedChange ? 'applied' : ''}}">
+          <td>{{consumeResource.label}}</td>
+          <td>-{{consumeResource.calc$.calcChange}}</td>
+          <td class="button-column">
+            <button (click)="this.apply($index)" class="apply"><i class="fas fa-check"></i></button>
+            <button (click)="this.undo($index)" class="undo"><i class="fas fa-undo"></i></button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  `,
+  style: /*css*/`
+    .button-column {
+      width: 50px;
+    }
+    
+    tbody .button-column button {
+      display: inline-block;
+    }
+
+    .applied .apply {
+      color: green;
+    }
+  
+    .apply,
+    .undo {
+      font-size: 10px;
+      height: 2em;
+      width: 2em;
+      line-height: 1em;
+    }
+  `
+})
+export class ResourceCardComponent extends BaseCardComponent implements OnInit {
+
+  //#region actions
+  private static permissionCheck = createPermissionCheckAction<{part: {data: ResourceCardData}, resourceIndex: number | '*'}>(({part, resourceIndex}) => {
+    const documents: CreatePermissionCheckArgs['documents'] = [];
+    if (resourceIndex === '*') {
+      for (const resource of part.data.consumeResources) {
+        documents.push({uuid: resource.calc$.uuid, permission: 'OWNER', security: true});
+      }
+    } else {
+      documents.push({uuid: part.data.consumeResources[resourceIndex].calc$.uuid, permission: 'OWNER', security: true});
+    }
+    return {documents: documents};
+  })
+  private static applyOrUndo = new Action<ChatPartIdData & {action: 'manual-apply' | 'undo'; resourceIndex: number | '*';}>('ResourceCardApplyOrUndo')
+    .addSerializer(ItemCardHelpers.getRawSerializer('action'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('resourceIndex'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getUserIdSerializer())
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<ResourceCardData>())
+    .setPermissionCheck(ResourceCardComponent.permissionCheck)
+    .build(async ({resourceIndex, part, allCardParts, messageId, action}) => {
+      const consumeResources: ResourceCardData['consumeResources'] = [];
+      if (resourceIndex === '*') {
+        for (const consumeResource of part.data.consumeResources) {
+          consumeResources.push(consumeResource)
+        }
+      } else if (part.data.consumeResources.length >= resourceIndex-1) {
+        consumeResources.push(part.data.consumeResources[resourceIndex]);
+      }
+
+      const changed: ResourceCardData['consumeResources'] = [];
+      for (const consumeResource of consumeResources) {
+        consumeResource.consumeResourcesAction = action as any;
+        changed.push(consumeResource);
+      }
+
+      if (changed.length) {
+        const request: ApplyResourceConsumptionRequest = {
+          messageDataById: new Map(),
+          resources: [],
+        }
+        request.messageDataById.set(messageId, getMessageState(allCardParts));
+        for (const change of changed) {
+          request.resources.push({
+            messageId: messageId,
+            resource: change,
+          })
+        }
+
+        await applyResourceConsumption(request);
+        return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+      }
+    })
+  //#endregion
+
+  public static getSelector(): string {
+    return `${staticValues.code}-resource-part`;
+  }
+
+  public localeResources = game.i18n.localize('Resources');
+  public localeUses = game.i18n.localize('DND5E.Uses');
+  public consumeResources: Array<ResourceCardData['consumeResources'][number] & {label: string;}> = [];
+  public allConsumeResourcesApplied = false;
+  
+  public onInit(args: OnInitParam) {
+    args.addStoppable(
+      this.getData().listen(({message, partId}) => this.setData(message, partId))
+    );
+  }
+
+  public apply(index: '*' | number) {
+    console.log('apply', index);
+    ResourceCardComponent.applyOrUndo({
+      messageId: this.messageId,
+      partId: this.partId,
+      resourceIndex: index,
+      action: 'manual-apply',
+    });
+  }
+
+  public undo(index: '*' | number) {
+    console.log('undo', index);
+    ResourceCardComponent.applyOrUndo({
+      messageId: this.messageId,
+      partId: this.partId,
+      resourceIndex: index,
+      action: 'undo',
+    });
+  }
+
+  private async setData(message: ChatMessage, partId: string) {
+    const allParts = ModularCard.getCardPartDatas(message);
+    let part: ModularCardPartData<ResourceCardData>;
+    if (allParts != null) {
+      part = allParts.find(p => p.id === partId && p.type === ResourceCardPart.instance.getType());
+    }
+
+    if (part) {
+      const hasPerm = await UtilsDocument.hasAllPermissions([{
+        permission: 'Observer',
+        uuid: part.data.calc$.actorUuid,
+        user: game.user,
+      }]);
+      if (hasPerm) {
+        this.consumeResources = part.data.consumeResources.map(resource => {
+          return {
+            ...resource,
+            label: ResourceCardComponent.translateUsage(resource),
+          }
+        });
+      } else {
+        this.consumeResources = [];
+      }
+    } else {
+      this.consumeResources = [];
+    }
+    this.allConsumeResourcesApplied = this.consumeResources.every(r => r.calc$.appliedChange === r.calc$.calcChange);
+  }
+
+  private static translateUsage(usage: ResourceCardData['consumeResources'][number]): string {
+    const uuidParts = usage.calc$.uuid.split('.');
+    const pathParts = usage.calc$.path.split('.');
+
+    const documentName = uuidParts[uuidParts.length - 2];
+    if (documentName === (Actor as any).documentName) {
+      switch (pathParts[0]) {
+        case 'data': {
+          switch (pathParts[1]) {
+            case 'attributes': {
+              if (pathParts[2] === 'hp') {
+                return `${game.i18n.localize('DND5E.HP')}`;
+              }
+            }
+            case 'currency': {
+              return `${game.i18n.localize('DND5E.Currency' + pathParts[2].capitalize())}`;
+            }
+            case 'resources': {
+              if (pathParts[3] === 'value') {
+                const actor = UtilsDocument.actorFromUuid(usage.calc$.uuid, {sync: true});
+                if (actor?.data?.data?.resources[pathParts[2]].label) {
+                  return actor.data.data.resources[pathParts[2]].label;
+                }
+                return `${game.i18n.localize('DND5E.Resource' + pathParts[2].capitalize())}`;
+              }
+            }
+            case 'spells': {
+              let spellLevel;
+              if (pathParts[2] === 'pact') {
+                spellLevel = game.i18n.localize('DND5E.PactMagic');
+              } else {
+                spellLevel = pathParts[2].substring(5);
+              }
+              return `${game.i18n.localize('DND5E.SpellLevel')}: ${spellLevel}`;
+            }
+          }
+        }
+      }
+    } else if (documentName === (Item as any).documentName) {
+      const item = UtilsDocument.itemFromUuid(usage.calc$.uuid, {sync: true});
+      if (item) {
+        return item.name;
+      }
+    }
+
+    return usage.calc$.path;
+  }
+
+}
+
 export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
 
   public static readonly instance = new ResourceCardPart();
@@ -190,7 +413,6 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
       consumeResources: [],
       calc$: {
         actorUuid: actor?.uuid,
-        allConsumeResourcesApplied: false,
       }
     };
     
@@ -319,86 +541,7 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck<{part: {data: ResourceCardData}, resourceIndex: number | '*'}>(({part, resourceIndex}) => {
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (resourceIndex === '*') {
-        for (const resource of part.data.consumeResources) {
-          documents.push({uuid: resource.calc$.uuid, permission: 'OWNER', security: true});
-        }
-      } else {
-        documents.push({uuid: part.data.consumeResources[resourceIndex].calc$.uuid, permission: 'OWNER', security: true});
-      }
-      return {documents: documents};
-    })
-    
-    new ElementBuilder()
-      .listenForAttribute('data-part-id', 'string')
-      .listenForAttribute('data-message-id', 'string')
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="manual-apply"],[data-action="undo"]')
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getActionSerializer())
-        .addSerializer(({event}) => {
-          const index = (event.target as HTMLElement).closest('[data-resource-index]').getAttribute('data-resource-index');
-          return {
-            resourceIndex: index === '*' ? '*' as const : Number(index),
-          }
-        })
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<ResourceCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(async ({resourceIndex, part, allCardParts, messageId, action}) => {
-          const consumeResources: ResourceCardData['consumeResources'] = [];
-          if (resourceIndex === '*') {
-            for (const consumeResource of part.data.consumeResources) {
-              consumeResources.push(consumeResource)
-            }
-          } else if (part.data.consumeResources.length >= resourceIndex-1) {
-            consumeResources.push(part.data.consumeResources[resourceIndex]);
-          }
-
-          const changed: ResourceCardData['consumeResources'] = [];
-          for (const consumeResource of consumeResources) {
-            consumeResource.consumeResourcesAction = action as any;
-            changed.push(consumeResource);
-          }
-
-          if (changed.length) {
-            const request: ApplyResourceConsumptionRequest = {
-              messageDataById: new Map(),
-              resources: [],
-            }
-            request.messageDataById.set(messageId, getMessageState(allCardParts));
-            for (const change of changed) {
-              request.resources.push({
-                messageId: messageId,
-                resource: change,
-              })
-            }
-
-            await applyResourceConsumption(request);
-            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-          }
-        })
-      )
-      .addOnAttributeChange(({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData<ResourceCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
-          element.innerHTML = await renderTemplate(
-            `modules/${staticValues.moduleName}/templates/modular-card/resource-part.hbs`, {
-              data: {
-                ...part.data,
-                consumeResources: part.data.consumeResources.filter(resource => {
-                  return resource.calc$.calcChange !== 0 || resource.calc$.appliedChange !== 0
-                })
-              },
-              moduleName: staticValues.moduleName
-            });
-          
-        }});
-      })
-      .build(this.getSelector())
-    
+    ModularCard.registerModularCardTrigger(this, new ResourceTrigger());
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     DmlTrigger.registerTrigger(new ChatMessageCardTrigger());
   }
@@ -408,15 +551,31 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
   }
 
   //#region Front end
-  public getSelector(): string {
-    return `${staticValues.code}-resource-part`;
-  }
-
   public getHtml(data: HtmlContext): string {
-    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
+    return `<${ResourceCardComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${ResourceCardComponent.getSelector()}>`
   }
   //#endregion
 
+}
+
+class ResourceTrigger implements ITrigger<ModularCardTriggerData<ResourceCardData>> {
+  
+  //#region beforeUpsert
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<ResourceCardData>>): boolean | void {
+    this.removeUnusedResources(context);
+  }
+
+  private removeUnusedResources(context: IDmlContext<ModularCardTriggerData<ResourceCardData>>): void {
+    for (const {newRow} of context.rows) {
+      const filtered = newRow.part.data.consumeResources.filter(resource => {
+        return resource.calc$.calcChange !== 0 || resource.calc$.appliedChange !== 0
+      });
+      if (filtered.length !== newRow.part.data.consumeResources.length) {
+        newRow.part.data.consumeResources = filtered;
+      }
+    }
+  }
+  //#endregion
 }
 
 class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
@@ -427,7 +586,6 @@ class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ChatMessage>): boolean | void {
     this.calcAutoApply(context);
-    this.calcAllApplied(context);
   }
 
   private calcAutoApply(context: IDmlContext<ChatMessage>): void {
@@ -461,21 +619,6 @@ class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
               }
             }
           }
-        }
-      }
-    }
-  }
-
-  private calcAllApplied(context: IDmlContext<ChatMessage>): void {
-    for (const {newRow} of context.rows) {
-      const allParts = ModularCard.getCardPartDatas(newRow);
-      if (!allParts) {
-        continue;
-      }
-
-      for (const part of allParts) {
-        if (ModularCard.isType<ResourceCardData>(ResourceCardPart.instance, part)) {
-          part.data.calc$.allConsumeResourcesApplied = part.data.consumeResources.every(r => r.calc$.appliedChange === r.calc$.calcChange);
         }
       }
     }
