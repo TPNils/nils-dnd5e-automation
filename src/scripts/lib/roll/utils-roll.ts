@@ -28,11 +28,23 @@ export interface DamageRollOptions extends Partial<RollTerm.EvaluationOptions> {
 
 export class UtilsRoll {
 
-  public static isValidDamageType(value: any): value is DamageType {
-    if (typeof value === 'string') {
-      value = value.toLowerCase();
+  /**
+   * @param value valid synax: "fire" or "fire:comment"
+   * @returns the damage type or null if no match was found
+   */
+  public static toDamageType(value: any): DamageType | null {
+    if (typeof value !== 'string') {
+      return null;
     }
-    return validDamageTypes.includes(value);
+    value = value.toLowerCase();
+    const index = value.indexOf(':');
+    if (index !== -1) {
+      value = value.substring(0, index);
+    }
+    if (validDamageTypes.includes(value)) {
+      return value;
+    }
+    return null;
   }
 
   public static getValidDamageTypes(): DamageType[] {
@@ -57,9 +69,15 @@ export class UtilsRoll {
     }
   }
 
+  private static damagePartsEndWithComment = /(.*)\[([^\]]*)\]$/;
   public static damagePartsToRoll(parts: MyItemData['data']['damage']['parts'], rollData?: any): Roll {
     return new Roll(parts.map(([formula, damageType]) => {
       if (damageType) {
+        const match = UtilsRoll.damagePartsEndWithComment.exec(formula);
+        if (match) {
+          // Already ends with a comment, overwrite it
+          return `${match[1]}[${damageType.toLowerCase()}:${match[2]}]`
+        }
         return `${formula}[${damageType.toLowerCase()}]`
       } else {
         return formula;
@@ -69,7 +87,7 @@ export class UtilsRoll {
 
   /**
    * Example formula and how it gets parsed (this is based on how I believe it will be user friendly)
-   * 1d12 + 1d10[cold] + 1d8 + 1d6[fire] + 1d4 
+   * 1d12 + 1d10[cold] + 1d8 + 1d6[fire: my comment] + 1d4 
    *  everything unlisted inherits from the right 
    *   => 1d12 & 1d10 = cold
    *   => 1d8  & 1d6  = fire
@@ -84,15 +102,16 @@ export class UtilsRoll {
     damageFormulaMap.set(latestDamageType, []);
     for (let i = terms.length-1; i >= 0; i--) {
       const flavor = terms[i].options?.flavor?.toLowerCase();
-      if (UtilsRoll.isValidDamageType(flavor)) {
-        if (!damageFormulaMap.has(flavor)) {
-          damageFormulaMap.set(flavor, []);
+      const damageType = UtilsRoll.toDamageType(flavor);
+      if (damageType != null) {
+        if (!damageFormulaMap.has(damageType)) {
+          damageFormulaMap.set(damageType, []);
         }
         if (damageFormulaMap.has(null)) {
-          damageFormulaMap.get(flavor).push(...damageFormulaMap.get(null));
+          damageFormulaMap.get(damageType).push(...damageFormulaMap.get(null));
           damageFormulaMap.delete(null);
         }
-        latestDamageType = flavor;
+        latestDamageType = damageType;
       }
       if (typeof terms[i].total === 'number') {
         damageFormulaMap.get(latestDamageType).unshift(terms[i].total);

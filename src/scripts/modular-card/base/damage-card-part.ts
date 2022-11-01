@@ -129,9 +129,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     if (item.data.data.damage?.versatile) {
       hasDamage = true;
       inputDamages.calc$.versatileBaseRoll = UtilsRoll.toRollData(new Roll(item.data.data.damage.versatile, rollData)).terms;
-      const versatileTermWithDamageType = inputDamages.calc$.versatileBaseRoll.find(term => UtilsRoll.isValidDamageType(term.options?.flavor));
+      const versatileTermWithDamageType = inputDamages.calc$.versatileBaseRoll.find(term => UtilsRoll.toDamageType(term.options?.flavor));
       if (!versatileTermWithDamageType) {
-        const noramlTermWithDamageType = inputDamages.calc$.versatileBaseRoll.find(term => UtilsRoll.isValidDamageType(term.options?.flavor));
+        const noramlTermWithDamageType = inputDamages.calc$.versatileBaseRoll.find(term => UtilsRoll.toDamageType(term.options?.flavor));
         if (noramlTermWithDamageType) {
           for (const term of inputDamages.calc$.versatileBaseRoll) {
             term.options = term.options ?? {};
@@ -173,8 +173,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           let scalingDamageType: DamageType = '';
           for (let i = currentValue.length - 1; i >= 0; i--) {
             const flavor = currentValue[i].options.flavor;
-            if (UtilsRoll.isValidDamageType(flavor)) {
-              scalingDamageType = flavor;
+            const damageType = UtilsRoll.toDamageType(flavor);
+            if (damageType != null) {
+              scalingDamageType = damageType;
               break;
             }
           }
@@ -732,7 +733,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
       }
 
       const baseRoll = newRow.part.data.source === 'versatile' ? newRow.part.data.calc$.versatileBaseRoll : newRow.part.data.calc$.normalBaseRoll;
-      const damageTypes: DamageType[] = baseRoll.map(roll => roll.options?.flavor).filter(flavor => UtilsRoll.isValidDamageType(flavor)) as DamageType[];
+      const damageTypes: DamageType[] = baseRoll.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
       const isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
       if (isHealing) {
         newRow.part.data.calc$.label = 'DND5E.Healing';
