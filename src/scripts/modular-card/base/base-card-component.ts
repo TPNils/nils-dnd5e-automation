@@ -1,8 +1,6 @@
 import { DocumentListener } from "../../lib/db/document-listener";
-import { Attribute, OnInitParam } from "../../lib/render-engine/component";
+import { Attribute } from "../../lib/render-engine/component";
 import { ValueProvider, ValueReader } from "../../provider/value-provider";
-import { ModularCard, ModularCardPartData } from "../modular-card";
-import { DescriptionCardPart } from "./description-card-part";
 
 export class BaseCardComponent {
   

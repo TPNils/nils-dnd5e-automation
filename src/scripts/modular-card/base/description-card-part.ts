@@ -1,7 +1,5 @@
-import { DocumentListener } from "../../lib/db/document-listener";
 import { RunOnce } from "../../lib/decorator/run-once";
-import { Attribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { ValueProvider, ValueReader } from "../../provider/value-provider";
+import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { staticValues } from "../../static-values";
 import { ModularCard, ModularCardPartData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";

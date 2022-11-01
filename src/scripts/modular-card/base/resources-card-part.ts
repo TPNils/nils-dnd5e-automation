@@ -1,4 +1,3 @@
-import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
 import { DmlTrigger, IDmlTrigger, IDmlContext, IAfterDmlContext, ITrigger } from "../../lib/db/dml-trigger";
 import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
@@ -7,7 +6,7 @@ import { staticValues } from "../../static-values";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { CheckCardData, CheckCardPart } from "./check-card-part";
@@ -305,7 +304,6 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
   }
 
   public apply(index: '*' | number) {
-    console.log('apply', index);
     ResourceCardComponent.applyOrUndo({
       messageId: this.messageId,
       partId: this.partId,
@@ -315,7 +313,6 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
   }
 
   public undo(index: '*' | number) {
-    console.log('undo', index);
     ResourceCardComponent.applyOrUndo({
       messageId: this.messageId,
       partId: this.partId,

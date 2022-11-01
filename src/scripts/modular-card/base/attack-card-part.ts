@@ -1,12 +1,10 @@
 import { RollD20EventData, RollMode } from "../../elements/roll-d20-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
-import { DocumentListener } from "../../lib/db/document-listener";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
-import { Attribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
+import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
-import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
 import { Action } from "../action";
