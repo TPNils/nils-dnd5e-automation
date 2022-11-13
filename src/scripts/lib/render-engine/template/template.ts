@@ -132,9 +132,9 @@ export class Template {
                   });
                   forIndex++;
                 }
-                pending[pending.length - 1].localVars.$last = true;
 
                 if (forIndex > 0) {
+                  pending[pending.length - 1].localVars.$last = true;
                   // The newly added items need to be processed before the rest of the queue
                   for (let j = i+1; j < processing.length; j++) {
                     pending.push(processing[j]);
