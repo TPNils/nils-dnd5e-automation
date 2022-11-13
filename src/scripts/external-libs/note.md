@@ -1,0 +1,1 @@
+I believe you can't use `npm i` for foundry modules, so I "install" libraries in this folder
