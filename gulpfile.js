@@ -10,6 +10,7 @@ import chalk from 'chalk';
 import archiver from 'archiver';
 import stringify from 'json-stringify-pretty-compact';
 import typescript from 'typescript';
+import postcss from 'postcss';
 
 import ts from 'gulp-typescript';
 import less from 'gulp-less';
@@ -17,11 +18,22 @@ import sassCompiler from 'sass';
 import gulpSass from 'gulp-sass';
 import git from 'gulp-git';
 import sourcemaps from 'gulp-sourcemaps';
-import minifyJs from 'gulp-minify';
 import minifyCss from 'gulp-clean-css';
 
 import child_process from 'child_process';
 import yargs from 'yargs';
+import { CssSelectorParser } from 'css-selector-parser';
+const cssParser = new CssSelectorParser();
+ 
+cssParser.registerSelectorPseudos(
+  'host-context',
+  'dir', 'lang',
+  'is', 'not', 'where', 'has'
+);
+cssParser.registerNumericPseudos('nth-child', 'nth-last-child', 'first-child', 'last-child', 'nth-of-type', 'nth-last-of-type');
+cssParser.registerNestingOperators('>', '+', '~');
+cssParser.registerAttrEqualityMods('^', '$', '*', '~');
+cssParser.enableSubstitutes();
 
 const sass = gulpSass(sassCompiler);
 const exec = child_process.exec;
@@ -266,6 +278,168 @@ class BuildActions {
     return importTransformer;
   }
 
+  /**
+   * TypeScript transformers
+   * @returns {typescript.TransformerFactory<typescript.SourceFile>}
+   */
+  static #cssTransformer() {
+    /**
+     * @param {string} prefix 
+     * @param {typescript.ObjectLiteralElementLike} style 
+     */
+    function transformCssProperty(prefix, property) {
+      const init = property.initializer;
+      if (typescript.isStringLiteral(init)) {
+        // init.text = '';
+        doCssTransform(prefix, init.text);
+      } else if (typescript.isNoSubstitutionTemplateLiteral(init)) {
+        doCssTransform(prefix, init.text);
+        // init.text = '';
+        // init.rawText = '';
+      } else if (typescript.isTemplateExpression(init)) {
+        init.ev
+        // init.text = '';
+        // init.rawText = '';
+      }
+    }
+    
+    /**
+     * @param {string} prefix 
+     * @param {string} css 
+     */
+    function doCssTransform(prefix, css) {
+      const hostAttr = `nac-hid-${prefix}` ;
+      const itemAttr = `nac-cid-${prefix}` ;
+
+      const rootCss = postcss(
+        {
+          postcssPlugin: 'prefix-scope',
+          RuleExit: (rule, helpers) => {
+            const rootParsedRules = cssParser.parse(rule.selector);
+            let pendingRules = rootParsedRules.type === 'selectors' ? rootParsedRules.selectors : [rootParsedRules];
+            for (const rootRule of pendingRules) {
+              const rules = [rootRule.rule];
+              while (rules[rules.length - 1].rule) {
+                rules.push(rules[rules.length - 1].rule);
+              }
+              for (const rule of rules) {
+                rule.attrs = rule.attrs == null ? [] : rule.attrs;
+                // TODO was written to only read the first selector => rewrite
+              }
+
+              // Inject item attributes
+              for (const rule of rules) {
+                let shouldAddItemAttr = true;
+                for (const attr of rule.attrs) {
+                  if ((attr.name === hostAttr || attr.name === itemAttr) && attr.operator == null && attr.value == null) {
+                    shouldAddItemAttr = false;
+                    break;
+                  }
+                }
+                if (shouldAddItemAttr) {
+                  rule.attrs.unshift({name: itemAttr});
+                }
+              }
+
+      
+              //#region old
+              if (false) {
+                rootRule.rule.attrs = rootRule.rule.attrs == null ? [] : rootRule.rule.attrs;
+                for (const attr of rootRule.rule.attrs) {
+                  if (attr.name === hostAttr && attr.operator == null && attr.value == null) {
+                    hasHostAttr = true;
+                  }
+                }
+                console.log(rootRule.rule)
+                let deletePseudoIndexes = [];
+                if (rootRule.rule.pseudos) {
+                  for (let i = 0; i < rootRule.rule.pseudos.length; i++) {
+                    const pseudo = rootRule.rule.pseudos[i];
+                    if (pseudo.name === 'host') {
+                      deletePseudoIndexes.push(i);
+                      if (!hasHostAttr) {
+                        rootRule.rule.attrs.unshift({name: hostAttr});
+                        hasHostAttr = true;
+                      }
+                    } else if (pseudo.name === 'host-context') {
+                      // TODO
+                    }
+                  }
+                }
+
+                for (let i = deletePseudoIndexes.length - 1; i >= 0; i--) {
+                  rootRule.rule.pseudos.splice(i, 1);
+                }
+                
+                if (!hasHostAttr) {
+                  let ruleIter = rootRule.rule;
+                  while (ruleIter != null) {
+
+                    let hasItemAttr = false;
+                    for (const attr of rootRule.rule.attrs) {
+                      if (attr.name === itemAttr && attr.operator == null && attr.value == null) {
+                        hasItemAttr = true;
+                      }
+                    }
+                  }
+                  // It's not a host so add item attribute
+                  rootRule.rule.attrs.unshift({name: itemAttr});
+                }
+                  
+              }
+              //#endregion
+              
+              
+              
+              // Write the order of the rules the way cssParser expects
+              for (let i = 0; i < rules.length - 1; i++) {
+                rules[i].rule = rules[i+1];
+                rules[i+1].rule = null;
+              }
+            }
+            const newSelectors = cssParser.render(rootParsedRules);
+            if (rule.selector !== newSelectors) {
+              rule.selector = newSelectors;
+            }
+          }
+        }
+      ).process(css);
+      
+      console.log(rootCss.toString())
+      return rootCss.toString()
+    }
+
+    let cssId = 0;
+    /**
+     * @param {typescript.TransformationContext} context
+     */
+    return function cssTransformer(context) {
+      /** @type {typescript.Visitor} */
+      const visit = (node) => {
+        if (typescript.isClassDeclaration(node) && node.decorators) {
+          for (const decorator of node.decorators) {
+            if (typescript.isCallExpression(decorator.expression) && typescript.isIdentifier(decorator.expression.expression)) {
+              if (decorator.expression.expression.escapedText === 'Component' && decorator.expression.arguments.length > 0) {
+                const config = decorator.expression.arguments[0];
+                if (typescript.isObjectLiteralExpression(config)) {
+                  for (const property of config.properties) {
+                    if (property.name?.escapedText === 'style') {
+                      transformCssProperty(String(cssId++), property);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          return node;
+        }
+        return typescript.visitEachChild(node, (child) => visit(child), context);
+      };
+  
+      return (node) => typescript.visitNode(node, visit);
+    }
+  }
+
   /** @type {ts.Project} */
   static #tsConfig;
   /**
@@ -275,6 +449,7 @@ class BuildActions {
     if (BuildActions.#tsConfig == null) {
       BuildActions.#tsConfig = ts.createProject('tsconfig.json', {
         getCustomTransformers: (_program) => ({
+          before: [BuildActions.#cssTransformer()],
           after: [BuildActions.#createTransformer()],
         }),
       });
