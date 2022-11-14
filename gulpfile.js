@@ -279,7 +279,7 @@ class BuildActions {
   }
 
   /**
-   * TypeScript transformers
+   * Transform @Component style css at compile time since we can't make use of an external library at runtime
    * @returns {typescript.TransformerFactory<typescript.SourceFile>}
    */
   static #cssTransformer() {
