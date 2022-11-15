@@ -350,6 +350,10 @@ export class ComponentElement extends HTMLElement {
     this.#controller[htmlElementSymbol] = this;
   }
 
+  public getHostAttribute(): string {
+    return `${cssHostIdAttrPrefix}-${this.getComponentConfig().componentId}`;
+  }
+
   private getComponentConfig(): ComponentConfigInternal {
     return this.#controller.constructor.prototype[componentConfigSymbol];
   }
@@ -447,7 +451,7 @@ export class ComponentElement extends HTMLElement {
    * This will happen each time the node is moved, and may happen before the element's contents have been fully parsed. 
    */
   public connectedCallback(): void {
-    const hostAttr = `${cssHostIdAttrPrefix}-${this.getComponentConfig().componentId}`;
+    const hostAttr = this.getHostAttribute();
     if (!this.hasAttribute(hostAttr)) {
       this.setAttribute(hostAttr, '');
     }

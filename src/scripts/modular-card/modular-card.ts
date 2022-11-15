@@ -3,7 +3,7 @@ import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from
 import { TransformTrigger } from "../lib/db/transform-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
-import { Component } from "../lib/render-engine/component";
+import { Component, ComponentElement } from "../lib/render-engine/component";
 import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
@@ -216,7 +216,7 @@ async function updateMessage(this: ChatLog, wrapped: (...args: any) => any, ...a
     if (sameTopLevelLayout) {
       for (let i = 0; i < currentContentChildren.length; i++) {
         // isEqualNode does a deep compare => make shallow copies
-        if (!currentContentChildren[i].cloneNode(false).isEqualNode(updatedContentChildren[i].cloneNode(false))) {
+        if (currentContentChildren[i].nodeName !== updatedContentChildren[i].nodeName) {
           sameTopLevelLayout = false;
           break;
         }
@@ -227,7 +227,21 @@ async function updateMessage(this: ChatLog, wrapped: (...args: any) => any, ...a
       // replace message content
       for (let i = 0; i < currentContentChildren.length; i++) {
         if (Component.isComponentElement(currentContentChildren[i])) {
-          // Don't need to change anything
+          const currentElement = (currentContentChildren[i] as ComponentElement);
+          const updatedElement = (updatedContentChildren[i] as HTMLElement);
+          for (const attr of updatedElement.getAttributeNames()) {
+            if (currentElement.getAttribute(attr) !== updatedElement.getAttribute(attr)) {
+              currentElement.setAttribute(attr, updatedElement.getAttribute(attr));
+            }
+          }
+          for (const attr of currentElement.getAttributeNames()) {
+            if (attr === currentElement.getHostAttribute()) {
+              continue;
+            }
+            if (currentElement.getAttribute(attr) !== updatedElement.getAttribute(attr)) {
+              currentElement.removeAttribute(attr);
+            }
+          }
         } else {
           currentContentChildren[i].replaceWith(updatedContentChildren[i]);
         }
