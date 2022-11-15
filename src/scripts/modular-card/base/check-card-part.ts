@@ -1,16 +1,20 @@
 import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
-import { RollD20Element } from "../../elements/roll-d20-element";
+import { RollD20Element, RollD20EventData, RollMode } from "../../elements/roll-d20-element";
 import { UtilsElement } from "../../elements/utils-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
+import { Attribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
+import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor, MyActorData } from "../../types/fixed-types";
+import { Action } from "../action";
 import { ItemCardHelpers, ChatPartIdData, ChatPartEnriched } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, createPermissionCheckAction } from "../modular-card-part";
+import { BaseCardComponent } from "./base-card-component";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 interface TargetCache {
@@ -39,7 +43,7 @@ export interface CheckCardData {
 }
 
 function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache | null {
-  if (!cache.targetCaches$) {
+  if (!cache?.targetCaches$) {
     return null;
   }
   for (const targetCache of cache.targetCaches$) {
@@ -48,6 +52,174 @@ function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache 
     }
   }
   return null;
+}
+
+@Component({
+  tag: CheckCardComponent.getSelector(),
+  html: /*html*/`
+    <nac-roll-d20
+      *if="this.cache?.roll$ != null"
+      class="hide-flavor snug"
+      data-label-type="icon"
+      [data-roll]="this.cache.roll$"
+      [data-bonus-formula]="this.cache.userBonus"
+      [data-show-bonus]="this.cache.phase !== 'mode-select'"
+
+      [data-interaction-permission]="this.interactionPermission"
+      [data-read-permission]="this.readPermission"
+      [data-read-hidden-display-type]="this.readHiddenDisplayType"
+
+      (bonusFormula)="this.onBonusChange($event)"
+      (rollClick)="this.onRollClick($event)"
+      (rollMode)="this.onRollMode($event)"
+      >
+    </nac-roll-d20>
+  `,
+  style: /*css*/`
+  
+  `
+})
+export class CheckCardComponent extends BaseCardComponent implements OnInit {
+  //#region actions
+  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: CheckCardData}, targetId: string;}>(({part, targetId}) => {
+    const cache = getTargetCache(part.data, targetId);
+    if (!cache?.actorUuid$) {
+      return {mustBeGm: true};
+    }
+    const documents: CreatePermissionCheckArgs['documents'] = [];
+    documents.push({uuid: cache.actorUuid$, permission: 'OWNER', security: true});
+    return {documents: documents};
+  });
+
+  
+  private static getTargetCacheEnricher(this: null, data: ChatPartIdData & ChatPartEnriched<CheckCardData> & {targetId: string;}): {targetCache: TargetCache} {
+    const cache = getTargetCache(data.part.data, data.targetId);
+    if (!cache) {
+      throw {
+        success: false,
+        errorType: 'warn',
+        errorMessage: `Pressed an action button for message part ${data.messageId}.${data.partId} but no data was found for subtype: ${data.targetId}`,
+      };
+    }
+    return {targetCache: cache};
+  }
+
+  private static rollClick = new Action<{event: MouseEvent; targetId: string;} & ChatPartIdData>('CheckOnRollClick')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
+    .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
+    .addEnricher(CheckCardComponent.getTargetCacheEnricher)
+    .setPermissionCheck(CheckCardComponent.actionPermissionCheck)
+    .build(({messageId, targetCache, click, allCardParts}) => {
+      if (targetCache.phase === 'result') {
+        return;
+      }
+  
+      const orderedPhases: TargetCache['phase'][] = ['mode-select', 'bonus-input', 'result'];
+      if (click?.shiftKey) {
+        targetCache.phase = orderedPhases[orderedPhases.length - 1];
+      } else {
+        targetCache.phase = orderedPhases[orderedPhases.indexOf(targetCache.phase) + 1];
+      }
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    })
+    
+  private static bonusChange = new Action<{bonus?: string; targetId: string} & ChatPartIdData>('AttackOnBonusChange')
+  /*.addFilter(({event}) => {
+    if (event.relatedTarget instanceof HTMLElement) {
+      // Do not fire this if roll is pressed (focusout triggers first)
+      return event.relatedTarget.closest(`[data-action="roll"]`) != null;
+    }
+    return false;
+  })*/
+  .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+  .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+  .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
+  .addSerializer(ItemCardHelpers.getRawSerializer('bonus'))
+  .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
+  .addEnricher(CheckCardComponent.getTargetCacheEnricher)
+  .setPermissionCheck(CheckCardComponent.actionPermissionCheck)
+  .build(({messageId, allCardParts, targetCache, bonus}) => {
+    targetCache.userBonus = bonus ?? '';
+    return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+  });
+private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>; targetId: string;} & ChatPartIdData>('AttackOnModeChange')
+  .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+  .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+  .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
+  .addSerializer(ItemCardHelpers.getCustomEventSerializer())
+  .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
+  .addEnricher(CheckCardComponent.getTargetCacheEnricher)
+  .setPermissionCheck(CheckCardComponent.actionPermissionCheck)
+  .build(({messageId, allCardParts, targetCache, event}) => {
+    if (targetCache.mode === event.data) {
+      return;
+    }
+
+    targetCache.mode = event.data;
+    if (event.quickRoll) {
+      targetCache.phase = 'result';
+    }
+    return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+  });
+  //#endregion
+
+  public static getSelector(): string {
+    return `${staticValues.code}-check-part`;
+  }
+  
+  //#region input
+  private _targetId = new ValueProvider<string>();
+  @Attribute('data-target-id')
+  public get targetId(): string {
+    return this._targetId.get();
+  }
+  public set targetId(v: string) {
+    this._targetId.set(v);
+  }
+  //#endregion
+  
+  public cache: TargetCache;
+  public interactionPermission: string;
+  public readPermission: string;
+  public readHiddenDisplayType: string;
+
+  public onInit(args: OnInitParam): void {
+    args.addStoppable(
+      this.getData().switchMap(({message, partId}) => {
+        return ValueProvider.mergeObject({
+          message,
+          partId,
+          targetId: this._targetId
+        })
+      }).listen(({message, partId, targetId}) => {
+        const allParts = ModularCard.getCardPartDatas(message);
+        const part: ModularCardPartData<CheckCardData> = allParts == null ? null : allParts.find(p => p.id === partId && p.type === CheckCardPart.instance.getType());
+        this.cache = getTargetCache(part.data, targetId);
+    
+        if (this.cache != null) {
+          this.interactionPermission = `OwnerUuid:${this.cache.actorUuid$}`;
+          this.readPermission = `${staticValues.code}ReadCheckUuid:${this.cache.actorUuid$}`;
+          this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'checkHiddenRoll') as string;
+        }
+      })
+    )
+  }
+  
+  public onRollClick(event: MouseEvent): void {
+    CheckCardComponent.rollClick({event, partId: this.partId, messageId: this.messageId, targetId: this.targetId});
+  }
+
+  public onBonusChange(event: CustomEvent<RollD20EventData<string>>): void {
+    CheckCardComponent.bonusChange({bonus: event.detail.data, partId: this.partId, messageId: this.messageId, targetId: this.targetId});
+  }
+
+  public onRollMode(event: CustomEvent<RollD20EventData<RollMode>>): void {
+    CheckCardComponent.modeChange({event, partId: this.partId, messageId: this.messageId, targetId: this.targetId});
+  }
+
 }
 
 export class CheckCardPart implements ModularCardPart<CheckCardData> {
@@ -101,154 +273,6 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck<{part: {data: CheckCardData}}>(({part, subType}) => {
-      const cache = getTargetCache(part.data, subType);
-      if (!cache?.actorUuid$) {
-        return {mustBeGm: true};
-      }
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      documents.push({uuid: cache.actorUuid$, permission: 'OWNER', security: true});
-      return {documents: documents};
-    })
-    
-    new ElementBuilder()
-      .listenForAttribute('data-part-id', 'string')
-      .listenForAttribute('data-message-id', 'string')
-      .listenForAttribute('data-sub-type', 'string')
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="roll"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
-        .addEnricher(this.getTargetCacheEnricher)
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, targetCache, click, allCardParts}) => {
-          if (targetCache.phase === 'result') {
-            return;
-          }
-      
-          const orderedPhases: TargetCache['phase'][] = ['mode-select', 'bonus-input', 'result'];
-          if (click?.shiftKey) {
-            targetCache.phase = orderedPhases[orderedPhases.length - 1];
-          } else {
-            targetCache.phase = orderedPhases[orderedPhases.indexOf(targetCache.phase) + 1];
-          }
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('focusout')
-        .addSelectorFilter('input[data-action="user-bonus"]')
-        .addFilter(({event}) => {
-          if (event.relatedTarget instanceof HTMLElement) {
-            // Do not fire this if roll is pressed (focusout triggers first)
-            return event.relatedTarget.closest(`[data-action="roll"]`) != null;
-          }
-          return false;
-        })
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
-        .addEnricher(this.getTargetCacheEnricher)
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, targetCache, inputValue}) => {
-          if (inputValue && !Roll.validate(inputValue)) {
-            // Only show error on key press
-            throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-          }
-          if (targetCache.phase === 'bonus-input') {
-            targetCache.phase = 'mode-select';
-          }
-          targetCache.userBonus = inputValue ?? '';
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('keyup')
-        .addSelectorFilter('input[data-action="user-bonus"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getKeyEventSerializer())
-        .addSerializer(ItemCardHelpers.getInputSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
-        .addEnricher(this.getTargetCacheEnricher)
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, targetCache, keyEvent, inputValue}) => {
-          if (keyEvent.key === 'Enter') {
-            const userBonus = inputValue == null ? '' : inputValue;
-            if (userBonus && !Roll.validate(userBonus)) {
-              // Only show error on key press
-              throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-            }
-            targetCache.phase = 'result';
-            targetCache.userBonus = userBonus;
-            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-          } else if (keyEvent.key === 'Escape' && targetCache.phase === 'bonus-input') {
-            targetCache.phase = 'mode-select';
-            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-          }
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="mode-minus"], [data-action="mode-plus"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addSerializer(ItemCardHelpers.getActionSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
-        .addEnricher(this.getTargetCacheEnricher)
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, targetCache, click, action}) => {
-          let modifier = action === 'mode-plus' ? 1 : -1;
-          if (click.shiftKey && modifier > 0) {
-            modifier++;
-          } else if (click.shiftKey && modifier < 0) {
-            modifier--;
-          }
-          
-          const order: Array<TargetCache['mode']> = ['disadvantage', 'normal', 'advantage'];
-          const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(targetCache.mode) + modifier));
-          if (targetCache.mode === order[newIndex]) {
-            return;
-          }
-          targetCache.mode = order[newIndex];
-
-          if (click.shiftKey) {
-            targetCache.phase = 'result';
-          }
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addOnAttributeChange(async ({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData<CheckCardData>({attr: attributes, element, type: this, callback: async ({part}) => {
-          const cache = getTargetCache(part.data, attributes['data-sub-type']);
-          if (!cache) {
-            return '';
-          }
-          const d20attributes = {
-            ['data-roll']: cache.roll$,
-            ['data-bonus-formula']: cache.userBonus,
-            ['data-show-bonus']: cache.phase !== 'mode-select',
-          };
-          if (cache.actorUuid$) {
-            d20attributes['data-interaction-permission'] = `OwnerUuid:${cache.actorUuid$}`;
-            d20attributes['data-read-permission'] = `${staticValues.code}ReadCheckUuid:${cache.actorUuid$}`;
-            d20attributes['data-read-hidden-display-type'] = game.settings.get(staticValues.moduleName, 'checkHiddenRoll');
-          }
-          const attributeArray: string[] = [];
-          for (let [attr, value] of Object.entries(d20attributes)) {
-            attributeArray.push(`${attr}="${UtilsElement.serializeAttr(value)}"`);
-          }
-          element.innerHTML = `<${RollD20Element.selector()} class="hide-flavor snug" ${attributeArray.join(' ')}></${RollD20Element.selector()}>`;
-        }});
-        
-      })
-      .build(this.getSelector())
-
     TargetCardPart.instance.registerIntegration({
       getVisualState: context => this.getTargetState(context),
     });
@@ -260,24 +284,6 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
   public getType(): string {
     return this.constructor.name;
   }
-
-  //#region Front end
-  public getSelector(): string {
-    return `${staticValues.code}-check-part`;
-  }
-
-  private getTargetCacheEnricher(data: ChatPartIdData & ChatPartEnriched<CheckCardData>): {targetCache: TargetCache} {
-    const cache = getTargetCache(data.part.data, data.subType);
-    if (!cache) {
-      throw {
-        success: false,
-        errorType: 'warn',
-        errorMessage: `Pressed an action button for message part ${data.messageId}.${data.partId} but no data was found for subtype: ${data.subType}`,
-      };
-    }
-    return {targetCache: cache};
-  }
-  //#endregion
   
   //#region Targeting
   private getTargetState(context: StateContext): VisualState[] {
@@ -304,7 +310,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
           visualState.columns.push({
             key: `${this.getType()}-check-${partNr}`,
             label: game.i18n.format('DND5E.SaveDC', {dc: canReadCheckDc ? part.data.dc : '?', ability: ''}),
-            rowValue: `<${this.getSelector()} data-part-id="${part.id}" data-message-id="${context.messageId}" data-sub-type="${selected.selectionId}"></${this.getSelector()}>`
+            rowValue: `<${CheckCardComponent.getSelector()} data-part-id="${part.id}" data-message-id="${context.messageId}" data-target-id="${selected.selectionId}"></${CheckCardComponent.getSelector()}>`
           });
         }
 

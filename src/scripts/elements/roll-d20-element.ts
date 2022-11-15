@@ -47,25 +47,25 @@ const userBonus = /*html*/`
       <div class="bonus-container" *if="this.roll?.total == null">
         <button class="roll-button" [disabled]="!this.hasInteractPermission" (click)="this.onRollClick($event)">
           <slot name="label">
-            <virtual *if="this.label && this.mode === 'normal'">
+            <div class="label-text" *if="this.label && this.rollMode === 'normal'">
               {{ this.label }}
-            </virtual>
-            <virtual *if="!this.label || this.mode !== 'normal'">
+            </div>
+            <div class="label-text" *if="!this.label || this.rollMode !== 'normal'">
               {{ this.rollModeLabel }}
-            </virtual>
-            <virtual *if="!this.label">
-              <svg class="advantage-icon" *if="this.mode === 'advantage'">
+            </div>
+            <div class="label-icon">
+              <svg class="advantage-icon" *if="this.rollMode === 'advantage'">
                 <use class="d20" xlink:href="/modules/${staticValues.moduleName}/assets/icons/d20.svg#d20"/>
                 <use class="arrow-up" xlink:href="/modules/${staticValues.moduleName}/assets/icons/arrow-up.svg#arrow-up"  width=".9em" height=".9em"></use>
               </svg>
-              <svg class="disadvantage-icon" *if="this.mode === 'disadvantage'">
+              <svg class="disadvantage-icon" *if="this.rollMode === 'disadvantage'">
                 <use class="d20" xlink:href="/modules/${staticValues.moduleName}/assets/icons/d20.svg#d20"/>
                 <use class="arrow-down" xlink:href="/modules/${staticValues.moduleName}/assets/icons/arrow-up.svg#arrow-up"  width=".9em" height=".9em"></use>
               </svg>
-              <svg class="normal-mode-icon" *if="this.mode === 'normal'">
+              <svg class="normal-mode-icon" *if="this.rollMode === 'normal'">
                 <use class="d20" xlink:href="/modules/${staticValues.moduleName}/assets/icons/d20.svg#d20"/>
               </svg>
-            </virtual>
+            </div>
           </slot>
         </button>
         
@@ -74,11 +74,11 @@ const userBonus = /*html*/`
 
       <div class="overlay" *if="this.hasInteractPermission">
         <div class="left">
-          <button (click)="this.onModeChange($event, '-')" class="mode-minus" [disabled]="this.mode === 'disadvantage'"><i class="fas fa-minus"></i></button>
+          <button (click)="this.onModeChange($event, '-')" class="mode-minus" [disabled]="this.rollMode === 'disadvantage'"><i class="fas fa-minus"></i></button>
         </div>
         <div class="middel"></div>
         <div class="right">
-          <button (click)="this.onModeChange($event, '+')" class="mode-plus" [disabled]="this.mode === 'advantage'"><i class="fas fa-plus"></i></button>
+          <button (click)="this.onModeChange($event, '+')" class="mode-plus" [disabled]="this.rollMode === 'advantage'"><i class="fas fa-plus"></i></button>
         </div>
       </div>
     </div>
@@ -182,6 +182,22 @@ const userBonus = /*html*/`
   
   .roll-wrapper .mode-plus {
     color: #4f8a10
+  }
+
+  /* Show only label text by default */
+  .label-text {
+    display: block;
+  }
+  .label-icon {
+    display: none;
+  }
+  
+  /* Allow to use icons */
+  :host[data-label-type="icon"] .label-text {
+    display: none;
+  }
+  :host[data-label-type="icon"] .label-icon {
+    display: block;
   }
   `
 })

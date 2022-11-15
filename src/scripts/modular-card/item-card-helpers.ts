@@ -5,7 +5,6 @@ import { ModularCardPart } from "./modular-card-part";
 export interface ChatPartIdData {
   readonly partId: string;
   readonly messageId: string;
-  readonly subType?: string | null;
 }
 
 export interface ChatPartEnriched<T> {
@@ -76,7 +75,6 @@ export class ItemCardHelpers {
       return {
         messageId: element.closest('[data-message-id]')?.getAttribute('data-message-id'),
         partId: element.closest('[data-part-id]')?.getAttribute('data-part-id'),
-        subType: element.getAttribute('data-sub-type'),
       }
     }
   }
