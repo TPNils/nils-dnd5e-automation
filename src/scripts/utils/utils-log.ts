@@ -2,6 +2,22 @@ import { staticValues } from "../static-values";
 
 export class UtilsLog {
 
+  public static buildInfo(message: string, styles: string[] = []): () => void {
+    return console.debug.bind(console, `%c${staticValues.moduleName} ${message}`, `color: #ff8f00`, ...styles);
+  }
+  public static buildDebug(message: string, styles: string[] = []): () => void {
+    return console.debug.bind(console, `%c${staticValues.moduleName} ${message}`, `color: #ff8f00`, ...styles);
+  }
+  public static buildLog(message: string, styles: string[] = []): () => void {
+    return console.log.bind(console, `%c${staticValues.moduleName} ${message}`, `color: #ff8f00`, ...styles);
+  }
+  public static buildWarn(message: string, styles: string[] = []): () => void {
+    return console.warn.bind(console, `%c${staticValues.moduleName} ${message}`, `color: #ff8f00`, ...styles);
+  }
+  public static buildError(message: string, styles: string[] = []): () => void {
+    return console.error.bind(console, `%c${staticValues.moduleName} ${message}`, `color: #ff8f00`, ...styles);
+  }
+
   public static info = UtilsLog.createWithPrefix('info');
   public static debug = UtilsLog.createWithPrefix('debug');
   public static log = UtilsLog.createWithPrefix('log');
