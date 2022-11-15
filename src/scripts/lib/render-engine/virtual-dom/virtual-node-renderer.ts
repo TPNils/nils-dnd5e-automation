@@ -64,8 +64,9 @@ export class VirtualNodeRenderer {
    * @returns Created or updated DOM element
    */
   public static async renderDom<T extends VirtualNode>(virtualNode: T, deepUpdate: boolean = false): Promise<ReturnType<T['createDom']>> {
-    let pending: Array<{parent?: VirtualParentNode, node: VirtualNode}> = [{
+    let pending: Array<{parent?: VirtualParentNode, node: VirtualNode, defaultNamespace: string | undefined;}> = [{
       node: virtualNode,
+      defaultNamespace: document?.head?.namespaceURI,
     }];
     const allSyncDomActions: DomAction[] = [];
     const allAsyncDomActions: DomAction[] = [];
@@ -74,7 +75,8 @@ export class VirtualNodeRenderer {
       const processing = pending;
       pending = [];
       for (const process of processing) {
-        const state = VirtualNodeRenderer.getOrNewState(process.node);
+        const state = VirtualNodeRenderer.getOrNewState(process.node, process.defaultNamespace);
+        const namespace = state.domNode instanceof Element ? state.domNode.namespaceURI : process.defaultNamespace
         if (state.lastRenderSelfState == null) {
           // First time render
           if (process.node.isAttributeNode()) {
@@ -109,8 +111,8 @@ export class VirtualNodeRenderer {
           if (process.node.isParentNode()) {
             for (const child of process.node.childNodes) {
               state.lastRenderChildrenState.push(child);
-              state.domNode.appendChild(VirtualNodeRenderer.getOrNewState(child).domNode);
-              pending.push({parent: process.node, node: child});
+              state.domNode.appendChild(VirtualNodeRenderer.getOrNewState(child, namespace).domNode);
+              pending.push({parent: process.node, node: child, defaultNamespace: namespace});
             }
           }
 
@@ -182,12 +184,12 @@ export class VirtualNodeRenderer {
           if (deepUpdate && process.node.isParentNode()) {
             const currentChildrenByNode = new Map<Node, VirtualNode>();
             for (const child of process.node.childNodes) {
-              currentChildrenByNode.set(VirtualNodeRenderer.getOrNewState(child).domNode, child);
+              currentChildrenByNode.set(VirtualNodeRenderer.getOrNewState(child, namespace).domNode, child);
             }
 
             const previousChildNodes: Node[] = [];
             for (const child of state.lastRenderChildrenState) {
-              const childDomNode = VirtualNodeRenderer.getOrNewState(child).domNode;
+              const childDomNode = VirtualNodeRenderer.getOrNewState(child, namespace).domNode;
               previousChildNodes.push(childDomNode);
               if (!currentChildrenByNode.has(childDomNode)) {
                 domActions.push({
@@ -197,7 +199,7 @@ export class VirtualNodeRenderer {
               }
             }
             for (let i = process.node.childNodes.length - 1; i >= 0; i--) {
-              const childDomNode = VirtualNodeRenderer.getOrNewState(process.node.childNodes[i]).domNode;
+              const childDomNode = VirtualNodeRenderer.getOrNewState(process.node.childNodes[i], namespace).domNode;
               if (!previousChildNodes.includes(childDomNode)) {
                 if (i === process.node.childNodes.length - 1) {
                   domActions.push({
@@ -229,7 +231,7 @@ export class VirtualNodeRenderer {
           // add children to the process queue
           if (deepUpdate && process.node.isParentNode()) {
             for (const child of process.node.childNodes) {
-              pending.push({parent: process.node, node: child});
+              pending.push({parent: process.node, node: child, defaultNamespace: namespace});
             }
           }
 
@@ -243,10 +245,10 @@ export class VirtualNodeRenderer {
     if (allAsyncDomActions.length > 0) {
       VirtualNodeRenderer.queuedDomActions.push(...allAsyncDomActions);
       return rerenderQueue.add(VirtualNodeRenderer, VirtualNodeRenderer.processDomActionQueue).then(() => {
-        return VirtualNodeRenderer.getOrNewState(virtualNode).domNode;
+        return VirtualNodeRenderer.getState(virtualNode).domNode;
       });
     }
-    return Promise.resolve(VirtualNodeRenderer.getOrNewState(virtualNode).domNode);
+    return Promise.resolve(VirtualNodeRenderer.getState(virtualNode).domNode);
   }
 
   private static queuedDomActions: DomAction[] = [];
@@ -317,11 +319,20 @@ export class VirtualNodeRenderer {
                 if (Component.isComponentElement(item.node)) {
                   item.node.setInput(item.attrName, item.value);
                 } else {
+                  const attrNs = AttributeParser.attrToNs(item.attrName);
                   if (item.value === false) {
                     // disabled="false" is still disabled => don't set false attributes
-                    item.node.removeAttribute(item.attrName);
+                    if (attrNs.namespace) {
+                      item.node.removeAttributeNS(attrNs.namespace, attrNs.name);
+                    } else {
+                      item.node.removeAttribute(attrNs.name);
+                    }
                   } else {
-                    item.node.setAttribute(item.attrName, AttributeParser.serialize(item.value));
+                    if (attrNs.namespace) {
+                      item.node.setAttributeNS(attrNs.namespace, attrNs.name, AttributeParser.serialize(item.value));
+                    } else {
+                      item.node.setAttribute(attrNs.name, AttributeParser.serialize(item.value));
+                    }
                   }
                 }
                 break;
@@ -355,11 +366,11 @@ export class VirtualNodeRenderer {
     }
   }
 
-  private static getOrNewState<T extends VirtualNode>(virtualNode: T): RenderState<T> {
+  private static getOrNewState<T extends VirtualNode>(virtualNode: T, defaultNamespace?: string): RenderState<T> {
     let state = VirtualNodeRenderer.getState(virtualNode);
     if (!state) {
       state = {
-        domNode: virtualNode.createDom() as ReturnType<T['createDom']>,
+        domNode: virtualNode.createDom(defaultNamespace) as ReturnType<T['createDom']>,
         lastRenderChildrenState: [],
       };
       VirtualNodeRenderer.setState(virtualNode, state);

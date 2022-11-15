@@ -22,7 +22,7 @@ export interface VirtualNode extends VirtualBaseNode {
   /**
    * Creates a new empty node
    */
-  createDom(): Node;
+  createDom(defaultNamespace?: string): Node;
 
   isNode(): this is VirtualNode;
   isAttributeNode(): this is VirtualAttributeNode;

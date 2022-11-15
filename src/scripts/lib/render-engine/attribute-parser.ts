@@ -6,8 +6,26 @@ export interface InputParseOptions {
 
 const defaultOptions: InputParseOptions = {};
 
+const prefixesToNamespaces = {
+  'xlink': 'http://www.w3.org/1999/xlink',
+}
+
 const emptyString = '';
 export class AttributeParser {
+
+  public static attrToNs(attrName: string): {name: string; namespace?: string;} {
+    if (!attrName.includes(':')) {
+      return {name: attrName};
+    }
+    const prefix = attrName.substring(0, attrName.indexOf(':'));
+    if (prefix in prefixesToNamespaces) {
+      return {
+        name: attrName,
+        namespace: prefixesToNamespaces[prefix],
+      }
+    }
+    return {name: attrName};
+  }
 
   public static serialize(value: any): string {
     if (value == null) {

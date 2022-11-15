@@ -5,12 +5,12 @@ export class VirtualHtmlNode extends VNode({attribute: true, child: true, event:
   
   public constructor(nodeName: string) {
     super();
-    this.#nodeName = nodeName.toUpperCase();
+    this.#nodeName = nodeName;
   }
 
   #nodeName: string;
   get nodeName(): string {
-    return this.#nodeName;
+    return this.#nodeName.toUpperCase();
   }
 
   public cloneNode(deep?: boolean): this {
@@ -22,8 +22,17 @@ export class VirtualHtmlNode extends VNode({attribute: true, child: true, event:
     return clone as this;
   }
   
-  public createDom(): Node {
-    return document.createElement(this.#nodeName);
+  public createDom(defaultNamespace?: string): Node {
+    if (this.getAttribute('xmlns')) {
+      return document.createElementNS(this.getAttribute('xmlns'), this.#nodeName);
+    } else if (this.#nodeName.toLowerCase() === 'svg') { // should this be case insensitive?
+      // SVG overwites default namespace
+      return document.createElementNS('http://www.w3.org/2000/svg', this.#nodeName);
+    } else if (defaultNamespace) {
+      return document.createElementNS(defaultNamespace, this.#nodeName);
+    } else {
+      return document.createElement(this.#nodeName);
+    }
   }
 
   public isNode(): this is VirtualNode {
