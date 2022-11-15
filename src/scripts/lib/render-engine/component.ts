@@ -7,66 +7,11 @@ import { VirtualAttributeNode, VirtualNode, VirtualParentNode } from "./virtual-
 import { VirtualNodeParser } from "./virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "./virtual-dom/virtual-node-renderer";
 
-const randomHostContextReplacementString = 'ownkpvxugsyazllonppejzbrturjgeqgkmwzqmycghzmlyawnxgfilehatkhebfttjyusazpejznezjaerwbtegfbuqhiqqcrkma';
-
 //#region Decorators
-let browserSupportHostContext = false;
-{
-  try {
-    const dummyStyleSheet = new CSSStyleSheet();
-    dummyStyleSheet.insertRule(`:host-context(div) {display: block;}`);
-    browserSupportHostContext = dummyStyleSheet.cssRules.length > 0;
-  } catch (e) {
-    browserSupportHostContext = false;
-  }
-}
-let nextComponentId = 0;
 const componentConfigSymbol = Symbol('ComponentConfig');
 const htmlElementSymbol = Symbol('HtmlElement');
+const cssHostIdAttrPrefix = `${staticValues.code}-hid`;
 const cssComponentIdAttrPrefix = `${staticValues.code}-cid`;
-function adjustCssSelector(selector: string, config: ComponentConfigInternal): string {
-  selector = selector.trim();
-  if (selector.length === 0) {
-    return selector;
-  }
-  const hostContextPrefix = browserSupportHostContext ? ':host-context(' : `:is(${randomHostContextReplacementString}`;
-  if (selector.toLowerCase().startsWith(hostContextPrefix)) {
-    const rule = selector.substring(hostContextPrefix.length);
-    let remainingOpenBrackets = 1; // already omitted one
-    let ruleIndex = 0;
-    for (; ruleIndex < rule.length && remainingOpenBrackets > 0; ruleIndex++) {
-      switch (rule[ruleIndex]) {
-        case '(': {
-          remainingOpenBrackets++;
-        }
-        case ')': {
-          remainingOpenBrackets--;
-        }
-      }
-    }
-    if (remainingOpenBrackets === 0) {
-      return [
-        rule.substring(0, ruleIndex-1),
-        adjustCssSelector(rule.substring(ruleIndex), config),
-      ].join(' ');
-    }
-  } else if (selector.toLowerCase().startsWith(':host')) {
-    let parts = [config.tag];
-    if (selector[5] === ' ') {
-      parts.push(' ');
-    }
-    parts.push(adjustCssSelector(selector.substring(5), config));
-    return parts.join('');
-  } else {
-    // TODO this doesnt cover selectors like :is(span, div)
-    return selector
-      .split(' ')
-      .map(part => `${part}[${cssComponentIdAttrPrefix}-${config.componentId}]`)
-      .join(' ');
-  }
-
-  return selector;
-}
 
 const componentInstanceProxyHandler: ProxyHandler<{[htmlElementSymbol]: ComponentElement}> = {
   set: (target: {[htmlElementSymbol]: ComponentElement}, field: string | symbol, value: any, receiver: any): boolean => {
@@ -99,10 +44,11 @@ export function Component(config: ComponentConfig | string) {
 
   return function<T extends { new (...args: any[]): {} }>(constructor: T) {
     const internalConfig: ComponentConfigInternal = {
+      componentId: (config as any).componentId, // Should be provided by the compiler
       ...config as ComponentConfig,
-      componentId: String(nextComponentId++),
       hasHtmlSlots: false,
     }
+
     internalConfig.tag = internalConfig.tag.toLowerCase();
 
     if (internalConfig.html) {
@@ -171,35 +117,9 @@ export function Component(config: ComponentConfig | string) {
 
     customElements.define(internalConfig.tag, element);
     if (internalConfig.style) {
-      const dummyStyleSheet = new CSSStyleSheet();
-      let sheetFriendlyStyle = internalConfig.style;
-      if (!browserSupportHostContext) {
-        // Not all browsers (firefox) support :host-context() https://developer.mozilla.org/en-US/docs/Web/CSS/:host-context
-        // But all browsers do support :is() https://developer.mozilla.org/en-US/docs/Web/CSS/:is
-        sheetFriendlyStyle = sheetFriendlyStyle.replace(/:host-context\(/ig, `:is(${randomHostContextReplacementString}`);
-      }
-      // @ts-ignore
-      dummyStyleSheet.replaceSync(sheetFriendlyStyle);
-
-      const rules: string[] = [];
-      for (let i = 0; i < dummyStyleSheet.cssRules.length; i++) {
-        const cssRule = dummyStyleSheet.cssRules[i];
-        let ruleString = cssRule.cssText;
-        if (cssRule instanceof CSSStyleRule) {
-          const modifiedSelectors: string[] = [];
-
-          // TODO this doesnt cover selectors like :is(span, div)
-          for (let selector of cssRule.selectorText.split(',')) {
-            modifiedSelectors.push(adjustCssSelector(selector, internalConfig));
-          }
-
-          ruleString = modifiedSelectors.join(',') + ' ' + cssRule.cssText.substring(cssRule.cssText.indexOf('{'));
-        }
-        rules.push(ruleString);
-      }
       const styleElement = document.createElement('style');
       styleElement.id = staticValues.code + '-element-' + internalConfig.componentId;
-      styleElement.innerHTML = rules.join('\n');
+      styleElement.innerHTML = internalConfig.style;
       
       document.head.appendChild(styleElement);
     }
@@ -428,6 +348,7 @@ export class ComponentElement extends HTMLElement {
     }
     this.#controller = value;
     this.#controller[htmlElementSymbol] = this;
+    this.setAttribute(`${cssHostIdAttrPrefix}-${this.getComponentConfig().componentId}`, '');
   }
 
   private getComponentConfig(): ComponentConfigInternal {
