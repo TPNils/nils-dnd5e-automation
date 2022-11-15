@@ -348,7 +348,6 @@ export class ComponentElement extends HTMLElement {
     }
     this.#controller = value;
     this.#controller[htmlElementSymbol] = this;
-    this.setAttribute(`${cssHostIdAttrPrefix}-${this.getComponentConfig().componentId}`, '');
   }
 
   private getComponentConfig(): ComponentConfigInternal {
@@ -448,6 +447,10 @@ export class ComponentElement extends HTMLElement {
    * This will happen each time the node is moved, and may happen before the element's contents have been fully parsed. 
    */
   public connectedCallback(): void {
+    const hostAttr = `${cssHostIdAttrPrefix}-${this.getComponentConfig().componentId}`;
+    if (!this.hasAttribute(hostAttr)) {
+      this.setAttribute(hostAttr, '');
+    }
     if (ComponentElement.isOnInit(this.#controller)) {
       this.#controller.onInit({
         addStoppable: (...stoppable: Stoppable[]) => {
