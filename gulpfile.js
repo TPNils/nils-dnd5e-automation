@@ -412,7 +412,7 @@ class BuildActions {
   static #cssTransformer() {
     /**
      * @param {string} prefix 
-     * @param {typescript.ObjectLiteralElementLike} style
+     * @param {typescript.ObjectLiteralElementLike} property
      * @returns {string | false}
      */
     function transformCssProperty(prefix, property) {
