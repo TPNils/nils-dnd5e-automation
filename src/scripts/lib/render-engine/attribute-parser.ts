@@ -53,13 +53,13 @@ export class AttributeParser {
   }
 
   public static parseBoolean(value: any, options: InputParseOptions = defaultOptions): boolean | null {
+    if (AttributeParser.nullOrEmptyStr(value)) {
+      return null;
+    }
     if (options?.executeFunctions) {
       while (typeof value === 'function') {
         value = value();
       }
-    }
-    if (value == null) {
-      return null;
     }
 
     if (typeof value === 'string') {
@@ -75,26 +75,26 @@ export class AttributeParser {
   }
 
   public static parseNumber(value: any, options: InputParseOptions = defaultOptions): number | null {
+    if (AttributeParser.nullOrEmptyStr(value)) {
+      return null;
+    }
     if (options?.executeFunctions) {
       while (typeof value === 'function') {
         value = value();
       }
-    }
-    if (value == null) {
-      return null;
     }
 
     return Number(value);
   }
 
   public static parseString(value: any, options: InputParseOptions = defaultOptions): string | null {
+    if (value == null) {
+      return null;
+    }
     if (options?.executeFunctions) {
       while (typeof value === 'function') {
         value = value();
       }
-    }
-    if (value == null) {
-      return null;
     }
 
     return String(value);
@@ -123,6 +123,10 @@ export class AttributeParser {
     }
     
     return value;
+  }
+
+  private static nullOrEmptyStr(value: any): boolean {
+    return value == null || value === '';
   }
 
 }
