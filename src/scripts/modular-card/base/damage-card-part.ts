@@ -124,8 +124,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
     }
 
-    // Versatile damage
-    if (item.data.data.damage?.versatile) {
+    // Versatile damage => this is hidden when no damage parts are shown
+    //  => Ignore versatile damage if no 'primary' damage is specified
+    if (hasDamage && item.data.data.damage?.versatile) {
       hasDamage = true;
       inputDamages.calc$.versatileBaseRoll = UtilsRoll.toRollData(new Roll(item.data.data.damage.versatile, rollData)).terms;
       const versatileTermWithDamageType = inputDamages.calc$.versatileBaseRoll.find(term => UtilsRoll.toDamageType(term.options?.flavor));
