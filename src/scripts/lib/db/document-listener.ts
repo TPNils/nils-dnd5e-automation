@@ -31,6 +31,7 @@ class CallbackTrigger<T extends FoundryDocument> implements IDmlTrigger<T> {
           }
           if (this.callbacksByUuid.size === 0) {
             triggersByDocumentType.get(this.type.documentName).stoppable.stop();
+            triggersByDocumentType.delete(this.type.documentName);
           }
         }
       }
