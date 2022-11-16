@@ -4,7 +4,7 @@ import { buffer } from "../decorator/buffer";
 import { RunOnce } from "../decorator/run-once";
 import { Stoppable } from "../utils/stoppable";
 import { UtilsCompare } from "../utils/utils-compare";
-import { FoundryDocument } from "./utils-document";
+import { FoundryDocument, UtilsDocument } from "./utils-document";
 
 const unsupportedAfterDocuments = [
   FogExploration, // Old document is only available on the client
@@ -473,10 +473,6 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       }],
     );
 
-    for (const callback of this.afterCallbackGroups.get('create').getCallbacks()) {
-      await callback(context);
-    }
-
     if (game.userId === userId) {
       let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
       const execs = context.endOfContextExecutes;
@@ -499,8 +495,22 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff});
         } else {
           await document.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}});
+          if (typeof (document as any as FoundryDocument).uuid === 'string') {
+            const queriedDocument = await UtilsDocument.fromUuid((document as any as FoundryDocument).uuid);
+            context = new AfterDmlContext<T>(
+              [{
+                newRow: new document.constructor(deepClone(queriedDocument.data), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
+                changedByUserId: userId,
+                options: options
+              }],
+            );
+          }
         }
       }
+    }
+    
+    for (const callback of this.afterCallbackGroups.get('create').getCallbacks()) {
+      await callback(context);
     }
 
     for (const exec of context.endOfContextExecutes) {
@@ -526,10 +536,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       }],
     );
 
-    for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
-      await callback(context);
-    }
-
+    const recursiveUpdate = options?.[staticValues.moduleName]?.recursiveUpdate ?? 0;
     if (game.userId === userId) {
       documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
       const execs = context.endOfContextExecutes;
@@ -557,12 +564,30 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             original: oldDocument.data
           });
         }
-        if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
+        if (recursiveUpdate > 5) {
           UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff});
           outputDiff = true;
         } else {
-          await modifiedDocument.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}});
+          await modifiedDocument.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: recursiveUpdate + 1}});
+          
+          // Get the latest values
+          if (recursiveUpdate === 0 && typeof (document as any as FoundryDocument).uuid === 'string') {
+            const queriedDocument = await UtilsDocument.fromUuid((document as any as FoundryDocument).uuid);
+            context = new AfterDmlContext<T>(
+              [{
+                newRow: new document.constructor(deepClone(queriedDocument.data), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
+                changedByUserId: userId,
+                options: options
+              }],
+            );
+          }
         }
+      }
+    }
+    
+    if (recursiveUpdate === 0) {
+      for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
+        await callback(context);
       }
     }
     
