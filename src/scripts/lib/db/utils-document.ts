@@ -1,4 +1,5 @@
 import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 
 export type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
 
@@ -10,7 +11,7 @@ interface DocumentsByContext<T extends foundry.abstract.Document<any, FoundryDoc
   documents: Array<T>
 }
 
-type EntityPermission = keyof typeof foundry.CONST.ENTITY_PERMISSIONS;
+type EntityPermission = keyof typeof foundry.CONST.USER_ROLES;
 const dmlPermissions = ['create', 'update', 'delete'] as const;
 export interface PermissionCheck<T = any> {
   uuid?: string;
@@ -42,9 +43,9 @@ class MaybePromise<T> {
 
 export type PermissionCheckHandler = ({}: {user: User; document: FoundryDocument;}) => boolean;
 const defaultPermissionChecks: {[key: string]: PermissionCheckHandler} = {};
-for (const perm of Object.keys(foundry.CONST.ENTITY_PERMISSIONS)) {
+for (const perm of Object.keys(UtilsFoundry.getUserRolls())) {
   defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
-    return document.testUserPermission(user, perm as EntityPermission);
+    return document.testUserPermission(user, perm as any);
   }
 }
 for (const perm of (['create', 'update', 'delete'] as const)) {

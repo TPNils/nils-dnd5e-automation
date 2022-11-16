@@ -1,4 +1,5 @@
 {
+  "id": "nils-automated-compendium",
   "name": "nils-automated-compendium",
   "title": "Nils' automated compendium",
   "description": "",
@@ -28,16 +29,22 @@
   ],
   "dependencies": [
     {
+      "id": "compendium-folders",
       "name": "compendium-folders",
       "manifest": "https://raw.githubusercontent.com/earlSt1/vtt-compendium-folders/master/module.json"
     },
-    {"name": "lib-wrapper"}
+    {
+      "id": "lib-wrapper",
+      "name": "lib-wrapper"
+    }
   ],
   "packs": [
     {
+      "system": "dnd5e",
       "name": "automated-spells",
       "label": "Automated spells",
       "path": "packs/automated-spells.db",
+      "type": "Item",
       "entity": "Item"
     }
   ]
