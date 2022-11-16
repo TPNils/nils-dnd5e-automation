@@ -67,8 +67,9 @@ class Meta {
       config = fs.readJSONSync(configPath);
       if (config.dataPath) {
         { // Validate correct path
-          const files = fs.readdirSync(config.dataPath);
-          if (!files.includes('Data') || !files.includes('Config') || !files.includes('Logs')) {
+          const files = fs.readdirSync(config.dataPath).filter(fileName => fileName !== 'Data' && fileName !== 'Config' && fileName !== 'Logs');
+          // 0 files => only the foundry folders exist (or some of them if the server has not yet started for a first time)
+          if (files.length !== 0) {
             throw new Error('dataPath in foundryconfig.json is not recognised as a foundry folder. The folder should include 3 other folders: Data, Config & Logs');
           }
         }
@@ -673,7 +674,7 @@ class BuildActions {
         }
         destPath = path.join(config.dataPath, 'Data', 'modules', manifest.file.name);
         if (!fs.existsSync(destPath)) {
-          fs.mkdirSync(destPath);
+          fs.mkdirSync(destPath, {recursive: true});
         }
         copyFiles = [...BuildActions.getStaticCopyFiles(), {from: ['src','packs'], to: ['packs'], options: {override: false}}];
         for (let i = 0; i < copyFiles.length; i++) {
