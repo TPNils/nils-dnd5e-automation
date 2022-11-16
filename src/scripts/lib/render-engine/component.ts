@@ -531,7 +531,15 @@ export class ComponentElement extends HTMLElement {
         const listener: EventListenerOrEventListenerObject = event => {
           this.#controller[config.propertyKey](event);
         }
-        this.addEventListener(config.eventName, listener);
+        if (config.eventName.toLowerCase().startsWith('window:')) {
+          window.addEventListener(config.eventName.substring(7), listener);
+        } else if (config.eventName.toLowerCase().startsWith('document:')) {
+          document.addEventListener(config.eventName.substring(9), listener);
+        } else if (config.eventName.toLowerCase().startsWith('body:')) {
+          document.addEventListener(config.eventName.substring(5), listener);
+        } else {
+          this.addEventListener(config.eventName, listener);
+        }
         this.unregisters.push({stop: () => this.removeEventListener(config.eventName, listener)});
       }
     }
