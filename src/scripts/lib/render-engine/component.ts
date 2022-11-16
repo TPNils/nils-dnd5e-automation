@@ -558,14 +558,50 @@ export class ComponentElement extends HTMLElement {
         const node = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
         this.findSlots();
         this.applySlots();
-        this.prepend(node);
+        this.setInnerNode(node);
       }
     } else if (this.template !== null) {
       this.templateRenderResult = await this.template.render({force: true});
-      await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
+      const node = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
       this.findSlots();
       this.applySlots();
+      this.setInnerNode(node);
     }
+  }
+
+  private setInnerNode(node: Node) {
+    let pendingNodes = [node];
+    const resultRootNodes: Node[] = [];
+    while (pendingNodes.length > 0) {
+      const processingNodes = pendingNodes;
+      pendingNodes = [];
+      for (const node of processingNodes) {
+        if (node instanceof DocumentFragment) {
+          pendingNodes.push(...Array.from(node.childNodes));
+        } else {
+          resultRootNodes.push(node);
+        }
+      }
+    }
+    if (resultRootNodes.length === 0) {
+      return;
+    }
+
+    if (resultRootNodes[0].parentNode !== this) {
+      if (resultRootNodes[0].parentNode != null) {
+        resultRootNodes[0].parentNode.removeChild(resultRootNodes[0]);
+      }
+      this.prepend(resultRootNodes[0]);
+    }
+
+    for (let i = 1; i < resultRootNodes.length; i++) {
+      const node = resultRootNodes[i];
+      if (node.parentNode != null) {
+        node.parentNode.removeChild(node);
+      }
+      (resultRootNodes[i-1] as ChildNode).after(resultRootNodes[i]);
+    }
+
   }
 
   private generateHtmlQueue(): Promise<void> {
