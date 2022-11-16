@@ -67,7 +67,7 @@ export interface AttackCardData {
       [data-read-hidden-display-type]="this.readHiddenDisplayType"
 
       (bonusFormula)="this.onBonusChange($event)"
-      (rollClick)="this.onRollClick($event)"
+      (doRoll)="this.onRollClick($event)"
       (rollMode)="this.onRollMode($event)"
       >
     </nac-roll-d20>
@@ -82,23 +82,18 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
     }
     return {documents: documents};
   });
-  private static rollClick = new Action<{event: MouseEvent} & ChatPartIdData>('AttackOnRollClick')
+  private static rollClick = new Action<{event: CustomEvent<{userBonus?: string}>} & ChatPartIdData>('AttackOnRollClick')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
-    .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+    .addSerializer(ItemCardHelpers.getCustomEventSerializer())
     .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
     .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
-    .build(({messageId, part, click, allCardParts}) => {
-      if (part.data.phase === 'result') {
+    .build(({messageId, part, event, allCardParts}) => {
+      if (part.data.userBonus === event.userBonus && part.data.phase === 'result') {
         return;
       }
-
-      const orderedPhases: RollPhase[] = ['mode-select', 'bonus-input', 'result'];
-      if (click.shiftKey) {
-        part.data.phase = orderedPhases[orderedPhases.length - 1];
-      } else {
-        part.data.phase = orderedPhases[orderedPhases.indexOf(part.data.phase) + 1];
-      }
+      part.data.userBonus = event.userBonus;
+      part.data.phase = 'result';
       return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
     });
   private static bonusChange = new Action<{bonus?: string} & ChatPartIdData>('AttackOnBonusChange')
@@ -163,7 +158,10 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
     )
   }
 
-  public onRollClick(event: MouseEvent): void {
+  public onRollClick(event: CustomEvent<{userBonus?: string}>): void {
+    if (this.part.data.userBonus === event.detail.userBonus && this.part.data.phase === 'result') {
+      return;
+    }
     AttackCardPartComponent.rollClick({event, partId: this.partId, messageId: this.messageId});
   }
 

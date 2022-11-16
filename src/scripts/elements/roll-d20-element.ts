@@ -16,14 +16,6 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
  return oldValue?.data === newValue?.data;   
 }
 
-const userBonus = /*html*/`
-  <input *if="this.showBonus && this.hasInteractPermission"
-    class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
-    type="text"
-    value="{{this.bonusFormula}}"
-    (blur)="this.onBonusBlur($event)"
-    (keyup)="this.onBonusKeyUp($event)"/>
-`;
 @Component({
   tag: RollD20Element.selector(),
   html: /*html*/`
@@ -39,8 +31,13 @@ const userBonus = /*html*/`
         [data-highlight-total-on-firstTerm]="this.highlightTotalOnFirstTerm"
         [data-display-type]="this.hasReadPermission ? '' : readHiddenDisplayType"
         [data-override-max-roll]="this.overrideMaxRoll">
-        <div slot="top" *if="this.showBonus">
-          ${userBonus}
+        <div slot="top">
+          <input *if="this.hasInteractPermission"
+            class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
+            type="text"
+            value="{{this.userBonus}}"
+            (blur)="this.onBonusBlur($event)"
+            (keyup)="this.onBonusKeyUp($event)"/>
         </div>
       </nac-roll-result>
 
@@ -69,7 +66,12 @@ const userBonus = /*html*/`
           </slot>
         </button>
         
-        ${userBonus}
+        <input *if="this.showBonus && this.hasInteractPermission"
+          class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
+          type="text"
+          value="{{this.userBonus}}"
+          (blur)="this.onBonusBlur($event)"
+          (keyup)="this.onBonusKeyUp($event)"/>
       </div>
 
       <div class="overlay" *if="this.hasInteractPermission">
@@ -233,11 +235,14 @@ export class RollD20Element {
     this._label = game.i18n.localize(v);
   }
 
-  @Attribute({name: 'data-show-bonus', dataType: 'boolean'})
-  public showBonus: string;
-
   @Attribute({name: 'data-bonus-formula', dataType: 'string'})
-  public bonusFormula: string = '';
+  public set setUserBonus(value: string) {
+    if (value == null) {
+      this.userBonus = '';
+    } else {
+      this.userBonus = value;
+    }
+  }
 
   @Attribute({name: 'data-override-formula', dataType: 'string'})
   public overrideFormula: string;
@@ -315,20 +320,22 @@ export class RollD20Element {
   }
 
   //#region template callbacks
-  @Output({eventName: 'bonusFormula', deduplicate: dedupeEventData})
-  private bonusFormulaChange: RollD20EventData<string>;
+  private userBonus: string = '';
   public onBonusBlur(event: FocusEvent): void {
     if (event.target instanceof HTMLInputElement) {
       const userBonus = event.target.value == null ? '' : event.target.value;
-      if (userBonus && !Roll.validate(userBonus)) {
-        ui.notifications.error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-        event.target.value = this.bonusFormula;
+      if (this.userBonus === userBonus) {
         return;
       }
-      this.bonusFormulaChange = {
-        quickRoll: false,
-        data: userBonus,
-      };
+      if (userBonus && !Roll.validate(userBonus)) {
+        ui.notifications.error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+        event.target.value = this.userBonus;
+        return;
+      }
+      this.userBonus = userBonus;
+      if (this.roll?.total != null) {
+        this.doRollEmitter = {userBonus: this.userBonus};
+      }
     }
   }
   public onBonusKeyUp(event: KeyboardEvent): void {
@@ -337,13 +344,11 @@ export class RollD20Element {
         const userBonus = event.target.value == null ? '' : event.target.value;
         if (userBonus && !Roll.validate(userBonus)) {
           ui.notifications.error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-          event.target.value = this.bonusFormula;
+          event.target.value = this.userBonus;
           return;
         }
-        this.bonusFormulaChange = {
-          quickRoll: event.shiftKey,
-          data: userBonus,
-        };
+        this.userBonus = userBonus;
+        this.doRollEmitter = {userBonus: this.userBonus};
         event.target.blur();
       }
     }
@@ -371,8 +376,30 @@ export class RollD20Element {
 
   @Output('rollClick')
   public rollClickEmitter: MouseEvent;
-  public onRollClick(event: MouseEvent): void {
+  public onRollClickOld(event: MouseEvent): void {
     this.rollClickEmitter = event;
+  }
+  
+  public showBonus = false;
+  @Output('doRoll')
+  public doRollEmitter: {userBonus?: string;};
+  public onRollClick(event: MouseEvent): void {
+    this.onRollClickOld(event);
+    if (this.roll?.result != null) {
+      this.showBonus = !this.showBonus;
+      return;
+    }
+
+    if (!event.shiftKey && !this.showBonus) {
+      this.showBonus = true;
+      return;
+    }
+    
+    if (this.showBonus) {
+      this.doRollEmitter = {userBonus: this.userBonus};
+    } else {
+      this.doRollEmitter = {};
+    }
   }
   //#endregion
 
