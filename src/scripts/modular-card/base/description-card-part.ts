@@ -73,11 +73,11 @@ export class DescriptionCardComponent extends BaseCardComponent implements OnIni
   public localeRequiredMaterials = game.i18n.localize('DND5E.RequiredMaterials')
   public name: string = '';
   public image: string = '';
-  public description: string;
+  public description: string = '';
   public materials: string;
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData().listen(({message, partId}) => {
+      this.getData().listen(async ({message, partId}) => {
           const allParts = ModularCard.getCardPartDatas(message);
           let part: ModularCardPartData<DescriptionCardData>;
           if (allParts != null) {
@@ -89,11 +89,11 @@ export class DescriptionCardComponent extends BaseCardComponent implements OnIni
           this.materials = part?.data?.materials$;
           this.description = part?.data?.description$;
           if (this.description) {
-            const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {};
+            const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {async: true} as any;
             if (game.user.isGM) {
               enrichOptions.secrets = true;
             }
-            this.description = TextEditor.enrichHTML(this.description, enrichOptions as any);
+            this.description = await TextEditor.enrichHTML(this.description, enrichOptions as any);
           }
         })
     )
