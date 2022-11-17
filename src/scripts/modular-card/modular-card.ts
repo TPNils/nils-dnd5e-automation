@@ -506,17 +506,20 @@ export class ModularCard {
       }
     }
 
-    const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {};
+    const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {async: true} as any;
     if (game.user.isGM) {
       enrichOptions.secrets = true;
     }
-    const htmlParts: string[] = [];
-    htmlParts.push(`<div class="${staticValues.moduleName}-item-card">`);
-    for (const part of await Promise.all(htmlParts$)) {
-      htmlParts.push(TextEditor.enrichHTML(part.html, enrichOptions as any))
+    
+    const htmlParts = await Promise.all(htmlParts$);
+
+    const enrichedHtmlParts: string[] = [];
+    enrichedHtmlParts.push(`<div class="${staticValues.moduleName}-item-card">`);
+    for (const enrichedPart of await Promise.all(htmlParts.map(part => TextEditor.enrichHTML(part.html, enrichOptions as any)))) {
+      enrichedHtmlParts.push(enrichedPart);
     }
-    htmlParts.push(`</div>`);
-    return htmlParts.join('');
+    enrichedHtmlParts.push(`</div>`);
+    return enrichedHtmlParts.join('');
   }
 
 }
