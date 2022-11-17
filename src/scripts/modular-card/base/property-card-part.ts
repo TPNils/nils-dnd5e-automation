@@ -2,6 +2,7 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { staticValues } from "../../static-values";
 import { MyItem } from "../../types/fixed-types";
+import { UtilsLog } from "../../utils/utils-log";
 import { ModularCard, ModularCardPartData } from "../modular-card";
 import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
@@ -59,13 +60,14 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
   public static readonly instance = new PropertyCardPart();
   private constructor(){}
   
-  public create({item}: {item: MyItem}): PropertyCardData {
+  public async create({item}: {item: MyItem}): Promise<PropertyCardData> {
+    const chatData = await item.getChatData();
     return {
-      properties$: item.getChatData().properties,
+      properties$: chatData.properties ?? [],
     };
   }
 
-  public refresh(data: PropertyCardData, args: ModularCardCreateArgs): PropertyCardData {
+  public refresh(data: PropertyCardData, args: ModularCardCreateArgs): Promise<PropertyCardData> {
     return this.create(args);
   }
 
