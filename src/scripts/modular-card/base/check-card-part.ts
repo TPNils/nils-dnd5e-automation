@@ -23,7 +23,7 @@ interface TargetCache {
   actorUuid$?: string;
   
   mode: 'normal' | 'advantage' | 'disadvantage';
-  phase: 'mode-select' | 'bonus-input' | 'result';
+  phase: 'mode-select' | 'result';
   userBonus: string;
   resultType$?: 'pass' | 'fail'; // There is no critical pass/fail for ability|skill checks or saving throws (RAW) // TODO maybe this needs to be a setting
   actorBonus$: string;
@@ -69,8 +69,7 @@ function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache 
       [data-read-permission]="this.readPermission"
       [data-read-hidden-display-type]="this.readHiddenDisplayType"
 
-      (bonusFormula)="this.onBonusChange($event)"
-      (rollClick)="this.onRollClick($event)"
+      (doRoll)="this.onRollClick($event)"
       (rollMode)="this.onRollMode($event)"
       >
     </nac-roll-d20>
@@ -101,47 +100,23 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
     return {targetCache: cache};
   }
 
-  private static rollClick = new Action<{event: MouseEvent; targetId: string;} & ChatPartIdData>('CheckOnRollClick')
+  private static rollClick = new Action<{event: CustomEvent<{userBonus?: string}>; targetId: string;} & ChatPartIdData>('CheckOnRollClick')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
-    .addSerializer(ItemCardHelpers.getMouseEventSerializer())
+    .addSerializer(ItemCardHelpers.getCustomEventSerializer())
     .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
     .addEnricher(CheckCardComponent.getTargetCacheEnricher)
     .setPermissionCheck(CheckCardComponent.actionPermissionCheck)
-    .build(({messageId, targetCache, click, allCardParts}) => {
-      if (targetCache.phase === 'result') {
+    .build(({messageId, targetCache, event, allCardParts}) => {
+      if (targetCache.userBonus === event.userBonus && targetCache.phase === 'result') {
         return;
       }
-  
-      const orderedPhases: TargetCache['phase'][] = ['mode-select', 'bonus-input', 'result'];
-      if (click?.shiftKey) {
-        targetCache.phase = orderedPhases[orderedPhases.length - 1];
-      } else {
-        targetCache.phase = orderedPhases[orderedPhases.indexOf(targetCache.phase) + 1];
-      }
+      targetCache.userBonus = event.userBonus;
+      targetCache.phase = 'result';
       return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
     })
     
-  private static bonusChange = new Action<{bonus?: string; targetId: string} & ChatPartIdData>('AttackOnBonusChange')
-  /*.addFilter(({event}) => {
-    if (event.relatedTarget instanceof HTMLElement) {
-      // Do not fire this if roll is pressed (focusout triggers first)
-      return event.relatedTarget.closest(`[data-action="roll"]`) != null;
-    }
-    return false;
-  })*/
-  .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-  .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
-  .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
-  .addSerializer(ItemCardHelpers.getRawSerializer('bonus'))
-  .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
-  .addEnricher(CheckCardComponent.getTargetCacheEnricher)
-  .setPermissionCheck(CheckCardComponent.actionPermissionCheck)
-  .build(({messageId, allCardParts, targetCache, bonus}) => {
-    targetCache.userBonus = bonus ?? '';
-    return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-  });
 private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>; targetId: string;} & ChatPartIdData>('AttackOnModeChange')
   .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
   .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
@@ -204,13 +179,12 @@ private static modeChange = new Action<{event: CustomEvent<RollD20EventData<Roll
       })
     )
   }
-  
-  public onRollClick(event: MouseEvent): void {
-    CheckCardComponent.rollClick({event, partId: this.partId, messageId: this.messageId, targetId: this.targetId});
-  }
 
-  public onBonusChange(event: CustomEvent<RollD20EventData<string>>): void {
-    CheckCardComponent.bonusChange({bonus: event.detail.data, partId: this.partId, messageId: this.messageId, targetId: this.targetId});
+  public onRollClick(event: CustomEvent<{userBonus?: string}>): void {
+    if (this.cache.userBonus === event.detail.userBonus && this.cache.phase === 'result') {
+      return;
+    }
+    CheckCardComponent.rollClick({event, partId: this.partId, messageId: this.messageId, targetId: this.targetId});
   }
 
   public onRollMode(event: CustomEvent<RollD20EventData<RollMode>>): void {

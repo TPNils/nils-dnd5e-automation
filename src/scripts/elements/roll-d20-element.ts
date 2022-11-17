@@ -380,18 +380,11 @@ export class RollD20Element {
       data: rollModeOrder[newIndex],
     };
   }
-
-  @Output('rollClick')
-  public rollClickEmitter: MouseEvent;
-  public onRollClickOld(event: MouseEvent): void {
-    this.rollClickEmitter = event;
-  }
   
   public showBonus = false;
   @Output('doRoll')
   public doRollEmitter: {userBonus?: string;};
   public onRollClick(event: MouseEvent): void {
-    this.onRollClickOld(event);
     if (this.roll?.total != null) {
       this.showBonus = !this.showBonus;
       return;

@@ -15,7 +15,7 @@ import { BaseCardComponent } from "./base-card-component";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
-type RollPhase = 'mode-select' | 'bonus-input' | 'result';
+type RollPhase = 'mode-select' | 'result';
 const modeOrder: Array<AttackCardData['mode']> = ['disadvantage', 'normal', 'advantage'];
 
 interface TargetCache {
@@ -66,7 +66,6 @@ export interface AttackCardData {
       [data-read-permission]="this.readPermission"
       [data-read-hidden-display-type]="this.readHiddenDisplayType"
 
-      (bonusFormula)="this.onBonusChange($event)"
       (doRoll)="this.onRollClick($event)"
       (rollMode)="this.onRollMode($event)"
       >
@@ -94,23 +93,6 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
       }
       part.data.userBonus = event.userBonus;
       part.data.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-    });
-  private static bonusChange = new Action<{bonus?: string} & ChatPartIdData>('AttackOnBonusChange')
-    /*.addFilter(({event}) => {
-      if (event.relatedTarget instanceof HTMLElement) {
-        // Do not fire this if roll is pressed (focusout triggers first)
-        return event.relatedTarget.closest(`[data-action="roll"]`) != null;
-      }
-      return false;
-    })*/
-    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('bonus'))
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
-    .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
-    .build(({messageId, allCardParts, part, bonus}) => {
-      part.data.userBonus = bonus ?? '';
       return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
     });
   private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>} & ChatPartIdData>('AttackOnModeChange')
@@ -163,10 +145,6 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
       return;
     }
     AttackCardPartComponent.rollClick({event, partId: this.partId, messageId: this.messageId});
-  }
-
-  public onBonusChange(event: CustomEvent<RollD20EventData<string>>): void {
-    AttackCardPartComponent.bonusChange({bonus: event.detail.data, partId: this.partId, messageId: this.messageId});
   }
 
   public onRollMode(event: CustomEvent<RollD20EventData<RollMode>>): void {
