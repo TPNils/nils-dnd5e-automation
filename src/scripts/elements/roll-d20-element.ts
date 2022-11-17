@@ -3,6 +3,7 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { Attribute, Component, Output } from "../lib/render-engine/component";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
+import { UtilsLog } from "../utils/utils-log";
 
 const rollModeOrder = ['disadvantage', 'normal', 'advantage'] as const;
 export type RollMode = typeof rollModeOrder[number];
@@ -322,6 +323,7 @@ export class RollD20Element {
   //#region template callbacks
   private userBonus: string = '';
   public onBonusBlur(event: FocusEvent): void {
+    this.showBonus = false;
     if (event.target instanceof HTMLInputElement) {
       const userBonus = event.target.value == null ? '' : event.target.value;
       if (this.userBonus === userBonus) {
@@ -340,16 +342,21 @@ export class RollD20Element {
   }
   public onBonusKeyUp(event: KeyboardEvent): void {
     if (event.target instanceof HTMLInputElement) {
-      if (event.key === 'Enter') {
-        const userBonus = event.target.value == null ? '' : event.target.value;
-        if (userBonus && !Roll.validate(userBonus)) {
-          ui.notifications.error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-          event.target.value = this.userBonus;
-          return;
-        }
-        this.userBonus = userBonus;
-        this.doRollEmitter = {userBonus: this.userBonus};
-        event.target.blur();
+      switch (event.key) {
+        case 'Enter':
+          const userBonus = event.target.value == null ? '' : event.target.value;
+          if (userBonus && !Roll.validate(userBonus)) {
+            ui.notifications.error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
+            event.target.value = this.userBonus;
+            return;
+          }
+          this.userBonus = userBonus;
+          this.doRollEmitter = {userBonus: this.userBonus};
+          event.target.blur();
+          break;
+        case 'Escape':
+          event.target.blur();
+          break;
       }
     }
   }
@@ -385,7 +392,7 @@ export class RollD20Element {
   public doRollEmitter: {userBonus?: string;};
   public onRollClick(event: MouseEvent): void {
     this.onRollClickOld(event);
-    if (this.roll?.result != null) {
+    if (this.roll?.total != null) {
       this.showBonus = !this.showBonus;
       return;
     }
