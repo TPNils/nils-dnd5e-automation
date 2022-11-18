@@ -259,9 +259,6 @@ class CssScoperPlugin {
             break;
           }
         }
-        if (this.hostAttr === 'nac-hid-1') {
-          console.log(JSON.stringify(rule))
-        }
         if (shouldAddItemAttr && rule.pseudos) {
           for (const pseudo of rule.pseudos) {
             if (pseudo.name === 'host-context') {
