@@ -235,26 +235,17 @@ class CssScoperPlugin {
         rule.attrs = rule.attrs == null ? [] : rule.attrs;
 
         // replace :host selector
-        let hasHostAttr = false;
-        for (const attr of rootRule.rule.attrs) {
-          if (attr.name === this.hostAttr && attr.operator == null && attr.value == null) {
-            hasHostAttr = true;
-          }
-        }
         if (rule.pseudos) {
           let deletePseudoIndexes = [];
           for (let i = 0; i < rule.pseudos.length; i++) {
             const pseudo = rule.pseudos[i];
             if (pseudo.name === 'host') {
               deletePseudoIndexes.push(i);
-              if (!hasHostAttr) {
-                rootRule.rule.attrs.unshift({name: this.hostAttr});
-                hasHostAttr = true;
-              }
+              rule.attrs.unshift({name: this.hostAttr});
             }
           }
           for (let i = deletePseudoIndexes.length - 1; i >= 0; i--) {
-            rootRule.rule.pseudos.splice(i, 1);
+            rule.pseudos.splice(i, 1);
           }
         }
       }
@@ -267,6 +258,9 @@ class CssScoperPlugin {
             shouldAddItemAttr = false;
             break;
           }
+        }
+        if (this.hostAttr === 'nac-hid-1') {
+          console.log(JSON.stringify(rule))
         }
         if (shouldAddItemAttr && rule.pseudos) {
           for (const pseudo of rule.pseudos) {
@@ -1059,7 +1053,7 @@ class Git {
 
 export const build = gulp.series(
   BuildActions.createFolder('dist'),
-  BuildActions.createClean('dist'),
+  //BuildActions.createClean('dist'),
   gulp.parallel(
     BuildActions.createBuildTS('dist'),
     BuildActions.createBuildLess('dist'),
