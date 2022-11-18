@@ -73,6 +73,17 @@ function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache 
       (rollMode)="this.onRollMode($event)"
       >
     </nac-roll-d20>
+  `,
+  style: /*css*/`
+    :host-context(nac-target-part) :host {
+      display: block;
+      font-size: 12px;
+      min-width: 6em;
+    }
+    
+    nac-roll-d20 {
+      font-size: 1em;
+    }
   `
 })
 export class CheckCardComponent extends BaseCardComponent implements OnInit {
