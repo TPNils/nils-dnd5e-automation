@@ -10,7 +10,7 @@ import { VirtualTextNode } from "./virtual-text-node";
 // y flag = sticky => allow useage of lastIndex
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/sticky
 const textNodeRegex = /(.*?)(?=<)/ys;
-const commentNodeRegex = /\s*<!--(.*)-->/ys;
+const commentNodeRegex = /\s*<!--(.*?)-->/ys;
 
 // https://www.ibm.com/docs/en/app-connect-pro/7.5.3?topic=schemas-valid-node-names
 const startElementPrefixRegex = /\s*<([a-zA-Z_][a-zA-Z0-9_\-\.]*)/y;
@@ -73,7 +73,6 @@ export class VirtualNodeParser {
   private readCommentNode(): void {
     if (this.exec(commentNodeRegex)) {
       this.currentNode.appendChild(new VirtualCommmentNode(this.regexResult[1]))
-      this.currentIndex = commentNodeRegex.lastIndex;
     }
   }
 
