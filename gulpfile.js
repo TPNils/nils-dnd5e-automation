@@ -1053,7 +1053,7 @@ class Git {
 
 export const build = gulp.series(
   BuildActions.createFolder('dist'),
-  //BuildActions.createClean('dist'),
+  BuildActions.createClean('dist'),
   gulp.parallel(
     BuildActions.createBuildTS('dist'),
     BuildActions.createBuildLess('dist'),
