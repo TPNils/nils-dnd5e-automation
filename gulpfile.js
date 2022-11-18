@@ -414,9 +414,7 @@ class BuildActions {
       } else if (typescript.isNoSubstitutionTemplateLiteral(init)) {
         return doCssTransform(prefix, init.text);
       } else if (typescript.isTemplateExpression(init)) {
-        // TODO might be a good idea to have a text parser 
-        // init.text = '';
-        // init.rawText = '';
+        throw Error(`Javascript string templates with variables are not supported in @Component styles`)
       }
       return false;
     }
