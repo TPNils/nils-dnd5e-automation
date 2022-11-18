@@ -12,10 +12,11 @@ interface DocumentsByContext<T extends foundry.abstract.Document<any, FoundryDoc
 }
 
 type EntityPermission = keyof typeof foundry.CONST.USER_ROLES;
+type DocumentPermission = keyof ReturnType<typeof UtilsFoundry['getDocumentPermissions']>;
 const dmlPermissions = ['create', 'update', 'delete'] as const;
 export interface PermissionCheck<T = any> {
   uuid?: string;
-  permission: EntityPermission | typeof dmlPermissions[number] | string;
+  permission: EntityPermission | typeof dmlPermissions[number] | DocumentPermission | string;
   user: User;
   meta?: T;
 }
@@ -48,8 +49,15 @@ for (const perm of Object.keys(UtilsFoundry.getUserRolls())) {
     return document.testUserPermission(user, perm as any);
   }
 }
+for (const perm of Object.keys(UtilsFoundry.getDocumentPermissions())) {
+  const level = UtilsFoundry.getDocumentPermissions()[perm];
+  defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
+    return document.getUserLevel(user) === level;
+  }
+}
 for (const perm of (['create', 'update', 'delete'] as const)) {
   defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
+    document.getUserLevel
     return document.canUserModify(user, perm);
   }
 }
