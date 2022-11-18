@@ -1,4 +1,3 @@
-import { MemoryStorageService } from "./service/memory-storage-service";
 import { staticValues } from "./static-values";
 
 class GlobalHtmlListener {
@@ -16,14 +15,10 @@ class GlobalHtmlListener {
 
       // Create an observer instance linked to the callback function
       const observer = new MutationObserver((mutationsList, observer) => {
-        const selector = MemoryStorageService.getFocusedElementSelector();
-        if (!selector) {
-          return;
-        }
         for (const mutation of mutationsList) {
           for (const addedNode of Array.from(mutation.addedNodes)) {
             if (addedNode instanceof Element) {
-              const queryNode = addedNode.querySelector(selector);
+              const queryNode = addedNode.matches(`[autofocus]`) ? addedNode : addedNode.querySelector(`[autofocus]`);
               if (queryNode instanceof HTMLElement) {
                 queryNode.focus();
                 // Only focus once

@@ -68,6 +68,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
         </button>
         
         <input *if="this.showBonus && this.hasInteractPermission"
+          autofocus
           class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
           type="text"
           value="{{this.userBonus}}"
