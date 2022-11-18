@@ -2,6 +2,7 @@ import { ElementBuilder, ElementCallbackBuilder, OnAttributeChange } from "../..
 import { DmlTrigger, ITrigger, IAfterDmlContext, IDmlTrigger, IDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { Stoppable } from "../../lib/utils/stoppable";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
 import MyAbilityTemplate from "../../pixi/ability-template";
@@ -14,6 +15,7 @@ import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../mod
 import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
 import { ActiveEffectCardPart } from "./active-effect-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { BaseCardComponent } from "./base-card-component";
 import { CheckCardData, CheckCardPart } from "./check-card-part";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { ResourceCardData, ResourceCardPart } from "./resources-card-part";
@@ -108,6 +110,350 @@ export function uuidsToSelected(uuids: string[]): TargetCardData['selected'] {
   return selected;
 }
 
+let nextCallbackId = 0;
+const callbacks = new Map<number, TargetIntegrationCallback>();
+
+@Component({
+  tag: TargetCardComponent.getSelector(),
+  html: /*html*/`
+    <div *if="this.tableBody.length" class="table target-table" style="grid-template-columns: max-content 25px {{this.tableHeader.row.length ? 'repeat(' + this.tableHeader.row.length + ', min-content)' : ''}} auto max-content;">
+      <!-- header -->
+      <div class="header-cell">
+        <button *if="this.autoChangeTarget" [disabled]="!ths.isOwner" data-action="refresh-targets" class="icon-button copy"><i class="fas fa-bullseye"></i></button>
+      </div>
+      <div class="header-cell target-amount-summary">
+        {{this.tableHeader.currentTargets}}{{this.tableHeader.expectedTargets ? '/' + this.tableHeader.expectedTargets : ''}}
+      </div>
+      <div *for="let row of this.tableHeader.row" class="header-cell" [innerHTML]="row"></div>
+      <div class="header-cell"><!-- filler --></div>
+      <div class="header-cell one-line">
+        <virtual *if="this.tableHeader.canOneActorWrite">
+          <button data-action="smart-apply" data-target-uuid="*" [data-state]="this.tableHeader.smartState" class="icon-button apply"><i class="fas fa-brain"></i></button>
+          <button data-action="force-apply" data-target-uuid="*" [data-state]="this.tableHeader.state" class="icon-button apply"><i class="fas fa-check"></i></button>
+          <button data-action="undo" data-target-uuid="*" [data-state]="this.tableHeader.state" class="icon-button undo"><i class="fas fa-undo"></i></button>
+        </virtual>
+      </div>
+      
+      <!-- body -->
+      <virtual *for="let target of this.tableBody">
+        <virtual *if="target.isPlaceholder">
+          <div class="body-cell"><!-- copy/delete --></div>
+          <div class="body-cell placeholder">
+            <i class="placeholder-image fas fa-bullseye"></i>
+          </div>
+          <div *for="let row of target.row" class="body-cell placeholder">
+            <!-- dummy data rows -->
+          </div>
+          <div class="body-cell placeholder"><!-- filler --></div>
+          <div class="body-cell placeholder"><!-- apply buttons --></div>
+        </virtual>
+        <virtual *if="!target.isPlaceholder">
+        </virtual>
+          <div class="body-cell">
+            <button [disabled]="!this.isOwner || ((target.state === 'partial-applied' || target.state === 'applied'))" data-action="delete" data-delete-uuid="{{target.selectionId}}" class="icon-button delete"><i class="fas fa-trash"></i></button>
+            <button [disabled]="!this.isOwner" data-action="copy" data-copy-uuid="{{target.tokenUuid}}" class="icon-button copy"><i class="far fa-copy"></i></button>
+          </div>
+          <div class="body-cell" [title]="target.name"><nac-token-img [data-token-uuid]="target.tokenUuid" [data-token-img]="target.img"></nac-token-img></div>
+          <div *for="let row of target.row" class="body-cell" [innerHTML]="row"></div>
+          <div class="body-cell"><!-- filler --></div>
+          <div class="body-cell one-line">
+            <virtual *if="target.canActorWrite">
+              <button data-action="smart-apply" data-target-uuid="{{target.selectionId}}" data-state="{{target.smartState}}" class="icon-button apply"><i class="fas fa-brain"></i></button>
+              <button data-action="force-apply" data-target-uuid="{{target.selectionId}}" data-state="{{target.state}}" class="icon-button apply"><i class="fas fa-check"></i></button>
+              <button data-action="undo" data-target-uuid="{{target.selectionId}}" data-state="{{target.state}}" class="icon-button undo"><i class="fas fa-undo"></i></button>
+            </virtual>
+          </div>
+      </virtual>
+    </div>
+  `,
+  style:  /*css*/`
+    :host-context(body.key-shift) :host:hover .copy {
+      display: none;
+    }
+    
+    :host-context(body:not(.key-shift)) :host .delete,
+    :host:not(:hover) .delete {
+      display: none;
+    }
+    
+    .target-table {
+      display: grid;
+    }
+  
+    .one-line {
+      display: flex;
+      min-width: max-content;
+    }
+
+    .header-cell.target-amount-summary {
+      display: flex;
+      justify-content: center;
+    }
+
+    .placeholder-image {
+      margin-left: 4px;;
+      opacity: .5;
+      color: red;
+    }
+
+    .icon-button {
+      font-size: 10px;
+      height: 2em;
+      width: 2em;
+      line-height: 1em;
+    }
+    
+    .apply[data-state="applied"] {
+      color: green;
+    }
+    .apply[data-state="disabled"] {
+      opacity: .5;
+      pointer-events: none;
+    }
+
+    .undo[data-state="not-applied"] {
+      color: green;
+    }
+  `
+})
+export class TargetCardComponent extends BaseCardComponent implements OnInit {
+  
+  public static getSelector(): string {
+    return `${staticValues.code}-target-part`;
+  }
+
+  public onInit(args: OnInitParam) {
+    args.addStoppable(
+      this.getData().listen(({message, partId}) => this.calc(message, partId))
+    );
+  }
+
+  public tableHeader: {
+    currentTargets: number;
+    expectedTargets?: number;
+    canOneActorWrite: boolean;
+    row: string[];
+    state: VisualState['state'];
+    smartState: VisualState['state'];
+  };
+  public tableBody: Array<{
+    selectionId: string;
+    tokenUuid: string;
+    actorUuid: string;
+    canActorWrite: boolean;
+    name: string;
+    img: string;
+    state: VisualState['state'];
+    smartState: VisualState['state'];
+    row: string[];
+    isPlaceholder: false;
+  } | {
+    isPlaceholder: true;
+  }> = [];
+  public isOwner = false;
+  private async calc(message: ChatMessage, partId: string) {
+    const allParts = ModularCard.getCardPartDatas(message);
+    const part: ModularCardPartData<TargetCardData> = allParts == null ? null : allParts.find(p => p.id === partId && p.type === TargetCardPart.instance.getType());
+    UtilsDocument.hasAllPermissions([{uuid: part.data.calc$.actorUuid, permission: 'OWNER', user: game.user}]).then(isOwner => {
+      this.isOwner = isOwner;
+    });
+    
+    // context.element.innerHTML = await renderTemplate(
+    //   `modules/${staticValues.moduleName}/templates/modular-card/target-part.hbs`, {
+    //     data: {
+    //       tableHeader: htmlTableHeader,
+    //       tableBody: htmlTableBody,
+    //       autoChangeTarget: part.data.calc$.autoChangeTarget,
+    //     },
+    //     actorUuid: part.data.calc$.actorUuid,
+    //     moduleName: staticValues.moduleName
+    //   })
+
+    // TODO check if token is invisible
+    const stateContext: StateContext = {
+      messageId: message.id,
+      selected: part.data.selected,
+      allMessageParts: allParts,
+    };
+    const fetchedVisualStates: Promise<VisualState[]>[] = [];
+    for (const integration of callbacks.values()) {
+      if (!integration.getVisualState) {
+        continue;
+      }
+
+      try {
+        const visualState = integration.getVisualState(stateContext);
+        if (visualState instanceof Promise) {
+          fetchedVisualStates.push(visualState);
+        } else {
+          fetchedVisualStates.push(Promise.resolve(visualState));
+        }
+      } catch (e) {
+        UtilsLog.error('Error during getVisualState()', e);
+      }
+    }
+    
+    const columnsByKey = new Map<string, {label: string}>();
+    const columnKeyOrder: string[] = [];
+    const tokenData = new Map<string, {uuid: string, state?: VisualState['state'], smartState?: VisualState['state'], columnData: Map<string, string>}>();
+    for (const selected of part.data.selected) {
+      tokenData.set(selected.selectionId, {uuid: selected.tokenUuid, columnData: new Map()});
+    }
+    for (const visualState of await Promise.all(fetchedVisualStates).then(states => states.deepFlatten())) {
+      if (!visualState?.selectionId) {
+        continue;
+      }
+
+      if (!tokenData.has(visualState.selectionId)) {
+        tokenData.set(visualState.selectionId, {uuid: visualState.tokenUuid, state: visualState.state, smartState: visualState.smartState, columnData: new Map()});
+      }
+      const currentData = tokenData.get(visualState.selectionId);
+      {
+        const strictestVisualStateIndex = [visualStates.indexOf(currentData.state), visualStates.indexOf(visualState.state)].sort()[1];
+        if (strictestVisualStateIndex >= 0) {
+          currentData.state = visualStates[strictestVisualStateIndex];
+        }
+      }
+      {
+        const strictestVisualStateIndex = [visualStates.indexOf(currentData.smartState), visualStates.indexOf(visualState.smartState)].sort()[1];
+        if (strictestVisualStateIndex >= 0) {
+          currentData.smartState = visualStates[strictestVisualStateIndex];
+        }
+      }
+
+      if (Array.isArray(visualState.columns)) {
+        for (const column of visualState.columns) {
+          if (!columnsByKey.has(column.key)) {
+            columnsByKey.set(column.key, {label: column.label});
+            columnKeyOrder.push(column.key);
+          }
+
+          currentData.columnData.set(column.key, column.rowValue);
+        }
+      }
+    }
+
+    if (columnsByKey.size === 0 && part.data.calc$.expectedTargets < 1) {
+      return '';
+    }
+
+    const htmlTableHeader: this['tableHeader'] = {
+      currentTargets: tokenData.size,
+      expectedTargets: part.data.calc$.expectedTargets,
+      canOneActorWrite: false,
+      row: [],
+      state: 'not-applied',
+      smartState: 'not-applied'
+    };
+    for (const key of columnKeyOrder) {
+      htmlTableHeader.row.push(columnsByKey.get(key).label);
+    }
+    const htmlTableBody: this['tableBody'] = [];
+
+    const tokenCacheByUuid = new Map<string, TargetCardData['calc$']['tokenData'][number]>();
+    for (const token of part.data.calc$.tokenData) {
+      tokenCacheByUuid.set(token.tokenUuid, token);
+    }
+    
+    const sortedSelectionIds = Array.from(tokenData.entries())
+      .filter(([key, token]) => tokenCacheByUuid.has(token.uuid))
+      .sort((a, b) => {
+        const aToken = tokenCacheByUuid.get(a[1].uuid);
+        const bToken = tokenCacheByUuid.get(b[1].uuid);
+        
+        // Since tokens are displayed with their image, group them together
+        let compare = aToken.img.localeCompare(bToken.img);
+        if (compare !== 0) {
+          return compare;
+        }
+
+        compare = aToken.name.localeCompare(bToken.name);
+        if (compare !== 0) {
+          return compare;
+        }
+
+        return a[0].localeCompare(b[0]);
+      })
+      .map(([key]) => key);
+    const allStates = new Set<VisualState['state']>();
+    const allSmartStates = new Set<VisualState['state']>();
+    const hardSelectionIds = part.data.selected.map(sel => sel.selectionId);
+    const notAppliedValues = [null, undefined, 'not-applied'];
+    for (const selectionId of sortedSelectionIds) {
+      const data = tokenData.get(selectionId);
+      if (notAppliedValues.includes(data.state) && notAppliedValues.includes(data.smartState) && !hardSelectionIds.includes(selectionId)) {
+        // Only show non selected tokens which have something applied to them (to show undo button)
+        continue;
+      }
+      const tokenCache = tokenCacheByUuid.get(data.uuid);
+      const row: string[] = [];
+      for (const key of columnKeyOrder) {
+        row.push(data.columnData.get(key) ?? '');
+      }
+      allStates.add(data.state);
+      allSmartStates.add(data.smartState);
+      const permissions = await UtilsDocument.hasPermissions([
+        {uuid: tokenCache.actorUuid, permission: 'LIMITED', user: game.user},
+        {uuid: tokenCache.actorUuid, permission: 'UPDATE', user: game.user},
+      ]);
+      const canRead = permissions.find(p => p.requestedCheck.permission === 'LIMITED').result;
+      const canWrite = permissions.find(p => p.requestedCheck.permission === 'UPDATE').result;
+      htmlTableBody.push({
+        selectionId: selectionId,
+        tokenUuid: tokenCache.tokenUuid,
+        actorUuid: tokenCache.actorUuid,
+        name: (tokenCache.nameVisibleAnyone || canRead) ? tokenCache.name : '',
+        canActorWrite: canWrite,
+        img: tokenCache.img,
+        state: data.state,
+        smartState: data.smartState,
+        row: row,
+        isPlaceholder: false
+      });
+    }
+    for (let i = htmlTableBody.length; i < part.data.calc$.expectedTargets; i++) {
+      htmlTableBody.push({isPlaceholder: true});
+    }
+    allStates.delete(null);
+    allStates.delete(undefined);
+    {
+      let allStatesArray = Array.from(allStates);
+      // If all are disabled
+      if (allStatesArray.length === 1) {
+        htmlTableHeader.state = allStatesArray[0];
+      }
+      allStatesArray = allStatesArray.filter(state => state !== 'disabled');
+      // If all are the same or disabled
+      if (allStatesArray.length === 1) {
+        htmlTableHeader.state = allStatesArray[0];
+      } else {
+        htmlTableHeader.state = 'partial-applied';
+      }
+    }
+    
+    {
+      let allSmartStatesArray = Array.from(allSmartStates);
+      if (allSmartStatesArray.length === 1) {
+        htmlTableHeader.smartState = allSmartStates[0];
+      }
+      allSmartStatesArray = allSmartStatesArray.filter(state => state !== 'disabled');
+      // If all are the same or disabled
+      if (allSmartStatesArray.length === 1) {
+        htmlTableHeader.smartState = allSmartStatesArray[0];
+      } else {
+        htmlTableHeader.smartState = 'partial-applied';
+      }
+    }
+
+    htmlTableHeader.currentTargets = htmlTableBody.filter(row => !row.isPlaceholder).length;
+    htmlTableHeader.canOneActorWrite = htmlTableBody.find(row => row.isPlaceholder === false && row.canActorWrite) != null;
+
+    this.tableHeader = htmlTableHeader;
+    this.tableBody = htmlTableBody;
+  }
+
+}
+
 export class TargetCardPart implements ModularCardPart<TargetCardData> {
 
   public static readonly instance = new TargetCardPart();
@@ -159,13 +505,11 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     return newData;
   }
 
-  private nextCallbackId = 0;
-  private callbacks = new Map<number, TargetIntegrationCallback>();
   public registerIntegration(integration: TargetIntegrationCallback): Stoppable {
-    const id = this.nextCallbackId++;
-    this.callbacks.set(id, integration);
+    const id = nextCallbackId++;
+    callbacks.set(id, integration);
     return {
-      stop: () => this.callbacks.delete(id),
+      stop: () => callbacks.delete(id),
     }
   }
 
@@ -256,9 +600,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
           await this.fireEvent(action, [targetUuid], part.data, messageId, allCardParts, userId);
           return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
         })
-      )
-      .addOnAttributeChange(args => this.setElementHtml(args))
-      .build(this.getSelector())
+      );
 
     ModularCard.registerModularCardPart(staticValues.moduleName, TargetCardPart.instance);
     ModularCard.registerModularCardTrigger(this, new TargetCardTrigger());
@@ -270,218 +612,9 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   }
 
   //#region Front end
-  public getSelector(): string {
-    return `${staticValues.code}-target-part`;
-  }
 
   public getHtml(data: HtmlContext): string {
-    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
-  }
-
-  private setElementHtml(context: Parameters<OnAttributeChange<{['data-message-id']: string; ['data-part-id']: string;}>>[0]): Promise<void> {
-    return ItemCardHelpers.ifAttrData<TargetCardData>({attr: context.attributes, element: context.element, type: this, callback: async ({allParts, part}) => {
-      // TODO check if token is invisible
-      const stateContext: StateContext = {
-        messageId: context.attributes['data-message-id'],
-        selected: part.data.selected,
-        allMessageParts: allParts,
-      };
-      const fetchedVisualStates: Promise<VisualState[]>[] = [];
-      for (const integration of this.callbacks.values()) {
-        if (!integration.getVisualState) {
-          continue;
-        }
-  
-        try {
-          const visualState = integration.getVisualState(stateContext);
-          if (visualState instanceof Promise) {
-            fetchedVisualStates.push(visualState);
-          } else {
-            fetchedVisualStates.push(Promise.resolve(visualState));
-          }
-        } catch (e) {
-          UtilsLog.error('Error during getVisualState()', e);
-        }
-      }
-      
-      const columnsByKey = new Map<string, {label: string}>();
-      const columnKeyOrder: string[] = [];
-      const tokenData = new Map<string, {uuid: string, state?: VisualState['state'], smartState?: VisualState['state'], columnData: Map<string, string>}>();
-      for (const selected of part.data.selected) {
-        tokenData.set(selected.selectionId, {uuid: selected.tokenUuid, columnData: new Map()});
-      }
-      for (const visualState of await Promise.all(fetchedVisualStates).then(states => states.deepFlatten())) {
-        if (!visualState?.selectionId) {
-          continue;
-        }
-  
-        if (!tokenData.has(visualState.selectionId)) {
-          tokenData.set(visualState.selectionId, {uuid: visualState.tokenUuid, state: visualState.state, smartState: visualState.smartState, columnData: new Map()});
-        }
-        const currentData = tokenData.get(visualState.selectionId);
-        {
-          const strictestVisualStateIndex = [visualStates.indexOf(currentData.state), visualStates.indexOf(visualState.state)].sort()[1];
-          if (strictestVisualStateIndex >= 0) {
-            currentData.state = visualStates[strictestVisualStateIndex];
-          }
-        }
-        {
-          const strictestVisualStateIndex = [visualStates.indexOf(currentData.smartState), visualStates.indexOf(visualState.smartState)].sort()[1];
-          if (strictestVisualStateIndex >= 0) {
-            currentData.smartState = visualStates[strictestVisualStateIndex];
-          }
-        }
-  
-        if (Array.isArray(visualState.columns)) {
-          for (const column of visualState.columns) {
-            if (!columnsByKey.has(column.key)) {
-              columnsByKey.set(column.key, {label: column.label});
-              columnKeyOrder.push(column.key);
-            }
-  
-            currentData.columnData.set(column.key, column.rowValue);
-          }
-        }
-      }
-  
-      if (columnsByKey.size === 0 && part.data.calc$.expectedTargets < 1) {
-        return '';
-      }
-  
-      const htmlTableHeader: {
-        currentTargets: number;
-        expectedTargets?: number;
-        row: string[];
-        state: VisualState['state'];
-        smartState: VisualState['state'];
-      } = {
-        currentTargets: tokenData.size,
-        expectedTargets: part.data.calc$.expectedTargets,
-        row: [],
-        state: 'not-applied',
-        smartState: 'not-applied'
-      };
-      for (const key of columnKeyOrder) {
-        htmlTableHeader.row.push(columnsByKey.get(key).label);
-      }
-      const htmlTableBody: Array<{
-        selectionId: string;
-        tokenUuid: string;
-        actorUuid: string;
-        name: string;
-        nameVisibleAnyone: boolean;
-        img: string;
-        state: VisualState['state'];
-        smartState: VisualState['state'];
-        row: string[];
-        isPlaceholder: false;
-      } | {
-        isPlaceholder: true;
-      }> = [];
-  
-      const tokenCacheByUuid = new Map<string, TargetCardData['calc$']['tokenData'][number]>();
-      for (const token of part.data.calc$.tokenData) {
-        tokenCacheByUuid.set(token.tokenUuid, token);
-      }
-      
-      const sortedSelectionIds = Array.from(tokenData.entries())
-        .filter(([key, token]) => tokenCacheByUuid.has(token.uuid))
-        .sort((a, b) => {
-          const aToken = tokenCacheByUuid.get(a[1].uuid);
-          const bToken = tokenCacheByUuid.get(b[1].uuid);
-          
-          // Since tokens are displayed with their image, group them together
-          let compare = aToken.img.localeCompare(bToken.img);
-          if (compare !== 0) {
-            return compare;
-          }
-  
-          compare = aToken.name.localeCompare(bToken.name);
-          if (compare !== 0) {
-            return compare;
-          }
-  
-          return a[0].localeCompare(b[0]);
-        })
-        .map(([key]) => key);
-      const allStates = new Set<VisualState['state']>();
-      const allSmartStates = new Set<VisualState['state']>();
-      const hardSelectionIds = part.data.selected.map(sel => sel.selectionId);
-      const notAppliedValues = [null, undefined, 'not-applied'];
-      for (const selectionId of sortedSelectionIds) {
-        const data = tokenData.get(selectionId);
-        if (notAppliedValues.includes(data.state) && notAppliedValues.includes(data.smartState) && !hardSelectionIds.includes(selectionId)) {
-          // Only show non selected tokens which have something applied to them (to show undo button)
-          continue;
-        }
-        const tokenCache = tokenCacheByUuid.get(data.uuid);
-        const row: string[] = [];
-        for (const key of columnKeyOrder) {
-          row.push(data.columnData.get(key) ?? '');
-        }
-        allStates.add(data.state);
-        allSmartStates.add(data.smartState);
-        htmlTableBody.push({
-          selectionId: selectionId,
-          tokenUuid: tokenCache.tokenUuid,
-          actorUuid: tokenCache.actorUuid,
-          name: tokenCache.name,
-          nameVisibleAnyone: tokenCache.nameVisibleAnyone,
-          img: tokenCache.img,
-          state: data.state,
-          smartState: data.smartState,
-          row: row,
-          isPlaceholder: false
-        });
-      }
-      for (let i = htmlTableBody.length; i < part.data.calc$.expectedTargets; i++) {
-        htmlTableBody.push({isPlaceholder: true});
-      }
-      allStates.delete(null);
-      allStates.delete(undefined);
-      {
-        let allStatesArray = Array.from(allStates);
-        // If all are disabled
-        if (allStatesArray.length === 1) {
-          htmlTableHeader.state = allStatesArray[0];
-        }
-        allStatesArray = allStatesArray.filter(state => state !== 'disabled');
-        // If all are the same or disabled
-        if (allStatesArray.length === 1) {
-          htmlTableHeader.state = allStatesArray[0];
-        } else {
-          htmlTableHeader.state = 'partial-applied';
-        }
-      }
-      
-      {
-        let allSmartStatesArray = Array.from(allSmartStates);
-        if (allSmartStatesArray.length === 1) {
-          htmlTableHeader.smartState = allSmartStates[0];
-        }
-        allSmartStatesArray = allSmartStatesArray.filter(state => state !== 'disabled');
-        // If all are the same or disabled
-        if (allSmartStatesArray.length === 1) {
-          htmlTableHeader.smartState = allSmartStatesArray[0];
-        } else {
-          htmlTableHeader.smartState = 'partial-applied';
-        }
-      }
-
-      htmlTableHeader.currentTargets = htmlTableBody.filter(row => !row.isPlaceholder).length;
-  
-      context.element.innerHTML = await renderTemplate(
-        `modules/${staticValues.moduleName}/templates/modular-card/target-part.hbs`, {
-          data: {
-            tableHeader: htmlTableHeader,
-            tableBody: htmlTableBody,
-            autoChangeTarget: part.data.calc$.autoChangeTarget,
-          },
-          actorUuid: part.data.calc$.actorUuid,
-          moduleName: staticValues.moduleName
-        }
-      );
-    }})
+    return `<${TargetCardComponent.getSelector()} data-test data-part-id="${data.partId}" data-message-id="${data.messageId}"></${TargetCardComponent.getSelector()}>`
   }
 
   private async fireEvent(type: TargetCallbackData['apply'], requestIds: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[], userId: string): Promise<void> {
@@ -504,7 +637,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       apply: type,
     }));
 
-    for (const integration of this.callbacks.values()) {
+    for (const integration of callbacks.values()) {
       if (integration.onChange) {
         const response = integration.onChange(callbackData);
         if (response instanceof Promise) {
@@ -520,7 +653,7 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     for (const selected of data.selected) {
       allSelected.set(selected.selectionId, {...selected, state: 'not-applied'});
     }
-    for (const integration of this.callbacks.values()) {
+    for (const integration of callbacks.values()) {
       if (!integration.getState) {
         continue;
       }
