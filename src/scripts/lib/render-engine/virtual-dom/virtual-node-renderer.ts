@@ -244,7 +244,7 @@ export class VirtualNodeRenderer {
     }
     if (allAsyncDomActions.length > 0) {
       VirtualNodeRenderer.queuedDomActions.push(...allAsyncDomActions);
-      return rerenderQueue.add(VirtualNodeRenderer, VirtualNodeRenderer.processDomActionQueue).then(() => {
+      return rerenderQueue.add(VirtualNodeRenderer.processDomActionQueue).then(() => {
         return VirtualNodeRenderer.getState(virtualNode).domNode;
       });
     }

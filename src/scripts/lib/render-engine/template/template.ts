@@ -69,12 +69,12 @@ export class Template {
   public async render(options: {force?: boolean} = {}): Promise<VirtualNode & VirtualParentNode> {
     if (this.#processedVirtualNode == null) {
       if (this.#context) {
-        await rerenderQueue.add(this.rerenderCallback, this.rerenderCallback);
+        await rerenderQueue.add(this.rerenderCallback);
       } else {
         this.#processedVirtualNode = new VirtualFragmentNode();
       }
     } else if (options.force) {
-      await rerenderQueue.add(this.rerenderCallback, this.rerenderCallback);
+      await rerenderQueue.add(this.rerenderCallback);
     }
     return this.#processedVirtualNode;
   }

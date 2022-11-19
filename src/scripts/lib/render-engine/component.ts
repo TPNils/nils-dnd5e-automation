@@ -613,7 +613,7 @@ export class ComponentElement extends HTMLElement {
   }
 
   private generateHtmlQueue(): Promise<void> {
-    return rerenderQueue.add(this.generateHtmlExec, this.generateHtmlExec);
+    return rerenderQueue.add(this.generateHtmlExec);
   }
   
   private elementsBySlotName = new Map<string, Array<VirtualNode & VirtualAttributeNode>>();

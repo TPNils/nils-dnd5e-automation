@@ -5,7 +5,10 @@ class RerenderQueue {
   private promiseResolvers: Array<{resolve: (value: any) => void, reject: (err: any) => void}> = [];
   private promises: Array<Promise<any>> = [];
 
-  public add<T extends () => R, R>(dedupeKey: any, exec: T): Promise<R> {
+  public add<T extends () => R, R>(exec: T, dedupeKey?: any): Promise<R> {
+    if (dedupeKey == null) {
+      dedupeKey = exec;
+    }
     let index = this.queueKeys.indexOf(dedupeKey);
     if (index === -1) {
       index = this.queueKeys.length;
