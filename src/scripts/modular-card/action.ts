@@ -12,7 +12,7 @@ export interface ActionResponse<ClientData, ServerData, R> {
 /* Using this symbol as a security measure to prevent full GM access */
 const runningLocalSymbol = Symbol('runningLocal');
 export type PermissionCheckResult = 'can-run-local' | 'can-run-as-gm' | 'prevent-action';
-export class Action<ClientData, ServerData extends object = object> {
+export class Action<ClientData, ServerData extends object = {user: User}> {
 
   constructor(private readonly name: string){}
 
@@ -71,11 +71,12 @@ export class Action<ClientData, ServerData extends object = object> {
           throw new Error('Security alert, someone is trying to impersonate a GM.');
         }
         
-        let enrichedData = deepClone(serializedData);
+        let enrichedData = deepClone(serializedData) as ServerData & {user: User};
         for (const enricher of this.enricherFuncs) {
           // await in loop => wait before the next is called as it might depend on the previous enriched data
           enrichedData = {...enrichedData, ...await enricher(enrichedData)};
         }
+        enrichedData.user = user;
         
         if (this.permissionCheckFunc && !user.isGM) {
           const permissionResponse = await this.permissionCheckFunc(enrichedData, user);
