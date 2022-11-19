@@ -7,15 +7,20 @@ import { ModularCard, ModularCardPartData } from "../modular-card";
 import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
+interface Property {
+  text: string;
+  highlight: boolean;
+}
+
 interface PropertyCardData {
-  properties$: string[];
+  properties$: Array<Property> | string[]; // string[] is deprecaded
 }
 
 @Component({
   tag: PropertyCardComponent.getSelector(),
   html: /*html*/`
   <div class="footer">
-    <span *if="this.part != null" *for="let prop of this.part.data.properties$">{{prop}}</span>
+    <span *for="let prop of this.properties" class="{{prop.highlight ? 'highlight' : ''}}">{{prop.text}}</span>
   </div>
   `,
   style: /*css*/`
@@ -33,6 +38,10 @@ interface PropertyCardData {
       padding: 0 3px 0 0;
       font-size: 10px;
     }
+
+    .highlight {
+      font-weight: bold;
+    }
   `
 })
 export class PropertyCardComponent extends BaseCardComponent implements OnInit {
@@ -41,14 +50,13 @@ export class PropertyCardComponent extends BaseCardComponent implements OnInit {
     return `${staticValues.code}-property-part`;
   }
   
-  public part: ModularCardPartData<PropertyCardData>;
+  public properties: Property[] = [];
   public onInit(args: OnInitParam): void {
     args.addStoppable(
       this.getData().listen(({message, partId}) => {
           const allParts = ModularCard.getCardPartDatas(message);
-          if (allParts != null) {
-            this.part = allParts.find(p => p.id === partId && p.type === PropertyCardPart.instance.getType());
-          }
+          const part: ModularCardPartData<PropertyCardData> = allParts == null ? null : allParts.find(p => p.id === partId && p.type === PropertyCardPart.instance.getType());
+          this.properties = part.data.properties$.map(prop => typeof prop === 'string' ? {text: prop, highlight: false} : prop);
         })
     )
   }
@@ -61,9 +69,14 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
   private constructor(){}
   
   public async create({item}: {item: MyItem}): Promise<PropertyCardData> {
-    const chatData = await item.getChatData();
+    const chatData: {properties: string[]} = await item.getChatData();
+    UtilsLog.debug(chatData, item.data)
     return {
-      properties$: chatData.properties ?? [],
+      properties$: (chatData.properties ?? []).map(prop => {
+        const consumed = item.data?.data?.materials.consumed;
+        const propIsConsumed = item.data?.data?.materials?.value != null && prop.includes(`(${item.data?.data?.materials?.value})`);
+        return {text: prop, highlight: consumed && propIsConsumed}
+      }),
     };
   }
 
