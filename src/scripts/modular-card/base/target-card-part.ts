@@ -568,7 +568,6 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
 
     this.tableHeader = htmlTableHeader;
     this.tableBody = htmlTableBody;
-    UtilsLog.debug(this.tableHeader, this.tableBody)
   }
 
   public onCopyClick(uuid: string) {
