@@ -2,7 +2,6 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { staticValues } from "../../static-values";
 import { MyItem } from "../../types/fixed-types";
-import { UtilsLog } from "../../utils/utils-log";
 import { ModularCard, ModularCardPartData } from "../modular-card";
 import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
@@ -70,7 +69,6 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
   
   public async create({item}: {item: MyItem}): Promise<PropertyCardData> {
     const chatData: {properties: string[]} = await item.getChatData();
-    UtilsLog.debug(chatData, item.data)
     return {
       properties$: (chatData.properties ?? []).map(prop => {
         const consumed = item.data?.data?.materials.consumed;
