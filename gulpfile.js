@@ -19,6 +19,7 @@ import gulpSass from 'gulp-sass';
 import git from 'gulp-git';
 import sourcemaps from 'gulp-sourcemaps';
 import minifyCss from 'gulp-clean-css';
+import open from 'open';
 
 import child_process from 'child_process';
 import yargs from 'yargs';
@@ -641,7 +642,22 @@ class BuildActions {
   
     const cmd = `node "${path.join(config.foundryPath, 'resources', 'app', 'main.js')}" --dataPath="${config.dataPath}"`;
     console.log('starting foundry: ', cmd)
-    exec(cmd);
+    const childProcess = exec(cmd);
+
+    let serverStarted = false;
+    childProcess.stdout.on('data', function (data) {
+      process.stdout.write(data);
+      if (!serverStarted) {
+        const result = /Server started and listening on port ([0-9]+)/i.exec(data.toString());
+        if (result) {
+          open(`http://localhost:${result[1]}/game`)
+        }
+      }
+    });
+    
+    childProcess.stderr.on('data', function (data) {
+      process.stderr.write(data);
+    });
   }
 
   /**
