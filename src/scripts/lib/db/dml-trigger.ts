@@ -492,7 +492,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const diff = UtilsCompare.findDiff(document.data, documentSnapshot.data);
       if (diff.changed) {
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
-          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff});
+          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, newRow: documentSnapshot});
         } else {
           await document.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}});
           if (typeof (document as any as FoundryDocument).uuid === 'string') {
@@ -561,11 +561,12 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             documentName: document.collectionName,
             uuid: (document as any).uuid,
             diff: diff,
-            original: oldDocument.data
+            oldRow: deepClone(oldDocument.data),
+            newRow: deepClone(modifiedDocument.data)
           });
         }
         if (recursiveUpdate > 5) {
-          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff});
+          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, oldRow: deepClone(oldDocument.data), newRow: deepClone(modifiedDocument.data)});
           outputDiff = true;
         } else {
           await modifiedDocument.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: recursiveUpdate + 1}});
