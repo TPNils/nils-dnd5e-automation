@@ -1,4 +1,3 @@
-import { ElementBuilder, ElementCallbackBuilder, OnAttributeChange } from "../../elements/element-builder";
 import { DmlTrigger, ITrigger, IAfterDmlContext, IDmlTrigger, IDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
@@ -10,9 +9,10 @@ import { staticValues } from "../../static-values";
 import { MyActor, MyItemData } from "../../types/fixed-types";
 import { UtilsLog } from "../../utils/utils-log";
 import { UtilsTemplate } from "../../utils/utils-template";
-import { ItemCardHelpers } from "../item-card-helpers";
+import { Action } from "../action";
+import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { ActiveEffectCardPart } from "./active-effect-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
@@ -119,7 +119,7 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
     <div *if="this.tableBody.length" class="table target-table" style="grid-template-columns: max-content 25px {{this.tableHeader.row.length ? 'repeat(' + this.tableHeader.row.length + ', min-content)' : ''}} auto max-content;">
       <!-- header -->
       <div class="header-cell">
-        <button *if="this.autoChangeTarget" [disabled]="!ths.isOwner" data-action="refresh-targets" class="icon-button copy"><i class="fas fa-bullseye"></i></button>
+        <button *if="this.autoChangeTarget" [disabled]="!this.isOwner" (click)="this.onRefreshClick()" class="icon-button copy"><i class="fas fa-bullseye"></i></button>
       </div>
       <div class="header-cell target-amount-summary">
         {{this.tableHeader.currentTargets}}{{this.tableHeader.expectedTargets ? '/' + this.tableHeader.expectedTargets : ''}}
@@ -128,9 +128,9 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
       <div class="header-cell"><!-- filler --></div>
       <div class="header-cell one-line">
         <virtual *if="this.tableHeader.canOneActorWrite">
-          <button data-action="smart-apply" data-target-uuid="*" [data-state]="this.tableHeader.smartState" class="icon-button apply"><i class="fas fa-brain"></i></button>
-          <button data-action="force-apply" data-target-uuid="*" [data-state]="this.tableHeader.state" class="icon-button apply"><i class="fas fa-check"></i></button>
-          <button data-action="undo" data-target-uuid="*" [data-state]="this.tableHeader.state" class="icon-button undo"><i class="fas fa-undo"></i></button>
+          <button (click)="this.onTargetActionClick('smart-apply', '*')" [data-state]="this.tableHeader.smartState" class="icon-button apply"><i class="fas fa-brain"></i></button>
+          <button (click)="this.onTargetActionClick('force-apply', '*')" [data-state]="this.tableHeader.state" class="icon-button apply"><i class="fas fa-check"></i></button>
+          <button (click)="this.onTargetActionClick('undo', '*')" [data-state]="this.tableHeader.state" class="icon-button undo"><i class="fas fa-undo"></i></button>
         </virtual>
       </div>
       
@@ -150,23 +150,23 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
         <virtual *if="!target.isPlaceholder">
         </virtual>
           <div class="body-cell">
-            <button [disabled]="!this.isOwner || ((target.state === 'partial-applied' || target.state === 'applied'))" data-action="delete" data-delete-uuid="{{target.selectionId}}" class="icon-button delete"><i class="fas fa-trash"></i></button>
-            <button [disabled]="!this.isOwner" data-action="copy" data-copy-uuid="{{target.tokenUuid}}" class="icon-button copy"><i class="far fa-copy"></i></button>
+            <button [disabled]="!this.isOwner || ((target.state === 'partial-applied' || target.state === 'applied'))" (click)="this.onDeleteClick(target.selectionId)" class="icon-button delete"><i class="fas fa-trash"></i></button>
+            <button [disabled]="!this.isOwner" (click)="this.onCopyClick(target.tokenUuid)" class="icon-button copy"><i class="far fa-copy"></i></button>
           </div>
           <div class="body-cell" [title]="target.name"><nac-token-img [data-token-uuid]="target.tokenUuid" [data-token-img]="target.img"></nac-token-img></div>
           <div *for="let row of target.row" class="body-cell" [innerHTML]="row"></div>
           <div class="body-cell"><!-- filler --></div>
           <div class="body-cell one-line">
             <virtual *if="target.canActorWrite">
-              <button data-action="smart-apply" data-target-uuid="{{target.selectionId}}" data-state="{{target.smartState}}" class="icon-button apply"><i class="fas fa-brain"></i></button>
-              <button data-action="force-apply" data-target-uuid="{{target.selectionId}}" data-state="{{target.state}}" class="icon-button apply"><i class="fas fa-check"></i></button>
-              <button data-action="undo" data-target-uuid="{{target.selectionId}}" data-state="{{target.state}}" class="icon-button undo"><i class="fas fa-undo"></i></button>
+              <button (click)="this.onTargetActionClick('smart-apply', target.selectionId)" [data-state]="target.smartState" class="icon-button apply"><i class="fas fa-brain"></i></button>
+              <button (click)="this.onTargetActionClick('force-apply', target.selectionId)" [data-state]="target.state" class="icon-button apply"><i class="fas fa-check"></i></button>
+              <button (click)="this.onTargetActionClick('undo', target.selectionId)" [data-state]="target.state" class="icon-button undo"><i class="fas fa-undo"></i></button>
             </virtual>
           </div>
       </virtual>
     </div>
   `,
-  style:  /*css*/`
+  style: /*css*/`
     :host-context(body.key-shift) :host:hover .copy {
       display: none;
     }
@@ -178,6 +178,7 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
     
     .target-table {
       display: grid;
+      width: 100%;
     }
   
     .one-line {
@@ -217,6 +218,132 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
   `
 })
 export class TargetCardComponent extends BaseCardComponent implements OnInit {
+  //#region actions
+  
+  private static copyUuid = new Action<{uuid: string;} & ChatPartIdData>('TargetCopyUuid')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('uuid'))
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
+    .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}}>(({part}) => {
+      const documents: CreatePermissionCheckArgs['documents'] = [];
+      if (part.data.calc$.actorUuid) {
+        documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
+      }
+      return {documents: documents};
+    }))
+    .build(async ({messageId, part, allCardParts, uuid}) => {
+      part.data.selected = uuidsToSelected([...part.data.selected.map(s => s.tokenUuid), uuid]);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    })
+    
+  private static deleteUuid = new Action<{uuid: string;} & ChatPartIdData>('TargetDeleteUuid')
+    // .addSelectorFilter('[data-action="delete"][data-delete-uuid]')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('uuid'))
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
+    .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}}>(({part}) => {
+      const documents: CreatePermissionCheckArgs['documents'] = [];
+      if (part.data.calc$.actorUuid) {
+        documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
+      }
+      return {documents: documents};
+    }))
+    .build(async ({messageId, part, allCardParts, uuid, user}) => {
+      part.data.selected = part.data.selected.filter(s => s.selectionId !== uuid);
+      UtilsLog.debug('deleteUuid', uuid);
+      await TargetCardComponent.fireEvent('undo', [uuid], part.data, messageId, allCardParts, user.id);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    })
+    
+  private static refreshTargets = new Action<ChatPartIdData>('TargetRefresh')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
+    .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}}>(({part}) => {
+      const documents: CreatePermissionCheckArgs['documents'] = [];
+      if (part.data.calc$.actorUuid) {
+        documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
+      }
+      return {documents: documents};
+    }))
+    .build(async ({messageId, part, allCardParts, user}) => {
+      await setTargetsFromUser(part.data, user);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    })
+    
+  private static setTargetstate = new Action<{action: TargetCallbackData['apply']; targetUuid: string;} & ChatPartIdData>('TargetSetState')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('action'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('targetUuid'))
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
+    .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}, targetUuid: string}>(({part, targetUuid}) => {
+      const documents: CreatePermissionCheckArgs['documents'] = [];
+      documents.push({uuid: part.data.selected.find(s => s.selectionId === targetUuid).tokenUuid, permission: 'update', security: true});
+      return {documents: documents};
+    }))
+    .build(async ({messageId, part, allCardParts, action, targetUuid, user}) => {
+      await TargetCardComponent.fireEvent(action, [targetUuid], part.data, messageId, allCardParts, user.id);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    })
+  //#endregion
+  
+  private static async fireEvent(type: TargetCallbackData['apply'], requestIds: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[], userId: string): Promise<void> {
+    const tokenPermissions = await UtilsDocument.hasPermissions(TargetCardComponent.getSelected(requestIds, data, messageId, allCardParts).map(selected => ({
+      uuid: selected.tokenUuid,
+      permission: 'update',
+      user: game.users.get(userId),
+      meta: {
+        selectionId: selected.selectionId
+      }
+    })));
+    
+    const callbackData: TargetCallbackData[] = tokenPermissions.filter(permission => permission.result).map(permission => ({
+      messageId: messageId,
+      messageCardParts: allCardParts,
+      selected: {
+        tokenUuid: permission.requestedCheck.uuid,
+        selectionId: permission.requestedCheck.meta.selectionId
+      },
+      apply: type,
+    }));
+
+    for (const integration of callbacks.values()) {
+      if (integration.onChange) {
+        const response = integration.onChange(callbackData);
+        if (response instanceof Promise) {
+          await response;
+        }
+      }
+    }
+  }
+
+  private static getSelected(requestSelectIds: (string | '*')[], data: TargetCardData, messageId: string, allMessageParts: ModularCardPartData[]): Array<TargetCardData['selected'][0] & {state: typeof visualStates[number]}> {
+    const allSelected = new Map<string, TargetCardData['selected'][0] & {state: typeof visualStates[number]}>();
+    const stateContext: StateContext = {messageId: messageId, allMessageParts: allMessageParts, selected: data.selected};
+    for (const selected of data.selected) {
+      allSelected.set(selected.selectionId, {...selected, state: 'not-applied'});
+    }
+    for (const integration of callbacks.values()) {
+      if (!integration.getState) {
+        continue;
+      }
+      for (const state of integration.getState(stateContext)) {
+        if (state.state === 'disabled' || state.state === 'not-applied') {
+          continue;
+        }
+        allSelected.set(state.selectionId, {selectionId: state.selectionId, tokenUuid: state.tokenUuid, state: state.state});
+      }
+    }
+    
+    if (requestSelectIds.includes('*')) {
+      return Array.from(allSelected.values());
+    } else {
+      return Array.from(allSelected.values()).filter(selected => requestSelectIds.includes(selected.selectionId))
+    }
+  }
   
   public static getSelector(): string {
     return `${staticValues.code}-target-part`;
@@ -251,23 +378,14 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     isPlaceholder: true;
   }> = [];
   public isOwner = false;
+  public autoChangeTarget = false;
   private async calc(message: ChatMessage, partId: string) {
     const allParts = ModularCard.getCardPartDatas(message);
     const part: ModularCardPartData<TargetCardData> = allParts == null ? null : allParts.find(p => p.id === partId && p.type === TargetCardPart.instance.getType());
+    this.autoChangeTarget = part.data.calc$.autoChangeTarget;
     UtilsDocument.hasAllPermissions([{uuid: part.data.calc$.actorUuid, permission: 'OWNER', user: game.user}]).then(isOwner => {
       this.isOwner = isOwner;
     });
-    
-    // context.element.innerHTML = await renderTemplate(
-    //   `modules/${staticValues.moduleName}/templates/modular-card/target-part.hbs`, {
-    //     data: {
-    //       tableHeader: htmlTableHeader,
-    //       tableBody: htmlTableBody,
-    //       autoChangeTarget: part.data.calc$.autoChangeTarget,
-    //     },
-    //     actorUuid: part.data.calc$.actorUuid,
-    //     moduleName: staticValues.moduleName
-    //   })
 
     // TODO check if token is invisible
     const stateContext: StateContext = {
@@ -303,6 +421,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       if (!visualState?.selectionId) {
         continue;
       }
+      UtilsLog.debug('visualState', visualState)
 
       if (!tokenData.has(visualState.selectionId)) {
         tokenData.set(visualState.selectionId, {uuid: visualState.tokenUuid, state: visualState.state, smartState: visualState.smartState, columnData: new Map()});
@@ -452,6 +571,39 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     this.tableBody = htmlTableBody;
   }
 
+  public onCopyClick(uuid: string) {
+    TargetCardComponent.copyUuid({
+      messageId: this.messageId,
+      partId: this.partId,
+      uuid: uuid,
+    });
+  }
+  
+  public onDeleteClick(uuid: string) {
+    UtilsLog.debug('onDeleteClick', uuid);
+    TargetCardComponent.deleteUuid({
+      messageId: this.messageId,
+      partId: this.partId,
+      uuid: uuid,
+    });
+  }
+  
+  public onRefreshClick() {
+    TargetCardComponent.refreshTargets({
+      messageId: this.messageId,
+      partId: this.partId,
+    });
+  }
+  
+  public onTargetActionClick(action: TargetCallbackData['apply'], targetUuid: string) {
+    TargetCardComponent.setTargetstate({
+      messageId: this.messageId,
+      partId: this.partId,
+      action: action,
+      targetUuid: targetUuid,
+    });
+  }
+
 }
 
 export class TargetCardPart implements ModularCardPart<TargetCardData> {
@@ -515,93 +667,6 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    new ElementBuilder()
-      .listenForAttribute('data-part-id', 'string')
-      .listenForAttribute('data-message-id', 'string')
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="copy"][data-copy-uuid]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(context => {
-          return {copyUuid: (context.event.target as HTMLElement).closest('[data-copy-uuid]').getAttribute('data-copy-uuid')};
-        })
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
-        .setPermissionCheck(createPermissionCheck<{part: {data: TargetCardData}}>(({part}) => {
-          const documents: CreatePermissionCheckArgs['documents'] = [];
-          if (part.data.calc$.actorUuid) {
-            documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
-          }
-          return {documents: documents};
-        }))
-        .setExecute(async ({messageId, part, allCardParts, copyUuid}) => {
-          part.data.selected = uuidsToSelected([...part.data.selected.map(s => s.tokenUuid), copyUuid]);
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="delete"][data-delete-uuid]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(context => {
-          return {deleteUuid: (context.event.target as HTMLElement).closest('[data-delete-uuid]').getAttribute('data-delete-uuid')};
-        })
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
-        .setPermissionCheck(createPermissionCheck<{part: {data: TargetCardData}}>(({part}) => {
-          const documents: CreatePermissionCheckArgs['documents'] = [];
-          if (part.data.calc$.actorUuid) {
-            documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
-          }
-          return {documents: documents};
-        }))
-        .setExecute(async ({messageId, part, allCardParts, deleteUuid, userId}) => {
-          part.data.selected = part.data.selected.filter(s => s.selectionId !== deleteUuid);
-          await this.fireEvent('undo', [deleteUuid], part.data, messageId, allCardParts, userId);
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="refresh-targets"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
-        .setPermissionCheck(createPermissionCheck<{part: {data: TargetCardData}}>(({part}) => {
-          const documents: CreatePermissionCheckArgs['documents'] = [];
-          if (part.data.calc$.actorUuid) {
-            documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
-          }
-          return {documents: documents};
-        }))
-        .setExecute(async ({messageId, part, allCardParts, userId}) => {
-          await setTargetsFromUser(part.data, game.users.get(userId));
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="force-apply"][data-target-uuid],[data-action="smart-apply"][data-target-uuid],[data-action="undo"][data-target-uuid]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(context => {
-          return {
-            action: (context.event.target as HTMLElement).closest('[data-action]').getAttribute('data-action') as TargetCallbackData['apply'],
-            targetUuid: (context.event.target as HTMLElement).closest('[data-target-uuid]').getAttribute('data-target-uuid'),
-          };
-        })
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
-        .setPermissionCheck(createPermissionCheck<{part: {data: TargetCardData}, targetUuid: string}>(({part, targetUuid}) => {
-          const documents: CreatePermissionCheckArgs['documents'] = [];
-          documents.push({uuid: part.data.selected.find(s => s.selectionId === targetUuid).tokenUuid, permission: 'update', security: true});
-          return {documents: documents};
-        }))
-        .setExecute(async ({messageId, part, allCardParts, action, targetUuid, userId}) => {
-          await this.fireEvent(action, [targetUuid], part.data, messageId, allCardParts, userId);
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      );
-
     ModularCard.registerModularCardPart(staticValues.moduleName, TargetCardPart.instance);
     ModularCard.registerModularCardTrigger(this, new TargetCardTrigger());
     DmlTrigger.registerTrigger(new DmlTriggerUser());
@@ -615,61 +680,6 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
 
   public getHtml(data: HtmlContext): string {
     return `<${TargetCardComponent.getSelector()} data-test data-part-id="${data.partId}" data-message-id="${data.messageId}"></${TargetCardComponent.getSelector()}>`
-  }
-
-  private async fireEvent(type: TargetCallbackData['apply'], requestIds: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[], userId: string): Promise<void> {
-    const tokenPermissions = await UtilsDocument.hasPermissions(this.getSelected(requestIds, data, messageId, allCardParts).map(selected => ({
-      uuid: selected.tokenUuid,
-      permission: 'update',
-      user: game.users.get(userId),
-      meta: {
-        selectionId: selected.selectionId
-      }
-    })));
-    
-    const callbackData: TargetCallbackData[] = tokenPermissions.filter(permission => permission.result).map(permission => ({
-      messageId: messageId,
-      messageCardParts: allCardParts,
-      selected: {
-        tokenUuid: permission.requestedCheck.uuid,
-        selectionId: permission.requestedCheck.meta.selectionId
-      },
-      apply: type,
-    }));
-
-    for (const integration of callbacks.values()) {
-      if (integration.onChange) {
-        const response = integration.onChange(callbackData);
-        if (response instanceof Promise) {
-          await response;
-        }
-      }
-    }
-  }
-
-  private getSelected(requestSelectIds: (string | '*')[], data: TargetCardData, messageId: string, allMessageParts: ModularCardPartData[]): Array<TargetCardData['selected'][0] & {state: typeof visualStates[number]}> {
-    const allSelected = new Map<string, TargetCardData['selected'][0] & {state: typeof visualStates[number]}>();
-    const stateContext: StateContext = {messageId: messageId, allMessageParts: allMessageParts, selected: data.selected};
-    for (const selected of data.selected) {
-      allSelected.set(selected.selectionId, {...selected, state: 'not-applied'});
-    }
-    for (const integration of callbacks.values()) {
-      if (!integration.getState) {
-        continue;
-      }
-      for (const state of integration.getState(stateContext)) {
-        if (state.state === 'disabled' || state.state === 'not-applied') {
-          continue;
-        }
-        allSelected.set(state.selectionId, {selectionId: state.selectionId, tokenUuid: state.tokenUuid, state: state.state});
-      }
-    }
-    
-    if (requestSelectIds.includes('*')) {
-      return Array.from(allSelected.values());
-    } else {
-      return Array.from(allSelected.values()).filter(selected => requestSelectIds.includes(selected.selectionId))
-    }
   }
   //#endregion
 
