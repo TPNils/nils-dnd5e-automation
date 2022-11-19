@@ -527,6 +527,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       // See injector (initOldValueInjector) for more info
       return;
     }
+    const originalDiff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
     let context = new AfterDmlContext<T>(
       [{
         newRow: documentSnapshot,
@@ -555,12 +556,14 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       }
 
       const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
-      if (diff.changed) {
+      if (!UtilsCompare.deepEquals(originalDiff, diff)) {
         if (outputDiff) {
           UtilsLog.debug('trigger diff', {
             documentName: document.collectionName,
             uuid: (document as any).uuid,
             diff: diff,
+            originalDiff: originalDiff,
+            diffDiff: UtilsCompare.findDiff(originalDiff, diff),
             oldRow: deepClone(oldDocument.data),
             newRow: deepClone(modifiedDocument.data)
           });

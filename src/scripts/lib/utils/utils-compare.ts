@@ -55,6 +55,10 @@ export class UtilsCompare {
     if (original === compareTo) {
       return true;
     }
+    // NaN !== NaN
+    if (Number.isNaN(original) && Number.isNaN(compareTo)) {
+      return true;
+    }
     const originalType = typeof original;
     const compareToType = typeof compareTo;
   
