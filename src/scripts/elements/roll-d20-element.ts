@@ -3,7 +3,6 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { Attribute, Component, Output } from "../lib/render-engine/component";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
-import { UtilsLog } from "../utils/utils-log";
 
 const rollModeOrder = ['disadvantage', 'normal', 'advantage'] as const;
 export type RollMode = typeof rollModeOrder[number];
