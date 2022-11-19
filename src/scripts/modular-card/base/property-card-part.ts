@@ -69,7 +69,7 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
     const chatData: {properties: string[]} = await item.getChatData();
     return {
       properties$: (chatData.properties ?? []).map(prop => {
-        const consumed = item.data?.data?.materials.consumed;
+        const consumed = item.data?.data?.materials?.consumed;
         const propIsConsumed = item.data?.data?.materials?.value != null && prop.includes(`(${item.data?.data?.materials?.value})`);
         return {text: prop, highlight: consumed && propIsConsumed}
       }),
