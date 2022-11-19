@@ -77,25 +77,19 @@ export class DescriptionCardComponent extends BaseCardComponent implements OnIni
   public materials: string;
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData().listen(async ({message, partId}) => {
-          const allParts = ModularCard.getCardPartDatas(message);
-          let part: ModularCardPartData<DescriptionCardData>;
-          if (allParts != null) {
-            part = allParts.find(p => p.id === partId && p.type === DescriptionCardPart.instance.getType());
+      this.getData<DescriptionCardData>(DescriptionCardPart.instance).listen(async ({part}) => {
+        this.name = part.data.name$;
+        this.image = part.data.img$;
+        this.materials = part.data.materials$;
+        this.description = part.data.description$;
+        if (this.description) {
+          const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {async: true} as any;
+          if (game.user.isGM) {
+            enrichOptions.secrets = true;
           }
-          
-          this.name = part?.data?.name$;
-          this.image = part?.data?.img$;
-          this.materials = part?.data?.materials$;
-          this.description = part?.data?.description$;
-          if (this.description) {
-            const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {async: true} as any;
-            if (game.user.isGM) {
-              enrichOptions.secrets = true;
-            }
-            this.description = await TextEditor.enrichHTML(this.description, enrichOptions as any);
-          }
-        })
+          this.description = await TextEditor.enrichHTML(this.description, enrichOptions as any);
+        }
+      })
     )
   }
 

@@ -80,7 +80,7 @@ export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
 
   public onInit(args: OnInitParam) {
     args.addStoppable(
-      this.getData().listen(({message, partId}) => this.setData(message, partId))
+      this.getData<LayOnHandsCardData>(LayOnHandsCardPart.instance).listen(({part}) => this.setData(part))
     );
   }
 
@@ -91,18 +91,12 @@ export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
   public maxHeal = 0;
   public maxCure = 0;
   public missingPermission = true;
-  private async setData(message: ChatMessage, partId: string) {
-    const allParts = ModularCard.getCardPartDatas(message);
-    let part: ModularCardPartData<LayOnHandsCardData>;
-    if (allParts != null) {
-      part = allParts.find(p => p.id === partId && p.type === LayOnHandsCardPart.instance.getType());
-    }
-
+  private async setData(part: ModularCardPartData<LayOnHandsCardData>) {
     let hasPermission = false;
     if (part) {
       const result = await LayOnHandsComponent.permissionCheck({
-        messageId: message.id,
-        partId: partId,
+        messageId: this.messageId,
+        partId: part.id,
         part: part
       }, game.user);
       hasPermission = result !== 'prevent-action';

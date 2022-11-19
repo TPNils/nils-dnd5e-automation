@@ -125,18 +125,12 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData().listen(({message, partId}) => {
-          const allParts = ModularCard.getCardPartDatas(message);
-          if (allParts != null) {
-            this.part = allParts.find(p => p.id === partId && p.type === AttackCardPart.instance.getType());
-          }
-      
-          if (this.part != null) {
-            this.interactionPermission = `OwnerUuid:${this.part.data.actorUuid$}`;
-            this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.data.actorUuid$}`;
-            this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
-          }
-        })
+      this.getData<AttackCardData>(AttackCardPart.instance).listen(({part}) => {
+        this.part = part;
+        this.interactionPermission = `OwnerUuid:${this.part.data.actorUuid$}`;
+        this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.data.actorUuid$}`;
+        this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
+      })
     )
   }
 

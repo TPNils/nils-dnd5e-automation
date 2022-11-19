@@ -52,11 +52,9 @@ export class PropertyCardComponent extends BaseCardComponent implements OnInit {
   public properties: Property[] = [];
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData().listen(({message, partId}) => {
-          const allParts = ModularCard.getCardPartDatas(message);
-          const part: ModularCardPartData<PropertyCardData> = allParts == null ? null : allParts.find(p => p.id === partId && p.type === PropertyCardPart.instance.getType());
-          this.properties = part.data.properties$.map(prop => typeof prop === 'string' ? {text: prop, highlight: false} : prop);
-        })
+      this.getData<PropertyCardData>(PropertyCardPart.instance).listen(({part}) => {
+        this.properties = part.data.properties$.map((prop: PropertyCardData['properties$'][number]) => typeof prop === 'string' ? {text: prop, highlight: false} : prop);
+      })
     )
   }
 

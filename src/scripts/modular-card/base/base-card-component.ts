@@ -1,6 +1,8 @@
 import { DocumentListener } from "../../lib/db/document-listener";
 import { Attribute } from "../../lib/render-engine/component";
 import { ValueProvider, ValueReader } from "../../provider/value-provider";
+import { ModularCard, ModularCardPartData } from "../modular-card";
+import { ModularCardPart } from "../modular-card-part";
 
 export class BaseCardComponent {
   
@@ -24,12 +26,20 @@ export class BaseCardComponent {
   }
   //#endregion
 
-  protected getData() {
+  protected getData<T>(type: ModularCardPart<T>) {
     return this._messageId
     .switchMap(id => ValueReader.mergeObject({
       message: DocumentListener.listenUuid<ChatMessage>(`ChatMessage.${id}`),
       partId: this._partId
-    }));
+    })).map(({message, partId}) => {
+      const allParts = ModularCard.getCardPartDatas(message);
+      const part: ModularCardPartData<T> = allParts == null ? null : allParts.find(p => p.id === partId && p.type === type.getType());
+      return {
+        message: message,
+        allParts: allParts,
+        part: part,
+      }
+    }).filter(({part}) => part != null);
   }
 
 }

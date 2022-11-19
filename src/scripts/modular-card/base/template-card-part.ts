@@ -46,19 +46,13 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
   public placeTemplateLocale = game.i18n.localize('DND5E.PlaceTemplate');
   public onInit(args: OnInitParam) {
     args.addStoppable(
-      this.getData().listen(data => this.setData(data.message, data.partId))
+      this.getData<TemplateCardData>(TemplateCardPart.instance).listen(data => this.setData(data.part))
     );
   }
 
   public hasPermission = false;
   private target: TemplateCardData['calc$']['target'];
-  private async setData(message: ChatMessage, partId: string) {
-    const allParts = ModularCard.getCardPartDatas(message);
-    let part: ModularCardPartData<TemplateCardData>;
-    if (allParts != null) {
-      part = allParts.find(p => p.id === partId && p.type === TemplateCardPart.instance.getType());
-    }
-
+  private async setData(part: ModularCardPartData<TemplateCardData>) {
     if (part) {
       this.hasPermission = await UtilsDocument.hasAllPermissions([{
         uuid: part.data.calc$.actorUuid,

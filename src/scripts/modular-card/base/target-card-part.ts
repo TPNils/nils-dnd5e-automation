@@ -351,7 +351,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
 
   public onInit(args: OnInitParam) {
     args.addStoppable(
-      this.getData().listen(({message, partId}) => this.calc(message, partId))
+      this.getData(TargetCardPart.instance).listen(({message, allParts, part}) => this.calc(message, allParts, part))
     );
   }
 
@@ -379,9 +379,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
   }> = [];
   public isOwner = false;
   public autoChangeTarget = false;
-  private async calc(message: ChatMessage, partId: string) {
-    const allParts = ModularCard.getCardPartDatas(message);
-    const part: ModularCardPartData<TargetCardData> = allParts == null ? null : allParts.find(p => p.id === partId && p.type === TargetCardPart.instance.getType());
+  private async calc(message: ChatMessage, allParts: Array<ModularCardPartData>, part: ModularCardPartData<TargetCardData>) {
     this.autoChangeTarget = part.data.calc$.autoChangeTarget;
     UtilsDocument.hasAllPermissions([{uuid: part.data.calc$.actorUuid, permission: 'OWNER', user: game.user}]).then(isOwner => {
       this.isOwner = isOwner;

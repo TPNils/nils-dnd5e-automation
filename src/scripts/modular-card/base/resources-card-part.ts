@@ -299,7 +299,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
   
   public onInit(args: OnInitParam) {
     args.addStoppable(
-      this.getData().listen(({message, partId}) => this.setData(message, partId))
+      this.getData<ResourceCardData>(ResourceCardPart.instance).listen(({part}) => this.setData(part))
     );
   }
 
@@ -321,13 +321,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
     });
   }
 
-  private async setData(message: ChatMessage, partId: string) {
-    const allParts = ModularCard.getCardPartDatas(message);
-    let part: ModularCardPartData<ResourceCardData>;
-    if (allParts != null) {
-      part = allParts.find(p => p.id === partId && p.type === ResourceCardPart.instance.getType());
-    }
-
+  private async setData(part: ModularCardPartData<ResourceCardData>) {
     if (part) {
       const hasPerm = await UtilsDocument.hasAllPermissions([{
         permission: 'Observer',

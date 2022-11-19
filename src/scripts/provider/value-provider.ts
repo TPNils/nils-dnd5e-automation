@@ -29,6 +29,12 @@ export abstract class ValueReader<T> implements ValueReader<T> {
   public map<R>(transformer: (value: T) => R): ValueReader<R> {
     return new Mapper<T, R>(this, transformer);
   }
+  /**
+   * @param predicate The filter method calls the predicate function one time for each element in the array.
+   */
+  public filter(predicate: (value: T) => boolean | Promise<boolean>): ValueReader<T> {
+    return new Filter<T>(this, predicate);
+  }
 
   public static mergeObject<T extends { [key: string]: ValueReader<any> | any }>(obj: T): ValueReader<ObjectWithRefReturnTypes<T>> {
     return new MergeObject<T>(obj);
@@ -130,6 +136,26 @@ class Mapper<D, T> extends ValueReader<T> {
   public listen(callback: (value?: T) => void): Stoppable {
     return this.delegate.listen(async value => {
       callback(await this.transformer(value));
+    })
+  }
+}
+
+class Filter<T> extends ValueReader<T> {
+  constructor(
+    private readonly delegate: ValueReader<T>,
+    private readonly predicate: (value: T) => boolean | Promise<boolean>
+  ){
+    super();
+  }
+
+  public listen(callback: (value?: T) => void): Stoppable {
+    return this.delegate.listen(async value => {
+      const response = this.predicate(value);
+      if (response instanceof Promise) {
+        response.then(r => callback(value));
+      } else if (response) {
+        callback(value);
+      }
     })
   }
 }

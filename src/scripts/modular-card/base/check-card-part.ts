@@ -171,15 +171,12 @@ private static modeChange = new Action<{event: CustomEvent<RollD20EventData<Roll
 
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData().switchMap(({message, partId}) => {
+      this.getData<CheckCardData>(CheckCardPart.instance).switchMap(({part}) => {
         return ValueProvider.mergeObject({
-          message,
-          partId,
+          part,
           targetId: this._targetId
         })
-      }).listen(({message, partId, targetId}) => {
-        const allParts = ModularCard.getCardPartDatas(message);
-        const part: ModularCardPartData<CheckCardData> = allParts == null ? null : allParts.find(p => p.id === partId && p.type === CheckCardPart.instance.getType());
+      }).listen(({part, targetId}) => {
         this.cache = getTargetCache(part.data, targetId);
     
         if (this.cache != null) {

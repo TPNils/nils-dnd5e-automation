@@ -65,12 +65,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
   public spellSlotOptions: Array<{label: string; value: string; selected: boolean}> = [];
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData().switchMap(({message, partId}) => {
-        const allParts = ModularCard.getCardPartDatas(message);
-        let part: ModularCardPartData<SpellLevelCardData>;
-        if (allParts != null) {
-          part = allParts.find(p => p.id === partId && p.type === SpellLevelCardPart.instance.getType());
-        }
+      this.getData<SpellLevelCardData>(SpellLevelCardPart.instance).switchMap(({part}) => {
         return ValueReader.mergeObject({
           part,
           actor: part == null ? null : DocumentListener.listenUuid<MyActor & FoundryDocument>(part.data.calc$.actorUuid)
