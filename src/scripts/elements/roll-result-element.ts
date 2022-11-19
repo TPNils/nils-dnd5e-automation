@@ -245,15 +245,15 @@ export class RollResultElement {
   @Attribute('data-override-formula')
   public overrideFormula: string;
 
-  private _displayType: string = defaultDisplayType;
+  private _displayType: DisplayType = defaultDisplayType;
   @Attribute({name: 'data-display-type', dataType: 'string'})
-  public get displayType(): string {
+  public get displayType(): DisplayType {
     return this._displayType;
   }
-  public set displayType(value: string) {
+  public set displayType(value: DisplayType | string) {
     value = value?.toLowerCase();
     if (supprtedDisplayTypes.includes(value as DisplayType)) {
-      this._displayType = value;
+      this._displayType = value as DisplayType;
     } else {
       this._displayType = defaultDisplayType;
     }
