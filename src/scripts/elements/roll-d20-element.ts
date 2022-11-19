@@ -323,6 +323,12 @@ export class RollD20Element {
   //#region template callbacks
   private userBonus: string = '';
   public onBonusBlur(event: FocusEvent): void {
+    if (event.relatedTarget instanceof HTMLElement) {
+      // Do not fire this if roll is pressed (focusout triggers first)
+      if (event.relatedTarget.matches(`.roll-button`) || event.relatedTarget.closest(`.roll-button`) != null) {
+        return;
+      }
+    }
     this.showBonus = false;
     if (event.target instanceof HTMLInputElement) {
       const userBonus = event.target.value == null ? '' : event.target.value;
