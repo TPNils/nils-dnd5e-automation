@@ -45,7 +45,7 @@ export class VirtualNodeParser {
       this.readCommentNode();
       this.readStartElement();
       this.readEndElement();
-      if (indexSnapshot === this.currentIndex) {
+      if (indexSnapshot === this.currentIndex && this.currentIndex < this.html.length) {
         throw new Error(`Internal error. Could not parse html, stuck at index ${indexSnapshot}. html:\n${this.html}`)
       }
     } while (this.currentIndex < this.html.length)
