@@ -4,6 +4,7 @@ import { TransformTrigger } from "../lib/db/transform-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { Component, ComponentElement } from "../lib/render-engine/component";
+import { rerenderQueue } from "../lib/render-engine/virtual-dom/render-queue";
 import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
@@ -407,10 +408,11 @@ export class ModularCard {
     Hooks.on('renderChatLog', () => {
       const log = document.querySelector("#chat-log");
       let isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
+      const scrollToBottom = () => (ui.chat as any).scrollBottom();
       
       const observer = new MutationObserver((mutationsList, observer) => {
         if (isAtBottom) {
-          (ui.chat as any).scrollBottom();
+          rerenderQueue.add(scrollToBottom);
         }
       });
 
