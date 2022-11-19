@@ -12,7 +12,7 @@ import { UtilsTemplate } from "../../utils/utils-template";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { ActiveEffectCardPart } from "./active-effect-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
@@ -117,7 +117,6 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
   tag: TargetCardComponent.getSelector(),
   html: /*html*/`
     <div *if="this.tableBody.length" class="table target-table" style="grid-template-columns: max-content 25px {{this.tableHeader.row.length ? 'repeat(' + this.tableHeader.row.length + ', min-content)' : ''}} auto max-content;">
-      <!-- header -->
       <div class="header-cell">
         <button *if="this.autoChangeTarget" [disabled]="!this.isOwner" (click)="this.onRefreshClick()" class="icon-button copy"><i class="fas fa-bullseye"></i></button>
       </div>
@@ -125,7 +124,7 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
         {{this.tableHeader.currentTargets}}{{this.tableHeader.expectedTargets ? '/' + this.tableHeader.expectedTargets : ''}}
       </div>
       <div *for="let row of this.tableHeader.row" class="header-cell" [innerHTML]="row"></div>
-      <div class="header-cell"><!-- filler --></div>
+      <div class="header-cell"></div>
       <div class="header-cell one-line">
         <virtual *if="this.tableHeader.canOneActorWrite">
           <button (click)="this.onTargetActionClick('smart-apply', '*')" [data-state]="this.tableHeader.smartState" class="icon-button apply"><i class="fas fa-brain"></i></button>
@@ -134,21 +133,19 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
         </virtual>
       </div>
       
-      <!-- body -->
       <virtual *for="let target of this.tableBody">
         <virtual *if="target.isPlaceholder">
           <div class="body-cell"><!-- copy/delete --></div>
           <div class="body-cell placeholder">
             <i class="placeholder-image fas fa-bullseye"></i>
           </div>
-          <div *for="let row of target.row" class="body-cell placeholder">
+          <div *for="let row of this.tableHeader.row" class="body-cell placeholder">
             <!-- dummy data rows -->
           </div>
           <div class="body-cell placeholder"><!-- filler --></div>
           <div class="body-cell placeholder"><!-- apply buttons --></div>
         </virtual>
         <virtual *if="!target.isPlaceholder">
-        </virtual>
           <div class="body-cell">
             <button [disabled]="!this.isOwner || ((target.state === 'partial-applied' || target.state === 'applied'))" (click)="this.onDeleteClick(target.selectionId)" class="icon-button delete"><i class="fas fa-trash"></i></button>
             <button [disabled]="!this.isOwner" (click)="this.onCopyClick(target.tokenUuid)" class="icon-button copy"><i class="far fa-copy"></i></button>
@@ -163,6 +160,7 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
               <button (click)="this.onTargetActionClick('undo', target.selectionId)" [data-state]="target.state" class="icon-button undo"><i class="fas fa-undo"></i></button>
             </virtual>
           </div>
+        </virtual>
       </virtual>
     </div>
   `,
@@ -238,7 +236,6 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     })
     
   private static deleteUuid = new Action<{uuid: string;} & ChatPartIdData>('TargetDeleteUuid')
-    // .addSelectorFilter('[data-action="delete"][data-delete-uuid]')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('uuid'))
@@ -252,7 +249,6 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     }))
     .build(async ({messageId, part, allCardParts, uuid, user}) => {
       part.data.selected = part.data.selected.filter(s => s.selectionId !== uuid);
-      UtilsLog.debug('deleteUuid', uuid);
       await TargetCardComponent.fireEvent('undo', [uuid], part.data, messageId, allCardParts, user.id);
       return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
     })
@@ -421,7 +417,6 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       if (!visualState?.selectionId) {
         continue;
       }
-      UtilsLog.debug('visualState', visualState)
 
       if (!tokenData.has(visualState.selectionId)) {
         tokenData.set(visualState.selectionId, {uuid: visualState.tokenUuid, state: visualState.state, smartState: visualState.smartState, columnData: new Map()});
@@ -569,6 +564,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
 
     this.tableHeader = htmlTableHeader;
     this.tableBody = htmlTableBody;
+    UtilsLog.debug(this.tableHeader, this.tableBody)
   }
 
   public onCopyClick(uuid: string) {
@@ -580,7 +576,6 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
   }
   
   public onDeleteClick(uuid: string) {
-    UtilsLog.debug('onDeleteClick', uuid);
     TargetCardComponent.deleteUuid({
       messageId: this.messageId,
       partId: this.partId,
