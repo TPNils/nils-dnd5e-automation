@@ -1,6 +1,4 @@
-import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
-import { RollD20Element, RollD20EventData, RollMode } from "../../elements/roll-d20-element";
-import { UtilsElement } from "../../elements/utils-element";
+import { RollD20EventData, RollMode } from "../../elements/roll-d20-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
