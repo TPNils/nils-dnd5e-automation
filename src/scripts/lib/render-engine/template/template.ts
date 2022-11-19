@@ -139,9 +139,12 @@ export class Template {
                   for (let j = i+1; j < processing.length; j++) {
                     pending.push(processing[j]);
                   }
+                  // Don't add this instance since it has been 'split' into multiple to be processed
+                  break;
+                } else {
+                  // No items => skip this node
+                  continue;
                 }
-                // Don't add this instance since it has been 'split' into multiple to be processed
-                break;
               }
             }
           }
