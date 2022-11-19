@@ -1,5 +1,5 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
-import { DmlTrigger, IAfterDmlContext, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
+import { DmlTrigger, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { TransformTrigger } from "../lib/db/transform-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
@@ -81,7 +81,6 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
   }
   
   public beforeUpdate(context: IDmlContext<ChatMessage>): boolean | void {
-    this.injectIsAtBottom(context);
     this.finalFields(context);
   }
   
@@ -110,25 +109,6 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
     }
 
     return true;
-  }
-
-  private injectIsAtBottom(context: IDmlContext<ChatMessage>) {
-    const log = document.querySelector("#chat-log");
-    const isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
-    if (isAtBottom) {
-      for (const row of context.rows) {
-        row.options['chatIsAtBottom'] = true;
-      }
-    }
-  }
-
-  public afterUpdate(context: IAfterDmlContext<ChatMessage>): void {
-    const isAtBottom = context.rows.some(row => row.options['chatIsAtBottom'] === true);
-    if (isAtBottom) {
-      setTimeout(() => {
-        (ui.chat as any).scrollBottom();
-      }, 0);
-    }
   }
 }
 
@@ -423,6 +403,24 @@ export class ModularCard {
       libWrapper.register(staticValues.moduleName, 'ChatMessage.prototype.getHTML', getHTML, 'WRAPPER');
       libWrapper.register(staticValues.moduleName, 'ChatLog.prototype.updateMessage', updateMessage, 'MIXED');
     });
+    
+    Hooks.on('renderChatLog', () => {
+      const log = document.querySelector("#chat-log");
+      let isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
+      
+      const observer = new MutationObserver((mutationsList, observer) => {
+        if (isAtBottom) {
+          (ui.chat as any).scrollBottom();
+        }
+      });
+
+      log.addEventListener('scroll', () => {
+        isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
+      });
+
+      // Start observing the target node for configured mutations
+      observer.observe(document, { childList: true, subtree: true });
+    })
   }
 
   public static getCardPartDatas(message: ChatMessage): Array<ModularCardPartData> | null {
