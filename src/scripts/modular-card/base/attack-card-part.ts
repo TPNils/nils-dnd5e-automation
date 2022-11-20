@@ -137,7 +137,11 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
     args.addStoppable(
       this.getData<AttackCardData>(AttackCardPart.instance).listen(({part}) => {
         this.part = part;
-        this.flavor = game.i18n.localize('DND5E.Attack');
+        if (part.data.roll$?.evaluated && part.data.mode !== 'normal') {
+          this.flavor = game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`);
+        } else {
+          this.flavor = game.i18n.localize('DND5E.Attack');
+        }
         this.interactionPermission = `OwnerUuid:${this.part.data.actorUuid$}`;
         this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.data.actorUuid$}`;
         this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;

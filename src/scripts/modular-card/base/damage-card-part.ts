@@ -201,14 +201,22 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   public onInit(args: OnInitParam): void {
     args.addStoppable(
       this.getData<DamageCardData>(DamageCardPart.instance).listen(({part}) => {
-        
         const baseRoll = part.data.source === 'versatile' ? part.data.calc$.versatileBaseRoll : part.data.calc$.normalBaseRoll;
         const damageTypes: DamageType[] = baseRoll.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
         const isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
         if (isHealing) {
           this.flavor = game.i18n.localize('DND5E.Healing');
+          if (part.data.calc$.roll?.evaluated && part.data.mode === 'critical') {
+            // Critical heals almost never happen (only in homebrew I think?), but just in case do specify that the crit is a heal
+            this.flavor = `${this.flavor}/${game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`)}`
+          }
         } else {
-          this.flavor = game.i18n.localize('DND5E.Damage');
+          if (part.data.calc$.roll?.evaluated && part.data.mode === 'critical') {
+            // Don't use Damage/Critical label => just critical is shorter
+            this.flavor = game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`);
+          } else {
+            this.flavor = game.i18n.localize('DND5E.Damage');
+          }
         }
         this.roll = part.data.calc$.roll;
         this.rollMode = part.data.mode;
