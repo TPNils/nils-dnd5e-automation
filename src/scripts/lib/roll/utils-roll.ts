@@ -241,6 +241,7 @@ export class UtilsRoll {
       powerfulCritical: game.settings.get("dnd5e", "criticalDamageMaxDice") === true,
       ...options
     }
+    // TODO critical does not work for complexer rolls like sneak attack => (ceil(7 /2))d6
     let dmgRoll: Roll;
     if (Array.isArray(roll)) {
       dmgRoll = new DamageRoll('0', {}, options) as Roll & {configureDamage: () => void};

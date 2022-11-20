@@ -302,6 +302,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
   public allConsumeResourcesApplied = false;
   
   public onInit(args: OnInitParam) {
+    // TODO resources are very strange => try upcast, downcast, upcaste, etc
     args.addStoppable(
       this.getData<ResourceCardData>(ResourceCardPart.instance).listen(({part}) => this.setData(part))
     );

@@ -7,6 +7,7 @@ import { VirtualAttributeNode, VirtualNode, VirtualParentNode } from "./virtual-
 import { VirtualNodeParser } from "./virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "./virtual-dom/virtual-node-renderer";
 
+// TODO review best practices https://web.dev/custom-elements-best-practices/
 //#region Decorators
 const componentConfigSymbol = Symbol('ComponentConfig');
 const htmlElementSymbol = Symbol('HtmlElement');

@@ -396,6 +396,11 @@ class BuildActions {
     return importTransformer;
   }
 
+  // TODO add a html transformer?
+  //  - Improve reading text templates
+  //  - Parse html string with https://github.com/Chevrotain/chevrotain
+  //  - Add param parsedHtml as javascript objects
+
   /**
    * Decent documentation: https://github.com/madou/typescript-transformer-handbook
    * Transform @Component style css at compile time since we can't make use of an external library at runtime

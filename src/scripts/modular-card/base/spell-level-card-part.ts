@@ -6,13 +6,14 @@ import { Component, OnInit, OnInitParam } from "../../lib/render-engine/componen
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { SpellData, MyActor } from "../../types/fixed-types";
+import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
-interface SpellLevelCardData {
+export interface SpellLevelCardData {
   selectedLevel: number | 'pact';
   calc$: {
     tokenUuid?: string;
@@ -195,6 +196,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
     });
 
     // Find the first available spellslot
+    // TODO innate casting (always?) also counts as known spells => allow to use either the (un)limited uses or (upcast) spell slots
     const spellIsPact = item.data.data?.preparation?.mode === 'pact';
     let selectedLevel: SpellLevelCardData['selectedLevel'] = spellIsPact ?  'pact' : item.data.data.level;
     const selectedLevelAvailableSlots = spellSlots.find(slot => selectedLevel === 'pact' ? (slot.type === 'pact') : (slot.type === 'spell' && slot.level === selectedLevel))?.availableSlots;

@@ -265,6 +265,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     // TODO what about other interactions like hunters mark (automatic, but only to a specific target)
     //  => Add a damage per target uuid option (not selection id)?
     //     Maybe a bit more structured => Should have a damage object/array which everything uses, base dmg, user bonus and external factors
+
+    // TODO make an other element with for the "other" formula
     const rollData: {[key: string]: any} = item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
       rollData.prof = item.data.data.prof.term;
@@ -668,6 +670,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
   
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
+    // TODO also account for success/failed checks + half or 0 damage
     await this.calcTargetCache(context);
   }
 

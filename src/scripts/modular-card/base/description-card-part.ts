@@ -87,6 +87,7 @@ export class DescriptionCardComponent extends BaseCardComponent implements OnIni
           if (game.user.isGM) {
             enrichOptions.secrets = true;
           }
+          // TODO Command of Caspian has unescaped characters like &nbsp;
           this.description = await TextEditor.enrichHTML(this.description, enrichOptions as any);
         }
       })

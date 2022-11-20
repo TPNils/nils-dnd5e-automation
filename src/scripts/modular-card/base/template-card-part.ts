@@ -75,6 +75,7 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
         }
       }
     });
+    // TODO area of Minor Illlusion (Caspian) is too big with XGE area (did not test default)
     if ((template as MyAbilityTemplate)?.drawPreview) {
       (template as MyAbilityTemplate).drawPreview();
     }
