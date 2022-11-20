@@ -89,7 +89,7 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   
   public create({item, actor, token}: ModularCardCreateArgs): TemplateCardData {
     // @ts-expect-error
-    const hasAoe = CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target.type);
+    const hasAoe = CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target?.type);
     if (!hasAoe) {
       return null;
     }

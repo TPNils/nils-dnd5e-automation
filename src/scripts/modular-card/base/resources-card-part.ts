@@ -424,7 +424,7 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
         });
       }
       
-      switch (item.data.data.consume.type) {
+      switch (item.data.data.consume?.type) {
         case 'attribute': {
           if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
             let propertyPath = `data.${item.data.data.consume.target}`;
@@ -445,10 +445,10 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
 
     // Consume item resources
     {
-      switch (item.data.data.consume.type) {
+      switch (item.data.data.consume?.type) {
         case 'ammo':
         case 'material': {
-          if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
+          if (item.data.data.consume?.target && item.data.data.consume.amount > 0) {
             const targetItem = item.actor.items.get(item.data.data.consume.target);
             let propertyPath = `data.quantity`;
             data.consumeResources.push({
@@ -464,7 +464,7 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
           break;
         }
         case 'charges': {
-          if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
+          if (item.data.data.consume?.target && item.data.data.consume.amount > 0) {
             const targetItem = item.actor.items.get(item.data.data.consume.target);
             let propertyPath = `data.uses.value`;
             data.consumeResources.push({
