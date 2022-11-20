@@ -108,7 +108,6 @@ function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache
     [data-has-versatile]="this.hasVersatile"
     [data-override-formula]="this.overrideFormula"
     [data-read-permission]="this.readPermission"
-    [data-read-hidden-display-type]="this.readHiddenDisplayType"
     [data-interaction-permission]="this.interactionPermission"
 
     (rollMode)="this.onRollMode($event)"
@@ -225,7 +224,6 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
         this.overrideFormula = part.data.calc$.displayFormula
         this.interactionPermission = `OwnerUuid:${part.data.calc$.actorUuid}`;
         this.readPermission = `${staticValues.code}ReadDamageUuid:${part.data.calc$.actorUuid}`;
-        this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
       })
     )
   }

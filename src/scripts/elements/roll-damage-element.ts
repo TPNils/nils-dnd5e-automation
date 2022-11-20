@@ -255,7 +255,7 @@ export class RollDamageElement {
     this.calcReadPermission();
   }
   
-  private _readHiddenDisplayType : RollResultElement['displayType'];
+  private _readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'damageHiddenRoll') as RollResultElement['displayType'];
   @Attribute({name: 'data-read-hidden-display-type', dataType: 'string'})
   public get readHiddenDisplayType(): RollResultElement['displayType'] {
     return this._readHiddenDisplayType;
