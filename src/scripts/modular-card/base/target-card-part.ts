@@ -697,6 +697,10 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       if (!newRow.part.data.calc$.autoChangeTarget) {
         continue;
       }
+      if (newRow.part.data.selected.length < newRow.part.data.calc$.expectedTargets ?? 1) {
+        // Don't disable autoChangeTarget while it's active and not all selected
+        continue;
+      }
 
       let attackCardData: AttackCardData;
       let checkCardData: CheckCardData;
@@ -844,7 +848,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     const bulkUpdateRequest: Parameters<typeof ModularCard.setBulkCardPartDatas>[0] = [];
     for (let messageIndex = game.messages.contents.length - 1; messageIndex >= 0; messageIndex--) {
       const chatMessage = game.messages.contents[messageIndex];
-      if (chatMessage.data.timestamp <= newestMessageCreatedDate || excludeMessageIds.has(chatMessage.id)) {
+      if (chatMessage.data.timestamp >= newestMessageCreatedDate || excludeMessageIds.has(chatMessage.id)) {
         continue;
       }
       const parts = ModularCard.getCardPartDatas(chatMessage);
