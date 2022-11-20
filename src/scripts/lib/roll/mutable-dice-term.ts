@@ -81,6 +81,15 @@ export class MutableDiceTerm extends Die {
     return result;
   }
 
+  public toJSON(): object {
+    const response: {class?: string} = super.toJSON();
+    // Allow it to play nice if this module is uninstalled
+    if (response.class === MutableDiceTerm.name) {
+      response.class = Die.name;
+    }
+    return response;
+  }
+
   @RunOnce()
   public static registerHooks(): void {
     CONFIG.Dice.termTypes[MutableDiceTerm.name] = MutableDiceTerm;
