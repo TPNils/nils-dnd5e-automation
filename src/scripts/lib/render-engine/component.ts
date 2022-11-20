@@ -277,18 +277,22 @@ export function Output(config?: string | OutputConfig) {
         internalConfig.deduplicate = config.deduplicate;
       }
     }
-    let lastEmitValue: any;
-    let hasEmit = false;
+    let dataStore = Symbol(`@Output-${internalConfig.eventName}`);
     const setFunction = function (this: {[htmlElementSymbol]: ComponentElement}, value: any, disable?: any): void {
-      if (hasEmit && internalConfig.deduplicate) {
-        if (typeof internalConfig.deduplicate === 'function' && internalConfig.deduplicate(lastEmitValue, value)) {
+      if (!this[dataStore]) {
+        this[dataStore] = {
+          hasEmit: false,
+        }
+      }
+      if (this[dataStore].hasEmit && internalConfig.deduplicate) {
+        if (typeof internalConfig.deduplicate === 'function' && internalConfig.deduplicate(this[dataStore].lastEmitValue, value)) {
           return;
-        } else if (lastEmitValue === value) {
+        } else if (this[dataStore].lastEmitValue === value) {
           return;
         }
       }
-      hasEmit = true;
-      lastEmitValue = value;
+      this[dataStore].hasEmit = true;
+      this[dataStore].lastEmitValue = value;
       if (disable === fromAttrChangeSymbol) {
         return;
       }
@@ -313,14 +317,14 @@ export function Output(config?: string | OutputConfig) {
         };
       } else {
         descriptor.get = function (this: {[htmlElementSymbol]: ComponentElement}): void {
-          return lastEmitValue;
+          return this[dataStore]?.lastEmitValue;
         };
         descriptor.set = setFunction;
       }
     } else {
       Reflect.defineProperty(targetPrototype, propertyKey, {
         get: function (this: {[htmlElementSymbol]: ComponentElement}): void {
-          return lastEmitValue;
+          return this[dataStore]?.lastEmitValue;
         },
         set: setFunction,
       })
