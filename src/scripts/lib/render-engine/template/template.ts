@@ -6,6 +6,7 @@ import { isVirtualNode, VirtualNode, VirtualParentNode } from "../virtual-dom/vi
 import { VirtualNodeParser } from "../virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
 
+const domParser = new DOMParser();
 const forAttrRegex = /^\s*let\s+([^\s]+\s)+of\s(.+)$/;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
   template: T;
@@ -263,35 +264,38 @@ export class Template {
     // TODO this is currently a dumb implementation and does not account for the 'keywords' {{ and }} to be present within the expression (example: in a javascript string)
     // Best to write an interpreter but thats a lot of work and maybe more process intensive so lets cross that bridge when we get there :)
     let startExpression = 0;
-    let endExpression: number;
-    while ((startExpression = value.indexOf('{{', startExpression)) !== -1) {
-      startExpression = value.indexOf('{{');
+    let endExpression = -1;
+    const parsedParts: string[] = [];
+    while ((startExpression = value.indexOf('{{', endExpression)) !== -1) {
       if (value[startExpression-1] === '\\') {
         // escaped, please continue
+        parsedParts.push('{');
+        startExpression++;
         continue;
       }
+      
+      // endExpression = the end of the last parsed expression
+      // startExpression = a start of a new expression
+      const unescapedHtml = domParser.parseFromString(value.substring(endExpression, startExpression), 'text/html').documentElement.textContent;
+      parsedParts.push(unescapedHtml);
 
       endExpression = startExpression;
       do {
         endExpression = value.indexOf('}}', endExpression);
         if (value[endExpression-1] === '\\') {
           // escaped, please continue
-          endExpression += 2;
+          endExpression++;
         } else {
           break;
         }
       } while (endExpression !== -1)
-      
-      let originalLength = value.length;
-      value = [
-        value.substring(0, startExpression),
-        String(this.parseExpression(value.substring(startExpression+2, endExpression), localVars)),
-        value.substring(endExpression+2),
-      ].join('');
+      parsedParts.push(String(this.parseExpression(value.substring(startExpression+2/*{{*/, endExpression), localVars)));
 
-      startExpression = endExpression + 2 - /*offset str length*/originalLength + value.length;
+      endExpression += 2 /*}}*/;
+      startExpression = endExpression;
     }
-    return value;
+    parsedParts.push(domParser.parseFromString(value.substring(endExpression), 'text/html').documentElement.textContent);
+    return parsedParts.join('');
   }
 
   private parsedExpressions = new Map<string, ParsedExpression>();
