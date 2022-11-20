@@ -199,7 +199,7 @@ export class UtilsRoll {
     const pendingTermRolls: Promise<RollTerm>[] = [];
     for (const term of newTerms) {
       // @ts-expect-error
-      if (!term._evaluated) {
+      if (!term._evaluated || term instanceof MutableDiceTerm) {
         pendingTermRolls.push(term.evaluate({async: true}));
       }
     }
