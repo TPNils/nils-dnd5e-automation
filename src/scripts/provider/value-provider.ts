@@ -8,7 +8,8 @@ export abstract class ValueReader<T> implements ValueReader<T> {
   public listenFirst(): Promise<T> {
     return new Promise((resolve) => {
       let shouldStop = false;
-      const stoppable = this.listen(value => {
+      let stoppable: Stoppable;
+      stoppable = this.listen(value => {
         shouldStop = true;
         if (stoppable != null) {
           stoppable.stop();
