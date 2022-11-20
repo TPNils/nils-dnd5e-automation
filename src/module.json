@@ -4,14 +4,14 @@
   "title": "Nils' automated compendium",
   "description": "",
   "authors": [{"name": "TPNils"}],
-  "version": "2.0.9-beta",
+  "version": "2.1.0-beta",
   "minimumCoreVersion": "0.8.0",
   "compatibleCoreVersion": "9",
   "manifestPlusVersion": "1.0.0",
   "socket": true,
   "url": "https://github.com/TPNils/nils-automated-compendium",
   "manifest": "https://github.com/TPNils/nils-automated-compendium/releases/download/latest/module.json",
-  "download": "https://github.com/TPNils/nils-automated-compendium/releases/download/v2.0.9-beta/module.zip",
+  "download": "https://github.com/TPNils/nils-automated-compendium/releases/download/v2.1.0-beta/module.zip",
   "type": "module",
   "styles": [],
   "esmodules": ["scripts/main.js"],
@@ -33,10 +33,7 @@
       "name": "compendium-folders",
       "manifest": "https://raw.githubusercontent.com/earlSt1/vtt-compendium-folders/master/module.json"
     },
-    {
-      "id": "lib-wrapper",
-      "name": "lib-wrapper"
-    }
+    {"id": "lib-wrapper", "name": "lib-wrapper"}
   ],
   "packs": [
     {
