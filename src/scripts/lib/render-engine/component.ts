@@ -563,51 +563,38 @@ export class ComponentElement extends HTMLElement {
       } else {
         this.template = new Template(parsedHtml, this.#controller);
         this.templateRenderResult = await this.template.render();
-        const node = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
+        const rootNodes = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
         this.findSlots();
         this.applySlots();
-        this.setInnerNode(node);
+        this.setInnerNode(rootNodes);
       }
     } else if (this.template !== null) {
       this.templateRenderResult = await this.template.render({force: true});
-      const node = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
+      const rootNodes = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
       this.findSlots();
       this.applySlots();
-      this.setInnerNode(node);
+      this.setInnerNode(rootNodes);
     }
   }
 
-  private setInnerNode(node: Node) {
-    let pendingNodes = [node];
-    const resultRootNodes: Node[] = [];
-    while (pendingNodes.length > 0) {
-      const processingNodes = pendingNodes;
-      pendingNodes = [];
-      for (const node of processingNodes) {
-        if (node instanceof DocumentFragment) {
-          pendingNodes.push(...Array.from(node.childNodes));
-        } else {
-          resultRootNodes.push(node);
-        }
-      }
-    }
-    if (resultRootNodes.length === 0) {
+  private setInnerNode(rootNodes: Node[]) {
+    if (rootNodes.length === 0) {
       return;
     }
 
-    if (resultRootNodes[0].parentNode !== this) {
-      if (resultRootNodes[0].parentNode != null) {
-        resultRootNodes[0].parentNode.removeChild(resultRootNodes[0]);
+    if (rootNodes[0].parentNode !== this) {
+      if (rootNodes[0].parentNode != null) {
+        rootNodes[0].parentNode.removeChild(rootNodes[0]);
       }
-      this.prepend(resultRootNodes[0]);
+      this.prepend(rootNodes[0]);
     }
 
-    for (let i = 1; i < resultRootNodes.length; i++) {
-      const node = resultRootNodes[i];
+    for (let i = 1; i < rootNodes.length; i++) {
+      const node = rootNodes[i];
       if (node.parentNode != null) {
         node.parentNode.removeChild(node);
       }
-      (resultRootNodes[i-1] as ChildNode).after(resultRootNodes[i]);
+      (rootNodes[i-1] as ChildNode).after(rootNodes[i]);
     }
 
   }

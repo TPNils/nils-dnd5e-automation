@@ -1,6 +1,7 @@
 import { AttributeParser } from "../attribute-parser";
 import { Component } from "../component";
 import { rerenderQueue } from "./render-queue";
+import { VirtualFragmentNode } from "./virtual-fragment-node";
 import { StoredEventCallback, VirtualAttributeNode, VirtualChildNode, VirtualEventNode, VirtualNode, VirtualParentNode } from "./virtual-node";
 import { VirtualTextNode } from "./virtual-text-node";
 
@@ -63,7 +64,7 @@ export class VirtualNodeRenderer {
    * @param deepUpdate when false and the node already exists, only update the node itself, not it's children
    * @returns Created or updated DOM element
    */
-  public static async renderDom<T extends VirtualNode>(virtualNode: T, deepUpdate: boolean = false): Promise<ReturnType<T['createDom']>> {
+  public static async renderDom<T extends VirtualNode>(virtualNode: T, deepUpdate: boolean = false): Promise<Node[]> {
     let pending: Array<{parent?: VirtualParentNode, node: VirtualNode, defaultNamespace: string | undefined;}> = [{
       node: virtualNode,
       defaultNamespace: document?.head?.namespaceURI,
@@ -75,6 +76,11 @@ export class VirtualNodeRenderer {
       const processing = pending;
       pending = [];
       for (const process of processing) {
+        if (process.node instanceof VirtualFragmentNode) {
+          for (const child of process.node.childNodes) {
+            pending.push({parent: process.parent, node: child, defaultNamespace: process.defaultNamespace});
+          }
+        }
         const state = VirtualNodeRenderer.getOrNewState(process.node, process.defaultNamespace);
         const namespace = state.domNode instanceof Element ? state.domNode.namespaceURI : process.defaultNamespace
         if (state.lastRenderSelfState == null) {
@@ -245,10 +251,10 @@ export class VirtualNodeRenderer {
     if (allAsyncDomActions.length > 0) {
       VirtualNodeRenderer.queuedDomActions.push(...allAsyncDomActions);
       return rerenderQueue.add(VirtualNodeRenderer.processDomActionQueue).then(() => {
-        return VirtualNodeRenderer.getState(virtualNode).domNode;
+        return VirtualNodeRenderer.getNodes(virtualNode);
       });
     }
-    return Promise.resolve(VirtualNodeRenderer.getState(virtualNode).domNode);
+    return Promise.resolve(VirtualNodeRenderer.getNodes(virtualNode));
   }
 
   private static queuedDomActions: DomAction[] = [];
@@ -376,6 +382,28 @@ export class VirtualNodeRenderer {
       VirtualNodeRenderer.setState(virtualNode, state);
     }
     return state;
+  }
+
+  private static getNodes<T extends VirtualNode>(virtualNode: T): Node[] {
+    if (virtualNode instanceof VirtualFragmentNode) {
+      let pendingNodes: VirtualNode[] = [virtualNode];
+      const resultRootNodes: VirtualNode[] = [];
+      while (pendingNodes.length > 0) {
+        const processingNodes = pendingNodes;
+        pendingNodes = [];
+        for (const node of processingNodes) {
+          if (node instanceof VirtualFragmentNode) {
+            pendingNodes.push(...Array.from(node.childNodes));
+          } else {
+            resultRootNodes.push(node);
+          }
+        }
+      }
+
+      return resultRootNodes.map(node => VirtualNodeRenderer.getState(node).domNode);
+    } else {
+      return [VirtualNodeRenderer.getState(virtualNode).domNode];
+    }
   }
 
 }
