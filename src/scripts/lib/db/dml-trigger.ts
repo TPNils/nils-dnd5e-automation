@@ -387,7 +387,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   //#region Before
   private onFoundryBeforeCreate(document: T & {constructor: new (...args: any[]) => T}, data: any, options: DmlOptions, userId: string): void | boolean {
-    const originalDocumentData = deepClone(document.toJSON());
+    const originalDocumentData = document.toObject();
     const context: IDmlContext<T> = {
       rows: [{
         newRow: document,
@@ -402,7 +402,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       }
     }
 
-    const totalDiff = UtilsCompare.findDiff(originalDocumentData, document.data);
+    const totalDiff = UtilsCompare.findDiff(originalDocumentData, document.toObject());
     if (totalDiff.changed) {
       document.data.update(totalDiff.diff);
     }
@@ -464,7 +464,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   //#region After
   private async onFoundryAfterCreate(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
     // Don't allow updates directly on the original document
-    let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
+    let documentSnapshot = new document.constructor(document.toObject(), {parent: document.parent, pack: document.pack});
     let context = new AfterDmlContext<T>(
       [{
         newRow: documentSnapshot,
@@ -474,7 +474,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     );
 
     if (game.userId === userId) {
-      let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
+      let documentSnapshot = new document.constructor(document.toObject(), {parent: document.parent, pack: document.pack});
       const execs = context.endOfContextExecutes;
       context = new AfterDmlContext<T>(
         [{
@@ -499,7 +499,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             const queriedDocument = await UtilsDocument.fromUuid((document as any as FoundryDocument).uuid);
             context = new AfterDmlContext<T>(
               [{
-                newRow: new document.constructor(deepClone(queriedDocument.data), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
+                newRow: new document.constructor(queriedDocument.toObject(), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
                 changedByUserId: userId,
                 options: options
               }],
@@ -521,7 +521,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   private async onFoundryAfterUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: DmlOptions, userId: string): Promise<void> {
     const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
-    let documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
+    let documentSnapshot = new document.constructor(modifiedDocument.toObject(), {parent: document.parent, pack: document.pack});
     const oldDocument = this.extractOldValue(document as any, options);
     if (oldDocument === undefined) {
       // See injector (initOldValueInjector) for more info
@@ -539,7 +539,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
     const recursiveUpdate = options?.[staticValues.moduleName]?.recursiveUpdate ?? 0;
     if (game.userId === userId) {
-      documentSnapshot = new document.constructor(deepClone(modifiedDocument.data), {parent: document.parent, pack: document.pack});
+      documentSnapshot = new document.constructor(modifiedDocument.toObject(), {parent: document.parent, pack: document.pack});
       const execs = context.endOfContextExecutes;
       context = new AfterDmlContext<T>(
         [{
@@ -569,7 +569,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           });
         }
         if (recursiveUpdate > 5) {
-          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, oldRow: deepClone(oldDocument.data), newRow: deepClone(modifiedDocument.data)});
+          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, oldRow: oldDocument.toObject(), newRow: modifiedDocument.toObject()});
           outputDiff = true;
         } else {
           await modifiedDocument.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: recursiveUpdate + 1}});
@@ -579,7 +579,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             const queriedDocument = await UtilsDocument.fromUuid((document as any as FoundryDocument).uuid);
             context = new AfterDmlContext<T>(
               [{
-                newRow: new document.constructor(deepClone(queriedDocument.data), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
+                newRow: new document.constructor(queriedDocument.toObject(), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
+                oldRow: oldDocument,
                 changedByUserId: userId,
                 options: options
               }],
@@ -602,7 +603,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   private async onFoundryAfterDelete(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
     // Don't allow updates directly on the original document
-    let documentSnapshot = new document.constructor(deepClone(document.data), {parent: document.parent, pack: document.pack});
+    let documentSnapshot = new document.constructor(document.toObject(), {parent: document.parent, pack: document.pack});
     const context = new AfterDmlContext<T>(
       [{
         oldRow: documentSnapshot,
@@ -648,8 +649,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const user = game.users.get(userId);
 
       // Don't allow updates directly on the original document
-      const documentSnapshot = new User(deepClone(user.data), {parent: user.parent, pack: user.pack});
-      const simulatedOldRow: User = new User(deepClone(user.data), {parent: user.parent, pack: user.pack});
+      const documentSnapshot = new User(user.toObject(), {parent: user.parent, pack: user.pack});
+      const simulatedOldRow: User = new User(user.toObject(), {parent: user.parent, pack: user.pack});
       
       // Prevent the hook from going off again
       documentSnapshot.targets.add = Set.prototype.add;
