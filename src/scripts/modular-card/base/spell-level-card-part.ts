@@ -195,11 +195,16 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
     });
 
     // Find the first available spellslot
-    let selectedLevel: SpellLevelCardData['selectedLevel'] = item.data.data.level;
-    for (const spellSlot of spellSlots) {
-      if (spellSlot.availableSlots > 0 && spellSlot.level >= item.data.data.level) {
-        selectedLevel = spellSlot.type === 'pact' ? 'pact' : spellSlot.level;
-        break;
+    const spellIsPact = item.data.data?.preparation?.mode === 'pact';
+    let selectedLevel: SpellLevelCardData['selectedLevel'] = spellIsPact ?  'pact' : item.data.data.level;
+    const selectedLevelAvailableSlots = spellSlots.find(slot => selectedLevel === 'pact' ? (slot.type === 'pact') : (slot.type === 'spell' && slot.level === selectedLevel))?.availableSlots;
+    let selectedLevelNumber = selectedLevel === 'pact' ? spellSlots.find(slot => slot.type === 'pact')?.level : selectedLevel;
+    if (selectedLevelNumber < item.data.data.level || selectedLevelAvailableSlots < 1) {
+      for (const spellSlot of spellSlots) {
+        if (spellSlot.availableSlots > 0 && spellSlot.level >= item.data.data.level) {
+          selectedLevel = spellSlot.type === 'pact' ? 'pact' : spellSlot.level;
+          break;
+        }
       }
     }
 
