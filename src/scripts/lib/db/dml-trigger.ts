@@ -590,7 +590,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       }
     }
     
-    if (recursiveUpdate === 0) {
+    if (recursiveUpdate === 0 || game.userId !== userId) {
       for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
         await callback(context);
       }
