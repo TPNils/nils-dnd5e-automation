@@ -367,8 +367,8 @@ class BuildActions {
         function visitor(node) {
           if (shouldMutateModuleSpecifier(node)) {
             if (typescript.isImportDeclaration(node)) {
-              const newModuleSpecifier = context.factory.createLiteral(`${node.moduleSpecifier.text}.js`);
-              return context.factory.updateImportDeclaration(
+              const newModuleSpecifier = typescript.createLiteral(`${node.moduleSpecifier.text}.js`);
+              return typescript.updateImportDeclaration(
                 node,
                 node.decorators,
                 node.modifiers,
@@ -376,8 +376,8 @@ class BuildActions {
                 newModuleSpecifier
               );
             } else if (typescript.isExportDeclaration(node)) {
-              const newModuleSpecifier = context.factory.createLiteral(`${node.moduleSpecifier.text}.js`);
-              return context.factory.updateExportDeclaration(
+              const newModuleSpecifier = typescript.createLiteral(`${node.moduleSpecifier.text}.js`);
+              return typescript.updateExportDeclaration(
                 node,
                 node.decorators,
                 node.modifiers,
