@@ -61,7 +61,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
 
       <div class="overlay" *if="this.hasInteractPermission">
         <div class="left">
-          <button (click)="this.onModeChange($event, '-')" class="mode-minus" [disabled]="this.rollMode === 'disadvantage'"><i class="fas fa-minus"></i></button>
+          <button (click)="this.onModeChange($event, '-')" class="mode-minus" [disabled]="this.rollMode === 'normal'"><i class="fas fa-minus"></i></button>
         </div>
         <div class="middel"></div>
         <div class="right">
@@ -69,7 +69,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
             <i class="fas fa-hand-holding hand-1" data-fa-transform="rotate-90"></i>
             <i class="fas fa-hand-holding hand-2" data-fa-transform="rotate-90"></i>
           </button>
-          <button (click)="this.onModeChange($event, '+')" class="mode-plus" [disabled]="this.rollMode === 'advantage'"><i class="fas fa-plus"></i></button>
+          <button (click)="this.onModeChange($event, '+')" class="mode-plus" [disabled]="this.rollMode === 'critical'"><i class="fas fa-plus"></i></button>
         </div>
       </div>
     </div>
