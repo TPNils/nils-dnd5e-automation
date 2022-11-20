@@ -99,6 +99,7 @@ function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache
   tag: DamageCardComponent.getSelector(),
   html: /*html*/`
   <nac-roll-damage
+    *if="this.roll != null"
     [data-roll]="this.roll"
     [data-label]="this.label"
     [data-bonus-formula]="this.userBonus"
