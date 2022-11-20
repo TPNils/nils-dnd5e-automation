@@ -1,6 +1,5 @@
 import { provider } from "../provider/provider";
 import { staticValues } from "../static-values";
-import { UtilsLog } from "../utils/utils-log";
 
 type ServerResponse<T> = {success: true; response: T} | {success: false; errorMessage: any[], stackTrace?: string[], errorType: 'warn' | 'error'};
 
@@ -80,7 +79,7 @@ export class Action<ClientData, ServerData extends object = {user: User}> {
         
         if (this.permissionCheckFunc && !user.isGM) {
           const permissionResponse = await this.permissionCheckFunc(enrichedData, user);
-          if (permissionResponse === 'can-run-local') {
+          if (permissionResponse === 'can-run-local' || (permissionResponse === 'can-run-as-gm' && game.user.isGM)) {
             const response = await serverExecutor(enrichedData);
             return {success: true, response: response};
           } else if (permissionResponse === 'can-run-as-gm') {
