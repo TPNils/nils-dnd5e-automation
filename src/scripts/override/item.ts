@@ -8,7 +8,7 @@ async function roll(this: MyItem, wrapped: (...args: any) => any, ...args: [{con
   if (this.type === 'tool') {
     return wrapped(...args);
   }
-  return this.displayCard({rollMode: options.rollMode, createMessage: options.createMessage});
+  return this.displayCard({rollMode: options?.rollMode, createMessage: options?.createMessage});
 }
 
 async function displayCard(this: MyItem, wrapped: (...args: any) => any, ...args: [{rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean}]): Promise<ChatMessage> {
