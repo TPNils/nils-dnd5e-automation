@@ -172,6 +172,10 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
     :host-context(body.key-shift) :host:hover .reset {
       visibility: hidden;
     }
+
+    .reset:not([disabled]) {
+      color: #bf3434; /*red variant*/
+    }
     
     :host-context(body:not(.key-shift)) :host .delete,
     :host:not(:hover) .delete {
