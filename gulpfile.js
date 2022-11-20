@@ -328,27 +328,30 @@ class CssScoperPlugin {
 
 class BuildActions {
   /**
-   * TypeScript transformers
+   * Appends .js to import statements
    * @returns {typescript.TransformerFactory<typescript.SourceFile>}
    */
-  static #createTransformer() {
+  static importTransformer() {
     /**
      * @param {typescript.Node} node
+     * @returns {boolean}
      */
     function shouldMutateModuleSpecifier(node) {
-      if (
-        !typescript.isImportDeclaration(node) &&
-        !typescript.isExportDeclaration(node)
-      )
+      if (!typescript.isImportDeclaration(node) && !typescript.isExportDeclaration(node)) {
         return false;
-      if (node.moduleSpecifier === undefined) return false;
-      if (!typescript.isStringLiteral(node.moduleSpecifier)) return false;
-      if (
-        !node.moduleSpecifier.text.startsWith('./') &&
-        !node.moduleSpecifier.text.startsWith('../')
-      )
+      }
+      if (node.moduleSpecifier === undefined || !typescript.isStringLiteral(node.moduleSpecifier)) {
         return false;
-      if (path.extname(node.moduleSpecifier.text) !== '') return false;
+      }
+      if (!node.moduleSpecifier.text.startsWith('./') && !node.moduleSpecifier.text.startsWith('../')) {
+        return false;
+      }
+      if (node.moduleSpecifier.text.endsWith('.js')) {
+        return false;
+      }
+      if (path.extname(node.moduleSpecifier.text) !== '') {
+        return false;
+      }
       return true;
     }
 
@@ -364,10 +367,8 @@ class BuildActions {
         function visitor(node) {
           if (shouldMutateModuleSpecifier(node)) {
             if (typescript.isImportDeclaration(node)) {
-              const newModuleSpecifier = typescript.createLiteral(
-                `${node.moduleSpecifier.text}.js`
-              );
-              return typescript.updateImportDeclaration(
+              const newModuleSpecifier = context.factory.createLiteral(`${node.moduleSpecifier.text}.js`);
+              return context.factory.updateImportDeclaration(
                 node,
                 node.decorators,
                 node.modifiers,
@@ -375,10 +376,8 @@ class BuildActions {
                 newModuleSpecifier
               );
             } else if (typescript.isExportDeclaration(node)) {
-              const newModuleSpecifier = typescript.createLiteral(
-                `${node.moduleSpecifier.text}.js`
-              );
-              return typescript.updateExportDeclaration(
+              const newModuleSpecifier = context.factory.createLiteral(`${node.moduleSpecifier.text}.js`);
+              return context.factory.updateExportDeclaration(
                 node,
                 node.decorators,
                 node.modifiers,
@@ -516,7 +515,7 @@ class BuildActions {
       BuildActions.#tsConfig = ts.createProject('tsconfig.json', {
         getCustomTransformers: (_program) => ({
           before: [BuildActions.#cssTransformer()],
-          after: [BuildActions.#createTransformer()],
+          after: [BuildActions.importTransformer()],
         }),
       });
     }
