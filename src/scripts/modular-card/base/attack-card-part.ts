@@ -55,6 +55,9 @@ export interface AttackCardData {
 @Component({
   tag: AttackCardPartComponent.getSelector(),
   html: /*html*/`
+    <div class="flavor">
+      {{ this.flavor }}
+    </div>
     <nac-roll-d20
       *if="this.part?.data?.roll$ != null"
       [data-roll]="this.part.data.roll$"
@@ -71,6 +74,12 @@ export interface AttackCardData {
       >
     </nac-roll-d20>
   `,
+  style: /*css*/`
+    .flavor {
+      margin-top: 2px;
+      text-align: center;
+    }
+  `
 })
 class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   //#region actions
@@ -119,6 +128,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   }
   
   public part: ModularCardPartData<AttackCardData>;
+  public flavor: string;
   public interactionPermission: string;
   public readPermission: string;
   public readHiddenDisplayType: string;
@@ -127,6 +137,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
     args.addStoppable(
       this.getData<AttackCardData>(AttackCardPart.instance).listen(({part}) => {
         this.part = part;
+        this.flavor = game.i18n.localize('DND5E.Attack');
         this.interactionPermission = `OwnerUuid:${this.part.data.actorUuid$}`;
         this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.data.actorUuid$}`;
         this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;

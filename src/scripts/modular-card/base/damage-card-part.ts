@@ -45,7 +45,6 @@ export interface DamageCardData {
   userBonus?: string;
   calc$: {
     actorUuid?: string;
-    label: string;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     normalBaseRoll: TermData[];
     versatileBaseRoll?: TermData[];
@@ -98,10 +97,12 @@ function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache
 @Component({
   tag: DamageCardComponent.getSelector(),
   html: /*html*/`
+  <div class="flavor">
+    {{ this.flavor }}
+  </div>
   <nac-roll-damage
     *if="this.roll != null"
     [data-roll]="this.roll"
-    [data-label]="this.label"
     [data-bonus-formula]="this.userBonus"
     [data-roll-mode]="this.rollMode"
     [data-roll-source]="this.rollSource"
@@ -116,6 +117,12 @@ function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache
     (doRoll)="this.onRollClick($event)"
   ></nac-roll-damage>
   `,
+  style: /*css*/`
+    .flavor {
+      margin-top: 2px;
+      text-align: center;
+    }
+  `
 })
 class DamageCardComponent extends BaseCardComponent implements OnInit {
   //#region actions
@@ -184,7 +191,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   public rollMode: RollDamageMode;
   public rollSource: DamageCardData['source'];
   public hasVersatile = false;
-  public label: string;
+  public flavor: string;
   public userBonus: string;
   public overrideFormula: string;
   public readPermission: string;
@@ -194,11 +201,19 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   public onInit(args: OnInitParam): void {
     args.addStoppable(
       this.getData<DamageCardData>(DamageCardPart.instance).listen(({part}) => {
+        
+        const baseRoll = part.data.source === 'versatile' ? part.data.calc$.versatileBaseRoll : part.data.calc$.normalBaseRoll;
+        const damageTypes: DamageType[] = baseRoll.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
+        const isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
+        if (isHealing) {
+          this.flavor = game.i18n.localize('DND5E.Healing');
+        } else {
+          this.flavor = game.i18n.localize('DND5E.Damage');
+        }
         this.roll = part.data.calc$.roll;
         this.rollMode = part.data.mode;
         this.rollSource = part.data.source;
         this.hasVersatile = part.data.calc$.versatileBaseRoll != null;
-        this.label = part.data.calc$.label;
         this.userBonus = part.data.userBonus;
         this.overrideFormula = part.data.calc$.displayFormula
         this.interactionPermission = `OwnerUuid:${part.data.calc$.actorUuid}`;
@@ -244,7 +259,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       phase: 'mode-select',
       source: 'normal',
       calc$: {
-        label: 'DND5E.Damage',
         normalBaseRoll: UtilsRoll.toRollData(new Roll('0')).terms,
         requestRollFormula: '',
         targetCaches: [],
@@ -745,31 +759,8 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
 
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): boolean | void {
-    this.calculateLabel(context);
     this.calculateRollDisplay(context);
     this.calcTargetCache(context);
-  }
-
-  private calculateLabel(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
-    for (const {newRow} of context.rows) {
-      if (newRow.part.data.mode === 'critical') {
-        newRow.part.data.calc$.label = 'DND5E.Critical';
-        continue;
-      }
-
-      const baseRoll = newRow.part.data.source === 'versatile' ? newRow.part.data.calc$.versatileBaseRoll : newRow.part.data.calc$.normalBaseRoll;
-      const damageTypes: DamageType[] = baseRoll.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
-      const isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
-      if (isHealing) {
-        newRow.part.data.calc$.label = 'DND5E.Healing';
-      } else {
-        if (newRow.part.data.source === 'versatile') {
-          newRow.part.data.calc$.label = 'DND5E.Versatile';
-        } else {
-          newRow.part.data.calc$.label = 'DND5E.Damage';
-        }
-      }
-    }
   }
 
   private calculateRollDisplay(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {

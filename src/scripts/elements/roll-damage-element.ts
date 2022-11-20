@@ -21,11 +21,6 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
 @Component({
   tag: RollDamageElement.selector(),
   html: /*html*/`
-    <div class="flavor">
-      <slot name="label" *if="this.roll?.total != null">
-        {{ this.rollModeLabel }}
-      </slot>
-    </div>
     <div class="roll-wrapper">
       <nac-roll-result *if="this.roll.total != null"
         [data-roll]="this.roll"
@@ -75,10 +70,6 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
     </div>
   `,
   style: /*css*/`
-    :host-context(.hide-flavor) .flavor,
-    :host.hide-flavor .flavor {
-      display: none;
-    }
     
     :host {
       display: block;
@@ -91,11 +82,6 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
     
     :host:not(:hover) .roll-wrapper .overlay {
       display: none;
-    }
-    
-    .flavor {
-      margin-top: 2px;
-      text-align: center;
     }
     
     .bonus-container {
