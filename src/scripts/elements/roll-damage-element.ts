@@ -301,18 +301,17 @@ export class RollDamageElement {
   
   public rollModeLabel = game.i18n.localize(`DND5E.${this.rollMode.capitalize()}`);
   private calcRollModeLabel() {
-    if (this.rollMode == null) {
-      // Fallback
-      this.rollModeLabel = game.i18n.localize(`DND5E.Normal`);
-    } else if (!this.hasReadPermission && this.readHiddenDisplayType !== 'result') {
-      // Can't see roll details => don't show if it's normal or crit
-      this.rollModeLabel = game.i18n.localize(`DND5E.Normal`);
-    } else {
-      if (this.label && this.rollMode.toLowerCase() === 'normal') {
-        this.rollModeLabel = this.label;
-      } else {
-        this.rollModeLabel = game.i18n.localize(`DND5E.${this.rollMode.capitalize()}`);
+    if (!this.hasReadPermission) {
+      this.rollModeLabel = game.i18n.localize('DND5E.Normal');
+    } else if (this.rollSource !== 'normal') {
+      this.rollModeLabel = game.i18n.localize(`DND5E.${this.rollSource.capitalize()}`);
+      if (this.rollMode === 'critical') {
+        this.rollModeLabel = `${this.rollModeLabel}+${game.i18n.localize(`DND5E.${this.rollMode.capitalize()}`)}`
       }
+    } else if (this.rollMode === 'critical') {
+      this.rollModeLabel = game.i18n.localize(`DND5E.${this.rollMode.capitalize()}`);
+    } else {
+      this.rollModeLabel = game.i18n.localize('DND5E.Normal');
     }
   }
   

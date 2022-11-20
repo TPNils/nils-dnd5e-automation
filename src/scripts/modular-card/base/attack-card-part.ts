@@ -61,6 +61,7 @@ export interface AttackCardData {
     <nac-roll-d20
       *if="this.part?.data?.roll$ != null"
       [data-roll]="this.part.data.roll$"
+      [data-label]="this.overrideRollLabel"
       [data-bonus-formula]="this.part.data.userBonus"
       [data-show-bonus]="this.part.data.phase !== 'mode-select'"
       [data-override-max-roll]="this.part.data.critTreshold$"
@@ -132,19 +133,22 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   public interactionPermission: string;
   public readPermission: string;
   public readHiddenDisplayType: string;
+  public overrideRollLabel: string;
   
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData<AttackCardData>(AttackCardPart.instance).listen(({part}) => {
+      this.getData<AttackCardData>(AttackCardPart.instance).listen(async ({part}) => {
         this.part = part;
-        if (part.data.roll$?.evaluated && part.data.mode !== 'normal') {
-          this.flavor = game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`);
-        } else {
-          this.flavor = game.i18n.localize('DND5E.Attack');
-        }
         this.interactionPermission = `OwnerUuid:${this.part.data.actorUuid$}`;
         this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.data.actorUuid$}`;
         this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
+        
+        const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.data.actorUuid$, permission: `${staticValues.code}ReadAttack`, user: game.user}])
+        if (!hasReadPermission || !part.data.roll$?.evaluated || part.data.mode === 'normal') {
+          this.flavor = game.i18n.localize('DND5E.Attack');
+        } else {
+          this.flavor = game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`);
+        }
       })
     )
   }

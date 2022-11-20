@@ -3,6 +3,7 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { Attribute, Component, Output } from "../lib/render-engine/component";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
+import { RollResultElement } from "./roll-result-element";
 
 const rollModeOrder = ['disadvantage', 'normal', 'advantage'] as const;
 export type RollMode = typeof rollModeOrder[number];
@@ -257,7 +258,7 @@ export class RollD20Element {
   }
   
   @Attribute({name: 'data-read-hidden-display-type', dataType: 'string'})
-  public readHiddenDisplayType: string;
+  public readHiddenDisplayType: RollResultElement['displayType'];
 
   @Attribute({name: 'data-override-max-roll', dataType: 'number'})
   public overrideMaxRoll: string;
@@ -282,7 +283,15 @@ export class RollD20Element {
       }
     }
 
-    this.rollModeLabel = game.i18n.localize(`DND5E.${this.rollMode.capitalize()}`);
+    if (this.hasReadPermission && this.readHiddenDisplayType !== 'result') {
+      this.rollModeLabel = game.i18n.localize(`DND5E.${this.rollMode.capitalize()}`);
+    } else {
+      if (this._roll?.total == null) {
+        this.rollModeLabel = game.i18n.localize(`DND5E.Normal`);
+      } else {
+        this.rollModeLabel = `<${game.i18n.localize(`Hidden`)}>`;
+      }
+    }
   }
   
   public hasReadPermission = true;
@@ -293,6 +302,7 @@ export class RollD20Element {
 
     const response = await UtilsDocument.hasPermissionsFromString(this.readPermission);
     this.hasReadPermission = response.some(check => check.result);
+    this.calcRollMode()
   }
   
   public hasInteractPermission = true;

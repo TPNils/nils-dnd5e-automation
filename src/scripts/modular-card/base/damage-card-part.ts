@@ -189,7 +189,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   public rollMode: RollDamageMode;
   public rollSource: DamageCardData['source'];
   public hasVersatile = false;
-  public flavor: string;
+  public flavor = '';
   public userBonus: string;
   public overrideFormula: string;
   public readPermission: string;
@@ -198,24 +198,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData<DamageCardData>(DamageCardPart.instance).listen(({part}) => {
-        const baseRoll = part.data.source === 'versatile' ? part.data.calc$.versatileBaseRoll : part.data.calc$.normalBaseRoll;
-        const damageTypes: DamageType[] = baseRoll.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
-        const isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
-        if (isHealing) {
-          this.flavor = game.i18n.localize('DND5E.Healing');
-          if (part.data.calc$.roll?.evaluated && part.data.mode === 'critical') {
-            // Critical heals almost never happen (only in homebrew I think?), but just in case do specify that the crit is a heal
-            this.flavor = `${this.flavor}/${game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`)}`
-          }
-        } else {
-          if (part.data.calc$.roll?.evaluated && part.data.mode === 'critical') {
-            // Don't use Damage/Critical label => just critical is shorter
-            this.flavor = game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`);
-          } else {
-            this.flavor = game.i18n.localize('DND5E.Damage');
-          }
-        }
+      this.getData<DamageCardData>(DamageCardPart.instance).listen(async ({part}) => {
         this.roll = part.data.calc$.roll;
         this.rollMode = part.data.mode;
         this.rollSource = part.data.source;
@@ -224,6 +207,35 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
         this.overrideFormula = part.data.calc$.displayFormula
         this.interactionPermission = `OwnerUuid:${part.data.calc$.actorUuid}`;
         this.readPermission = `${staticValues.code}ReadDamageUuid:${part.data.calc$.actorUuid}`;
+        
+        const baseRoll = part.data.source === 'versatile' ? part.data.calc$.versatileBaseRoll : part.data.calc$.normalBaseRoll;
+        const damageTypes: DamageType[] = baseRoll.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
+        const isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
+        const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.data.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}])
+        if (isHealing) {
+          this.flavor = game.i18n.localize('DND5E.Healing');
+          if (hasReadPermission && part.data.calc$.roll?.evaluated) {
+            // Critical and/or versatile heals almost never happen (only in homebrew I think?), but just in case do specify that the crit is a heal
+            if (part.data.source === 'versatile') {
+              this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.source.capitalize()}`)}`;
+            }if (part.data.mode === 'critical') {
+              this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`)}`;
+            }
+          }
+        } else {
+          if (!hasReadPermission || !part.data.calc$.roll?.evaluated) {
+            this.flavor = game.i18n.localize('DND5E.Damage');
+          } else if (part.data.source === 'versatile') {
+            this.flavor = game.i18n.localize(`DND5E.${part.data.source.capitalize()}`);
+            if (part.data.mode === 'critical') {
+              this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`)}`
+            }
+          } else if (part.data.mode === 'critical') {
+            this.flavor = game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`);
+          } else {
+            this.flavor = game.i18n.localize('DND5E.Damage');
+          }
+        }
       })
     )
   }
