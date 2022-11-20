@@ -198,7 +198,7 @@ function getMessageState(allParts: ModularCardPartData[]): MessageState {
         </tr>
       </thead>
       <tbody>
-        <tr *for="let consumeResource of this.consumeResources" class="{{consumeResource.calc$.calcChange === consumeResource.calc$.appliedChange ? 'applied' : ''}}">
+        <tr *for="let consumeResource of this.consumeResources" class="{{consumeResource.state}}">
           <td>{{consumeResource.label}}</td>
           <td>-{{consumeResource.calc$.calcChange}}</td>
           <td class="button-column">
@@ -219,6 +219,10 @@ function getMessageState(allParts: ModularCardPartData[]): MessageState {
     }
 
     .applied .apply {
+      color: green;
+    }
+
+    .not-applied .undo {
       color: green;
     }
   
@@ -294,7 +298,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
 
   public localeResources = game.i18n.localize('Resources');
   public localeUses = game.i18n.localize('DND5E.Uses');
-  public consumeResources: Array<ResourceCardData['consumeResources'][number] & {label: string;}> = [];
+  public consumeResources: Array<ResourceCardData['consumeResources'][number] & {label: string; state: 'applied' | 'partial-applied' | 'not-applied'}> = [];
   public allConsumeResourcesApplied = false;
   
   public onInit(args: OnInitParam) {
@@ -330,9 +334,18 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
       }]);
       if (hasPerm) {
         this.consumeResources = part.data.consumeResources.map(resource => {
+          let state: this['consumeResources'][number]['state'];
+          if (resource.calc$.appliedChange === 0) {
+            state = 'not-applied';
+          } else if (resource.calc$.appliedChange === resource.calc$.calcChange) {
+            state = 'applied';
+          } else {
+            state = 'partial-applied';
+          }
           return {
             ...resource,
             label: ResourceCardComponent.translateUsage(resource),
+            state: state,
           }
         });
       } else {
