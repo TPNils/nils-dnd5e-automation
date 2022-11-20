@@ -1,17 +1,21 @@
 
 import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
+import { RollDamageEventData, RollDamageMode } from "../../elements/roll-damage-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { TermData, RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { UtilsObject } from "../../lib/utils/utils-object";
 import { staticValues } from "../../static-values";
 import { MyActor, DamageType } from "../../types/fixed-types";
-import { ItemCardHelpers } from "../item-card-helpers";
+import { Action } from "../action";
+import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { BaseCardComponent } from "./base-card-component";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 interface TargetCache {
@@ -89,6 +93,134 @@ function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache
     }
   }
   return null;
+}
+
+@Component({
+  tag: DamageCardComponent.getSelector(),
+  html: /*html*/`
+  <nac-roll-damage
+    [data-roll]="this.roll"
+    [data-label]="this.label"
+    [data-bonus-formula]="this.userBonus"
+    [data-roll-mode]="this.rollMode"
+    [data-roll-source]="this.rollSource"
+    [data-has-versatile]="this.hasVersatile"
+    [data-override-formula]="this.overrideFormula"
+    [data-read-permission]="this.readPermission"
+    [data-read-hidden-display-type]="this.readHiddenDisplayType"
+    [data-interaction-permission]="this.interactionPermission"
+
+    (rollMode)="this.onRollMode($event)"
+    (rollSource)="this.onRollSource($event)"
+    (doRoll)="this.onRollClick($event)"
+  ></nac-roll-damage>
+  `,
+})
+class DamageCardComponent extends BaseCardComponent implements OnInit {
+  //#region actions
+  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: DamageCardData}}>(({part}) => {
+    const documents: CreatePermissionCheckArgs['documents'] = [];
+    if (part.data.calc$.actorUuid) {
+      documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
+    }
+    return {documents: documents};
+  });
+  private static rollClick = new Action<{event: CustomEvent<{userBonus?: string}>} & ChatPartIdData>('DamageOnRollClick')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getCustomEventSerializer())
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+    .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
+    .build(({messageId, part, event, allCardParts}) => {
+      if (part.data.userBonus === event.userBonus && part.data.phase === 'result') {
+        return;
+      }
+      part.data.userBonus = event.userBonus;
+      part.data.phase = 'result';
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    });
+  private static modeChange = new Action<{event: CustomEvent<RollDamageEventData<RollDamageMode>>} & ChatPartIdData>('DamageOnModeChange')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getCustomEventSerializer())
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+    .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
+    .build(({messageId, allCardParts, part, event}) => {
+      if (part.data.mode === event.data) {
+        return;
+      }
+
+      part.data.mode = event.data;
+      if (event.quickRoll) {
+        part.data.phase = 'result';
+      }
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    });
+  private static sourceChange = new Action<{event: CustomEvent<RollDamageEventData<DamageCardData['source']>>} & ChatPartIdData>('DamageOnSourceChange')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getCustomEventSerializer())
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+    .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
+    .build(({messageId, allCardParts, part, event}) => {
+      if (part.data.source === event.data) {
+        return;
+      }
+
+      part.data.source = event.data;
+      if (event.quickRoll) {
+        part.data.phase = 'result';
+      }
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    });
+  //#endregion
+
+  public static getSelector(): string {
+    return `${staticValues.code}-damage-part`;
+  }
+  
+  public roll: RollData;
+  public rollMode: RollDamageMode;
+  public rollSource: DamageCardData['source'];
+  public hasVersatile = false;
+  public label: string;
+  public userBonus: string;
+  public overrideFormula: string;
+  public readPermission: string;
+  public readHiddenDisplayType: string;
+  public interactionPermission: string;
+  
+  public onInit(args: OnInitParam): void {
+    args.addStoppable(
+      this.getData<DamageCardData>(DamageCardPart.instance).listen(({part}) => {
+        this.roll = part.data.calc$.roll;
+        this.rollMode = part.data.mode;
+        this.rollSource = part.data.source;
+        this.hasVersatile = part.data.calc$.versatileBaseRoll != null;
+        this.label = part.data.calc$.label;
+        this.userBonus = part.data.userBonus;
+        this.overrideFormula = part.data.calc$.displayFormula
+        this.interactionPermission = `OwnerUuid:${part.data.calc$.actorUuid}`;
+        this.readPermission = `${staticValues.code}ReadDamageUuid:${part.data.calc$.actorUuid}`;
+        this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
+      })
+    )
+  }
+
+  public onRollClick(event: CustomEvent<{userBonus?: string}>): void {
+    if (this.userBonus === event.detail.userBonus && this.roll.evaluated) {
+      return;
+    }
+    DamageCardComponent.rollClick({event, partId: this.partId, messageId: this.messageId});
+  }
+  
+  public onRollSource(event: CustomEvent<RollDamageEventData<DamageCardData['source']>>): void {
+    DamageCardComponent.sourceChange({event, partId: this.partId, messageId: this.messageId});
+  }
+
+  public onRollMode(event: CustomEvent<RollDamageEventData<RollDamageMode>>): void {
+    DamageCardComponent.modeChange({event, partId: this.partId, messageId: this.messageId});
+  }
 }
 
 export class DamageCardPart implements ModularCardPart<DamageCardData> {
@@ -257,28 +389,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       .listenForAttribute('data-message-id', 'string')
       .addListener(new ElementCallbackBuilder()
         .setEvent('click')
-        .addSelectorFilter('[data-action="item-damage"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, part, click, allCardParts}) => {
-          if (part.data.phase === 'result') {
-            return;
-          }
-      
-          const orderedPhases: DamageCardData['phase'][] = ['mode-select', 'bonus-input', 'result'];
-          if (click.shiftKey) {
-            part.data.phase = orderedPhases[orderedPhases.length - 1];
-          } else {
-            part.data.phase = orderedPhases[orderedPhases.indexOf(part.data.phase) + 1];
-          }
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
         .addSelectorFilter('[data-action="item-damage-source-toggle"]')
         .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
         .addSerializer(ItemCardHelpers.getUserIdSerializer())
@@ -297,90 +407,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
         })
       )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('focusout')
-        .addSelectorFilter('input[data-action="item-damage-bonus"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(context => ({inputValue: (context.event.target as HTMLInputElement).value}))
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, part, inputValue}) => {
-          if (inputValue && !Roll.validate(inputValue)) {
-            // Only show error on key press
-            throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-          }
-          part.data.phase = 'mode-select';
-          part.data.userBonus = inputValue ?? '';
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('keypress')
-        .addSelectorFilter('input[data-action="item-damage-bonus"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getKeyEventSerializer())
-        .addSerializer(ItemCardHelpers.getInputSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, part, keyEvent, inputValue}) => {
-          if (keyEvent.key === 'Enter') {
-            const userBonus = inputValue == null ? '' : inputValue;
-            if (userBonus && !Roll.validate(userBonus)) {
-              // Only show error on key press
-              throw new Error(game.i18n.localize('Error') + ': ' + game.i18n.localize('Roll Formula'));
-            }
-            part.data.phase = 'result';
-            part.data.userBonus = userBonus;
-            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-          } else if (keyEvent.key === 'Escape' && part.data.phase === 'bonus-input') {
-            part.data.phase = 'mode-select';
-            return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-          }
-        })
-      )
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="mode-minus"], [data-action="mode-plus"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addSerializer(ItemCardHelpers.getActionSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, allCardParts, part, click, action}) => {
-          let modifier = action === 'mode-plus' ? 1 : -1;
-          if (click.shiftKey && modifier > 0) {
-            modifier++;
-          } else if (click.shiftKey && modifier < 0) {
-            modifier--;
-          }
-          
-          const order: Array<DamageCardData['mode']> = ['normal', 'critical'];
-          const newIndex = Math.max(0, Math.min(order.length-1, order.indexOf(part.data.mode) + modifier));
-          if (part.data.mode === order[newIndex]) {
-            return;
-          }
-          part.data.mode = order[newIndex];
-
-          if (click.shiftKey) {
-            part.data.phase = 'result';
-          }
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-      .addOnAttributeChange(async ({element, attributes}) => {
-        return ItemCardHelpers.ifAttrData({attr: attributes, element, type: this, callback: async ({part}) => {
-          element.innerHTML = await renderTemplate(
-            `modules/${staticValues.moduleName}/templates/modular-card/damage-part.hbs`, {
-              data: part.data,
-              moduleName: staticValues.moduleName
-            }
-          );
-        }});
-      })
-      .build(this.getSelector())
 
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new DamageCardTrigger());
@@ -397,12 +423,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   //#region Front end
-  public getSelector(): string {
-    return `${staticValues.code}-damage-part`;
-  }
-
   public getHtml(data: HtmlContext): string {
-    return `<${this.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${this.getSelector()}>`
+    return `<${DamageCardComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${DamageCardComponent.getSelector()}>`
   }
   //#endregion
 

@@ -14,11 +14,13 @@ import MyAbilityTemplate from "./pixi/ability-template";
 import { ItemSheetHooks } from "./modular-card/item-sheet-hooks";
 import { TokenImgElement } from "./elements/token-img-element";
 import { VirtualNodeParser } from "./lib/render-engine/virtual-dom/virtual-node-parser";
+import { RollDamageElement } from "./elements/roll-damage-element";
 
 VirtualNodeParser.init();
 TokenImgElement.registerHooks();
 RollResultElement.registerHooks();
 RollD20Element.registerHooks();
+RollDamageElement.registerHooks();
 MutableDiceTerm.registerHooks();
 MyAbilityTemplate.registerHooks();
 ItemSheetHooks.registerHooks();
