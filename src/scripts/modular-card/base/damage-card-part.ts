@@ -1,5 +1,4 @@
 
-import { ElementBuilder, ElementCallbackBuilder } from "../../elements/element-builder";
 import { RollDamageEventData, RollDamageMode } from "../../elements/roll-damage-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
@@ -13,7 +12,7 @@ import { MyActor, DamageType } from "../../types/fixed-types";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, createPermissionCheck, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
@@ -400,37 +399,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   @RunOnce()
   public registerHooks(): void {
-    const permissionCheck = createPermissionCheck<{part: {data: DamageCardData}}>(({part}) => {
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (part.data.calc$.actorUuid) {
-        documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
-      }
-      return {documents: documents};
-    })
-    new ElementBuilder()
-      .listenForAttribute('data-part-id', 'string')
-      .listenForAttribute('data-message-id', 'string')
-      .addListener(new ElementCallbackBuilder()
-        .setEvent('click')
-        .addSelectorFilter('[data-action="item-damage-source-toggle"]')
-        .addSerializer(ItemCardHelpers.getChatPartIdSerializer())
-        .addSerializer(ItemCardHelpers.getUserIdSerializer())
-        .addSerializer(ItemCardHelpers.getMouseEventSerializer())
-        .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
-        .setPermissionCheck(permissionCheck)
-        .setExecute(({messageId, part, allCardParts, click}) => {
-          if (part.data.source === 'normal' && part.data.calc$.versatileBaseRoll != null) {
-            part.data.source = 'versatile';
-          } else {
-            part.data.source = 'normal';
-          }
-          if (click.shiftKey) {
-            part.data.phase = 'result';
-          }
-          return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
-        })
-      )
-
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new DamageCardTrigger());
     ModularCard.registerModularCardTrigger(TargetCardPart.instance, new TargetCardTrigger());
