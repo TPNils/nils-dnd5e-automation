@@ -118,7 +118,7 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
   html: /*html*/`
     <div *if="this.tableBody.length" class="table target-table" style="grid-template-columns: max-content 25px {{this.tableHeader.row.length ? 'repeat(' + this.tableHeader.row.length + ', min-content)' : ''}} auto max-content;">
       <div class="header-cell">
-        <button *if="this.autoChangeTarget" [disabled]="!this.isOwner" (click)="this.onRefreshClick()" class="icon-button reset"><i class="fas fa-bullseye"></i></button>
+        <button *if="!this.autoChangeTarget" [disabled]="!this.isOwner" (click)="this.onRefreshClick()" class="icon-button reset"><i class="fas fa-bullseye"></i></button>
       </div>
       <div class="header-cell target-amount-summary">
         {{this.tableHeader.currentTargets}}{{this.tableHeader.expectedTargets ? '/' + this.tableHeader.expectedTargets : ''}}
