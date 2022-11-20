@@ -29,6 +29,26 @@
   }
 }
 
+/* item card grid */
+.#{$module-name}-item-card {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+
+  & > * {
+    grid-column: span 10;
+  }
+
+  // Firefox does not support :has => solved in an other way
+  &.has-#{$module-code}-attack-part.has-#{$module-code}-damage-part {
+    #{$module-code}-attack-part {
+      grid-column: span 5;
+    }
+    #{$module-code}-damage-part {
+      grid-column: span 5;
+    }
+  }
+}
+
 .#{$module-name}-item-card {
   font-style: normal;
   font-size: var(--font-size-12, 12px);
