@@ -57,7 +57,6 @@ for (const perm of Object.keys(UtilsFoundry.getDocumentPermissions())) {
 }
 for (const perm of (['create', 'update', 'delete'] as const)) {
   defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
-    document.getUserLevel
     return document.canUserModify(user, perm);
   }
 }
