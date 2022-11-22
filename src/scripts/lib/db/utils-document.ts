@@ -52,7 +52,7 @@ for (const perm of Object.keys(UtilsFoundry.getUserRolls())) {
 for (const perm of Object.keys(UtilsFoundry.getDocumentPermissions())) {
   const level = UtilsFoundry.getDocumentPermissions()[perm];
   defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
-    return document.getUserLevel(user) === level;
+    return document.getUserLevel(user) >= level;
   }
 }
 for (const perm of (['create', 'update', 'delete'] as const)) {
