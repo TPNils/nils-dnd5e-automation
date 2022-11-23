@@ -10,6 +10,7 @@ const unsupportedAfterDocuments = [
   FogExploration, // Old document is only available on the client
 ];
 const unsupportedAfterDocumentNames = unsupportedAfterDocuments.map(doc => doc.documentName);
+const onCompleteSymbol = Symbol('onCompletePromise');
 
 export interface ITrigger<T> {
 
@@ -100,6 +101,7 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> exte
 
 interface DmlOptions {
   [key: string]: any;
+  [onCompleteSymbol]?: Promise<any>;
 }
 
 export interface IDmlContextRow<T> {
@@ -494,7 +496,12 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
           UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, newRow: documentSnapshot});
         } else {
-          await document.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}});
+          const recursiveOptions: DmlOptions = {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}}
+          await document.update(diff.diff, recursiveOptions as any);
+          if (recursiveOptions[onCompleteSymbol]) {
+            await recursiveOptions[onCompleteSymbol];
+          }
+
           if (typeof (document as any as FoundryDocument).uuid === 'string') {
             const queriedDocument = await UtilsDocument.fromUuid((document as any as FoundryDocument).uuid);
             context = new AfterDmlContext<T>(
@@ -519,29 +526,25 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   }
   
   private async onFoundryAfterUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: DmlOptions, userId: string): Promise<void> {
-    const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
-    const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
-    let documentSnapshot = new document.constructor(modifiedDocument.toObject(), {parent: document.parent, pack: document.pack});
-    const oldDocument = this.extractOldValue(document as any, options);
-    if (oldDocument === undefined) {
-      // See injector (initOldValueInjector) for more info
-      return;
-    }
-    const originalDiff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
-    let context = new AfterDmlContext<T>(
-      [{
-        newRow: documentSnapshot,
-        oldRow: oldDocument,
-        changedByUserId: userId,
-        options: options
-      }],
-    );
+    let doResolve: (value?: any) => void;
+    let doReject: (err: any) => void;
+    const onCompletePromise = new Promise((resolve, reject) => {
+      doResolve = resolve;
+      doReject = reject;
+    })
+    options[onCompleteSymbol] = onCompletePromise; 
 
-    const recursiveUpdate = options?.[staticValues.moduleName]?.recursiveUpdate ?? 0;
-    if (game.userId === userId) {
-      documentSnapshot = new document.constructor(modifiedDocument.toObject(), {parent: document.parent, pack: document.pack});
-      const execs = context.endOfContextExecutes;
-      context = new AfterDmlContext<T>(
+    try {
+      const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
+      const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
+      let documentSnapshot = new document.constructor(modifiedDocument.toObject(), {parent: document.parent, pack: document.pack});
+      const oldDocument = this.extractOldValue(document as any, options);
+      if (oldDocument === undefined) {
+        // See injector (initOldValueInjector) for more info
+        return;
+      }
+      const originalDiff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
+      let context = new AfterDmlContext<T>(
         [{
           newRow: documentSnapshot,
           oldRow: oldDocument,
@@ -549,55 +552,76 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           options: options
         }],
       );
-      context.endOfContext(...execs);
 
-      for (const callback of this.afterCallbackGroups.get('update').getDmlCallbacks()) {
-        await callback(context);
-      }
+      const recursiveUpdate = options?.[staticValues.moduleName]?.recursiveUpdate ?? 0;
+      if (game.userId === userId) {
+        documentSnapshot = new document.constructor(modifiedDocument.toObject(), {parent: document.parent, pack: document.pack});
+        const execs = context.endOfContextExecutes;
+        context = new AfterDmlContext<T>(
+          [{
+            newRow: documentSnapshot,
+            oldRow: oldDocument,
+            changedByUserId: userId,
+            options: options
+          }],
+        );
+        context.endOfContext(...execs);
 
-      const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
-      if (!UtilsCompare.deepEquals(originalDiff, diff)) {
-        if (outputDiff) {
-          UtilsLog.debug('trigger diff', {
-            documentName: document.collectionName,
-            uuid: (document as any).uuid,
-            diff: diff,
-            originalDiff: originalDiff,
-            diffDiff: UtilsCompare.findDiff(originalDiff, diff),
-            oldRow: deepClone(oldDocument.data),
-            newRow: deepClone(modifiedDocument.data)
-          });
+        for (const callback of this.afterCallbackGroups.get('update').getDmlCallbacks()) {
+          await callback(context);
         }
-        if (recursiveUpdate > 5) {
-          UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, oldRow: oldDocument.toObject(), newRow: modifiedDocument.toObject()});
-          outputDiff = true;
-        } else {
-          await modifiedDocument.update(diff.diff, {[staticValues.moduleName]: {recursiveUpdate: recursiveUpdate + 1}});
-          
-          // Get the latest values
-          if (recursiveUpdate === 0 && typeof (document as any as FoundryDocument).uuid === 'string') {
-            const queriedDocument = await UtilsDocument.fromUuid((document as any as FoundryDocument).uuid);
-            context = new AfterDmlContext<T>(
-              [{
-                newRow: new document.constructor(queriedDocument.toObject(), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
-                oldRow: oldDocument,
-                changedByUserId: userId,
-                options: options
-              }],
-            );
+
+        const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
+        if (!UtilsCompare.deepEquals(originalDiff, diff)) {
+          if (outputDiff) {
+            UtilsLog.debug('trigger diff', {
+              documentName: document.collectionName,
+              uuid: (document as any).uuid,
+              diff: diff,
+              originalDiff: originalDiff,
+              diffDiff: UtilsCompare.findDiff(originalDiff, diff),
+              oldRow: deepClone(oldDocument.data),
+              newRow: deepClone(modifiedDocument.data)
+            });
+          }
+          if (recursiveUpdate > 5) {
+            UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, oldRow: oldDocument.toObject(), newRow: modifiedDocument.toObject()});
+            outputDiff = true;
+          } else {
+            const recursiveOptions: DmlOptions = {[staticValues.moduleName]: {recursiveUpdate: recursiveUpdate + 1}}
+            await modifiedDocument.update(diff.diff, recursiveOptions as any);
+            if (recursiveOptions[onCompleteSymbol]) {
+              await recursiveOptions[onCompleteSymbol];
+            }
+            
+            // Get the latest values
+            if (recursiveUpdate === 0 && typeof (document as any as FoundryDocument).uuid === 'string') {
+              const queriedDocument = await UtilsDocument.fromUuid((document as any as FoundryDocument).uuid);
+              context = new AfterDmlContext<T>(
+                [{
+                  newRow: new document.constructor(queriedDocument.toObject(), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
+                  oldRow: oldDocument,
+                  changedByUserId: userId,
+                  options: options
+                }],
+              );
+            }
           }
         }
       }
-    }
-    
-    if (recursiveUpdate === 0 || game.userId !== userId) {
-      for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
-        await callback(context);
+      
+      if (recursiveUpdate === 0 || game.userId !== userId) {
+        for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
+          await callback(context);
+        }
       }
-    }
-    
-    for (const exec of context.endOfContextExecutes) {
-      await exec();
+      
+      for (const exec of context.endOfContextExecutes) {
+        await exec();
+      }
+      doResolve();
+    } catch (e) {
+      doReject(e);
     }
   }
 
