@@ -6,6 +6,7 @@ import { Component, OnInit, OnInitParam } from "../../lib/render-engine/componen
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { SpellData, MyActor } from "../../types/fixed-types";
+import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
@@ -53,6 +54,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
     .addEnricher(ItemCardHelpers.getChatPartEnricher<SpellLevelCardData>())
     .setPermissionCheck(SpellLevelCardComponent.actionPermissionCheck)
     .build(async ({messageId, part, inputValue, allCardParts}) => {
+      UtilsLog.debug(inputValue)
       part.data.selectedLevel = inputValue === 'pact' ? inputValue : Number.parseInt(inputValue);
       return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
     });
@@ -151,14 +153,6 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       return null;
     }
 
-    // TODO happens on level change wih the Command spell for Erling
-    //   Uncaught (in promise) TypeError: obj is null
-    //   [Detected 1 package: nils-automated-compendium]
-    //   setProperty utils-object.ts:24
-    //   injectDeleteForDml utils-object.ts:32
-    //   setCardPartDatas modular-card.ts:360
-    //   registerHooks spell-level-card-part.ts:176
-
     let spellSlots: SpellLevelCardData['calc$']['spellSlots'] = [];
     for (const spellKey in actor.data.data.spells) {
       const spellData: SpellData = actor.data.data.spells[spellKey];
@@ -231,7 +225,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       return newData;
     }
 
-    if (newData.calc$.spellSlots.find(slot => slot.level === oldData.selectedLevel)) {
+    if (newData.calc$.spellSlots.find(slot => (slot.level === oldData.selectedLevel) || (oldData.selectedLevel === 'pact' && slot.type === 'pact'))) {
       // Retain the selected level if still available
       newData.selectedLevel = oldData.selectedLevel;
     }
@@ -290,9 +284,13 @@ class SpellLevelCardTrigger implements ITrigger<ModularCardTriggerData<SpellLeve
         part.data.calc$.tokenUuid == null ? Promise.resolve(null) : UtilsDocument.tokenFromUuid(part.data.calc$.tokenUuid)
       ]);
   
-      if (item.data.data.level !== level) {
+      if (item.data.data.level !== level || (part.data.selectedLevel === 'pact' && item.data.data?.preparation?.mode !== 'pact')) {
         const originalLevel = item.data.data.level;
-        item = item.clone({data: {level: level}}, {keepId: true});
+        const updateItem: {[key: string]: any} = {data: {level: level}};
+        if (part.data.selectedLevel === 'pact') {
+          updateItem.data.preparation = {mode: 'pact'};
+        }
+        item = item.clone(updateItem, {keepId: true});
         item.prepareFinalAttributes(); // Spell save DC, etc...
         item[originalLevelSymbol] = originalLevel;
       }
