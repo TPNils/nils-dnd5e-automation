@@ -3,7 +3,6 @@ import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { staticValues } from "../../static-values";
-import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
@@ -544,10 +543,6 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
         if (spellResource && spellKeyRegex.exec(resource.calc$.path)) {
           originalSpellResources.push(resource);
           continue;
-          // Transfer input from old spell to new
-          spellResource.consumeResourcesAction = resource.consumeResourcesAction;
-          // Undo old spell slot
-          action = 'undo';
         }
         newData.consumeResources.push({
           consumeResourcesAction: action,
