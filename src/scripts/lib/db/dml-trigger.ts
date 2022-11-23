@@ -10,7 +10,6 @@ const unsupportedAfterDocuments = [
   FogExploration, // Old document is only available on the client
 ];
 const unsupportedAfterDocumentNames = unsupportedAfterDocuments.map(doc => doc.documentName);
-const onCompleteSymbol = Symbol('onCompletePromise');
 
 export interface ITrigger<T> {
 
@@ -101,7 +100,6 @@ export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> exte
 
 interface DmlOptions {
   [key: string]: any;
-  [onCompleteSymbol]?: Promise<any>;
 }
 
 export interface IDmlContextRow<T> {
@@ -464,6 +462,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   //#endregion
 
   //#region After
+  private nextExtendedId = 0;
+  private extendedOptionsById = new Map<number, any>();
   private async onFoundryAfterCreate(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
     // Don't allow updates directly on the original document
     let documentSnapshot = new document.constructor(document.toObject(), {parent: document.parent, pack: document.pack});
@@ -496,10 +496,18 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
           UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, newRow: documentSnapshot});
         } else {
-          const recursiveOptions: DmlOptions = {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}}
-          await document.update(diff.diff, recursiveOptions as any);
-          if (recursiveOptions[onCompleteSymbol]) {
-            await recursiveOptions[onCompleteSymbol];
+          const recursiveOptions: DmlOptions = {[staticValues.moduleName]: {recursiveUpdate: (options?.[staticValues.moduleName]?.recursiveUpdate ?? 0) + 1}};
+          let extendedOptions: Promise<any>;
+          try {
+            this.initExtendedOptions(recursiveOptions)
+            await document.update(diff.diff, recursiveOptions as any);
+            extendedOptions = this.getExtendedOptions<Promise<any>>(recursiveOptions);
+          } finally {
+            this.clearExtendedOptions(recursiveOptions);
+          }
+
+          if (extendedOptions != null) {
+            await extendedOptions;
           }
 
           if (typeof (document as any as FoundryDocument).uuid === 'string') {
@@ -528,11 +536,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   private async onFoundryAfterUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: DmlOptions, userId: string): Promise<void> {
     let doResolve: (value?: any) => void;
     let doReject: (err: any) => void;
-    const onCompletePromise = new Promise((resolve, reject) => {
+    this.setExtendedOptions(options, new Promise((resolve, reject) => {
       doResolve = resolve;
       doReject = reject;
-    })
-    options[onCompleteSymbol] = onCompletePromise; 
+    }));
 
     try {
       const modifiedData = mergeObject(document.toObject(), change, {inplace: false});
@@ -588,10 +595,17 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, oldRow: oldDocument.toObject(), newRow: modifiedDocument.toObject()});
             outputDiff = true;
           } else {
-            const recursiveOptions: DmlOptions = {[staticValues.moduleName]: {recursiveUpdate: recursiveUpdate + 1}}
-            await modifiedDocument.update(diff.diff, recursiveOptions as any);
-            if (recursiveOptions[onCompleteSymbol]) {
-              await recursiveOptions[onCompleteSymbol];
+            const recursiveOptions: DmlOptions = {[staticValues.moduleName]: {recursiveUpdate: recursiveUpdate + 1}};
+            let extendedOptions: Promise<any>;
+            try {
+              this.initExtendedOptions(recursiveOptions)
+              await modifiedDocument.update(diff.diff, recursiveOptions);
+              extendedOptions = this.getExtendedOptions<Promise<any>>(recursiveOptions);
+            } finally {
+              this.clearExtendedOptions(recursiveOptions);
+            }
+            if (extendedOptions != null) {
+              await extendedOptions;
             }
             
             // Get the latest values
@@ -650,6 +664,37 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   
   private extractOldValue(document: {uuid: string}, options: any): T {
     return options[Wrapper.oldDocumentSymbol]?.[document.uuid];
+  }
+
+  private clearExtendedOptions(options: DmlOptions) {
+    const id = options[staticValues.moduleName]?.extendedId;
+    if (id != null) {
+      this.extendedOptionsById.delete(id);
+    }
+  }
+
+  private initExtendedOptions(options: DmlOptions) {
+    if (!options[staticValues.moduleName]) {
+      options[staticValues.moduleName] = {};
+    }
+    if (options[staticValues.moduleName].extendedId == null) {
+      options[staticValues.moduleName].extendedId = this.nextExtendedId++;
+    }
+  }
+
+  private setExtendedOptions(options: DmlOptions, extended: any) {
+    const id = options[staticValues.moduleName]?.extendedId;
+    if (id != null) {
+      this.extendedOptionsById.set(id, extended);
+    }
+  }
+
+  private getExtendedOptions<T = any>(options: DmlOptions): T | null {
+    const id = options[staticValues.moduleName]?.extendedId;
+    if (id == null) {
+      return null;
+    }
+    return this.extendedOptionsById.get(id);
   }
   //#endregion
 
