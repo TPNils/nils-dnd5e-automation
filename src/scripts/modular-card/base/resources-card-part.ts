@@ -537,10 +537,13 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
       }
     }
 
+    const originalSpellResources: ResourceCardData['consumeResources'] = [];
     for (const [key, resource] of originalResourcesByKey.entries()) {
       if (!newKeys.has(key)) {
         let action = resource.consumeResourcesAction;
         if (spellResource && spellKeyRegex.exec(resource.calc$.path)) {
+          originalSpellResources.push(resource);
+          continue;
           // Transfer input from old spell to new
           spellResource.consumeResourcesAction = resource.consumeResourcesAction;
           // Undo old spell slot
@@ -554,6 +557,26 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
           }
         });
       }
+    }
+
+    let originalSpellAction: ResourceCardData['consumeResources'][number]['consumeResourcesAction'] = 'undo';
+    for (const originalSpellResource of originalSpellResources) {
+      if (originalSpellResource.calc$.calcChange !== 0) {
+        originalSpellAction = originalSpellResource.consumeResourcesAction;
+      }
+
+      newData.consumeResources.push({
+        consumeResourcesAction: 'undo',
+        calc$: {
+          ...originalSpellResource.calc$, // Undo old spell slot
+          calcChange: 0,
+        }
+      });
+    }
+
+    // Transfer input from old spell to new
+    if (spellResource) {
+      spellResource.consumeResourcesAction = originalSpellAction;
     }
 
     return newData;
