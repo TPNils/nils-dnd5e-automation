@@ -6,7 +6,6 @@ import { Component, OnInit, OnInitParam } from "../../lib/render-engine/componen
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { SpellData, MyActor } from "../../types/fixed-types";
-import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
@@ -54,7 +53,6 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
     .addEnricher(ItemCardHelpers.getChatPartEnricher<SpellLevelCardData>())
     .setPermissionCheck(SpellLevelCardComponent.actionPermissionCheck)
     .build(async ({messageId, part, inputValue, allCardParts}) => {
-      UtilsLog.debug(inputValue)
       part.data.selectedLevel = inputValue === 'pact' ? inputValue : Number.parseInt(inputValue);
       return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
     });
@@ -86,31 +84,28 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
       }, game.user)
       const isOwner = permissionResponse !== 'prevent-action';
       if (actor) {
-        for (const spellData of part.data.calc$.spellSlots) {
-          // const spellData: SpellData = actor.data.data.spells[spellKey];
-          // if (spellData.max <= 0) {
-          //   continue;
-          // }
-          if (spellData.type === 'spell') {
-            // const spellLevel = Number.parseInt(spellKey.substring(5));
-            const spellLevel = spellData.level;
-            const availableSlots = spellData.availableSlots;
-            this.spellSlotOptions.push({
-              label: game.i18n.format("DND5E.SpellLevelSlot", {level: game.i18n.localize(`DND5E.SpellLevel${spellLevel}`), n: isOwner ? availableSlots : '?'}),
-              value: String(spellLevel),
-              selected: part.data.selectedLevel === spellLevel,
-            });
-          } else if (spellData.type === 'pact') {
-            // const spellLevel = (spellData as MyActor['data']['data']['spells']['pact']).level;
-            // const availableSlots = spellData.value;
-            const spellLevel = spellData.level;
-            const availableSlots = spellData.availableSlots;
+        for (const spellKey of Object.keys(actor.data.data.spells)) {
+          const spellData: SpellData = actor.data.data.spells[spellKey];
+          if (spellData.max === 0) {
+            continue;
+          }
+          if (spellKey === 'pact') {
+            const spellLevel = (spellData as MyActor['data']['data']['spells']['pact']).level;
+            const availableSlots = spellData.value;
             this.spellSlotOptions.push({
               label: game.i18n.format("DND5E.SpellLevelPact", {level: spellLevel, n: isOwner ? availableSlots : '?'}),
-              value: spellData.type,
+              value: 'pact',
               selected: part.data.selectedLevel === spellLevel,
             });
-          }
+          } else {
+            const spellLevel = /spell([0-9]+)/.exec(spellKey)[1];
+            const availableSlots = spellData.value;
+            this.spellSlotOptions.push({
+              label: game.i18n.format("DND5E.SpellLevelSlot", {level: game.i18n.localize(`DND5E.SpellLevel${spellLevel}`), n: isOwner ? availableSlots : '?'}),
+              value: spellLevel,
+              selected: part.data.selectedLevel === spellLevel,
+            });
+          } 
         }
       } else if (part.data.selectedLevel === 'pact') {
         this.spellSlotOptions.push({
