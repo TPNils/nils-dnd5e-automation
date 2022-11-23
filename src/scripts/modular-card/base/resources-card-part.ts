@@ -3,6 +3,7 @@ import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { staticValues } from "../../static-values";
+import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
@@ -56,27 +57,25 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
   {
     const requestUuids = new Set<string>();
     for (const resource of resources) {
-      let shouldApply = false;
+      let tryToApply = false;
       if (resource.resource.consumeResourcesAction === 'undo') {
-        shouldApply = false;
+        tryToApply = resource.resource.calc$.appliedChange !== 0;
       } else if (resource.resource.consumeResourcesAction === 'manual-apply') {
-        shouldApply = true;
+        tryToApply = resource.resource.calc$.appliedChange !== resource.resource.calc$.calcChange;
       } else {
         switch (resource.resource.calc$.autoconsumeAfter) {
           case 'init': {
-            shouldApply = true;
+            tryToApply = true;
             break;
           }
           default: {
-            shouldApply = messageDataById.get(resource.messageId).completedStates.has(resource.resource.calc$.autoconsumeAfter);
+            tryToApply = messageDataById.get(resource.messageId).completedStates.has(resource.resource.calc$.autoconsumeAfter);
             break;
           }
         }
       }
-
-      const isCurrentlyApplied = resource.resource.calc$.appliedChange === resource.resource.calc$.calcChange;
       
-      if (shouldApply !== isCurrentlyApplied) {
+      if (tryToApply) {
         applyResources.push(resource);
         requestUuids.add(resource.resource.calc$.uuid);
       }
@@ -125,7 +124,7 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
     const originalValue = currentValue + resource.resource.calc$.appliedChange;
     const newValue = Math.max(0, originalValue - expectedApplyAmount);
     resource.resource.calc$.appliedChange = originalValue - newValue;
-    // UtilsLog.log({expectedApplyAmount, currentValue, originalValue: newValue})
+    // UtilsLog.log({path: resource.resource.calc$.path, expectedApplyAmount, currentValue, originalValue, newValue, appliedChange: resource.resource.calc$.appliedChange})
     
     setProperty(updates, resource.resource.calc$.path, newValue);
   }
@@ -302,7 +301,6 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
   public allConsumeResourcesApplied = false;
   
   public onInit(args: OnInitParam) {
-    // TODO resources are very strange => try upcast, downcast, upcaste, etc
     args.addStoppable(
       this.getData<ResourceCardData>(ResourceCardPart.instance).listen(({part}) => this.setData(part))
     );
@@ -334,21 +332,26 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
         user: game.user,
       }]);
       if (hasPerm) {
-        this.consumeResources = part.data.consumeResources.map(resource => {
-          let state: this['consumeResources'][number]['state'];
-          if (resource.calc$.appliedChange === 0) {
-            state = 'not-applied';
-          } else if (resource.calc$.appliedChange === resource.calc$.calcChange) {
-            state = 'applied';
-          } else {
-            state = 'partial-applied';
-          }
-          return {
-            ...resource,
-            label: ResourceCardComponent.translateUsage(resource),
-            state: state,
-          }
-        });
+        this.consumeResources = part.data.consumeResources
+          .filter(resource => {
+            // Hide unused resources
+            return resource.calc$.appliedChange !== 0 || resource.calc$.calcChange !== 0;
+          })
+          .map(resource => {
+            let state: this['consumeResources'][number]['state'];
+            if (resource.calc$.appliedChange === 0) {
+              state = 'not-applied';
+            } else if (resource.calc$.appliedChange === resource.calc$.calcChange) {
+              state = 'applied';
+            } else {
+              state = 'partial-applied';
+            }
+            return {
+              ...resource,
+              label: ResourceCardComponent.translateUsage(resource),
+              state: state,
+            }
+          });
       } else {
         this.consumeResources = [];
       }
@@ -520,7 +523,12 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
 
     const newData = this.create(args);
     const newKeys = new Set<string>();
+    const spellKeyRegex = /^data\.spells\.(?:pact|spell[0-9]+)\.value$/;
+    let spellResource: ResourceCardData['consumeResources'][number];
     for (const resource of newData.consumeResources) {
+      if (spellKeyRegex.exec(resource.calc$.path)) {
+        spellResource = resource;
+      }
       const key = `${resource.calc$.uuid}-${resource.calc$.path}`;
       newKeys.add(key);
       const original = originalResourcesByKey.get(key);
@@ -531,8 +539,15 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
 
     for (const [key, resource] of originalResourcesByKey.entries()) {
       if (!newKeys.has(key)) {
+        let action = resource.consumeResourcesAction;
+        if (spellResource && spellKeyRegex.exec(resource.calc$.path)) {
+          // Transfer input from old spell to new
+          spellResource.consumeResourcesAction = resource.consumeResourcesAction;
+          // Undo old spell slot
+          action = 'undo';
+        }
         newData.consumeResources.push({
-          consumeResourcesAction: resource.consumeResourcesAction,
+          consumeResourcesAction: action,
           calc$: {
             ...resource.calc$,
             calcChange: 0,
@@ -565,22 +580,87 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
 
 class ResourceTrigger implements ITrigger<ModularCardTriggerData<ResourceCardData>> {
   
-  //#region beforeUpsert
-  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<ResourceCardData>>): boolean | void {
-    this.removeUnusedResources(context);
+  //#region upsert
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<ResourceCardData>>) {
+    await this.applyConsumeResources(context);
   }
-
-  private removeUnusedResources(context: IDmlContext<ModularCardTriggerData<ResourceCardData>>): void {
-    for (const {newRow} of context.rows) {
-      const filtered = newRow.part.data.consumeResources.filter(resource => {
-        return resource.calc$.calcChange !== 0 || resource.calc$.appliedChange !== 0
-      });
-      if (filtered.length !== newRow.part.data.consumeResources.length) {
-        newRow.part.data.consumeResources = filtered;
+  
+  private async applyConsumeResources(context: IAfterDmlContext<ModularCardTriggerData<ResourceCardData>>): Promise<void> {
+    const applyRequest: ApplyResourceConsumptionRequest = {
+      messageDataById: new Map(),
+      resources: [],
+    };
+    for (const {newRow, oldRow} of context.rows) {
+      const oldResourceByKey = new Map<string, ResourceCardData['consumeResources'][number]>();
+      if (oldRow) {
+        for (const consumeResource of oldRow.part.data.consumeResources) {
+          oldResourceByKey.set(`${consumeResource.calc$.uuid}-${consumeResource.calc$.path}`, consumeResource);
+        }
       }
+
+      let originalResourceCount = applyRequest.resources.length;
+      const newResourceByKey = new Map<string, ResourceCardData['consumeResources'][number]>();
+      for (const consumeResource of newRow.part.data.consumeResources) {
+        const key = `${consumeResource.calc$.uuid}-${consumeResource.calc$.path}`;
+        const oldResouce = oldResourceByKey.get(key);
+        newResourceByKey.set(key, consumeResource);
+
+        const changed = consumeResource.consumeResourcesAction !== (oldResouce?.consumeResourcesAction || 'undo') ||
+          consumeResource.calc$.calcChange != (oldResouce?.calc$.calcChange || 0);
+
+        if (changed) {
+          switch (consumeResource.consumeResourcesAction) {
+            case 'auto': {
+              applyRequest.resources.push({
+                messageId: newRow.messageId,
+                resource: consumeResource,
+              });
+              break;
+            }
+            case 'manual-apply': {
+              if (consumeResource.calc$.calcChange !== consumeResource.calc$.appliedChange) {
+                applyRequest.resources.push({
+                  messageId: newRow.messageId,
+                  resource: consumeResource,
+                });
+              }
+              break;
+            }
+            case 'undo': {
+              if (consumeResource.calc$.appliedChange !== 0) {
+                applyRequest.resources.push({
+                  messageId: newRow.messageId,
+                  resource: consumeResource,
+                });
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      for (const [key, oldResource] of oldResourceByKey.entries()) {
+        if (!newResourceByKey.has(key)) {
+          const oldClone = deepClone(oldResource);
+          oldClone.consumeResourcesAction = 'undo';
+          applyRequest.resources.push({
+            messageId: oldRow.messageId,
+            resource: oldClone,
+          });
+        }
+      }
+      
+      if (originalResourceCount !== applyRequest.resources.length && !applyRequest.messageDataById.has(newRow.messageId)) {
+        applyRequest.messageDataById.set(newRow.messageId, getMessageState(newRow.allParts));
+      }
+    }
+
+    if (applyRequest.resources.length > 0) {
+      await applyResourceConsumption(applyRequest);
     }
   }
   //#endregion
+
 }
 
 class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
@@ -630,55 +710,4 @@ class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
   }
   //#endregion
   
-  //#region upsert
-  public async upsert(context: IAfterDmlContext<ChatMessage>) {
-    await this.applyConsumeResources(context);
-  }
-  
-  private async applyConsumeResources(context: IAfterDmlContext<ChatMessage>): Promise<void> {
-    const applyRequest: ApplyResourceConsumptionRequest = {
-      messageDataById: new Map(),
-      resources: [],
-    };
-    for (const {newRow, changedByUserId} of context.rows) {
-      if (changedByUserId !== game.userId) {
-        // Only one user needs to do this operation
-        continue;
-      }
-      const allParts = ModularCard.getCardPartDatas(newRow);
-      if (!allParts) {
-        continue;
-      }
-
-      const resources: ResourceCardData[] = [];
-      for (const part of allParts) {
-        if (ModularCard.isType<ResourceCardData>(ResourceCardPart.instance, part)) {
-          resources.push(part.data);
-        }
-      }
-      if (resources.length > 0) {
-        let addedResource = false;
-        for (const resource of resources) {
-          for (const consumeResource of resource.consumeResources) {
-            if (consumeResource.consumeResourcesAction === 'auto') {
-              addedResource = true;
-              applyRequest.resources.push({
-                messageId: newRow.id,
-                resource: consumeResource,
-              });
-            }
-          }
-        }
-        if (addedResource) {
-          applyRequest.messageDataById.set(newRow.id, getMessageState(allParts));
-        }
-      }
-    }
-
-    if (applyRequest.resources.length > 0) {
-      await applyResourceConsumption(applyRequest);
-    }
-  }
-  //#endregion
-
 }
