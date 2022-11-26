@@ -274,8 +274,10 @@ export type MyItemData = {
 
 export type MyItem = BaseDocument<MyItemData> & {
   name: string;
+  img: string;
   type: 'weapon' | 'equipment' | 'consumable' | 'tool' | 'loot' | 'class' | 'spell' | 'feat' | 'backpack';
-  parent: MyActor;
+  actor?: MyActor;
+  parent?: MyActor;
   readonly abilityMod: keyof MyActorData['data']['abilities']
   readonly hasDamage: boolean;
   getRollData: () => {[key: string]: any};
