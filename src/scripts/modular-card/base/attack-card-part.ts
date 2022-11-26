@@ -601,11 +601,9 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
   }
   //#endregion
 
-  
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
     await this.doRoll(context);
-    // TODO auto apply healing, but it needs to be sync?
   }
 
   private async doRoll(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
@@ -679,7 +677,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
         if (roll) {
           showRolls.push({
             uuid: newRow.part.data.actorUuid$,
-            permission: `${staticValues.code}ReadDamage`,
+            permission: `${staticValues.code}ReadAttack`,
             user: game.user,
             meta: roll,
           });
@@ -701,6 +699,5 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
     });
   }
   //#endregion
-
 
 }
