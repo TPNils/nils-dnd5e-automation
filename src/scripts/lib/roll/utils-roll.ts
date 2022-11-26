@@ -1,7 +1,8 @@
 import { ReEvaluatableDie } from "./re-evaluatable-die";
 import { DamageType, MyActor, MyActorData, MyItemData } from "../../types/fixed-types";
 import { UtilsDiceSoNice } from "./utils-dice-so-nice";
-import { MutableDiceTerm } from "./mutable-dice-term";
+import { ReusableDiceTerm } from "./reusable-dice-term";
+import { staticValues } from "../../static-values";
 
 const validDamageTypes: DamageType[] = ['' /* none */, 'acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder', 'healing', 'temphp'];
 
@@ -134,101 +135,98 @@ export class UtilsRoll {
   }
 
   /**
-   * @param original The original roll where you wish to retain any existing roll results from
+   * @param originalRoll The original roll where you wish to retain any existing roll results from
    * @param newFormula What the new roll formula should be
    * @returns the new result roll and any new terms which have been rolled if the original was already rolled
    */
-  public static async setRoll(original: Roll, newFormula: string): Promise<{result: Roll, rollToDisplay: Roll | null}>
-  public static async setRoll(original: RollTerm[], newFormula: string): Promise<{result: RollTerm[], rollToDisplay: Roll | null}>
-  public static async setRoll(original: RollTerm[] | Roll, newFormula: string): Promise<{result: RollTerm[] | Roll, rollToDisplay: Roll | null}> {
-    const originalWasRoll = original instanceof Roll;
-    original = original = (original instanceof Roll ? original.terms : original);
-
+  public static async setRoll(originalRoll: Roll, newFormula: string): Promise<{result: Roll, rollToDisplay: Roll | null}> {
+    let originalTerms = originalRoll.terms;
     {
-      const hasAnyOriginalEvaluated = original.find(term => (term as any)._evaluated) != null;
+      const hasAnyOriginalEvaluated = originalTerms.find(term => (term as any)._evaluated) != null;
       if (!hasAnyOriginalEvaluated) {
-        const newRoll = new Roll(newFormula);
-        if (originalWasRoll) {
-          return {result: newRoll, rollToDisplay: null};
+        return {result: new Roll(newFormula), rollToDisplay: null};
+      }
+    }
+
+    if (originalRoll.options == null) {
+      originalRoll.options = {};
+    }
+    if (originalRoll.options[staticValues.moduleName] == null) {
+      originalRoll.options[staticValues.moduleName] = {};
+    }
+    if (originalRoll.options[staticValues.moduleName].allRolledResults == null) {
+      originalRoll.options[staticValues.moduleName].allRolledResults = {};
+    }
+    // TODO only allow 1 instance to run at a time
+    //  Solve with an annotation
+    //  Provide these options globally
+    //  MutableDiceTerm should overwrite the default Die functions or whatever it needs to do to exist
+    const mutableDiceOptions: ReusableDiceTerm.Options = {
+      prerolledPool: originalRoll.options[staticValues.moduleName].allRolledResults,
+      newRolls: {},
+    };
+
+    try {
+      // Wrap dice to be mutable
+      ReusableDiceTerm.pushOptions(mutableDiceOptions);
+  
+      const rollResult = await new Roll(newFormula).roll({async: true});
+
+      let termsToDisplay: RollTerm[] = []
+      for (const faceStr of Object.keys(mutableDiceOptions.newRolls) as `${number}`[]) {
+        let activeResults = 0;
+        for (const result of mutableDiceOptions.newRolls[faceStr]) {
+          if (result.active) {
+            activeResults++;
+          }
         }
-        return {result: newRoll.terms, rollToDisplay: null};
+        termsToDisplay.push(new Die({
+          faces: Number(faceStr),
+          number: activeResults,
+          results: mutableDiceOptions.newRolls[faceStr],
+        }));
+        termsToDisplay.push(new OperatorTerm({operator: '+'}));
       }
-    }
-
-    original = original.map(t => {
-      if (t instanceof Die) {
-        return MutableDiceTerm.fromDie(t);
-      }
-      return t;
-    });
-    const newTerms = new Roll(newFormula).terms.map(t => {
-      if (t instanceof Die) {
-        return MutableDiceTerm.fromDie(t);
-      }
-      return t;
-    });
-
-    const originalResultsFromByDieFaces = new Map<number, MutableDiceTerm[]>();
-    for (const term of original) {
-      if (term instanceof MutableDiceTerm) {
-        if (!originalResultsFromByDieFaces.has(term.faces)) {
-          originalResultsFromByDieFaces.set(term.faces, []);
-        }
-        originalResultsFromByDieFaces.get(term.faces).push(term);
-      }
-    }
-
-    for (const term of newTerms) {
-      if (term instanceof MutableDiceTerm) {
-        if (originalResultsFromByDieFaces.get(term.faces)?.length) {
-          const originalTerm = originalResultsFromByDieFaces.get(term.faces).splice(0, 1)[0];
-          term.results = [...originalTerm.results];
-        }
-      }
-    }
-
-    for (let term of Array.from(originalResultsFromByDieFaces.values()).deepFlatten()) {
-      if (newTerms.length > 0) {
-        newTerms.push(new OperatorTerm({operator: '+'}));
-      }
-      term = MutableDiceTerm.fromData(deepClone(term.toJSON())) as MutableDiceTerm;
-      term.number = 0;
-      newTerms.push(term);
-    }
-
-    const pendingTermRolls: Promise<RollTerm>[] = [];
-    for (const term of newTerms) {
-      // @ts-expect-error
-      if (!term._evaluated || term instanceof MutableDiceTerm) {
-        pendingTermRolls.push(term.evaluate({async: true}));
-      }
-    }
-
-    let termsToDisplay: RollTerm[] = [];
-    for (const term of await Promise.all(pendingTermRolls)) {
+  
       if (termsToDisplay.length > 0) {
-        termsToDisplay.push(await new OperatorTerm({operator: '+'}).evaluate({async: true}));
+        termsToDisplay = termsToDisplay.splice(0, 1);
+        termsToDisplay = (await UtilsRoll.rollUnrolledTerms(termsToDisplay, {async: true})).results;
       }
-      if (term instanceof MutableDiceTerm) {
-        if (term.newRollsSinceEvaluate.length > 0) {
-          termsToDisplay.push(new Die({
-            number: term.newRollsSinceEvaluate.length,
-            faces: term.faces,
-            results: term.newRollsSinceEvaluate,
-          }))
-          term.newRollsSinceEvaluate = [];
+
+      if (rollResult.options == null) {
+        rollResult.options = {};
+      }
+      if (rollResult.options[staticValues.moduleName] == null) {
+        rollResult.options[staticValues.moduleName] = {};
+      }
+      const allRolledResults: ReusableDiceTerm.Options['prerolledPool'] = {};
+      for (const term of rollResult.terms) {
+        if (term instanceof DiceTerm) {
+          const faces = String(term.faces);
+          if (!allRolledResults[faces]) {
+            allRolledResults[faces] = [];
+          }
+          for (const result of term.results) {
+            allRolledResults[faces].push(result.result);
+          }
         }
-      } else if (term instanceof DiceTerm) {
-        termsToDisplay.push(term);
       }
-    }
-
-    termsToDisplay = UtilsRoll.simplifyTerms(termsToDisplay);
-    termsToDisplay = (await UtilsRoll.rollUnrolledTerms(termsToDisplay, {async: true})).results;
-
-    return {
-      result: originalWasRoll ? Roll.fromTerms(newTerms) : newTerms,
-      rollToDisplay: termsToDisplay.length > 0 ? Roll.fromTerms(termsToDisplay) : null,
+      // Any prerolledPool not consumed by mutable dice should be re-added 
+      for (const faces of Object.keys(mutableDiceOptions.prerolledPool) as `${number}`[]) {
+        if (!allRolledResults[faces]) {
+          allRolledResults[faces] = [];
+        }
+        for (const result of mutableDiceOptions.prerolledPool[faces]) {
+          allRolledResults[faces].push(result);
+        }
+      }
+      rollResult.options[staticValues.moduleName].allRolledResults = allRolledResults;
+      return {
+        result: rollResult,
+        rollToDisplay: termsToDisplay.length > 0 ? Roll.fromTerms(termsToDisplay) : null,
+      }
+    } finally {
+      ReusableDiceTerm.popOptions();
     }
   }
 
