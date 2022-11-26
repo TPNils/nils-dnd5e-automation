@@ -789,20 +789,32 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
             // Crit's don't work for sneak attack "(ceil(@classes.rogue.levels /2))d6" on DnD5e V1.5.3
             // It does work on V2.0.3 (probably worked sooner)
             // Consider this bug fixed since it's fixed in a DnD system update
-            const newRoll = () => item.rollDamage({
-              critical: newData.mode === 'critical',
-              versatile: newData.source === 'versatile',
-              spellLevel: damageSource.spellLevel,
-              options: {
-                fastForward: true,
-                chatMessage: false,
+            const newRoll = async () => {
+              const rollPromises: Promise<Roll>[] = [];
+              rollPromises.push(item.rollDamage({
+                critical: newData.mode === 'critical',
+                versatile: newData.source === 'versatile',
+                spellLevel: damageSource.spellLevel,
+                options: {
+                  fastForward: true,
+                  chatMessage: false,
+                }}));
+
+              if (newData.userBonus) {
+                rollPromises.push(new Roll(newData.userBonus).roll({async: true}));
               }
-            });
+              return UtilsRoll.mergeRolls(...await Promise.all(rollPromises));
+            };
             const oldRoll = oldData.calc$.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
             newData.calc$.roll = UtilsRoll.toRollData((await UtilsRoll.modifyRoll(oldRoll, newRoll)).result);
           }
         } else {
-          const newRoll = UtilsRoll.fromRollTermData(newData.source === 'versatile' ? newData.calc$.damageSource.versatileBaseRoll :  newData.calc$.damageSource.normalBaseRoll);
+          const rollTerms = newData.source === 'versatile' ? newData.calc$.damageSource.versatileBaseRoll :  newData.calc$.damageSource.normalBaseRoll;
+          if (newData.userBonus) {
+            rollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermData);
+            rollTerms.push(...UtilsRoll.toRollData(new Roll(newData.userBonus)).terms);
+          }
+          const newRoll = UtilsRoll.fromRollTermData(rollTerms);
           const oldRoll = oldData.calc$.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
           const resultRoll = (await UtilsRoll.modifyRoll(oldRoll, newRoll)).result;
           if (resultRoll.total == null) {
