@@ -157,10 +157,6 @@ export class UtilsRoll {
     if (originalRoll.options[staticValues.moduleName].allRolledResults == null) {
       originalRoll.options[staticValues.moduleName].allRolledResults = {};
     }
-    // TODO only allow 1 instance to run at a time
-    //  Solve with an annotation
-    //  Provide these options globally
-    //  MutableDiceTerm should overwrite the default Die functions or whatever it needs to do to exist
     const mutableDiceOptions: ReusableDiceTerm.Options = {
       prerolledPool: originalRoll.options[staticValues.moduleName].allRolledResults,
       newRolls: {},
