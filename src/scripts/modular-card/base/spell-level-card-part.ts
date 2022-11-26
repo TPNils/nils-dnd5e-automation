@@ -120,7 +120,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
           selected: true,
         });
       }
-      
+
       if (!isOwner) {
         // Only show the selected slot
         this.spellSlotOptions = this.spellSlotOptions.filter(option => option.selected);
