@@ -144,14 +144,14 @@ export class UtilsRoll {
     }
 
     {
-      const hasAnyOriginalEvaluated = newRoll.terms.find(term => term.evaluated) != null;
-      if (!hasAnyOriginalEvaluated) {
+      const hasAnyEvaluated = newRoll.terms.some(term => term.evaluated);
+      if (!hasAnyEvaluated) {
         return null; // new is not evaluated => no rolls => nothing to show
       }
     }
     {
-      const hasAnyOriginalEvaluated = originalRoll == null ? false : (originalRoll?.terms?.find(term => term.evaluated) != null);
-      if (!hasAnyOriginalEvaluated) {
+      const hasAnyEvaluated = originalRoll == null ? false : (originalRoll?.terms?.some(term => term.evaluated));
+      if (!hasAnyEvaluated) {
         return inputNewRoll instanceof Roll ? inputNewRoll : UtilsRoll.fromRollData(inputNewRoll); // new is evaluated, old is not => everything is new
       }
     }
@@ -166,6 +166,9 @@ export class UtilsRoll {
       const face = (term as DiceTerm.Data).faces;
       if (!newDisplayedRollesByFace.has(face)) {
         newDisplayedRollesByFace.set(face, []);
+      }
+      for (const result of term.results) {
+        newDisplayedRollesByFace.get(face).push(result.result);
       }
     }
     for (const face of newDisplayedRollesByFace.keys()) {
