@@ -688,7 +688,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
           newRow.part.data.roll$ = UtilsRoll.toRollData(new Roll(newRow.part.data.requestRollFormula$));
         } else {
           const oldRoll = UtilsRoll.fromRollData(newRow.part.data.roll$);
-          const result = await UtilsRoll.setRoll(oldRoll, newRow.part.data.requestRollFormula$);
+          const result = await UtilsRoll.modifyRoll(oldRoll, newRow.part.data.requestRollFormula$);
           newRow.part.data.roll$ = UtilsRoll.toRollData(result.result);
           if (result.rollToDisplay) {
             // Auto rolls if original roll was already evaluated

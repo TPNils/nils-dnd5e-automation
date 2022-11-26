@@ -6,9 +6,9 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { TermData, RollData, UtilsRoll } from "../../lib/roll/utils-roll";
-import { UtilsObject } from "../../lib/utils/utils-object";
+import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { staticValues } from "../../static-values";
-import { MyActor, DamageType } from "../../types/fixed-types";
+import { MyActor, DamageType, MyItemData } from "../../types/fixed-types";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
@@ -37,27 +37,34 @@ interface TargetCache {
   calcAddTmpHp: number;
 }
 
+interface ItemDamageSource {
+  type: 'Item';
+  itemUuid: string;
+  spellLevel?: MyItemData['data']['level'];
+  hasVersatile: boolean;
+}
+
+interface ManualDamageSource {
+  type: 'Manual';
+  normalBaseRoll: TermData[];
+  versatileBaseRoll?: TermData[];
+}
+
 export interface DamageCardData {
-  phase: 'mode-select' | 'bonus-input' | 'result';
+  phase: 'mode-select' | 'result';
   mode: 'normal' | 'critical';
   source: 'normal' | 'versatile';
   userBonus?: string;
   calc$: {
     actorUuid?: string;
+    damageSource: ItemDamageSource | ManualDamageSource;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
-    normalBaseRoll: TermData[];
-    versatileBaseRoll?: TermData[];
-    upcastRoll?: TermData[];
-    actorBonusRoll?: TermData[];
-    requestRollFormula: string;
     roll?: RollData;
     displayFormula?: string;
     displayDamageTypes?: string;
     targetCaches: TargetCache[]
   }
 }
-
-const rollBaseKeys = ['normalBaseRoll', 'versatileBaseRoll'] as const;
 
 function setTargetCache(cache: DamageCardData, targetCache: TargetCache): void {
   if (!cache.calc$.targetCaches) {
@@ -100,7 +107,6 @@ function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache
     {{ this.flavor }}
   </div>
   <nac-roll-damage
-    *if="this.roll != null"
     [data-roll]="this.roll"
     [data-bonus-formula]="this.userBonus"
     [data-roll-mode]="this.rollMode"
@@ -202,15 +208,33 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
         this.roll = part.data.calc$.roll;
         this.rollMode = part.data.mode;
         this.rollSource = part.data.source;
-        this.hasVersatile = part.data.calc$.versatileBaseRoll != null;
+        this.hasVersatile = part.data.calc$.damageSource.type === 'Item' ? part.data.calc$.damageSource.hasVersatile : (part.data.calc$.damageSource.versatileBaseRoll != null);
         this.userBonus = part.data.userBonus;
         this.overrideFormula = part.data.calc$.displayFormula
         this.interactionPermission = `OwnerUuid:${part.data.calc$.actorUuid}`;
         this.readPermission = `${staticValues.code}ReadDamageUuid:${part.data.calc$.actorUuid}`;
+
+        this.flavor = game.i18n.localize('DND5E.Damage');
+        let isHealing = false;
+        if (!part.data.calc$.roll && part.data.calc$.damageSource.type === 'Item') {
+          const item = await UtilsDocument.itemFromUuid(part.data.calc$.damageSource.itemUuid);
+          if (item) {
+            isHealing = item.data.data.damage.parts.every(([dmg, type]) => ItemCardHelpers.healingDamageTypes.includes(type));
+          } else {
+            isHealing = false;
+          }
+        } else {
+          let rollTerms: TermData[];
+          if (part.data.calc$.roll) {
+            rollTerms = part.data.calc$.roll.terms;
+          } else {
+            rollTerms = part.data.source === 'versatile' ? (part.data.calc$.damageSource as ManualDamageSource).versatileBaseRoll : (part.data.calc$.damageSource as ManualDamageSource).normalBaseRoll;
+          }
+          
+          const damageTypes: DamageType[] = rollTerms.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
+          isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
+        }
         
-        const baseRoll = part.data.source === 'versatile' ? part.data.calc$.versatileBaseRoll : part.data.calc$.normalBaseRoll;
-        const damageTypes: DamageType[] = baseRoll.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
-        const isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
         const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.data.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}])
         if (isHealing) {
           this.flavor = game.i18n.localize('DND5E.Healing');
@@ -241,7 +265,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   }
 
   public onRollClick(event: CustomEvent<{userBonus?: string}>): void {
-    if (this.userBonus === event.detail.userBonus && this.roll.evaluated) {
+    if (this.userBonus === event.detail.userBonus && this.roll?.evaluated) {
       return;
     }
     DamageCardComponent.rollClick({event, partId: this.partId, messageId: this.messageId});
@@ -266,124 +290,30 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     //  => Add a damage per target uuid option (not selection id)?
     //     Maybe a bit more structured => Should have a damage object/array which everything uses, base dmg, user bonus and external factors
 
+    if (!item.hasDamage) {
+      return null;
+    }
+
     // TODO make an other element with for the "other" formula
     const rollData: {[key: string]: any} = item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
       rollData.prof = item.data.data.prof.term;
     }
 
-    let hasDamage = false;
     const inputDamages: DamageCardData = {
       mode: 'normal',
       phase: 'mode-select',
       source: 'normal',
       calc$: {
-        normalBaseRoll: UtilsRoll.toRollData(new Roll('0')).terms,
-        requestRollFormula: '',
+        damageSource: {
+          type: 'Item',
+          itemUuid: item.uuid,
+          spellLevel: item.data.data.level,
+          hasVersatile: item.data.data.damage?.versatile?.length > 0,
+        },
         targetCaches: [],
       }
     };
-    // Main damage
-    {
-      const damageParts = item.data.data.damage?.parts;
-      if (damageParts && damageParts.length > 0) {
-        hasDamage = true;
-        inputDamages.calc$.normalBaseRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(damageParts, rollData)).terms;
-      }
-    }
-
-    // Versatile damage => this is hidden when no damage parts are shown
-    //  => Ignore versatile damage if no 'primary' damage is specified
-    if (hasDamage && item.data.data.damage?.versatile) {
-      hasDamage = true;
-      inputDamages.calc$.versatileBaseRoll = UtilsRoll.toRollData(new Roll(item.data.data.damage.versatile, rollData)).terms;
-      const versatileTermWithDamageType = inputDamages.calc$.versatileBaseRoll.find(term => UtilsRoll.toDamageType(term.options?.flavor));
-      if (!versatileTermWithDamageType) {
-        const noramlTermWithDamageType = inputDamages.calc$.versatileBaseRoll.find(term => UtilsRoll.toDamageType(term.options?.flavor));
-        if (noramlTermWithDamageType) {
-          for (const term of inputDamages.calc$.versatileBaseRoll) {
-            term.options = term.options ?? {};
-            term.options.flavor = noramlTermWithDamageType.options.flavor;
-          }
-        }
-      }
-    }
-
-    // Spell scaling
-    const scaling = item.data.data.scaling;
-    if (scaling?.mode === 'level' && scaling.formula) {
-      const originalItem = await UtilsDocument.itemFromUuid(item.uuid);
-      if (originalItem && item.data.data.level > originalItem.data.data.level) {
-        const upcastLevels = item.data.data.level - originalItem.data.data.level;
-        const scalingRollJson: TermData[] = UtilsRoll.toRollData(new Roll(scaling.formula, rollData).alter(upcastLevels, 0)).terms;
-        inputDamages.calc$.upcastRoll = scalingRollJson;
-      }
-    } else if (scaling?.mode === 'cantrip' && actor) {
-      let actorLevel = 0;
-      if (actor.type === "character") {
-        actorLevel = actor.data.data.details.level;
-      } else if (item.data.data.preparation.mode === "innate") {
-        actorLevel = Math.ceil(actor.data.data.details.cr);
-      } else {
-        actorLevel = actor.data.data.details.spellLevel;
-      }
-      const applyScalingXTimes = Math.floor((actorLevel + 1) / 6);
-
-      if (applyScalingXTimes > 0) {
-        for (const rollBaseKey of rollBaseKeys) {
-          // DND5e spell compendium has cantrip formula empty => default to the base damage formula
-          const currentValue: TermData[] = inputDamages.calc$[rollBaseKey];
-          if (!currentValue) {
-            continue;
-          }
-          const currentRoll = UtilsRoll.fromRollTermData(currentValue);
-          let scalingFormula = scaling.formula == null || scaling.formula.length === 0 ? Roll.getFormula(currentValue.map(RollTerm.fromData)) : scaling.formula;
-          let scalingDamageType: DamageType = '';
-          for (let i = currentValue.length - 1; i >= 0; i--) {
-            const flavor = currentValue[i].options.flavor;
-            const damageType = UtilsRoll.toDamageType(flavor);
-            if (damageType != null) {
-              scalingDamageType = damageType;
-              break;
-            }
-          }
-          if (scalingDamageType) {
-            scalingFormula += `[${scalingDamageType}]`;
-          }
-          const scalingRoll = new Roll(scalingFormula, rollData, deepClone(currentRoll.options)).alter(applyScalingXTimes, 0, {multiplyNumeric: true});
-          // Override normal roll since cantrip scaling is static, not dynamic like level scaling
-          inputDamages.calc$[rollBaseKey] = UtilsRoll.toRollData(UtilsRoll.mergeRolls(currentRoll, scalingRoll)).terms;
-        }
-      }
-    }
-    
-    if (!hasDamage) {
-      for (const rollBaseKey of rollBaseKeys) {
-        const currentValue: TermData[] = inputDamages.calc$[rollBaseKey];
-        if (!currentValue) {
-          continue;
-        }
-        if (currentValue.length === 0) {
-          continue;
-        }
-        if (currentValue.length === 1 && currentValue[0].class === NumericTerm.name && (currentValue[0] as any).number === 0) {
-          continue;
-        }
-        hasDamage = true;
-      }
-    }
-
-    if (!hasDamage) {
-      return null;
-    }
-    
-    // Add damage bonus formula
-    {
-      const actorBonus = actor.data.data.bonuses?.[item.data.data.actionType];
-      if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
-        inputDamages.calc$.actorBonusRoll = UtilsRoll.toRollData(new Roll(actorBonus.damage, rollData)).terms;
-      }
-    }
 
     if (actor) {
       inputDamages.calc$.actorUuid = actor.uuid;
@@ -817,109 +747,106 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
 
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData<DamageCardData>>): Promise<void> {
-    await this.calcDamageFormulas(context);
+    await this.doRoll(context);
     // TODO auto apply healing, but it needs to be sync?
   }
+
+  private async doRoll(context: IAfterDmlContext<ModularCardTriggerData<DamageCardData>>): Promise<void> {
+    for (const {newRow, oldRow} of context.rows) {
+      if (newRow.part.data.phase !== 'result') {
+        return;
+      }
+
+      // Only do roll when changed is detected
+      const newData = newRow.part.data;
+      const oldData = oldRow?.part?.data;
+
+      let shouldModifyRoll = oldData == null || !newRow.part.data.calc$.roll?.evaluated;
+      if (!shouldModifyRoll) {
+        const newChangeDetectData: DeepPartial<DamageCardData> = {
+          ...newData,
+        }
+        newChangeDetectData.calc$ = {
+          damageSource: newData.calc$.damageSource,
+        };
+        
+        const oldChangeDetectData: DeepPartial<DamageCardData> = {
+          ...oldData,
+        }
+        oldChangeDetectData.calc$ = {
+          damageSource: oldData.calc$.damageSource,
+        };
+        shouldModifyRoll = !UtilsCompare.deepEquals(newChangeDetectData, oldChangeDetectData);
+      }
+
+      if (shouldModifyRoll) {
+        if (newData.calc$.damageSource.type === 'Item') {
+          const damageSource = newData.calc$.damageSource
+          const item = await UtilsDocument.itemFromUuid(newData.calc$.damageSource.itemUuid);
+          if (item) {
+            // Crit's don't work for sneak attack "(ceil(@classes.rogue.levels /2))d6" on DnD5e V1.5.3
+            // It does work on V2.0.3 (probably worked sooner)
+            // Consider this bug fixed since it's fixed in a DnD system update
+            const newRoll = () => item.rollDamage({
+              critical: newData.mode === 'critical',
+              versatile: newData.source === 'versatile',
+              spellLevel: damageSource.spellLevel,
+              options: {
+                fastForward: true,
+                chatMessage: false,
+              }
+            });
+            const oldRoll = oldData.calc$.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
+            newData.calc$.roll = UtilsRoll.toRollData((await UtilsRoll.modifyRoll(oldRoll, newRoll)).result);
+          }
+        } else {
+          const newRoll = UtilsRoll.fromRollTermData(newData.source === 'versatile' ? newData.calc$.damageSource.versatileBaseRoll :  newData.calc$.damageSource.normalBaseRoll);
+          const oldRoll = oldData.calc$.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
+          const resultRoll = (await UtilsRoll.modifyRoll(oldRoll, newRoll)).result;
+          if (resultRoll.total == null) {
+            await resultRoll.roll({async: true});
+          }
+          newData.calc$.roll = UtilsRoll.toRollData(resultRoll);
+        }
+      }
+    }
+  }
+  //#endregion
+
+  //#region afterUpsert
+  public async afterUpsert(context: IAfterDmlContext<ModularCardTriggerData<DamageCardData>>): Promise<void> {
+    await this.diceSoNiceHook(context);
+  }
   
-  private async calcDamageFormulas(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): Promise<void> {
+  private async diceSoNiceHook(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): Promise<void> {
     const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
-      const newRollTerms: TermData[] = [];
-      for (const rollProperty of this.getRollProperties(newRow.part.data)) {
-        if (newRollTerms.length > 0) {
-          newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermData);
-        }
-        newRollTerms.push(...(UtilsObject.getProperty(newRow.part.data, rollProperty)));
-      }
-      if (newRow.part.data.userBonus) {
-        if (newRollTerms.length > 0) {
-          newRollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermData);
-        }
-        newRollTerms.push(...new Roll(newRow.part.data.userBonus).terms.map(t => t.toJSON() as TermData));
-      }
-      if (newRollTerms.length === 0) {
-        newRollTerms.push(new NumericTerm({number: 0}).toJSON() as TermData);
-      }
-      
-      // Store the requested formula seperatly since the UtilsRoll.setRoll may change it, causing an infinite loop to changing the formula
-      newRow.part.data.calc$.requestRollFormula = UtilsRoll.createDamageRoll(newRollTerms.map(t => RollTerm.fromData(t)), {critical: newRow.part.data.mode === 'critical'}).formula;
-
-      // Calc roll
-      if (newRow.part.data.calc$.requestRollFormula !== oldRow?.part?.data?.calc$?.requestRollFormula) {
-        if (!newRow.part.data.calc$.roll) {
-          newRow.part.data.calc$.roll = UtilsRoll.toRollData(new Roll(newRow.part.data.calc$.requestRollFormula));
-        } else {
-          const oldRoll = UtilsRoll.fromRollData(newRow.part.data.calc$.roll);
-          const result = await UtilsRoll.setRoll(oldRoll, newRow.part.data.calc$.requestRollFormula);
-          newRow.part.data.calc$.roll = UtilsRoll.toRollData(result.result);
-          if (result.rollToDisplay) {
-            // Auto rolls if original roll was already evaluated
-            for (const user of game.users.values()) {
-              if (user.active) {
-                showRolls.push({
-                  uuid: newRow.part.data.calc$.actorUuid,
-                  permission: `${staticValues.code}ReadDamage`,
-                  user: user,
-                  meta: result.rollToDisplay
-                });
-              }
-            }
-          }
-        }
-      }
-      
-      // Execute initial roll
-      if ((newRow.part.data.phase === 'result') && newRow.part.data.calc$.roll?.evaluated !== true) {
-        const roll = UtilsRoll.fromRollData(newRow.part.data.calc$.roll);
-        newRow.part.data.calc$.roll = UtilsRoll.toRollData(await roll.roll({async: true}));
-        for (const user of game.users.values()) {
-          if (user.active) {
-            showRolls.push({
-              uuid: newRow.part.data.calc$.actorUuid,
-              permission: `${staticValues.code}ReadDamage`,
-              user: user,
-              meta: roll,
-            });
-          }
+      // Detect new rolled dice
+      if (newRow.part.data.calc$.roll?.evaluated) {
+        const roll = UtilsRoll.getNewRolledTerms(oldRow?.part?.data?.calc$?.roll, newRow.part.data.calc$.roll);
+        if (roll) {
+          showRolls.push({
+            uuid: newRow.part.data.calc$.actorUuid,
+            permission: `${staticValues.code}ReadDamage`,
+            user: game.user,
+            meta: roll,
+          });
         }
       }
     }
     
     UtilsDocument.hasPermissions(showRolls).then(responses => {
-      const rollsPerUser = new Map<string, Roll[]>()
+      const rolls: Roll[] = [];
       for (const response of responses) {
         if (response.result) {
-          if (!rollsPerUser.has(response.requestedCheck.user.id)) {
-            rollsPerUser.set(response.requestedCheck.user.id, []);
-          }
-          rollsPerUser.get(response.requestedCheck.user.id).push(response.requestedCheck.meta);
+          rolls.push(response.requestedCheck.meta);
         }
       }
 
-      const rollPromises: Promise<any>[] = [];
-      for (const [userId, rolls] of rollsPerUser.entries()) {
-        rollPromises.push(UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...rolls), showUserIds: [userId]}));
+      if (rolls.length > 0) {
+        return UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...rolls), showUserIds: [game.userId]});
       }
-      return rollPromises;
     });
-  }
-  //#endregion
-
-  //#region helpers
-  private getRollProperties(data: DamageCardData): string[][] {
-    const rollProperties: string[][] = [];
-    if (data.source === 'versatile') {
-      rollProperties.push(['calc$', 'versatileBaseRoll']);
-    } else {
-      rollProperties.push(['calc$', 'normalBaseRoll']);
-    }
-    if (data.calc$.upcastRoll) {
-      rollProperties.push(['calc$', 'upcastRoll']);
-    }
-    if (data.calc$.actorBonusRoll) {
-      rollProperties.push(['calc$', 'actorBonusRoll']);
-    }
-    return rollProperties;
   }
   //#endregion
 

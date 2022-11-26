@@ -282,6 +282,7 @@ export type MyItem = BaseDocument<MyItemData> & {
   readonly hasDamage: boolean;
   getRollData: () => {[key: string]: any};
   getChatData: () => any;
+  rollDamage(args?: {critical?: boolean, spellLevel?: MyItemData['data']['level'], versatile?: boolean, options?: {fastForward?: boolean, chatMessage?: boolean}}): Promise<Roll>;
   roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
   displayCard({}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
   getCriticalThreshold(): number | null;

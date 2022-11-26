@@ -134,39 +134,132 @@ export class UtilsRoll {
     return damageMap;
   }
 
-  /**
-   * @param originalRoll The original roll where you wish to retain any existing roll results from
-   * @param newFormula What the new roll formula should be
-   * @returns the new result roll and any new terms which have been rolled if the original was already rolled
-   */
-  public static async setRoll(originalRoll: Roll, newFormula: string): Promise<{result: Roll, rollToDisplay: Roll | null}> {
-    let originalTerms = originalRoll.terms;
+  public static getNewRolledTerms(originalRoll: Roll | RollData | null, newRoll: Roll | RollData): Roll | null {
+    const inputNewRoll = newRoll;
+    if (originalRoll instanceof Roll) {
+      originalRoll = UtilsRoll.toRollData(originalRoll);
+    }
+    if (newRoll instanceof Roll) {
+      newRoll = UtilsRoll.toRollData(newRoll);
+    }
+
     {
-      const hasAnyOriginalEvaluated = originalTerms.find(term => (term as any)._evaluated) != null;
+      const hasAnyOriginalEvaluated = newRoll.terms.find(term => term.evaluated) != null;
       if (!hasAnyOriginalEvaluated) {
-        return {result: new Roll(newFormula), rollToDisplay: null};
+        return null; // new is not evaluated => no rolls => nothing to show
+      }
+    }
+    {
+      const hasAnyOriginalEvaluated = originalRoll == null ? false : (originalRoll?.terms?.find(term => term.evaluated) != null);
+      if (!hasAnyOriginalEvaluated) {
+        return inputNewRoll instanceof Roll ? inputNewRoll : UtilsRoll.fromRollData(inputNewRoll); // new is evaluated, old is not => everything is new
+      }
+    }
+    
+    const newDisplayedRollesByFace = new Map<number, number[]>();
+    const oldDisplayedRollesByFace = new Map<number, number[]>();
+    for (const term of newRoll.terms) {
+      if ((term as DiceTerm.Data).faces == null) {
+        continue;
+      }
+
+      const face = (term as DiceTerm.Data).faces;
+      if (!newDisplayedRollesByFace.has(face)) {
+        newDisplayedRollesByFace.set(face, []);
+      }
+    }
+    for (const face of newDisplayedRollesByFace.keys()) {
+      oldDisplayedRollesByFace.set(face, []);
+    }
+    
+    if (originalRoll) {
+      for (const term of originalRoll.terms) {
+        if ((term as DiceTerm.Data).faces == null) {
+          continue;
+        }
+
+        const face = (term as DiceTerm.Data).faces;
+        if (!oldDisplayedRollesByFace.has(face)) {
+          oldDisplayedRollesByFace.set(face, []);
+        }
+        for (const result of term.results) {
+          oldDisplayedRollesByFace.get(face).push(result.result);
+        }
       }
     }
 
-    if (originalRoll.options == null) {
-      originalRoll.options = {};
+    const newRollsByFace = new Map<number, number[]>();
+    for (const [face, newRolls] of newDisplayedRollesByFace.entries()) {
+      const oldRolls = oldDisplayedRollesByFace.get(face);
+      for (const result of newRolls) {
+        const oldIndex = oldRolls.indexOf(result);
+        if (oldIndex === -1) {
+          if (!newRollsByFace.has(face)) {
+            newRollsByFace.set(face, []);
+          }
+          newRollsByFace.get(face).push(result);
+        } else {
+          oldRolls.splice(oldIndex, 1);
+        }
+      }
     }
-    if (originalRoll.options[staticValues.moduleName] == null) {
-      originalRoll.options[staticValues.moduleName] = {};
+
+    if (newRollsByFace.size === 0) {
+      return null;
     }
-    if (originalRoll.options[staticValues.moduleName].allRolledResults == null) {
-      originalRoll.options[staticValues.moduleName].allRolledResults = {};
+
+    const newRollTerms: RollTerm[] = [];
+    for (const [face, results] of newRollsByFace.entries()) {
+      newRollTerms.push(new Die({
+        faces: face,
+        number: results.length,
+        results: results.map(r => ({result: r, active: true}))
+      }))
+      
+      const plus = new OperatorTerm({operator: '+'});
+      // @ts-ignore
+      plus._evaluated = true;
+      newRollTerms.push(plus);
+    }
+    newRollTerms.pop(); // Remove the trailing '+'
+    
+    return Roll.fromTerms(newRollTerms);
+  }
+
+  /**
+   * @param originalRoll The original roll where you wish to retain any existing roll results from
+   * @param newRollOrFormula What the new roll should be, either a formula or a factory wich returns a new roll
+   * @returns The new modified roll
+   */
+  public static async modifyRoll(originalRoll: Roll, newRollOrFormula: string | Roll | (() => Roll | Promise<Roll>)): Promise<{result: Roll, rollToDisplay: Roll | null}> {
+    {
+      const hasAnyOriginalEvaluated = originalRoll == null ? false : originalRoll.terms?.find(term => (term as any)._evaluated) != null;
+      if (!hasAnyOriginalEvaluated) {
+        return {result: await UtilsRoll.parseRollRequest(newRollOrFormula), rollToDisplay: null};
+      }
     }
     const mutableDiceOptions: ReusableDiceTerm.Options = {
-      prerolledPool: originalRoll.options[staticValues.moduleName].allRolledResults,
+      prerolledPool: {},
       newRolls: {},
     };
+
+    for (const term of originalRoll.terms) {
+      if (term instanceof DiceTerm) {
+        const faces = String(term.faces) as `${number}`;
+        if (!mutableDiceOptions.prerolledPool[faces]) {
+          mutableDiceOptions.prerolledPool[faces] = [];
+        }
+        for (const result of term.results) {
+          mutableDiceOptions.prerolledPool[faces].push(result.result);
+        }
+      }
+    }
 
     try {
       // Wrap dice to be mutable
       ReusableDiceTerm.pushOptions(mutableDiceOptions);
   
-      const rollResult = await new Roll(newFormula).roll({async: true});
+      let rollResult = await UtilsRoll.parseRollRequest(newRollOrFormula, true);
 
       let termsToDisplay: RollTerm[] = []
       for (const faceStr of Object.keys(mutableDiceOptions.newRolls) as `${number}`[]) {
@@ -189,12 +282,6 @@ export class UtilsRoll {
         termsToDisplay = (await UtilsRoll.rollUnrolledTerms(termsToDisplay, {async: true})).results;
       }
 
-      if (rollResult.options == null) {
-        rollResult.options = {};
-      }
-      if (rollResult.options[staticValues.moduleName] == null) {
-        rollResult.options[staticValues.moduleName] = {};
-      }
       const allRolledResults: ReusableDiceTerm.Options['prerolledPool'] = {};
       for (const term of rollResult.terms) {
         if (term instanceof DiceTerm) {
@@ -207,16 +294,31 @@ export class UtilsRoll {
           }
         }
       }
-      // Any prerolledPool not consumed by mutable dice should be re-added 
+      // Any prerolledPool not consumed by mutable dice should be re-added
+      const unusedTerms: RollTerm[] = [];
       for (const faces of Object.keys(mutableDiceOptions.prerolledPool) as `${number}`[]) {
-        if (!allRolledResults[faces]) {
-          allRolledResults[faces] = [];
+        if (mutableDiceOptions.prerolledPool[faces].length === 0) {
+          continue;
         }
-        for (const result of mutableDiceOptions.prerolledPool[faces]) {
-          allRolledResults[faces].push(result);
-        }
+        unusedTerms.push(new Die({
+          faces: Number(faces),
+          number: 0,
+          results: mutableDiceOptions.prerolledPool[faces].map(r => ({result: r, active: false, discarded: true}))
+        }))
       }
-      rollResult.options[staticValues.moduleName].allRolledResults = allRolledResults;
+
+      if (unusedTerms.length > 0) {
+        const terms = [...rollResult.terms];
+        if (terms.length > 0) {
+          terms.push(new OperatorTerm({operator: '+'}));
+        }
+        for (const unusedTerm of unusedTerms) {
+          terms.push(unusedTerm);
+          terms.push(new OperatorTerm({operator: '+'}));
+        }
+        terms.pop(); // Remove the trailing '+'
+        rollResult = Roll.fromTerms((await UtilsRoll.rollUnrolledTerms(terms, {async: true})).results);
+      }
       return {
         result: rollResult,
         rollToDisplay: termsToDisplay.length > 0 ? Roll.fromTerms(termsToDisplay) : null,
@@ -224,6 +326,31 @@ export class UtilsRoll {
     } finally {
       ReusableDiceTerm.popOptions();
     }
+  }
+
+  private static parseRollRequest(newRollOrFormula: string | Roll | (() => Roll | Promise<Roll>), ensureEvaluated = false): Promise<Roll> {
+    let roll: Promise<Roll>;
+    if (typeof newRollOrFormula === 'string') {
+      roll = Promise.resolve(new Roll(newRollOrFormula));
+    } else if (newRollOrFormula instanceof Roll) {
+      roll = Promise.resolve(newRollOrFormula);
+    } else {
+      let result = newRollOrFormula();
+      if (!(result instanceof Promise)) {
+        result = Promise.resolve(result);
+      }
+      roll = result;
+    }
+
+    if (ensureEvaluated) {
+      roll = roll.then(r => {
+        if (!r.total) {
+          return r.evaluate({async: true});
+        }
+        return r;
+      })
+    }
+    return roll;
   }
 
   public static createDamageRoll(roll: string | RollTerm[], options: DamageRollOptions = {}): Roll {

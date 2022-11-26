@@ -515,7 +515,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
             target.roll$ = UtilsRoll.toRollData(new Roll(target.requestRollFormula$));
           } else {
             const oldRoll = UtilsRoll.fromRollData(target.roll$);
-            const result = await UtilsRoll.setRoll(oldRoll, target.requestRollFormula$);
+            const result = await UtilsRoll.modifyRoll(oldRoll, target.requestRollFormula$);
             target.roll$ = UtilsRoll.toRollData(result.result);
             if (result.rollToDisplay) {
               // Auto rolls if original roll was already evaluated
