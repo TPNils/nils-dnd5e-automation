@@ -21,7 +21,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
   tag: RollD20Element.selector(),
   html: /*html*/`
     <div class="roll-wrapper">
-      <nac-roll-result *if="this.roll.total != null"
+      <nac-roll-result *if="this.roll?.total != null"
         [data-roll]="this.roll"
         [data-override-formula]="this.overrideFormula"
         [data-highlight-total-on-firstTerm]="this.highlightTotalOnFirstTerm"
