@@ -636,9 +636,6 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
         if (newData.attackSource$.type === 'Item') {
           const item = await UtilsDocument.itemFromUuid(newData.attackSource$.itemUuid);
           if (item) {
-            // Crit's don't work for sneak attack "(ceil(@classes.rogue.levels /2))d6" on DnD5e V1.5.3
-            // It does work on V2.0.3 (probably worked sooner)
-            // Consider this bug fixed since it's fixed in a DnD system update
             const newRoll = async () => {
               const rollPromises: Promise<Roll>[] = [];
               rollPromises.push(item.rollAttack({
