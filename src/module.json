@@ -31,9 +31,11 @@
     {
       "id": "compendium-folders",
       "name": "compendium-folders",
+      "type": "module",
       "manifest": "https://raw.githubusercontent.com/earlSt1/vtt-compendium-folders/master/module.json"
     },
-    {"id": "lib-wrapper", "name": "lib-wrapper"}
+    { "id": "lib-wrapper", "name": "lib-wrapper", "type": "module"},
+    { "id": "socketlib", "name": "socketlib", "type": "module" }
   ],
   "packs": [
     {
