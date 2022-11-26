@@ -22,7 +22,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
   tag: RollDamageElement.selector(),
   html: /*html*/`
     <div class="roll-wrapper">
-      <nac-roll-result *if="this.roll.total != null"
+      <nac-roll-result *if="this.roll?.total != null"
         [data-roll]="this.roll"
         [data-override-formula]="this.overrideFormula"
         [data-display-type]="this.hasReadPermission ? '' : this.readHiddenDisplayType">
