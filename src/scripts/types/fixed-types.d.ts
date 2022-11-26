@@ -272,6 +272,51 @@ export type MyItemData = {
   }
 }
 
+export interface D20RollOptions {
+  /** The dice roll component parts, excluding the initial d20 */
+  parts?: string[];
+  /** Actor or item data against which to parse the roll */
+  data?: object;
+  /** Apply advantage to the roll (unless otherwise specified) */
+  advantage?: boolean;
+  /** Apply disadvantage to the roll (unless otherwise specified) */
+  disadvantage?: boolean;
+  /** The value of d20 result which represents a critical success */
+  critical?: number;
+  /** The value of d20 result which represents a critical failure */
+  fumble?: number;
+  /** Assign a target value against which the result of this roll should be compared */
+  targetValue?: number;
+  /** Allow Elven Accuracy to modify this roll? */
+  elvenAccuracy?: boolean;
+  /** Allow Halfling Luck to modify this roll? */
+  halflingLucky?: boolean;
+  /** Allow Reliable Talent to modify this roll? */
+  reliableTalent?: boolean;
+  /** Choose the ability modifier that should be used when the roll is made */
+  chooseModifier?: boolean;
+  /** Allow fast-forward advantage selection */
+  fastForward?: boolean;
+  /** The triggering event which initiated the roll */
+  event?: Event;
+  /** The HTML template used to render the roll dialog */
+  template?: string;
+  /** The dialog window title */
+  title?: string;
+  /** Modal dialog options */
+  dialogOptions?: object;
+  /** Automatically create a Chat Message for the result of this roll */
+  chatMessage?: boolean;
+  /** Additional data which is applied to the created Chat Message, if any */
+  messageData?: object;
+  /** A specific roll mode to apply as the default for the resulting roll */
+  rollMode?: string;
+  /** The ChatMessage speaker to pass when creating the chat */
+  speaker?: object;
+  /** Flavor text to use in the posted chat message */
+  flavor?: string;
+}
+
 export type MyItem = BaseDocument<MyItemData> & {
   name: string;
   img: string;
@@ -282,6 +327,7 @@ export type MyItem = BaseDocument<MyItemData> & {
   readonly hasDamage: boolean;
   getRollData: () => {[key: string]: any};
   getChatData: () => any;
+  rollAttack(options?: D20RollOptions): Promise<Roll | null>;
   rollDamage(args?: {critical?: boolean, spellLevel?: MyItemData['data']['level'], versatile?: boolean, options?: {fastForward?: boolean, chatMessage?: boolean}}): Promise<Roll>;
   roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
   displayCard({}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;

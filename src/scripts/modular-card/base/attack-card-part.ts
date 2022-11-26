@@ -5,6 +5,7 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
+import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
 import { Action } from "../action";
@@ -30,12 +31,12 @@ export interface AttackCardData {
   mode: 'normal' | 'advantage' | 'disadvantage';
   userBonus: string;
   actorUuid$?: string;
+  attackSource$: {
+    type: 'Item';
+    itemUuid: string;
+  };
   advantageSources$: Array<{$uuid: string, $name: string, $image: string}>;
   disadvantageSources$: Array<{$uuid: string, $name: string, $image: string}>;
-  hasHalflingLucky$: boolean;
-  elvenAccuracy$: boolean;
-  rollBonus$?: string;
-  requestRollFormula$?: string;
   roll$?: RollData;
   critTreshold$: number;
   isCrit$?: boolean;
@@ -59,7 +60,6 @@ export interface AttackCardData {
       {{ this.flavor }}
     </div>
     <nac-roll-d20
-      *if="this.part?.data?.roll$ != null"
       [data-roll]="this.part.data.roll$"
       [data-label]="this.overrideRollLabel"
       [data-bonus-formula]="this.part.data.userBonus"
@@ -174,54 +174,19 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     if (!['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
       return null;
     }
-    const bonus = ['@mod'];
 
-    // Add proficiency bonus if an explicit proficiency flag is present or for non-item features
-    if ( !["weapon", "consumable"].includes(item.data.data.type) || item.data.proficient ) {
-      bonus.push("@prof");
-    }
-
-    const rollData: {[key: string]: any} = actor == null ? {} : item.getRollData();
-    if (item.data.data.prof?.hasProficiency) {
-      rollData.prof = item.data.data.prof.term;
-    }
-
-    // Item bonus
-    if (item.data.data.attackBonus) {
-      bonus.push(String(item.data.data.attackBonus));
-    }
-
-    // Actor bonus
-    const actorBonus = actor?.data?.data?.bonuses?.[item.data.data.actionType]?.attack;
-    if (actorBonus) {
-      bonus.push(actorBonus);
-    }
-
-    // One-time bonus provided by consumed ammunition
-    if ( (item.data.data.consume?.type === 'ammo') && !!actor?.items ) {
-      const ammoItemData = actor.items.get(item.data.data.consume.target)?.data;
-
-      if (ammoItemData) {
-        const ammoItemQuantity = ammoItemData.data.quantity;
-        const ammoCanBeConsumed = ammoItemQuantity && (ammoItemQuantity - (item.data.data.consume.amount ?? 0) >= 0);
-        const ammoItemAttackBonus = ammoItemData.data.attackBonus;
-        const ammoIsTypeConsumable = ammoItemData.type === "consumable" && ammoItemData.data.consumableType === "ammo";
-        if ( ammoCanBeConsumed && ammoItemAttackBonus && ammoIsTypeConsumable ) {
-          bonus.push(`${ammoItemAttackBonus}[ammo]`);
-        }
-      }
-    }
     const attack: AttackCardData = {
       mode: 'normal',
       phase: 'mode-select',
       userBonus: "",
+      attackSource$: {
+        type: 'Item',
+        itemUuid: item.uuid,
+      },
       targetCaches$: [],
       advantageSources$: [],
       disadvantageSources$: [],
-      elvenAccuracy$: actor?.getFlag("dnd5e", "elvenAccuracy") === true && ["dex", "int", "wis", "cha"].includes(item.abilityMod),
-      hasHalflingLucky$: actor?.getFlag("dnd5e", "halflingLucky") === true,
       actorUuid$: actor?.uuid,
-      rollBonus$: new Roll(bonus.filter(b => b !== '0' && b.length > 0).join(' + '), rollData).toJSON().formula,
       critTreshold$: 20
     };
 
@@ -636,111 +601,106 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
   }
   //#endregion
 
+  
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
-    await this.calcAttackRoll(context);
-    await this.rollAttack(context);
+    await this.doRoll(context);
+    // TODO auto apply healing, but it needs to be sync?
   }
 
-  private async calcAttackRoll(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
-    for (const {newRow} of context.rows) {
-      let baseRoll = new Die({faces: 20, number: 1});
-      if (newRow.part.data.hasHalflingLucky$) {
-        // reroll a base roll 1 once
-        // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
-        // second 2 = reroll when the roll result is equal to 1 (=1)
-        baseRoll.modifiers.push('r1=1');
-      }
-      switch (newRow.part.data.mode) {
-        case 'advantage': {
-          if (newRow.part.data.elvenAccuracy$) {
-            baseRoll.number = 3;
-          } else {
-            baseRoll.number = 2;
-          }
-          baseRoll.modifiers.push('kh');
-          break;
-        }
-        case 'disadvantage': {
-          baseRoll.number = 2;
-          baseRoll.modifiers.push('kl');
-          break;
-        }
-      }
-      const parts: string[] = [baseRoll.formula];
-      if (newRow.part.data.rollBonus$) {
-        parts.push(newRow.part.data.rollBonus$);
-      }
-      
-      if (newRow.part.data.userBonus && Roll.validate(newRow.part.data.userBonus)) {
-        parts.push(newRow.part.data.userBonus);
+  private async doRoll(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
+    for (const {newRow, oldRow} of context.rows) {
+      if (newRow.part.data.phase !== 'result') {
+        return;
       }
 
-      newRow.part.data.requestRollFormula$ = UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).formula;
+      // Only do roll when changed is detected
+      const newData = newRow.part.data;
+      const oldData = oldRow?.part?.data;
+
+      let shouldModifyRoll = oldData == null || !newRow.part.data.roll$?.evaluated;
+      if (!shouldModifyRoll) {
+        const newChangeDetectData: DeepPartial<AttackCardData> = {
+          mode: newData.mode,
+          userBonus: newData.userBonus,
+          attackSource$: newData.attackSource$,
+        }
+        
+        const oldChangeDetectData: DeepPartial<AttackCardData> = {
+          mode: oldData.mode,
+          userBonus: oldData.userBonus,
+          attackSource$: oldData.attackSource$,
+        }
+        shouldModifyRoll = !UtilsCompare.deepEquals(newChangeDetectData, oldChangeDetectData);
+      }
+
+      if (shouldModifyRoll) {
+        if (newData.attackSource$.type === 'Item') {
+          const item = await UtilsDocument.itemFromUuid(newData.attackSource$.itemUuid);
+          if (item) {
+            // Crit's don't work for sneak attack "(ceil(@classes.rogue.levels /2))d6" on DnD5e V1.5.3
+            // It does work on V2.0.3 (probably worked sooner)
+            // Consider this bug fixed since it's fixed in a DnD system update
+            const newRoll = async () => {
+              const rollPromises: Promise<Roll>[] = [];
+              rollPromises.push(item.rollAttack({
+                advantage: newData.mode === 'advantage',
+                disadvantage: newData.mode === 'disadvantage',
+                critical: newData.critTreshold$,  
+                fastForward: true,
+                chatMessage: false,
+              }));
+
+              if (newData.userBonus) {
+                rollPromises.push(new Roll(newData.userBonus).roll({async: true}));
+              }
+              return UtilsRoll.mergeRolls(...await Promise.all(rollPromises));
+            };
+            const oldRoll = oldData.roll$ == null ? null : UtilsRoll.fromRollData(oldData.roll$);
+            newData.roll$ = UtilsRoll.toRollData((await UtilsRoll.modifyRoll(oldRoll, newRoll)).result);
+          }
+        }
+      }
     }
   }
+  //#endregion
 
-  private async rollAttack(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
+  //#region afterUpsert
+  public async afterUpsert(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
+    await this.diceSoNiceHook(context);
+  }
+  
+  private async diceSoNiceHook(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
     const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
-      if (newRow.part.data.requestRollFormula$ !== oldRow?.part?.data?.requestRollFormula$) {
-        if (!newRow.part.data.roll$) {
-          newRow.part.data.roll$ = UtilsRoll.toRollData(new Roll(newRow.part.data.requestRollFormula$));
-        } else {
-          const oldRoll = UtilsRoll.fromRollData(newRow.part.data.roll$);
-          const result = await UtilsRoll.modifyRoll(oldRoll, newRow.part.data.requestRollFormula$);
-          newRow.part.data.roll$ = UtilsRoll.toRollData(result.result);
-          if (result.rollToDisplay) {
-            // Auto rolls if original roll was already evaluated
-            for (const user of game.users.values()) {
-              if (user.active) {
-                showRolls.push({
-                  uuid: newRow.part.data.actorUuid$,
-                  permission: `${staticValues.code}ReadCheck`,
-                  user: user,
-                  meta: result.rollToDisplay
-                });
-              }
-            }
-          }
-        }
-      }
-
-      // Execute initial roll
-      if ((newRow.part.data.phase === 'result') && newRow.part.data.roll$?.evaluated !== true) {
-        const roll = UtilsRoll.fromRollData(newRow.part.data.roll$);
-        newRow.part.data.roll$ = UtilsRoll.toRollData(await roll.roll({async: true}));
-        for (const user of game.users.values()) {
-          if (user.active) {
-            showRolls.push({
-              uuid: newRow.part.data.actorUuid$,
-              permission: `${staticValues.code}ReadCheck`,
-              user: user,
-              meta: roll,
-            });
-          }
+      // Detect new rolled dice
+      if (newRow.part.data.roll$?.evaluated) {
+        const roll = UtilsRoll.getNewRolledTerms(oldRow?.part?.data?.roll$, newRow.part.data.roll$);
+        if (roll) {
+          showRolls.push({
+            uuid: newRow.part.data.actorUuid$,
+            permission: `${staticValues.code}ReadDamage`,
+            user: game.user,
+            meta: roll,
+          });
         }
       }
     }
-
+    
     UtilsDocument.hasPermissions(showRolls).then(responses => {
-      const rollsPerUser = new Map<string, Roll[]>()
+      const rolls: Roll[] = [];
       for (const response of responses) {
         if (response.result) {
-          if (!rollsPerUser.has(response.requestedCheck.user.id)) {
-            rollsPerUser.set(response.requestedCheck.user.id, []);
-          }
-          rollsPerUser.get(response.requestedCheck.user.id).push(response.requestedCheck.meta);
+          rolls.push(response.requestedCheck.meta);
         }
       }
 
-      const rollPromises: Promise<any>[] = [];
-      for (const [userId, rolls] of rollsPerUser.entries()) {
-        rollPromises.push(UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...rolls), showUserIds: [userId]}));
+      if (rolls.length > 0) {
+        return UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...rolls), showUserIds: [game.userId]});
       }
-      return rollPromises;
     });
   }
   //#endregion
+
 
 }
