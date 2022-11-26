@@ -213,51 +213,53 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
         this.overrideFormula = part.data.calc$.displayFormula
         this.interactionPermission = `OwnerUuid:${part.data.calc$.actorUuid}`;
         this.readPermission = `${staticValues.code}ReadDamageUuid:${part.data.calc$.actorUuid}`;
-
         this.flavor = game.i18n.localize('DND5E.Damage');
-        let isHealing = false;
-        if (!part.data.calc$.roll && part.data.calc$.damageSource.type === 'Item') {
-          const item = await UtilsDocument.itemFromUuid(part.data.calc$.damageSource.itemUuid);
-          if (item) {
-            isHealing = item.data.data.damage.parts.every(([dmg, type]) => ItemCardHelpers.healingDamageTypes.includes(type));
+
+        const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.data.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}]);
+        if (hasReadPermission) {
+          let isHealing = false;
+          if (!part.data.calc$.roll && part.data.calc$.damageSource.type === 'Item') {
+            const item = await UtilsDocument.itemFromUuid(part.data.calc$.damageSource.itemUuid);
+            if (item) {
+              isHealing = item.data.data.damage.parts.every(([dmg, type]) => ItemCardHelpers.healingDamageTypes.includes(type));
+            } else {
+              isHealing = false;
+            }
           } else {
-            isHealing = false;
-          }
-        } else {
-          let rollTerms: TermData[];
-          if (part.data.calc$.roll) {
-            rollTerms = part.data.calc$.roll.terms;
-          } else {
-            rollTerms = part.data.source === 'versatile' ? (part.data.calc$.damageSource as ManualDamageSource).versatileBaseRoll : (part.data.calc$.damageSource as ManualDamageSource).normalBaseRoll;
+            let rollTerms: TermData[];
+            if (part.data.calc$.roll) {
+              rollTerms = part.data.calc$.roll.terms;
+            } else {
+              rollTerms = part.data.source === 'versatile' ? (part.data.calc$.damageSource as ManualDamageSource).versatileBaseRoll : (part.data.calc$.damageSource as ManualDamageSource).normalBaseRoll;
+            }
+            
+            const damageTypes: DamageType[] = rollTerms.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
+            isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
           }
           
-          const damageTypes: DamageType[] = rollTerms.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
-          isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
-        }
-        
-        const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.data.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}])
-        if (isHealing) {
-          this.flavor = game.i18n.localize('DND5E.Healing');
-          if (hasReadPermission && part.data.calc$.roll?.evaluated) {
-            // Critical and/or versatile heals almost never happen (only in homebrew I think?), but just in case do specify that the crit is a heal
-            if (part.data.source === 'versatile') {
-              this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.source.capitalize()}`)}`;
-            }if (part.data.mode === 'critical') {
-              this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`)}`;
+          if (isHealing) {
+            this.flavor = game.i18n.localize('DND5E.Healing');
+            if (part.data.calc$.roll?.evaluated) {
+              // Critical and/or versatile heals almost never happen (only in homebrew I think?), but just in case do specify that the crit is a heal
+              if (part.data.source === 'versatile') {
+                this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.source.capitalize()}`)}`;
+              }if (part.data.mode === 'critical') {
+                this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`)}`;
+              }
             }
-          }
-        } else {
-          if (!hasReadPermission || !part.data.calc$.roll?.evaluated) {
-            this.flavor = game.i18n.localize('DND5E.Damage');
-          } else if (part.data.source === 'versatile') {
-            this.flavor = game.i18n.localize(`DND5E.${part.data.source.capitalize()}`);
-            if (part.data.mode === 'critical') {
-              this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`)}`
-            }
-          } else if (part.data.mode === 'critical') {
-            this.flavor = game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`);
           } else {
-            this.flavor = game.i18n.localize('DND5E.Damage');
+            if (!part.data.calc$.roll?.evaluated) {
+              this.flavor = game.i18n.localize('DND5E.Damage');
+            } else if (part.data.source === 'versatile') {
+              this.flavor = game.i18n.localize(`DND5E.${part.data.source.capitalize()}`);
+              if (part.data.mode === 'critical') {
+                this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`)}`
+              }
+            } else if (part.data.mode === 'critical') {
+              this.flavor = game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`);
+            } else {
+              this.flavor = game.i18n.localize('DND5E.Damage');
+            }
           }
         }
       })
