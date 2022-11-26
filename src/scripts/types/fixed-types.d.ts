@@ -272,11 +272,12 @@ export type MyItemData = {
   }
 }
 
-export type MyItem = Omit<Item, 'getRollData', 'parent'> & BaseDocument<MyItemData> & {
+export type MyItem = BaseDocument<MyItemData> & {
   name: string;
   type: 'weapon' | 'equipment' | 'consumable' | 'tool' | 'loot' | 'class' | 'spell' | 'feat' | 'backpack';
   parent: MyActor;
   readonly abilityMod: keyof MyActorData['data']['abilities']
+  readonly hasDamage: boolean;
   getRollData: () => {[key: string]: any};
   getChatData: () => any;
   roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
