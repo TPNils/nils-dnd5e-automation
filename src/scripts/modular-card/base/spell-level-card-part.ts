@@ -77,12 +77,32 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
   private async setData(part: ModularCardPartData<SpellLevelCardData>, actor: MyActor) {
     this.spellSlotOptions = [];
     if (part) {
-      const permissionResponse = await SpellLevelCardComponent.actionPermissionCheck({
-        part: part,
-        partId: this.partId,
-        messageId: this.messageId,
-      }, game.user)
-      const isOwner = permissionResponse !== 'prevent-action';
+      const [interactPermission, isObserver] = await Promise.all([
+        SpellLevelCardComponent.actionPermissionCheck({
+          part: part,
+          partId: this.partId,
+          messageId: this.messageId,
+        }, game.user),
+        UtilsDocument.hasAnyPermissions([
+          {
+            uuid: part.data.calc$.actorUuid,
+            // TODO Don't know if I want to bloat more settings
+            //  ReadImmunity has the same idea as read spell slots => are you allowed to see details in the character sheet
+            //  Maybe make a proper setting settings page with a global behaviour with the option to fine tune
+            permission: `${staticValues.code}ReadImmunity`,
+            user: game.user,
+          },
+        ])
+      ]);
+      
+      if (!isObserver) {
+        // Only show the selected slot
+        this.spellSlotOptions.push({
+          label: game.i18n.format("DND5E.SpellLevelSlot", {level: '?', n: '?'}),
+          value: '-1',
+          selected: true,
+        });
+      }
       if (actor) {
         for (const spellKey of Object.keys(actor.data.data.spells)) {
           const spellData: SpellData = actor.data.data.spells[spellKey];
@@ -93,7 +113,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
             const spellLevel = (spellData as MyActor['data']['data']['spells']['pact']).level;
             const availableSlots = spellData.value;
             this.spellSlotOptions.push({
-              label: game.i18n.format("DND5E.SpellLevelPact", {level: spellLevel, n: isOwner ? availableSlots : '?'}),
+              label: game.i18n.format("DND5E.SpellLevelPact", {level: spellLevel, n: availableSlots}),
               value: 'pact',
               selected: part.data.selectedLevel === spellLevel,
             });
@@ -101,9 +121,9 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
             const spellLevel = /spell([0-9]+)/.exec(spellKey)[1];
             const availableSlots = spellData.value;
             this.spellSlotOptions.push({
-              label: game.i18n.format("DND5E.SpellLevelSlot", {level: game.i18n.localize(`DND5E.SpellLevel${spellLevel}`), n: isOwner ? availableSlots : '?'}),
+              label: game.i18n.format("DND5E.SpellLevelSlot", {level: game.i18n.localize(`DND5E.SpellLevel${spellLevel}`), n: availableSlots}),
               value: spellLevel,
-              selected: part.data.selectedLevel === spellLevel,
+              selected: part.data.selectedLevel === Number(spellLevel),
             });
           } 
         }
@@ -121,7 +141,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
         });
       }
 
-      if (!isOwner) {
+      if (interactPermission === 'prevent-action') {
         // Only show the selected slot
         this.spellSlotOptions = this.spellSlotOptions.filter(option => option.selected);
       }
