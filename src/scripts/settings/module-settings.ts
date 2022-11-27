@@ -1,9 +1,11 @@
-import { UtilsDocument } from "./lib/db/utils-document";
-import { RunOnce } from "./lib/decorator/run-once";
-import { ModularCard } from "./modular-card/modular-card";
-import { staticValues } from "./static-values";
-import { MyActor } from "./types/fixed-types";
+import { UtilsDocument } from "../lib/db/utils-document";
+import { RunOnce } from "../lib/decorator/run-once";
+import { ModularCard } from "../modular-card/modular-card";
+import { staticValues } from "../static-values";
+import { MyActor } from "../types/fixed-types";
 
+// TODO make a component to render setting groups
+//  Add automation to add auto roll options
 const refreshMessages = () => {
   for (const message of game.messages.contents) {
     if (ModularCard.getCardPartDatas(message) != null) {
