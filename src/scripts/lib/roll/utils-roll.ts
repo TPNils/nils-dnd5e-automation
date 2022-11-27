@@ -406,7 +406,7 @@ export class UtilsRoll {
       return null;
     }
 
-    return Roll.fromTerms(UtilsRoll.mergeTerms(rolls.map(r => r.terms), getMergeKey));
+    return Roll.fromTerms(UtilsRoll.simplifyTerms(UtilsRoll.mergeTerms(rolls.map(r => r.terms), getMergeKey)));
   }
 
   private static mergeTerms(termsCollection: Array<RollTerm[]>, getMergeKey: (context: RollTerm[], term: RollTerm) => string | null): RollTerm[] {
