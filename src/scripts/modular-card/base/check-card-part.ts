@@ -5,6 +5,7 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Attribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
+import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor, MyActorData } from "../../types/fixed-types";
@@ -24,9 +25,6 @@ interface TargetCache {
   phase: 'mode-select' | 'result';
   userBonus: string;
   resultType$?: 'pass' | 'fail'; // There is no critical pass/fail for ability|skill checks or saving throws (RAW) // TODO maybe this needs to be a setting
-  actorBonus$: string;
-  hasHalflingLucky$: boolean;
-  minRoll$?: number;
   requestRollFormula$?: string;
   roll$?: RollData;
 }
@@ -56,8 +54,8 @@ function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache 
   tag: CheckCardComponent.getSelector(),
   html: /*html*/`
     <nac-roll-d20
-      *if="this.cache?.roll$ != null"
-      class="hide-flavor snug"
+      *if="this.cache"
+      class="snug"
       data-label-type="icon"
       [data-roll]="this.cache.roll$"
       [data-bonus-formula]="this.cache.userBonus"
@@ -360,57 +358,10 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
                 selectionId$: selected.selectionId,
                 mode: 'normal',
                 phase: 'mode-select',
-                actorBonus$: '',
                 userBonus: '',
-                hasHalflingLucky$: false,
               };
               if (actor) {
-                const actorAbility = actor.data.data.abilities[part.data.ability];
-                const actorSkill = actor.data.data.skills[part.data.skill];
                 targetCache.actorUuid$ = actor.uuid;
-                targetCache.hasHalflingLucky$ = actor?.getFlag("dnd5e", "halflingLucky") === true;
-                // Reliable Talent applies to any skill check we have full or better proficiency in
-                if (actor?.getFlag("dnd5e", "reliableTalent") === true && actorSkill?.value >= 1) {
-                  targetCache.minRoll$ = 10;
-                }
-
-                const bonuses = getProperty(actor.data.data, 'bonuses.abilities') || {};
-                const parts: string[] = [];
-            
-                // Compose roll parts and data
-                const data: {[key: string]: any} = {};
-            
-                parts.push('@abilityMod');
-                data.abilityMod = actorAbility.mod;
-            
-                if (part.data.iSave && actorAbility.prof !== 0) {
-                  parts.push('@abilitySaveProf');
-                  data.abilitySaveProf = actorAbility.prof;
-                  
-                  if (bonuses.save) {
-                    parts.push("@abilitySaveBonus");
-                    data.abilitySaveBonus = bonuses.save;
-                  }
-                }
-                
-                // Ability test bonus
-                if (bonuses.check) {
-                  data.abilityBonus = bonuses.check;
-                  parts.push("@abilityBonus");
-                }
-            
-                if (actorSkill) {
-                  parts.push('@skillProf');
-                  data.skillProf = actorSkill.prof;
-                  
-                  // Skill check bonus
-                  if (bonuses.skill) {
-                    data["skillBonus"] = bonuses.skill;
-                    parts.push("@skillBonus");
-                  }
-                }
-
-                targetCache.actorBonus$ = Roll.replaceFormulaData(parts.join('+'), data);
               }
 
               part.data.targetCaches$.push(targetCache);
@@ -452,121 +403,128 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
 
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData<CheckCardData>>): Promise<void> {
-    await this.calcTargetRoll(context);
-    await this.rollTargetRoll(context);
+    await this.doRoll(context);
   }
 
-  private async calcTargetRoll(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): Promise<void> {
-    for (const {newRow} of context.rows) {
+  private async doRoll(context: IAfterDmlContext<ModularCardTriggerData<CheckCardData>>): Promise<void> {
+    for (const {newRow, oldRow} of context.rows) {
+      const oldCacheBySelectionId = new Map<string, TargetCache>();
+      if (oldRow) {
+        for (const target of oldRow.part.data.targetCaches$) {
+          oldCacheBySelectionId.set(target.selectionId$, target);
+        }
+      }
+      
       for (const target of newRow.part.data.targetCaches$) {
-        let baseRoll = new Die({faces: 20, number: 1});
-        if (target.minRoll$ != null) {
-          // reroll a base roll 1 once
-          // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
-          // second 2 = reroll when the roll result is equal to 1 (=1)
-          baseRoll.modifiers.push(`min${target.minRoll$}`);
+        if (target.phase !== 'result') {
+          continue;
         }
-        if (target.hasHalflingLucky$) {
-          // reroll a base roll 1 once
-          // first 1 = maximum reroll 1 die not both at (dis)advantage (see PHB p173)
-          // second 2 = reroll when the roll result is equal to 1 (=1)
-          baseRoll.modifiers.push('r1=1');
-        }
-        switch (target.mode) {
-          case 'advantage': {
-            baseRoll.number = 2;
-            baseRoll.modifiers.push('kh');
-            break;
+        // Only do roll when changed is detected
+        const oldTarget = oldCacheBySelectionId.get(target.selectionId$);
+
+        let shouldModifyRoll = oldTarget == null || !target.roll$?.evaluated;
+        if (!shouldModifyRoll) {
+          const newChangeDetectData: DeepPartial<TargetCache> = {
+            mode: target.mode,
+            phase: target.phase,
+            userBonus: target.userBonus,
           }
-          case 'disadvantage': {
-            baseRoll.number = 2;
-            baseRoll.modifiers.push('kl');
-            break;
+          
+          const oldChangeDetectData: DeepPartial<TargetCache> = {
+            mode: oldTarget.mode,
+            phase: oldTarget.phase,
+            userBonus: oldTarget.userBonus,
           }
-        }
-        const parts: string[] = [baseRoll.formula];
-        if (target.actorBonus$) {
-          parts.push(target.actorBonus$);
-        }
-        
-        if (target.userBonus && Roll.validate(target.userBonus)) {
-          parts.push(target.userBonus);
+          shouldModifyRoll = !UtilsCompare.deepEquals(newChangeDetectData, oldChangeDetectData);
         }
 
-        target.requestRollFormula$ = UtilsRoll.simplifyTerms(new Roll(parts.join(' + '))).formula;
+        if (shouldModifyRoll) {
+          // Get the token actor which might be different than the "root" actor
+          let actor = await UtilsDocument.actorFromUuid(target.targetUuid$);
+          if (!actor && target.actorUuid$ !== target.targetUuid$) {
+            actor = await UtilsDocument.actorFromUuid(target.actorUuid$);
+          }
+          if (actor) {
+            const newRoll = async () => {
+              const rollPromises: Promise<Roll>[] = [];
+              if (newRow.part.data.skill) {
+                rollPromises.push(actor.rollSkill(newRow.part.data.skill, {
+                  advantage: target.mode === 'advantage',
+                  disadvantage: target.mode === 'disadvantage',
+                  fastForward: true,
+                  chatMessage: false,
+                }));
+              } else if (newRow.part.data.iSave) {
+                rollPromises.push(actor.rollAbilitySave(newRow.part.data.ability, {
+                  advantage: target.mode === 'advantage',
+                  disadvantage: target.mode === 'disadvantage',
+                  fastForward: true,
+                  chatMessage: false,
+                }));
+              } else {
+                rollPromises.push(actor.rollAbilityTest(newRow.part.data.ability, {
+                  advantage: target.mode === 'advantage',
+                  disadvantage: target.mode === 'disadvantage',
+                  fastForward: true,
+                  chatMessage: false,
+                }));
+              }
+
+              if (target.userBonus) {
+                rollPromises.push(new Roll(target.userBonus).roll({async: true}));
+              }
+              return UtilsRoll.mergeRolls(...await Promise.all(rollPromises));
+            };
+            const oldRoll = oldTarget.roll$ == null ? null : UtilsRoll.fromRollData(oldTarget.roll$);
+            target.roll$ = UtilsRoll.toRollData((await UtilsRoll.modifyRoll(oldRoll, newRoll)).result);
+          }
+        }
       }
     }
   }
+  //#endregion
 
-  private async rollTargetRoll(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): Promise<void> {
+  //#region afterUpsert
+  public async afterUpsert(context: IAfterDmlContext<ModularCardTriggerData<CheckCardData>>): Promise<void> {
+    await this.diceSoNiceHook(context);
+  }
+  
+  private async diceSoNiceHook(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): Promise<void> {
     const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
-      const oldTargets = new Map<string, TargetCache>();
+      // Detect new rolled dice
+      const oldRollsBySelectionId = new Map<string, RollData>();
       if (oldRow) {
         for (const target of oldRow.part.data.targetCaches$) {
-          oldTargets.set(target.selectionId$, target);
+          oldRollsBySelectionId.set(target.selectionId$, target.roll$);
         }
       }
-
       for (const target of newRow.part.data.targetCaches$) {
-        const oldTarget = oldTargets.get(target.selectionId$);
-        if (target.requestRollFormula$ !== oldTarget?.requestRollFormula$) {
-          if (!target.roll$) {
-            target.roll$ = UtilsRoll.toRollData(new Roll(target.requestRollFormula$));
-          } else {
-            const oldRoll = UtilsRoll.fromRollData(target.roll$);
-            const result = await UtilsRoll.modifyRoll(oldRoll, target.requestRollFormula$);
-            target.roll$ = UtilsRoll.toRollData(result.result);
-            if (result.rollToDisplay) {
-              // Auto rolls if original roll was already evaluated
-              for (const user of game.users.values()) {
-                if (user.active) {
-                  showRolls.push({
-                    uuid: target.actorUuid$ ?? target.targetUuid$, // Players don't seem to have owner permission of their own token
-                    permission: `${staticValues.code}ReadCheck`,
-                    user: user,
-                    meta: result.rollToDisplay,
-                  });
-                }
-              }
-            }
-          }
-        }
-
-        // Execute initial roll
-        if ((target.phase === 'result') && target.roll$?.evaluated !== true) {
-          const roll = UtilsRoll.fromRollData(target.roll$);
-          target.roll$ = UtilsRoll.toRollData(await roll.roll({async: true}));
-          for (const user of game.users.values()) {
-            if (user.active) {
-              showRolls.push({
-                uuid: target.actorUuid$ ?? target.targetUuid$, // Players don't seem to have owner permission of their own token
-                permission: `${staticValues.code}ReadCheck`,
-                user: user,
-                meta: roll,
-              });
-            }
+        if (target.roll$?.evaluated) {
+          const roll = UtilsRoll.getNewRolledTerms(oldRollsBySelectionId.get(target.selectionId$), target.roll$);
+          if (roll) {
+            showRolls.push({
+              uuid: newRow.part.data.actorUuid$,
+              permission: `${staticValues.code}ReadCheck`,
+              user: game.user,
+              meta: roll,
+            });
           }
         }
       }
     }
     
     UtilsDocument.hasPermissions(showRolls).then(responses => {
-      const rollsPerUser = new Map<string, Roll[]>()
+      const rolls: Roll[] = [];
       for (const response of responses) {
         if (response.result) {
-          if (!rollsPerUser.has(response.requestedCheck.user.id)) {
-            rollsPerUser.set(response.requestedCheck.user.id, []);
-          }
-          rollsPerUser.get(response.requestedCheck.user.id).push(response.requestedCheck.meta);
+          rolls.push(response.requestedCheck.meta);
         }
       }
 
-      const rollPromises: Promise<any>[] = [];
-      for (const [userId, rolls] of rollsPerUser.entries()) {
-        rollPromises.push(UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...rolls), showUserIds: [userId]}));
+      if (rolls.length > 0) {
+        return UtilsDiceSoNice.showRoll({roll: UtilsRoll.mergeRolls(...rolls), showUserIds: [game.userId]});
       }
-      return rollPromises;
     });
   }
   //#endregion

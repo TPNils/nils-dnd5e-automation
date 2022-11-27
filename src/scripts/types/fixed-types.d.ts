@@ -345,6 +345,9 @@ export type MyActor = Actor & BaseDocument<MyActorData> & {
   pack: any;
   isOwner: boolean;
   update(data: any, context?: any);
+  rollSkill(skillId: keyof MyActor['data']['data']['skills'], options?: D20RollOptions): Promise<Roll>;
+  rollAbilityTest(skillId: keyof MyActor['data']['data']['abilities'], options?: D20RollOptions): Promise<Roll>;
+  rollAbilitySave(skillId: keyof MyActor['data']['data']['abilities'], options?: D20RollOptions): Promise<Roll>;
 }
 
 export type MyCompendiumCollection = CompendiumCollection & BaseDocument<CompendiumCollection.Metadata>;
