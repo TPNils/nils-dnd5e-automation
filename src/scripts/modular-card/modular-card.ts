@@ -12,7 +12,7 @@ import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { UtilsLog } from "../utils/utils-log";
 import { ActiveEffectCardPart, AttackCardPart, CheckCardPart, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardPart, SpellLevelCardPart, TargetCardPart, TemplateCardPart } from "./base/index";
-import { ModularCardPart } from "./modular-card-part";
+import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { LayOnHandsCardPart } from "./srd/index";
 
 export interface ModularCardPartData<T = any> {
@@ -289,6 +289,30 @@ interface ModularCardInitPosition<T> {
 }
 export class BeforeCreateModuleCardEvent {
 
+  constructor({item, actor, token}: ModularCardCreateArgs) {
+    Object.defineProperties(this, {
+      item: {
+        value: item,
+        writable: false,
+        configurable: false,
+      },
+      actor: {
+        value: actor,
+        writable: false,
+        configurable: false,
+      },
+      token: {
+        value: token,
+        writable: false,
+        configurable: false,
+      },
+    })
+  }
+
+  public readonly item: MyItem;
+  public readonly actor?: MyActor;
+  public readonly token?: TokenDocument;
+
   private addActions: ModularCardInitAdd[] = [];
   private add(addPart: ModularCardPart | ModularCardPart[], ...inputPositions: Array<ModularCardInitPosition<ModularCardPart | string> | ModularCardInitPosition<ModularCardPart | string>[]>): void {
     addPart = (Array.isArray(addPart) ? addPart : [addPart]);
@@ -436,7 +460,7 @@ export class ModularCard {
     let id = 0;
     const parts: Promise<{data: any, cardPart: ModularCardPart}>[] = [];
 
-    const createEvent = new BeforeCreateModuleCardEvent();
+    const createEvent = new BeforeCreateModuleCardEvent(data);
     // Ignore returned boolean
     Hooks.call(`create${staticValues.code.capitalize()}ModuleCard`, createEvent);
 

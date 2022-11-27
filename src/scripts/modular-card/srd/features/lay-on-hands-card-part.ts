@@ -1,4 +1,3 @@
-import { ifError } from "assert";
 import { IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
 import { RunOnce } from "../../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
@@ -218,8 +217,10 @@ export class LayOnHandsCardPart extends DamageCardPart {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new LayOnHandsCardTrigger());
     Hooks.on(`create${staticValues.code.capitalize()}ModuleCard`, (event: BeforeCreateModuleCardEvent) => {
-      event.addBefore(DamageCardPart.instance, LayOnHandsCardPart.instance);
-      event.remove(DamageCardPart.instance);
+      if (event.item.name.toLowerCase() === 'lay on hands') {
+        event.addBefore(DamageCardPart.instance, LayOnHandsCardPart.instance);
+        event.remove(DamageCardPart.instance);
+      }
     })
   }
 
