@@ -475,7 +475,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
               }
               return UtilsRoll.mergeRolls(...await Promise.all(rollPromises));
             };
-            const oldRoll = oldTarget.roll$ == null ? null : UtilsRoll.fromRollData(oldTarget.roll$);
+            const oldRoll = oldTarget?.roll$ == null ? null : UtilsRoll.fromRollData(oldTarget.roll$);
             target.roll$ = UtilsRoll.toRollData((await UtilsRoll.modifyRoll(oldRoll, newRoll)).result);
           }
         }
