@@ -962,12 +962,6 @@ class DmlTriggerUser implements IDmlTrigger<User> {
       return;
     }
 
-    // Specifically the last general message, not of the user.
-    // There needs to be some way of cutting off the ability to retarget when they are not relevant anymore
-    // TODO this should probably be improved
-    //  Idea: Provide a visual to indiate which card is selected to targets (cached on user?)
-    //  Can press this visual to change card target (is this even relevant?)
-
     let chatMessage: ChatMessage;
     let parts: ModularCardPartData[];
     let targetData: TargetCardData;

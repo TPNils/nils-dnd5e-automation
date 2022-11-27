@@ -365,7 +365,6 @@ export class UtilsRoll {
       powerfulCritical: game.settings.get("dnd5e", "criticalDamageMaxDice") === true,
       ...options
     }
-    // TODO critical does not work for complexer rolls like sneak attack => (ceil(7 /2))d6
     let dmgRoll: Roll;
     if (Array.isArray(roll)) {
       dmgRoll = new DamageRoll('0', {}, options) as Roll & {configureDamage: () => void};
@@ -375,66 +374,6 @@ export class UtilsRoll {
       dmgRoll = new DamageRoll(roll, {}, options);
     }
     return dmgRoll;
-  }
-
-  /**
-   * TODO check if this can use the standard dnd5e module for potentially better integration
-   */
-  public static getAbilityRoll(actor: MyActor, {ability, skill, addSaveBonus}: {ability: keyof MyActorData['data']['abilities'], skill?: string, addSaveBonus?: boolean}): Roll {
-    const actorAbility = actor.data.data.abilities[ability];
-    const actorSkill = actor.data.data.skills[skill];
-    const bonuses = getProperty(actor.data.data, 'bonuses.abilities') || {};
-
-    let baseRoll = new Die();
-    baseRoll.faces = 20;
-    baseRoll.number = 1;
-    if (actor.getFlag("dnd5e", "halflingLucky")) {
-      // reroll a base roll 1 once
-      baseRoll.modifiers.push('r1');
-    }
-    const parts: string[] = [
-      baseRoll.formula
-    ];
-
-    // Compose roll parts and data
-    const data: {[key: string]: any} = {};
-
-    parts.push('@abilityMod');
-    data.abilityMod = actorAbility.mod;
-
-    if (addSaveBonus && actorAbility.prof !== 0) {
-      parts.push('@abilitySaveProf');
-      data.abilitySaveProf = actorAbility.prof;
-      
-      if ( bonuses.save ) {
-        parts.push("@abilitySaveBonus");
-        data.abilitySaveBonus = bonuses.save;
-      }
-    }
-    
-    // Ability test bonus
-    if (bonuses.check) {
-      data.abilityBonus = bonuses.check;
-      parts.push("@abilityBonus");
-    }
-
-    if (skill) {
-      // Reliable Talent applies to any skill check we have full or better proficiency in
-      if (actorSkill.value >= 1 && actor.getFlag("dnd5e", "reliableTalent")) {
-        // minimum base roll is 10
-        baseRoll.modifiers.push('min10');
-      }
-      parts.push('@skillProf');
-      data.skillProf = actorSkill.prof;
-      
-      // Skill check bonus
-      if (bonuses.skill) {
-        data["skillBonus"] = bonuses.skill;
-        parts.push("@skillBonus");
-      }
-    }
-
-    return new Roll(parts.join(' + '), data);
   }
 
   /**

@@ -44,8 +44,7 @@ export interface AttackCardData {
 }
 
 /**
- * // TODO when expanding attack card, show the user bonus, which can be edited
- *     UI => can probably solve this with slots
+ * // TODO: solve the below issue
  * Most attack items only have 1 target.
  * However there are a few with multiple targets and I could not find a written rule to handle those.
  * So I decided that you need to roll an attack for each target based on multiple spells/feats RAW

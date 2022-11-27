@@ -116,7 +116,7 @@ export class VirtualNodeParser {
 
   private readAttributes(): void {
     if (!this.currentNode.isAttributeNode || !this.currentNode.isAttributeNode()) {
-      return; // TODO remove due to performance?
+      return;
     }
     let indexSnapshot: number = this.currentIndex;
     while (this.exec(attrRegex)) {
