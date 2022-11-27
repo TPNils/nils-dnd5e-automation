@@ -7,7 +7,6 @@ import { VirtualAttributeNode, VirtualNode, VirtualParentNode } from "./virtual-
 import { VirtualNodeParser } from "./virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "./virtual-dom/virtual-node-renderer";
 
-// TODO review best practices https://web.dev/custom-elements-best-practices/
 //#region Decorators
 const componentConfigSymbol = Symbol('ComponentConfig');
 const htmlElementSymbol = Symbol('HtmlElement');
@@ -392,13 +391,18 @@ export class ComponentElement extends HTMLElement {
     if (this.setControllerFromAttribute(name, newValue)) {
       this.skipAttrCallback = true;
     }
-    if (newValue === false) {
-      // disabled="false" is still disabled => don't set false attributes
-      this.removeAttribute(name);
-    } else {
-      this.setAttribute(name, AttributeParser.serialize(newValue));
+    if (this.hasAttribute(name)) {
+      // If the attribute was set, reflect changes to it
+      // If attribute was not set, keep it all internal
+      // This aligns a bit (not 100%) with the best practices https://web.dev/custom-elements-best-practices/
+      //   and teaked by my opinion
+      if (newValue === false) {
+        // disabled="false" is still disabled => don't set false attributes
+        this.removeAttribute(name);
+      } else {
+        this.setAttribute(name, AttributeParser.serialize(newValue));
+      }
     }
-    this.setAttribute(name, AttributeParser.serialize(newValue));
     this.skipAttrCallback = false;
   }
 
@@ -456,6 +460,7 @@ export class ComponentElement extends HTMLElement {
    * This will happen each time the node is moved, and may happen before the element's contents have been fully parsed. 
    */
   public connectedCallback(): void {
+    this.readAllAttributes();
     const hostAttr = this.getHostAttribute();
     if (!this.hasAttribute(hostAttr)) {
       this.setAttribute(hostAttr, '');
@@ -508,6 +513,17 @@ export class ComponentElement extends HTMLElement {
     this.generateHtmlQueue().then(() => {
       this.registerEventListeners();
     });
+  }
+
+  /**
+   * attributeChangedCallback is only called when it's part of the dom
+   * Read attributes on init
+   * https://web.dev/custom-elements-best-practices/
+   */
+  private readAllAttributes(): void {
+    for (const attr of this.getAttributeNames()) {
+      this.setControllerFromAttribute(attr, this.getAttribute(attr));
+    }
   }
 
   /**
