@@ -279,6 +279,127 @@ async function updateMessage(this: ChatLog, wrapped: (...args: any) => any, ...a
 
 const chatMessageTransformerMap = new Map<string, ChatMessageTransformer<any>>();
 
+interface ModularCardInitAdd {
+  addPart: ModularCardPart;
+  position: ModularCardInitPosition<ModularCardPart | string>[];
+}
+interface ModularCardInitPosition<T> {
+  type: 'before' | 'after'
+  reference: T;
+}
+export class BeforeCreateModuleCardEvent {
+
+  private addActions: ModularCardInitAdd[] = [];
+  private add(addPart: ModularCardPart | ModularCardPart[], ...inputPositions: Array<ModularCardInitPosition<ModularCardPart | string> | ModularCardInitPosition<ModularCardPart | string>[]>): void {
+    addPart = (Array.isArray(addPart) ? addPart : [addPart]);
+    const positions: ModularCardInitPosition<ModularCardPart | string>[] = [];
+    for (const position of inputPositions.deepFlatten()) {
+      const refType = typeof position.reference === 'string' ? position.reference : position.reference.getType();
+      if (ModularCard.getTypeHandler(refType) == null) {
+        UtilsLog.warn(new Error(`${refType} has not been registered, skipping it as a position option.`));
+      } else {
+        positions.push(position);
+      }
+    }
+    for (let i = 0; i < addPart.length; i++) {
+      if (ModularCard.getTypeHandler(addPart[i].getType()) == null) {
+        UtilsLog.error(new Error(`${addPart[i].getType()} has not been registered, it won't be added to the card.`));
+        continue;
+      }
+      if (i === 0) {
+        this.addActions.push({
+          addPart: addPart[i],
+          position: positions,
+        });
+      } else {
+        this.addActions.push({
+          addPart: addPart[i],
+          position: [{type: 'after', reference: addPart[0]}],
+        });
+      }
+    }
+  }
+
+  public addBefore(reference: ModularCardPart | string, addPart: ModularCardPart): void {
+    this.add(addPart, {type: 'before', reference: reference});
+  }
+
+  public addAfter(reference: ModularCardPart | string, addPart: ModularCardPart): void {
+    this.add(addPart, {type: 'after', reference: reference});
+  }
+
+  private removed = new Set<string>();
+  public remove(...removeInputs: Array<ModularCardPart | ModularCardPart[] | string | string[]>) {
+    // Don't actually remove any items so they can still be used as a reference
+    const removes = removeInputs.deepFlatten();
+    for (const remove of removes) {
+      this.removed.add(typeof remove === 'string' ? remove : remove.getType());
+    }
+  }
+
+  public getParts(): ModularCardPart[] {
+    const resolvedParts: Array<string> = [];
+    for (const standardPart of [
+      DescriptionCardPart.instance,
+      SpellLevelCardPart.instance,
+      AttackCardPart.instance,
+      DamageCardPart.instance,
+      TemplateCardPart.instance,
+      ResourceCardPart.instance,
+      CheckCardPart.instance,
+      TargetCardPart.instance,
+      ActiveEffectCardPart.instance,
+      PropertyCardPart.instance,
+    ]) {
+      resolvedParts.push(standardPart.getType());
+    }
+
+    const fallbackPosition: ModularCardInitPosition<string> = {
+      type: 'after',
+      reference: TemplateCardPart.instance.getType()
+    };
+
+    let pendingAddActions = this.addActions;
+    while (pendingAddActions.length > 0) {
+      const processing = pendingAddActions;
+      pendingAddActions = [];
+      for (const process of processing) {
+        const positions = process.position.length === 0 ? [fallbackPosition] : process.position;
+        let added = false;
+        for (const position of positions) {
+          const type = typeof position.reference === 'string' ? position.reference : position.reference.getType();
+          const index = resolvedParts.indexOf(type);
+          if (index !== -1) {
+            resolvedParts.splice(index + (position.type === 'after' ? 1 : 0), 0, process.addPart.getType());
+            added = true;
+            break;
+          }
+          if (!added) {
+            pendingAddActions.push(process);
+          }
+        }
+
+        if (processing.length === pendingAddActions.length) {
+          // Nothing got processed => missing a reference, use fallback
+          // TODO be smarter, detect wich are also still pending
+          for (const pending of pendingAddActions) {
+            pending.position = [fallbackPosition];
+          }
+        }
+      }
+    }
+    
+    for (const remove of this.removed) {
+      const index = resolvedParts.indexOf(remove);
+      if (index !== -1) {
+        resolvedParts.splice(index, 1);
+      }
+    }
+
+    return resolvedParts.map(typeName => ModularCard.getTypeHandler(typeName));
+  }
+}
+
 export class ModularCard {
 
   private static registeredPartsByType = new Map<string, {part: ModularCardPart}>();
@@ -312,22 +433,14 @@ export class ModularCard {
   }
 
   public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardPartData[]> {
-    // TODO this is proof of concept, when finished to should dynamically assign which parts to use for creation
     let id = 0;
     const parts: Promise<{data: any, cardPart: ModularCardPart}>[] = [];
 
-    const cardParts: ModularCardPart[] = [
-      DescriptionCardPart.instance,
-      SpellLevelCardPart.instance,
-      AttackCardPart.instance,
-      DamageCardPart.instance,
-      TemplateCardPart.instance,
-      ResourceCardPart.instance,
-      CheckCardPart.instance,
-      TargetCardPart.instance,
-      ActiveEffectCardPart.instance,
-      PropertyCardPart.instance,
-    ];
+    const createEvent = new BeforeCreateModuleCardEvent();
+    // Ignore returned boolean
+    Hooks.call(`create${staticValues.code.capitalize()}ModuleCard`, createEvent);
+
+    const cardParts: ModularCardPart[] = createEvent.getParts();
 
     if (data.item.name === 'Lay on Hands') {
       cardParts[cardParts.indexOf(DamageCardPart.instance)] = LayOnHandsCardPart.instance;

@@ -8,7 +8,7 @@ import { Action } from "../../action";
 import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ResourceCardData, ResourceCardPart, TargetCardData, TargetCardPart } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
-import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../../modular-card";
+import { BeforeCreateModuleCardEvent, ModularCard, ModularCardPartData, ModularCardTriggerData } from "../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs } from "../../modular-card-part";
 
 export interface LayOnHandsCardData extends DamageCardData {
@@ -218,6 +218,10 @@ export class LayOnHandsCardPart extends DamageCardPart {
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new LayOnHandsCardTrigger());
+    Hooks.on(`create${staticValues.code.capitalize()}ModuleCard`, (event: BeforeCreateModuleCardEvent) => {
+      event.addBefore(DamageCardPart.instance, LayOnHandsCardPart.instance);
+      event.remove(DamageCardPart.instance);
+    })
   }
 
   public getHtml(data: HtmlContext<any>): string {
