@@ -15,6 +15,7 @@ import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../mod
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
+import { CheckCardData, CheckCardPart, TargetCache as CheckTargetCache } from "./check-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 interface TargetCache {
@@ -317,6 +318,14 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
     };
 
+    if (item.data.data.level === 0) {
+      // Non homebrew cantrips take no damage on save
+      inputDamages.calc$.modfierRule = 'save-no-dmg';
+    } else if (item.data.data.level > 0) {
+      // Not confirmed, but I believe most leveled spells that do damage use half damage on save
+      inputDamages.calc$.modfierRule = 'save-halve-dmg';
+    }
+
     if (actor) {
       inputDamages.calc$.actorUuid = actor.uuid;
     }
@@ -365,8 +374,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   //#region Targeting
   private async targetCallback(targetEvents: TargetCallbackData[]): Promise<void> {
-    // TODO seems bugged, smart apply applies when check has succeeded
-    //  Also: when succeeded cantrip save => no damage, otherwise halve
     const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.selected.tokenUuid));
     let tokenHpSnapshot = new Map<string, {hp: number; failedDeathSaves: number; maxHp: number; tempHp: number}>();
     for (const token of tokenDocuments.values()) {
@@ -709,6 +716,15 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
   
   private calcTargetCache(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
     for (const {newRow} of context.rows) {
+      let checkPart: ModularCardPartData<CheckCardData> = newRow.allParts.find(part => ModularCard.isType<CheckCardData>(CheckCardPart.instance, part));
+      
+      const checkResultsBySelectionId = new Map<string, CheckTargetCache>();
+      if (checkPart) {
+        for (const target of checkPart.data.targetCaches$) {
+          checkResultsBySelectionId.set(target.selectionId$, target);
+        }
+      }
+
       for (const cache of newRow.part.data.calc$.targetCaches) {
         cache.calcAddTmpHp = 0;
         cache.calcHpChange = 0;
@@ -723,6 +739,19 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
             }
             if (cache.vulnerabilities.includes(dmgType)) {
               amount *= 2;
+            }
+            const checkResult = checkResultsBySelectionId.get(cache.selectionId);
+            if (checkResult?.resultType$ === 'pass') {
+              switch (newRow.part.data.calc$.modfierRule) {
+                case 'save-halve-dmg': {
+                  amount /= 2;
+                  break;
+                }
+                case 'save-no-dmg': {
+                  amount = 0;
+                  break;
+                }
+              }
             }
             amount = Math.ceil(amount);
             // Assume that negative amounts are from negative modifiers => should be 0.

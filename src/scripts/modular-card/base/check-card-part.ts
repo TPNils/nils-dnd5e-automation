@@ -9,6 +9,7 @@ import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor, MyActorData } from "../../types/fixed-types";
+import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ItemCardHelpers, ChatPartIdData, ChatPartEnriched } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
@@ -16,7 +17,7 @@ import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, crea
 import { BaseCardComponent } from "./base-card-component";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
-interface TargetCache {
+export interface TargetCache {
   selectionId$: string;
   targetUuid$: string;
   actorUuid$?: string;
@@ -440,9 +441,11 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
 
         if (shouldModifyRoll) {
           // Get the token actor which might be different than the "root" actor
-          let actor = await UtilsDocument.actorFromUuid(target.targetUuid$);
+          let actor: MyActor = await (await UtilsDocument.tokenFromUuid(target.targetUuid$))?.getActor();
+          UtilsLog.debug('token actor', actor)
           if (!actor && target.actorUuid$ !== target.targetUuid$) {
             actor = await UtilsDocument.actorFromUuid(target.actorUuid$);
+            UtilsLog.debug('actor', actor)
           }
           if (actor) {
             const newRoll = async () => {
