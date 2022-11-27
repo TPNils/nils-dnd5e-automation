@@ -170,7 +170,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   private constructor() {}
 
   public create({item, actor}: ModularCardCreateArgs): AttackCardData {
-    if (!['mwak', 'rwak', 'msak', 'rsak'].includes(item?.data?.data?.actionType)) {
+    if (!item.hasAttack) {
       return null;
     }
 

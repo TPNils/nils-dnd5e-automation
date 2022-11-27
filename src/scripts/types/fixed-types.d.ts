@@ -324,6 +324,7 @@ export type MyItem = BaseDocument<MyItemData> & {
   actor?: MyActor;
   parent?: MyActor;
   readonly abilityMod: keyof MyActorData['data']['abilities']
+  readonly hasAttack: boolean;
   readonly hasDamage: boolean;
   getRollData: () => {[key: string]: any};
   getChatData: () => any;
