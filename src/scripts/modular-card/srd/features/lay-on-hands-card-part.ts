@@ -240,7 +240,9 @@ class LayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<LayOnHand
 
   private calcRoll(context: IDmlContext<ModularCardTriggerData<LayOnHandsCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
-      newRow.part.data.phase = 'result';
+      if (newRow.part.data.heal > 0) {
+        newRow.part.data.phase = 'result';
+      }
       if (newRow.part.data.heal !== oldRow?.part?.data?.heal) {
         const terms = [new NumericTerm({number: newRow.part.data.heal, options: {flavor: 'healing'}})];
         newRow.part.data.calc$.damageSource = {
