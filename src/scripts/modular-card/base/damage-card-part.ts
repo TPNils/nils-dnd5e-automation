@@ -834,7 +834,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
               }
               return UtilsRoll.mergeRolls(...await Promise.all(rollPromises));
             };
-            const oldRoll = oldData.calc$.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
+            const oldRoll = oldData?.calc$?.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
             newData.calc$.roll = UtilsRoll.toRollData((await UtilsRoll.modifyRoll(oldRoll, newRoll)).result);
           }
         } else {

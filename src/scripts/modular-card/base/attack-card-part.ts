@@ -650,7 +650,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
               }
               return UtilsRoll.mergeRolls(...await Promise.all(rollPromises));
             };
-            const oldRoll = oldData.roll$ == null ? null : UtilsRoll.fromRollData(oldData.roll$);
+            const oldRoll = oldData?.roll$ == null ? null : UtilsRoll.fromRollData(oldData.roll$);
             newData.roll$ = UtilsRoll.toRollData((await UtilsRoll.modifyRoll(oldRoll, newRoll)).result);
           }
         }
