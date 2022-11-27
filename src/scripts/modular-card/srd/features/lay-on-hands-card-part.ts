@@ -203,7 +203,6 @@ export class LayOnHandsCardPart extends DamageCardPart {
 
   public async create(args: ModularCardCreateArgs): Promise<LayOnHandsCardData> {
     const data = await super.create(this.injectCreateHealing(args)) as Partial<LayOnHandsCardData>;
-    data.phase = 'result';
     data.maxUsage = Number(args.item.getRollData().item.uses?.max) ?? 0;
     data.heal = 0;
     data.cure = 0;
