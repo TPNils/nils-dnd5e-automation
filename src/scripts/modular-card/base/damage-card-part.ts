@@ -844,7 +844,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
             rollTerms.push(...UtilsRoll.toRollData(new Roll(newData.userBonus)).terms);
           }
           const newRoll = UtilsRoll.fromRollTermData(rollTerms);
-          const oldRoll = oldData.calc$.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
+          const oldRoll = oldData?.calc$?.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
           const resultRoll = (await UtilsRoll.modifyRoll(oldRoll, newRoll)).result;
           if (resultRoll.total == null) {
             await resultRoll.roll({async: true});
