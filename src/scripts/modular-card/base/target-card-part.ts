@@ -837,6 +837,14 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
   }
 
   private async markOlderAutoChangeTarget(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
+    const activeGm = Array.from(game.users.values()).filter(user => user.isGM).sort((a, b) => a.id.localeCompare(b.id))[0];
+    // If a GM is active, the GM should update old messages
+    // Otherwise (further down) the author needs to update
+    // If neither are online... well to bad I guess, not the end of the world
+    if (activeGm && game.userId !== activeGm.id) {
+      return;
+    }
+
     const timestamps: number[] = [];
     const excludeMessageIds = new Set<string>();
     for (const {newRow} of context.rows) {
@@ -848,8 +856,16 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     const bulkUpdateRequest: Parameters<typeof ModularCard.setBulkCardPartDatas>[0] = [];
     for (let messageIndex = game.messages.contents.length - 1; messageIndex >= 0; messageIndex--) {
       const chatMessage = game.messages.contents[messageIndex];
-      if (chatMessage.data.timestamp >= newestMessageCreatedDate || excludeMessageIds.has(chatMessage.id)) {
+      // If active gm is not null, current user i active gm
+      if (activeGm == null && !chatMessage.isAuthor) {
         continue;
+      }
+      if (excludeMessageIds.has(chatMessage.id)) {
+        continue;
+      }
+
+      if (chatMessage.data.timestamp >= newestMessageCreatedDate) {
+        return;
       }
       const parts = ModularCard.getCardPartDatas(chatMessage);
       if (!parts) {
