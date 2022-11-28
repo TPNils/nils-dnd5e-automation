@@ -690,7 +690,7 @@ export class ModularCard {
       enrichOptions.secrets = true;
     }
     
-    const htmlParts = await Promise.all(htmlParts$);
+    const htmlParts = (await Promise.all(htmlParts$)).filter(part => part.html != null);
 
     const enrichedHtmlParts: string[] = [];
     enrichedHtmlParts.push(`<div class="${staticValues.moduleName}-item-card">`);
