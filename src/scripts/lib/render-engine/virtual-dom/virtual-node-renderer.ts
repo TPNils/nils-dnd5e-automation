@@ -358,7 +358,11 @@ export class VirtualNodeRenderer {
                 break;
               }
               case 'addNodeBefore': {
-                item.parent.insertBefore(item.node, item.addBefore);
+                if (item.addBefore instanceof Element) {
+                  item.addBefore.parentNode.insertBefore(item.node, item.addBefore);
+                } else {
+                  item.parent.insertBefore(item.node, item.addBefore);
+                }
                 break;
               }
               case 'addNodeToEnd': {
