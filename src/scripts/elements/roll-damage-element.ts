@@ -56,15 +56,15 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
 
       <div class="overlay" *if="this.hasInteractPermission">
         <div class="left">
-          <button (click)="this.onModeChange($event, '-')" class="mode-minus" [disabled]="this.rollMode === 'normal'"><i class="fas fa-minus"></i></button>
+          <button *if="!this.disableModeSelect" (click)="this.onModeChange($event, '-')" class="mode-minus" [disabled]="this.rollMode === 'normal'"><i class="fas fa-minus"></i></button>
         </div>
         <div class="middel"></div>
         <div class="right">
-          <button *if="this.hasVersatile" (click)="this.onRollSourceClick($event)" class="damage-source-toggle source-{{this.rollSource}}">
+          <button *if="!this.disableSourceSelect" (click)="this.onRollSourceClick($event)" class="damage-source-toggle source-{{this.rollSource}}">
             <i class="fas fa-hand-holding hand-1" data-fa-transform="rotate-90"></i>
             <i class="fas fa-hand-holding hand-2" data-fa-transform="rotate-90"></i>
           </button>
-          <button (click)="this.onModeChange($event, '+')" class="mode-plus" [disabled]="this.rollMode === 'critical'"><i class="fas fa-plus"></i></button>
+          <button *if="!this.disableModeSelect" (click)="this.onModeChange($event, '+')" class="mode-plus" [disabled]="this.rollMode === 'critical'"><i class="fas fa-plus"></i></button>
         </div>
       </div>
     </div>
@@ -274,6 +274,15 @@ export class RollDamageElement {
     this._rollMode = v;
     this.calcRollModeLabel();
   }
+
+  private _disableModeSelect = false;
+  @Attribute({name: 'data-disable-mode-select', dataType: 'boolean'})
+  public get disableModeSelect(): boolean {
+    return this._disableModeSelect;
+  }
+  public set disableModeSelect(v: boolean) {
+    this._disableModeSelect = v;
+  }
   
   private _rollSource: DamageCardData['source'] = 'normal';
   @Attribute({name: 'data-roll-source', dataType: 'string'})
@@ -285,13 +294,13 @@ export class RollDamageElement {
     this.calcRollModeLabel();
   }
 
-  private _hasVersatile = false;
-  @Attribute({name: 'data-has-versatile', dataType: 'boolean'})
-  public get hasVersatile(): boolean {
-    return this._hasVersatile;
+  private _disableSourceSelect = true;
+  @Attribute({name: 'data-disable-source-select', dataType: 'boolean'})
+  public get disableSourceSelect(): boolean {
+    return this._disableSourceSelect;
   }
-  public set hasVersatile(v: boolean) {
-    this._hasVersatile = v;
+  public set disableSourceSelect(v: boolean) {
+    this._disableSourceSelect = v;
   }
   
   //#endregion

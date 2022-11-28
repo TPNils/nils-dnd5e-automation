@@ -112,7 +112,7 @@ function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache
     [data-bonus-formula]="this.userBonus"
     [data-roll-mode]="this.rollMode"
     [data-roll-source]="this.rollSource"
-    [data-has-versatile]="this.hasVersatile"
+    [data-disable-source-select]="!this.hasVersatile"
     [data-override-formula]="this.overrideFormula"
     [data-read-permission]="this.readPermission"
     [data-interaction-permission]="this.interactionPermission"
@@ -367,7 +367,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   //#region Front end
-  public getHtml(data: HtmlContext): string {
+  public getHtml(data: HtmlContext): string | null | Promise<string | null> {
     return `<${DamageCardComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${DamageCardComponent.getSelector()}>`
   }
   //#endregion
