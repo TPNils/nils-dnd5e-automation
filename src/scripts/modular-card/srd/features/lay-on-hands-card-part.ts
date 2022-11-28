@@ -8,7 +8,7 @@ import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ResourceCardData, ResourceCardPart, TargetCardData, TargetCardPart } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
 import { BeforeCreateModuleCardEvent, ModularCard, ModularCardPartData, ModularCardTriggerData } from "../../modular-card";
-import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs } from "../../modular-card-part";
+import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
 
 export interface LayOnHandsCardData extends DamageCardData {
   heal: number;
@@ -185,7 +185,7 @@ export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
 
 }
 
-export class LayOnHandsCardPart extends DamageCardPart {
+export class LayOnHandsCardPart extends DamageCardPart implements ModularCardPart<LayOnHandsCardData> {
   
   public static readonly instance = new LayOnHandsCardPart();
 

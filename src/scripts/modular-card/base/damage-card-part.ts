@@ -45,11 +45,18 @@ interface ItemDamageSource {
   hasVersatile: boolean;
 }
 
+interface FormulaDamageSource {
+  type: 'Formula';
+  formula: string;
+}
+
 interface ManualDamageSource {
   type: 'Manual';
   normalBaseRoll: TermData[];
   versatileBaseRoll?: TermData[];
 }
+
+type DamageSource = ItemDamageSource | FormulaDamageSource | ManualDamageSource
 
 export interface DamageCardData {
   phase: 'mode-select' | 'result';
@@ -64,6 +71,10 @@ export interface DamageCardData {
     displayFormula?: string;
     displayDamageTypes?: string;
     targetCaches: TargetCache[]
+  };
+  /* External factors may add damages to this object to be added to the total */
+  extraDamageSources: {
+    [key: string]: DamageSource;
   }
 }
 
@@ -315,7 +326,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           hasVersatile: item.data.data.damage?.versatile?.length > 0,
         },
         targetCaches: [],
-      }
+      },
+      extraDamageSources: {},
     };
 
     if (item.data.data.level === 0) {
@@ -811,49 +823,63 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
       }
 
       if (shouldModifyRoll) {
-        if (newData.calc$.damageSource.type === 'Item') {
-          const damageSource = newData.calc$.damageSource
-          const item = await UtilsDocument.itemFromUuid(newData.calc$.damageSource.itemUuid);
-          if (item) {
-            // Crit's don't work for sneak attack "(ceil(@classes.rogue.levels /2))d6" on DnD5e V1.5.3
-            // It does work on V2.0.3 (probably worked sooner)
-            // Consider this bug fixed since it's fixed in a DnD system update
-            const newRoll = async () => {
-              const rollPromises: Promise<Roll>[] = [];
-              rollPromises.push(item.rollDamage({
-                critical: newData.mode === 'critical',
-                versatile: newData.source === 'versatile',
-                spellLevel: damageSource.spellLevel,
-                options: {
-                  fastForward: true,
-                  chatMessage: false,
-                }}));
-
-              if (newData.userBonus) {
-                rollPromises.push(new Roll(newData.userBonus).roll({async: true}));
-              }
-              return UtilsRoll.mergeRolls(...await Promise.all(rollPromises));
-            };
-            const oldRoll = oldData?.calc$?.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
-            newData.calc$.roll = UtilsRoll.toRollData((await UtilsRoll.modifyRoll(oldRoll, newRoll)).result);
-          }
-        } else {
-          const rollTerms = newData.source === 'versatile' ? newData.calc$.damageSource.versatileBaseRoll :  newData.calc$.damageSource.normalBaseRoll;
-          if (newData.userBonus) {
-            rollTerms.push(new OperatorTerm({operator: '+'}).toJSON() as TermData);
-            rollTerms.push(...UtilsRoll.toRollData(new Roll(newData.userBonus)).terms);
-          }
-          const newRoll = UtilsRoll.fromRollTermData(rollTerms);
-          const oldRoll = oldData?.calc$?.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
-          const resultRoll = (await UtilsRoll.modifyRoll(oldRoll, newRoll)).result;
-          if (resultRoll.total == null) {
-            await resultRoll.roll({async: true});
-          }
-          newData.calc$.roll = UtilsRoll.toRollData(resultRoll);
+        const damageSources: DamageSource[] = [newData.calc$.damageSource];
+        if (newData.userBonus) {
+          damageSources.push({type: 'Formula', formula: newData.userBonus});
         }
+        damageSources.push(...Object.values(newData.extraDamageSources));
+        
+        const newRoll: () => Promise<Roll> = () => {
+          const rollPromises: Promise<Roll | null>[] = [];
+          for (const damageSource of damageSources) {
+            switch (damageSource.type) {
+              case 'Formula': {
+                rollPromises.push(new Roll(damageSource.formula).roll({async: true}));
+                break;
+              }
+              case 'Manual': {
+                const rollTerms = newData.source === 'versatile' ? damageSource.versatileBaseRoll :  damageSource.normalBaseRoll;
+                rollPromises.push(UtilsRoll.fromRollTermData(rollTerms).roll({async: true}));
+                break;
+              }
+              case 'Item': {
+                rollPromises.push(UtilsDocument.itemFromUuid(damageSource.itemUuid).then(item => {
+                  if (!item) {
+                    return null;
+                  }
+
+                  // Crit's don't work for sneak attack "(ceil(@classes.rogue.levels /2))d6" on DnD5e V1.5.3
+                  // It does work on V2.0.3 (probably worked sooner)
+                  // Consider this bug fixed since it's fixed in a DnD system update
+                  return item.rollDamage({
+                    critical: newData.mode === 'critical',
+                    versatile: newData.source === 'versatile',
+                    spellLevel: damageSource.spellLevel,
+                    options: {
+                      fastForward: true,
+                      chatMessage: false,
+                    }});
+                }));
+                break;
+              }
+            }
+          }
+
+          return Promise.all(rollPromises).then(rolls => {
+            return UtilsRoll.mergeRolls(...rolls.filter(r => r != null));
+          })
+        }
+
+        const oldRoll = oldData?.calc$?.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
+        const resultRoll = (await UtilsRoll.modifyRoll(oldRoll, newRoll)).result;
+        if (resultRoll.total == null) {
+          await resultRoll.roll({async: true});
+        }
+        newData.calc$.roll = UtilsRoll.toRollData(resultRoll);
       }
     }
   }
+  
   //#endregion
 
   //#region afterUpsert
