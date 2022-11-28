@@ -56,7 +56,7 @@ interface ManualDamageSource {
   versatileBaseRoll?: TermData[];
 }
 
-type DamageSource = ItemDamageSource | FormulaDamageSource | ManualDamageSource
+export type DamageSource = ItemDamageSource | FormulaDamageSource | ManualDamageSource
 
 export interface DamageCardData {
   phase: 'mode-select' | 'result';
@@ -838,7 +838,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
                 break;
               }
               case 'Manual': {
-                const rollTerms = newData.source === 'versatile' ? damageSource.versatileBaseRoll :  damageSource.normalBaseRoll;
+                const rollTerms = newData.source === 'versatile' && damageSource.versatileBaseRoll ? damageSource.versatileBaseRoll :  damageSource.normalBaseRoll;
                 rollPromises.push(UtilsRoll.fromRollTermData(rollTerms).roll({async: true}));
                 break;
               }
