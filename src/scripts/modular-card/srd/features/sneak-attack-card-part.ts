@@ -4,12 +4,14 @@ import { DocumentListener } from "../../../lib/db/document-listener";
 import { UtilsDocument } from "../../../lib/db/utils-document";
 import { RunOnce } from "../../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { UtilsRoll } from "../../../lib/roll/utils-roll";
+import { UtilsCompare } from "../../../lib/utils/utils-compare";
 import { ValueReader } from "../../../provider/value-provider";
 import { staticValues } from "../../../static-values";
-import { MyActor, MyItem } from "../../../types/fixed-types";
+import { DamageType, MyActor, MyItem } from "../../../types/fixed-types";
 import { Action } from "../../action";
 import { BaseCardComponent } from "../../base/base-card-component";
-import { DamageCardData, DamageCardPart } from "../../base/index";
+import { DamageCardData, DamageCardPart, ManualDamageSource } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
 import { BeforeCreateModuleCardEvent, ModularCard, ModularCardPartData, ModularCardTriggerData } from "../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
@@ -24,7 +26,10 @@ export interface SrdSneakAttackCardData {
     combatantId?: string; // who's turn
     combatUuid: string;
   };
+  selectedDamage?: DamageType;
   calc$: {
+    damageOptions: DamageType[];
+    damageSource: ManualDamageSource;
     actorUuid: string;
   }
 }
@@ -37,6 +42,10 @@ export interface SrdSneakAttackCardData {
       <i *if="this.usedInCombat" class="used-in-combat-warning {{this.addSneak ? 'this-is-active' : ''}} fas fa-exclamation-triangle"></i>
       <img *if="this.itemImg" [src]="this.itemImg">
       {{this.itemName}}
+      <div class="flexer"></div>
+      <select *if="this.damageOptions.length > 0" [disabled]="this.damageOptions.length === 1" (change)="this.setDamageType($event)">
+        <option *for="let option of this.damageOptions" [value]="option.value" [selected]="option.selected">{{option.label}}</option>
+      </select>
     </label>
   `,
   style: /*css*/`
@@ -59,6 +68,10 @@ export interface SrdSneakAttackCardData {
       min-height: 16px;
       height: 16px;
       margin-right: 4px;
+    }
+
+    .flexer {
+      flex-grow: 1;
     }
 
     .used-in-combat-warning {
@@ -93,6 +106,19 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
       part.data.shouldAdd = addSneak;
       return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
     });
+  private static setDamageType = new Action<{dmg: DamageType} & ChatPartIdData>('SneakAttackSetDamageType')
+    .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
+    .addSerializer(ItemCardHelpers.getRawSerializer('dmg'))
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<SrdSneakAttackCardData>())
+    .setPermissionCheck(SrdSneakAttackComponent.actionPermissionCheck)
+    .build(({messageId, part, dmg, allCardParts}) => {
+      if (part.data.selectedDamage === dmg) {
+        return;
+      }
+      part.data.selectedDamage = dmg;
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    });
   //#endregion
   
   public static getSelector(): string {
@@ -118,6 +144,7 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
   public itemImg: string;
   public addSneak: boolean = false;
   public usedInCombat = false;
+  public damageOptions: Array<{value: string; label: string; selected: boolean;}> = [];
   private async setData(part: ModularCardPartData<SrdSneakAttackCardData>, combat: Combat | null) {
     // read permission are handled in SneakAttackCardPart.getHtml()
     this.itemName = `${part.data.name}?`;
@@ -129,6 +156,14 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
       part: part,
     }, game.user);
     this.canEdit = actionResponse !== 'prevent-action';
+    this.damageOptions = part.data.calc$.damageOptions.map(dmg => {
+      return {
+        value: dmg,
+        label: game.i18n.localize(`DND5E.` + (dmg === '' ? 'None' : `Damage${dmg.capitalize()}`)),
+        selected: part.data.selectedDamage === dmg,
+      }
+    });
+    
 
     if (!combat) {
       this.usedInCombat = false;
@@ -156,6 +191,14 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
     })
   }
 
+  public setDamageType(event: Event) {
+    return SrdSneakAttackComponent.setDamageType({
+      messageId: this.messageId,
+      partId: this.partId,
+      dmg: (event.target as HTMLSelectElement).value as DamageType,
+    })
+  }
+
 }
 
 export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCardData> {
@@ -176,12 +219,22 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
       return;
     }
 
+    const rollData = sneakItem.getRollData()
+    const normalRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(sneakItem.data.data.damage.parts, rollData));
+    const versatileRoll = UtilsRoll.toRollData(UtilsRoll.versatilePartsToRoll(sneakItem.data.data.damage.parts, sneakItem.data.data.damage.versatile, rollData));
+
     const data: SrdSneakAttackCardData = {
       itemUuid: sneakItem.uuid,
       itemImg: sneakItem.img,
       name: sneakItem.name,
       shouldAdd: false,
       calc$: {
+        damageOptions: [],
+        damageSource: {
+          type: 'Manual',
+          normalBaseRoll: normalRoll.terms,
+          versatileBaseRoll: versatileRoll?.terms,
+        },
         actorUuid: args.actor?.uuid,
       }
     };
@@ -257,7 +310,38 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
 
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>): boolean | void {
+    this.selectedDamage(context);
     this.syncWithBaseDamage(context);
+  }
+
+  private selectedDamage(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
+    for (const {newRow} of context.rows) {
+      if (newRow.part.data.calc$.damageOptions.length === 0) {
+        newRow.part.data.selectedDamage = '';
+      } else if (!newRow.part.data.calc$.damageOptions.includes(newRow.part.data.selectedDamage)) {
+        newRow.part.data.selectedDamage = newRow.part.data.calc$.damageOptions[0];
+      }
+
+      // Convert all damage types to the selected
+      const rolls = [newRow.part.data.calc$.damageSource.normalBaseRoll];
+      if (newRow.part.data.calc$.damageSource.versatileBaseRoll) {
+        rolls.push(newRow.part.data.calc$.damageSource.versatileBaseRoll);
+      }
+      for (const terms of rolls) {
+        let foundDamageType = false;
+        for (const term of terms) {
+          if (UtilsRoll.toDamageType(term.options?.flavor) != null) {
+            foundDamageType = true;
+            term.options.flavor = newRow.part.data.selectedDamage;
+          }
+        }
+        if (!foundDamageType) {
+          terms[terms.length - 1].options = terms[terms.length - 1].options ?? {};
+          terms[terms.length - 1].options.flavor = newRow.part.data.selectedDamage;
+        }
+      }
+
+    }
   }
 
   private syncWithBaseDamage(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
@@ -272,15 +356,76 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
       
       if (newRow.part.data.shouldAdd !== (oldRow?.part?.data?.shouldAdd || false)) {
         if (newRow.part.data.shouldAdd) {
-          baseDamage.data.extraDamageSources[SrdSneakAttackCardPart.instance.getType()] = {
-            type: 'Item',
-            itemUuid: newRow.part.data.itemUuid,
-            hasVersatile: false,
-          }
+          baseDamage.data.extraDamageSources[SrdSneakAttackCardPart.instance.getType()] = deepClone(newRow.part.data.calc$.damageSource);
         } else {
           delete baseDamage.data.extraDamageSources[SrdSneakAttackCardPart.instance.getType()];
         }
       }
+    }
+  }
+  //#endregion
+
+  //#region upsert
+  public async upsert(context: IAfterDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>): Promise<void> {
+    await this.calcDamageTypeOptions(context);
+  }
+
+  private async calcDamageTypeOptions(context: IAfterDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
+    for (const {newRow, oldRow} of context.rows) {
+      const baseDamage: ModularCardPartData<DamageCardData> = newRow.allParts.find(part => {
+        return ModularCard.isType<DamageCardData>(DamageCardPart.instance, part) && !ModularCard.isType(SrdSneakAttackCardPart.instance, part);
+      });
+      if (!baseDamage) {
+        continue;
+      }
+      const oldDamage: ModularCardPartData<DamageCardData> = oldRow?.allParts?.find(part => part.id === baseDamage.id);
+
+      const newChangeDetect = {
+        damageSource: baseDamage.data.calc$.damageSource,
+        extraDamageSources: baseDamage.data.extraDamageSources,
+      }
+      const oldChangeDetect = {
+        damageSource: oldDamage?.data?.calc$?.damageSource,
+        extraDamageSources: oldDamage?.data?.extraDamageSources,
+      }
+
+      if (UtilsCompare.deepEquals(newChangeDetect, oldChangeDetect)) {
+        continue;
+      }
+
+      const damageTypes = new Set<DamageType>();
+      const damageSources = Object.values(baseDamage.data.extraDamageSources);
+      damageSources.push(baseDamage.data.calc$.damageSource);
+      if (baseDamage.data.userBonus) {
+        damageSources.push({
+          type: 'Formula',
+          formula: baseDamage.data.userBonus,
+        });
+      }
+
+      for (let source of damageSources) {
+        if (source.type === 'Formula') {
+          source = {
+            type: 'Manual',
+            normalBaseRoll: UtilsRoll.toRollData(new Roll(source.formula)).terms,
+          }
+        }
+        if (source.type === 'Manual') {
+          const terms = baseDamage.data.source === 'versatile' ? source.versatileBaseRoll : source.normalBaseRoll;
+          for (const term of terms) {
+            damageTypes.add(UtilsRoll.toDamageType(term.options?.flavor));
+          }
+        }
+        if (source.type === 'Item') {
+          const item = await UtilsDocument.itemFromUuid(source.itemUuid);
+          for (const [formula, damage] of item.data.data.damage.parts) {
+            damageTypes.add(damage);
+          }
+        }
+      }
+      damageTypes.delete(null);
+      damageTypes.delete(undefined);
+      newRow.part.data.calc$.damageOptions = Array.from(damageTypes);
     }
   }
   //#endregion

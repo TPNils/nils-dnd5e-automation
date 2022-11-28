@@ -38,19 +38,19 @@ interface TargetCache {
   calcAddTmpHp: number;
 }
 
-interface ItemDamageSource {
+export interface ItemDamageSource {
   type: 'Item';
   itemUuid: string;
   spellLevel?: MyItemData['data']['level'];
   hasVersatile: boolean;
 }
 
-interface FormulaDamageSource {
+export interface FormulaDamageSource {
   type: 'Formula';
   formula: string;
 }
 
-interface ManualDamageSource {
+export interface ManualDamageSource {
   type: 'Manual';
   normalBaseRoll: TermData[];
   versatileBaseRoll?: TermData[];

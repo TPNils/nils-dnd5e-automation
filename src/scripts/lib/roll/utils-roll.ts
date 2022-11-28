@@ -85,6 +85,27 @@ export class UtilsRoll {
       }
     }).join(' + '), rollData);
   }
+  
+  public static versatilePartsToRoll(parts: MyItemData['data']['damage']['parts'], versatile: string, rollData?: any): Roll | null {
+    if (versatile == null) {
+      return null;
+    }
+    return new Roll(parts.map(([formula, damageType], index) => {
+      if (index === 0) {
+        formula = versatile;
+      }
+      if (damageType) {
+        const match = UtilsRoll.damagePartsEndWithComment.exec(formula);
+        if (match) {
+          // Already ends with a comment, overwrite it
+          return `${match[1]}[${damageType.toLowerCase()}:${match[2]}]`
+        }
+        return `${formula}[${damageType.toLowerCase()}]`
+      } else {
+        return formula;
+      }
+    }).join(' + '), rollData);
+  }
 
   /**
    * Example formula and how it gets parsed (this is based on how I believe it will be user friendly)
