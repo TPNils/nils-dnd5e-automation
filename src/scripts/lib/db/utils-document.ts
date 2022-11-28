@@ -314,6 +314,54 @@ export class UtilsDocument {
     }).getValue() as any;
   }
 
+  public static combatFromUuid(inputUuid: string): Promise<Combat>
+  public static combatFromUuid(inputUuid: Iterable<string>, options?: {sync?: false}): Promise<Map<string, Combat>>
+  public static combatFromUuid(inputUuid: string, options: {sync: true}): Combat
+  public static combatFromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, Combat>
+  public static combatFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): Combat | Map<string, Combat> | Promise<Combat> | Promise<Map<string, Combat>> {
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
+      for (let document of response.values()) {
+        if (document.documentName !== (Combat as any).documentName) {
+          throw new Error(`UUID '${document.uuid}' is not an ${(Combat as any).documentName}. In stead found: ${document.documentName}`)
+        }
+      }
+      return typeof inputUuid === 'string' ? response.get(inputUuid) : response;
+    }).getValue() as any;
+  }
+
+  public static journalFromUuid(inputUuid: string): Promise<Journal>
+  public static journalFromUuid(inputUuid: Iterable<string>, options?: {sync?: false}): Promise<Map<string, Journal>>
+  public static journalFromUuid(inputUuid: string, options: {sync: true}): Journal
+  public static journalFromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, Journal>
+  public static journalFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): Journal | Map<string, Journal> | Promise<Journal> | Promise<Map<string, Journal>> {
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
+      for (let document of response.values()) {
+        if (document.documentName !== (Journal as any).documentName) {
+          throw new Error(`UUID '${document.uuid}' is not an ${(Journal as any).documentName}. In stead found: ${document.documentName}`)
+        }
+      }
+      return typeof inputUuid === 'string' ? response.get(inputUuid) : response;
+    }).getValue() as any;
+  }
+
+  public static rollTableFromUuid(inputUuid: string): Promise<RollTable>
+  public static rollTableFromUuid(inputUuid: Iterable<string>, options?: {sync?: false}): Promise<Map<string, RollTable>>
+  public static rollTableFromUuid(inputUuid: string, options: {sync: true}): RollTable
+  public static rollTableFromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, RollTable>
+  public static rollTableFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): RollTable | Map<string, RollTable> | Promise<RollTable> | Promise<Map<string, RollTable>> {
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
+      for (let document of response.values()) {
+        if (document.documentName !== (RollTable as any).documentName) {
+          throw new Error(`UUID '${document.uuid}' is not an ${(RollTable as any).documentName}. In stead found: ${document.documentName}`)
+        }
+      }
+      return typeof inputUuid === 'string' ? response.get(inputUuid) : response;
+    }).getValue() as any;
+  }
+
   public static itemFromUuid(inputUuid: string): Promise<MyItem>
   public static itemFromUuid(inputUuid: Iterable<string>, options?: {sync?: false}): Promise<Map<string, MyItem>>
   public static itemFromUuid(inputUuid: string, options: {sync: true}): MyItem
