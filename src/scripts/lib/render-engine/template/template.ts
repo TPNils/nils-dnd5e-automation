@@ -276,8 +276,7 @@ export class Template {
       
       // endExpression = the end of the last parsed expression
       // startExpression = a start of a new expression
-      const unescapedHtml = domParser.parseFromString(value.substring(endExpression, startExpression), 'text/html').documentElement.textContent;
-      parsedParts.push(unescapedHtml);
+      parsedParts.push(this.unescapeHtml(value.substring(endExpression, startExpression)));
 
       endExpression = startExpression;
       do {
@@ -294,8 +293,15 @@ export class Template {
       endExpression += 2 /*}}*/;
       startExpression = endExpression;
     }
-    parsedParts.push(domParser.parseFromString(value.substring(endExpression), 'text/html').documentElement.textContent);
+    parsedParts.push(this.unescapeHtml(value.substring(endExpression)));
     return parsedParts.join('');
+  }
+
+  private unescapeHtml(html: string): string {
+    // domParser.parseFromString removes the start whitespaces
+    const whitespacePrefix = /^ */.exec(html);
+    const unescapedHtml = domParser.parseFromString(html, 'text/html').documentElement.textContent;
+    return whitespacePrefix[0] + unescapedHtml;
   }
 
   private parsedExpressions = new Map<string, ParsedExpression>();
