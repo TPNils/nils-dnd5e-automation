@@ -1,8 +1,10 @@
 import { RoundData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/foundry.js/clientDocuments/combat";
-import { IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
+import { IAfterDmlContext, IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
+import { DocumentListener } from "../../../lib/db/document-listener";
 import { UtilsDocument } from "../../../lib/db/utils-document";
 import { RunOnce } from "../../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { ValueReader } from "../../../provider/value-provider";
 import { staticValues } from "../../../static-values";
 import { MyActor, MyItem } from "../../../types/fixed-types";
 import { Action } from "../../action";
@@ -17,7 +19,11 @@ export interface SrdSneakAttackCardData {
   itemImg: string;
   name: string;
   shouldAdd: boolean;
-  createdCombatRound?: RoundData;
+  createdCombatRound?: Omit<RoundData, 'combatantid'> & {
+    // combatantid is a typo in RoundData
+    combatantId?: string; // who's turn
+    combatUuid: string;
+  };
   calc$: {
     actorUuid: string;
   }
@@ -28,6 +34,7 @@ export interface SrdSneakAttackCardData {
   html: /*html*/`
     <label class="wrapper{{!this.canEdit ? ' disabled' : ''}}">
       <input [disabled]="!this.canEdit" (click)="this.onSneakToggleClick($event)" [checked]="this.addSneak" type="checkbox"/>
+      <i *if="this.usedInCombat" class="used-in-combat-warning {{this.addSneak ? 'this-is-active' : ''}} fas fa-exclamation-triangle"></i>
       <img *if="this.itemImg" [src]="this.itemImg">
       {{this.itemName}}
     </label>
@@ -52,6 +59,15 @@ export interface SrdSneakAttackCardData {
       min-height: 16px;
       height: 16px;
       margin-right: 4px;
+    }
+
+    .used-in-combat-warning {
+      color: #fb6944;
+      margin-right: 4px;
+    }
+
+    .used-in-combat-warning.this-is-active {
+      color: red;
     }
   `
 })
@@ -85,7 +101,15 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
 
   public onInit(args: OnInitParam) {
     args.addStoppable(
-      this.getData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance).listen(({part}) => this.setData(part))
+      this.getData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance)
+        .switchMap(args => {
+          const uuid = args.part.data.createdCombatRound?.combatUuid;
+          return ValueReader.mergeObject({
+            ...args,
+            combat: uuid == null ? null : DocumentListener.listenUuid<Combat>(uuid)
+          })
+        })
+        .listen(({part, combat}) => this.setData(part, combat))
     );
   }
 
@@ -93,7 +117,8 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
   public itemName: string = '';
   public itemImg: string;
   public addSneak: boolean = false;
-  private async setData(part: ModularCardPartData<SrdSneakAttackCardData>) {
+  public usedInCombat = false;
+  private async setData(part: ModularCardPartData<SrdSneakAttackCardData>, combat: Combat | null) {
     // read permission are handled in SneakAttackCardPart.getHtml()
     this.itemName = `${part.data.name}?`;
     this.itemImg = part.data.itemImg;
@@ -104,6 +129,23 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
       part: part,
     }, game.user);
     this.canEdit = actionResponse !== 'prevent-action';
+
+    if (!combat) {
+      this.usedInCombat = false;
+    } else {
+      if (part.data.calc$.actorUuid == null) {
+        this.usedInCombat = false;
+      } else {
+        const usedSneakFlag = game.combat.getFlag(staticValues.moduleName, 'usedSneak') as {[turnKey: string]: Array<{source: string;}>} ?? {};
+        const source = `${this.messageId}/${part.id}`;
+        const key = `${part.data.createdCombatRound.combatantId}/${part.data.calc$.actorUuid.replace('.', '/')}`;
+        if (!usedSneakFlag[key]) {
+          this.usedInCombat = false;
+        } else {
+          this.usedInCombat = usedSneakFlag[key].some(flag => flag.source !== source);
+        }
+      }
+    }
   }
 
   public onSneakToggleClick(event: MouseEvent) {
@@ -144,7 +186,10 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
       }
     };
     if (game.combat) {
-      data.createdCombatRound = deepClone(game.combat.current);
+      data.createdCombatRound = {
+        ...deepClone(game.combat.current),
+        combatUuid: game.combat.uuid
+      };
     }
 
     return data;
@@ -205,6 +250,7 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
 
 class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSneakAttackCardData>> {
 
+  //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>): boolean | void {
     this.syncWithBaseDamage(context);
   }
@@ -232,5 +278,48 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
       }
     }
   }
+  //#endregion
+
+  //#region afterUpsert
+  public async afterUpsert(context: IAfterDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>): Promise<void> {
+    await this.setSneakUsed(context);
+  }
+
+  private async setSneakUsed(context: IAfterDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>): Promise<void> {
+    for (const {newRow, oldRow} of context.rows) {
+      if (newRow.part.data.shouldAdd !== !!oldRow?.part?.data?.shouldAdd) {
+        if (!newRow.part.data.createdCombatRound) {
+          continue;
+        }
+        const combat = await UtilsDocument.combatFromUuid(newRow.part.data.createdCombatRound.combatUuid);
+        if (!combat) {
+          continue;
+        }
+
+        let usedSneakFlag = combat.getFlag(staticValues.moduleName, 'usedSneak') as {[turnKey: string]: Array<{source: string;}>};
+        if (usedSneakFlag == null) {
+          usedSneakFlag = {};
+        } else {
+          usedSneakFlag = deepClone(usedSneakFlag);
+        }
+        const key = `${newRow.part.data.createdCombatRound.combatantId}/${newRow.part.data.calc$.actorUuid.replace('.', '/')}`;
+        usedSneakFlag[key] = usedSneakFlag[key] ?? [];
+
+        const source = `${newRow.messageId}/${newRow.part.id}`;
+        const hasSource = usedSneakFlag[key].some(flag => flag.source === source);
+        if (newRow.part.data.shouldAdd === hasSource) {
+          continue;
+        }
+
+        if (newRow.part.data.shouldAdd) {
+          usedSneakFlag[key].push({source: source});
+        } else {
+          usedSneakFlag[key] = usedSneakFlag[key].filter(flag => flag.source !== source);
+        }
+        await combat.setFlag(staticValues.moduleName, 'usedSneak', usedSneakFlag);
+      }
+    }
+  }
+  //#endregion
 
 }
