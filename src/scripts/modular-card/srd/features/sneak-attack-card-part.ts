@@ -206,7 +206,6 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
 class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSneakAttackCardData>> {
 
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>): boolean | void {
-    // TODO if rolled, should also display in the damage component
     this.syncWithBaseDamage(context);
   }
 
