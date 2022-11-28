@@ -217,7 +217,15 @@ export class SrdLayOnHandsCardPart extends DamageCardPart implements ModularCard
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new SrdLayOnHandsCardTrigger());
     Hooks.on(`create${staticValues.code.capitalize()}ModuleCard`, (event: BeforeCreateModuleCardEvent) => {
-      if (event.item.name.toLowerCase() === 'lay on hands') {
+      let isItemLoh = false;
+      // Imported from dnd5e compendium, also assigned during vanilla level up
+      if (event.item.getFlag('core', 'sourceId') === 'Compendium.dnd5e.classfeatures.OdrvL3afwLOPeuYZ') {
+        isItemLoh = true;
+      } else if (event.item.name.toLowerCase() === 'lay on hands') {
+        // Fall back, doesn't work for player renaming the item, but idk what else to do
+        isItemLoh = true;
+      }
+      if (isItemLoh) {
         event.addBefore(DamageCardPart.instance, SrdLayOnHandsCardPart.instance);
         event.remove(DamageCardPart.instance);
       }

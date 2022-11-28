@@ -214,6 +214,11 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
       return null;
     }
     for (const item of actor.items.values()) {
+      // Sneak attack imported from dnd5e compendium, also assigned during vanilla level up
+      if (item.getFlag('core', 'sourceId') === 'Compendium.dnd5e.classfeatures.DPN2Gfk8yi1Z5wp7') {
+        return item;
+      }
+      // Fall back, doesn't work for player renaming the item, but idk what else to do
       if (item.name.toLowerCase() === 'sneak attack') {
         return item;
       }
