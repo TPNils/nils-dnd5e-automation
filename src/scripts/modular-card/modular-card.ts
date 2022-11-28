@@ -13,7 +13,7 @@ import { MyActor, MyItem } from "../types/fixed-types";
 import { UtilsLog } from "../utils/utils-log";
 import { ActiveEffectCardPart, AttackCardPart, CheckCardPart, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardPart, SpellLevelCardPart, TargetCardPart, TemplateCardPart } from "./base/index";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
-import { LayOnHandsCardPart } from "./srd/index";
+import { SrdLayOnHandsCardPart } from "./srd/index";
 
 export interface ModularCardPartData<T = any> {
   readonly id: string;
@@ -467,7 +467,7 @@ export class ModularCard {
     const cardParts: ModularCardPart[] = createEvent.getParts();
 
     if (data.item.name === 'Lay on Hands') {
-      cardParts[cardParts.indexOf(DamageCardPart.instance)] = LayOnHandsCardPart.instance;
+      cardParts[cardParts.indexOf(DamageCardPart.instance)] = SrdLayOnHandsCardPart.instance;
     }
     
     for (const cardPart of cardParts) {

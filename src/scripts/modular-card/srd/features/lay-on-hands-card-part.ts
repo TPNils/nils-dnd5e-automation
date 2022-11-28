@@ -10,14 +10,14 @@ import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
 import { BeforeCreateModuleCardEvent, ModularCard, ModularCardPartData, ModularCardTriggerData } from "../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
 
-export interface LayOnHandsCardData extends DamageCardData {
+export interface SrdLayOnHandsCardData extends DamageCardData {
   heal: number;
   cure: number;
   maxUsage: number;
 }
 
 @Component({
-  tag: LayOnHandsComponent.getSelector(),
+  tag: SrdLayOnHandsComponent.getSelector(),
   html: /*html*/`
   <div class="loh-grid">
     <label>{{this.localeHealing}}:</label>
@@ -42,7 +42,7 @@ export interface LayOnHandsCardData extends DamageCardData {
     }
   `
 })
-export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
+export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit {
 
   //#region actions
   private static readonly permissionCheck = createPermissionCheckAction<{part: {data: DamageCardData}}>(({part}) => {
@@ -57,8 +57,8 @@ export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
     .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('cure'))
     .addSerializer(ItemCardHelpers.getRawSerializer('heal'))
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<LayOnHandsCardData>())
-    .setPermissionCheck(LayOnHandsComponent.permissionCheck)
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<SrdLayOnHandsCardData>())
+    .setPermissionCheck(SrdLayOnHandsComponent.permissionCheck)
     .build(async ({messageId, part, allCardParts, heal, cure}) => {
       if (heal != null) {
         part.data.heal = heal;
@@ -74,12 +74,12 @@ export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
   //#endregion
   
   public static getSelector(): string {
-    return `${staticValues.code}-lay-on-hands-part`;
+    return `srd-lay-on-hands-part`;
   }
 
   public onInit(args: OnInitParam) {
     args.addStoppable(
-      this.getData<LayOnHandsCardData>(LayOnHandsCardPart.instance).listen(({part}) => this.setData(part))
+      this.getData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance).listen(({part}) => this.setData(part))
     );
   }
 
@@ -90,10 +90,10 @@ export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
   public maxHeal = 0;
   public maxCure = 0;
   public missingPermission = true;
-  private async setData(part: ModularCardPartData<LayOnHandsCardData>) {
+  private async setData(part: ModularCardPartData<SrdLayOnHandsCardData>) {
     let hasPermission = false;
     if (part) {
-      const result = await LayOnHandsComponent.permissionCheck({
+      const result = await SrdLayOnHandsComponent.permissionCheck({
         messageId: this.messageId,
         partId: part.id,
         part: part
@@ -143,7 +143,7 @@ export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
       return;
     }
 
-    LayOnHandsComponent.setHealAndCure({
+    SrdLayOnHandsComponent.setHealAndCure({
       messageId: this.messageId,
       partId: this.partId,
       heal: value
@@ -176,7 +176,7 @@ export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
       return;
     }
 
-    LayOnHandsComponent.setHealAndCure({
+    SrdLayOnHandsComponent.setHealAndCure({
       messageId: this.messageId,
       partId: this.partId,
       cure: value
@@ -185,9 +185,9 @@ export class LayOnHandsComponent extends BaseCardComponent implements OnInit {
 
 }
 
-export class LayOnHandsCardPart extends DamageCardPart implements ModularCardPart<LayOnHandsCardData> {
+export class SrdLayOnHandsCardPart extends DamageCardPart implements ModularCardPart<SrdLayOnHandsCardData> {
   
-  public static readonly instance = new LayOnHandsCardPart();
+  public static readonly instance = new SrdLayOnHandsCardPart();
 
   private injectCreateHealing(args: ModularCardCreateArgs): ModularCardCreateArgs {
     const merge = args.item.data.data.damage == null ? {} : deepClone(args.item.data.data.damage);
@@ -200,45 +200,45 @@ export class LayOnHandsCardPart extends DamageCardPart implements ModularCardPar
     return {...args, item: modifiedItem};
   }
 
-  public async create(args: ModularCardCreateArgs): Promise<LayOnHandsCardData> {
-    const data = await super.create(this.injectCreateHealing(args)) as Partial<LayOnHandsCardData>;
+  public async create(args: ModularCardCreateArgs): Promise<SrdLayOnHandsCardData> {
+    const data = await super.create(this.injectCreateHealing(args)) as Partial<SrdLayOnHandsCardData>;
     data.maxUsage = Number(args.item.getRollData().item.uses?.max) ?? 0;
     data.heal = 0;
     data.cure = 0;
-    return data as LayOnHandsCardData;
+    return data as SrdLayOnHandsCardData;
   }
 
-  public refresh(oldData: DamageCardData, args: ModularCardCreateArgs): Promise<LayOnHandsCardData> {
-    return super.refresh(oldData, this.injectCreateHealing(args)) as Promise<LayOnHandsCardData>;
+  public refresh(oldData: DamageCardData, args: ModularCardCreateArgs): Promise<SrdLayOnHandsCardData> {
+    return super.refresh(oldData, this.injectCreateHealing(args)) as Promise<SrdLayOnHandsCardData>;
   }
 
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
-    ModularCard.registerModularCardTrigger(this, new LayOnHandsCardTrigger());
+    ModularCard.registerModularCardTrigger(this, new SrdLayOnHandsCardTrigger());
     Hooks.on(`create${staticValues.code.capitalize()}ModuleCard`, (event: BeforeCreateModuleCardEvent) => {
       if (event.item.name.toLowerCase() === 'lay on hands') {
-        event.addBefore(DamageCardPart.instance, LayOnHandsCardPart.instance);
+        event.addBefore(DamageCardPart.instance, SrdLayOnHandsCardPart.instance);
         event.remove(DamageCardPart.instance);
       }
     })
   }
 
   public getHtml(data: HtmlContext<any>): string {
-    return `<${LayOnHandsComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${LayOnHandsComponent.getSelector()}>`
+    return `<${SrdLayOnHandsComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${SrdLayOnHandsComponent.getSelector()}>`
   }
   
 }
 
 
-class LayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<LayOnHandsCardData>> {
+class SrdLayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<SrdLayOnHandsCardData>> {
   
-  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<LayOnHandsCardData>>): boolean | void {
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<SrdLayOnHandsCardData>>): boolean | void {
     this.calcRoll(context);
     this.calcResource(context);
   }
 
-  private calcRoll(context: IDmlContext<ModularCardTriggerData<LayOnHandsCardData>>): void {
+  private calcRoll(context: IDmlContext<ModularCardTriggerData<SrdLayOnHandsCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
       if (newRow.part.data.heal > 0) {
         newRow.part.data.phase = 'result';
@@ -253,14 +253,14 @@ class LayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<LayOnHand
     }
   }
 
-  private calcResource(context: IDmlContext<ModularCardTriggerData<LayOnHandsCardData>>): void {
+  private calcResource(context: IDmlContext<ModularCardTriggerData<SrdLayOnHandsCardData>>): void {
     for (const {newRow} of context.rows) {
       const resources: ResourceCardData[] = [];
       let amountOfTargets = 0;
 
       let healAmount = 0;
       for (const part of newRow.allParts) {
-        if (ModularCard.isType<LayOnHandsCardData>(LayOnHandsCardPart.instance, part)) {
+        if (ModularCard.isType<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance, part)) {
           // If for some reason there are multiple instances
           healAmount += part.data.heal;
           healAmount += (part.data.cure * 5);

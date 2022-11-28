@@ -12,7 +12,7 @@ import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
 import { BeforeCreateModuleCardEvent, ModularCard, ModularCardPartData, ModularCardTriggerData } from "../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
 
-export interface SneakAttackCardData {
+export interface SrdSneakAttackCardData {
   itemUuid: string;
   itemImg: string;
   name: string;
@@ -24,7 +24,7 @@ export interface SneakAttackCardData {
 }
 
 @Component({
-  tag: SneakAttackComponent.getSelector(),
+  tag: SrdSneakAttackComponent.getSelector(),
   html: /*html*/`
     <label class="wrapper{{!this.canEdit ? ' disabled' : ''}}">
       <input [disabled]="!this.canEdit" (click)="this.onSneakToggleClick($event)" [checked]="this.addSneak" type="checkbox"/>
@@ -55,9 +55,9 @@ export interface SneakAttackCardData {
     }
   `
 })
-export class SneakAttackComponent extends BaseCardComponent implements OnInit {
+export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit {
   //#region actions
-  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: SneakAttackCardData}}>(({part}) => {
+  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: SrdSneakAttackCardData}}>(({part}) => {
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (part.data.calc$.actorUuid) {
       documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
@@ -68,8 +68,8 @@ export class SneakAttackComponent extends BaseCardComponent implements OnInit {
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('addSneak'))
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<SneakAttackCardData>())
-    .setPermissionCheck(SneakAttackComponent.actionPermissionCheck)
+    .addEnricher(ItemCardHelpers.getChatPartEnricher<SrdSneakAttackCardData>())
+    .setPermissionCheck(SrdSneakAttackComponent.actionPermissionCheck)
     .build(({messageId, part, addSneak, allCardParts}) => {
       if (part.data.shouldAdd === addSneak) {
         return;
@@ -80,12 +80,12 @@ export class SneakAttackComponent extends BaseCardComponent implements OnInit {
   //#endregion
   
   public static getSelector(): string {
-    return `${staticValues.code}-sneak-attack-part`;
+    return `srd-sneak-attack-part`;
   }
 
   public onInit(args: OnInitParam) {
     args.addStoppable(
-      this.getData<SneakAttackCardData>(SneakAttackCardPart.instance).listen(({part}) => this.setData(part))
+      this.getData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance).listen(({part}) => this.setData(part))
     );
   }
 
@@ -93,12 +93,12 @@ export class SneakAttackComponent extends BaseCardComponent implements OnInit {
   public itemName: string = '';
   public itemImg: string;
   public addSneak: boolean = false;
-  private async setData(part: ModularCardPartData<SneakAttackCardData>) {
+  private async setData(part: ModularCardPartData<SrdSneakAttackCardData>) {
     // read permission are handled in SneakAttackCardPart.getHtml()
     this.itemName = `${part.data.name}?`;
     this.itemImg = part.data.itemImg;
     this.addSneak = part.data.shouldAdd;
-    const actionResponse = await SneakAttackComponent.actionPermissionCheck({
+    const actionResponse = await SrdSneakAttackComponent.actionPermissionCheck({
       messageId: this.messageId,
       partId: part.id,
       part: part,
@@ -107,7 +107,7 @@ export class SneakAttackComponent extends BaseCardComponent implements OnInit {
   }
 
   public onSneakToggleClick(event: MouseEvent) {
-    return SneakAttackComponent.setAddSneak({
+    return SrdSneakAttackComponent.setAddSneak({
       messageId: this.messageId,
       partId: this.partId,
       addSneak: (event.target as HTMLInputElement).checked,
@@ -116,11 +116,11 @@ export class SneakAttackComponent extends BaseCardComponent implements OnInit {
 
 }
 
-export class SneakAttackCardPart implements ModularCardPart<SneakAttackCardData> {
+export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCardData> {
   
-  public static readonly instance = new SneakAttackCardPart();
+  public static readonly instance = new SrdSneakAttackCardPart();
 
-  public async create(args: ModularCardCreateArgs): Promise<SneakAttackCardData> {
+  public async create(args: ModularCardCreateArgs): Promise<SrdSneakAttackCardData> {
     // Only add sneak attack to weapon attacks
     if (!args.item.hasAttack || !['mwak', 'rwak'].includes(args.item.data.data.actionType)) {
       return null;
@@ -129,12 +129,12 @@ export class SneakAttackCardPart implements ModularCardPart<SneakAttackCardData>
       return null;
     }
 
-    const sneakItem = SneakAttackCardPart.getSneakItem(args.actor);
+    const sneakItem = SrdSneakAttackCardPart.getSneakItem(args.actor);
     if (sneakItem == null) {
       return;
     }
 
-    const data: SneakAttackCardData = {
+    const data: SrdSneakAttackCardData = {
       itemUuid: sneakItem.uuid,
       itemImg: sneakItem.img,
       name: sneakItem.name,
@@ -150,7 +150,7 @@ export class SneakAttackCardPart implements ModularCardPart<SneakAttackCardData>
     return data;
   }
 
-  public async refresh(oldData: SneakAttackCardData, args: ModularCardCreateArgs): Promise<SneakAttackCardData> {
+  public async refresh(oldData: SrdSneakAttackCardData, args: ModularCardCreateArgs): Promise<SrdSneakAttackCardData> {
     const data = await this.create(args);
     if (data == null) {
       return oldData;
@@ -161,7 +161,7 @@ export class SneakAttackCardPart implements ModularCardPart<SneakAttackCardData>
   }
   
   public getType(): string {
-    return SneakAttackCardPart.name;
+    return SrdSneakAttackCardPart.name;
   }
 
   private static getSneakItem(actor: MyActor): MyItem {
@@ -179,15 +179,15 @@ export class SneakAttackCardPart implements ModularCardPart<SneakAttackCardData>
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
-    ModularCard.registerModularCardTrigger(this, new SneakAttackCardTrigger());
+    ModularCard.registerModularCardTrigger(this, new SrdSneakAttackCardTrigger());
     Hooks.on(`create${staticValues.code.capitalize()}ModuleCard`, (event: BeforeCreateModuleCardEvent) => {
-      if (SneakAttackCardPart.getSneakItem(event.actor) != null) {
-        event.addAfter(DamageCardPart.instance, SneakAttackCardPart.instance);
+      if (SrdSneakAttackCardPart.getSneakItem(event.actor) != null) {
+        event.addAfter(DamageCardPart.instance, SrdSneakAttackCardPart.instance);
       }
     })
   }
 
-  public async getHtml(data: HtmlContext<SneakAttackCardData>): Promise<string> {
+  public async getHtml(data: HtmlContext<SrdSneakAttackCardData>): Promise<string> {
     const canSeeSneak = await UtilsDocument.hasAllPermissions([
       {
         uuid: data.data.calc$.actorUuid,
@@ -198,22 +198,22 @@ export class SneakAttackCardPart implements ModularCardPart<SneakAttackCardData>
     if (!canSeeSneak) {
       return null;
     }
-    return `<${SneakAttackComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${SneakAttackComponent.getSelector()}>`
+    return `<${SrdSneakAttackComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${SrdSneakAttackComponent.getSelector()}>`
   }
   
 }
 
-class SneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SneakAttackCardData>> {
+class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSneakAttackCardData>> {
 
-  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<SneakAttackCardData>>): boolean | void {
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>): boolean | void {
     // TODO if rolled, should also display in the damage component
     this.syncWithBaseDamage(context);
   }
 
-  private syncWithBaseDamage(context: IDmlContext<ModularCardTriggerData<SneakAttackCardData>>) {
+  private syncWithBaseDamage(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
     for (const {newRow, oldRow} of context.rows) {
       const baseDamage: ModularCardPartData<DamageCardData> = newRow.allParts.find(part => {
-        return ModularCard.isType<DamageCardData>(DamageCardPart.instance, part) && !ModularCard.isType(SneakAttackCardPart.instance, part);
+        return ModularCard.isType<DamageCardData>(DamageCardPart.instance, part) && !ModularCard.isType(SrdSneakAttackCardPart.instance, part);
       });
 
       if (!baseDamage) {
@@ -222,13 +222,13 @@ class SneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SneakAtt
       
       if (newRow.part.data.shouldAdd !== (oldRow?.part?.data?.shouldAdd || false)) {
         if (newRow.part.data.shouldAdd) {
-          baseDamage.data.extraDamageSources[SneakAttackCardPart.instance.getType()] = {
+          baseDamage.data.extraDamageSources[SrdSneakAttackCardPart.instance.getType()] = {
             type: 'Item',
             itemUuid: newRow.part.data.itemUuid,
             hasVersatile: false,
           }
         } else {
-          delete baseDamage.data.extraDamageSources[SneakAttackCardPart.instance.getType()];
+          delete baseDamage.data.extraDamageSources[SrdSneakAttackCardPart.instance.getType()];
         }
       }
     }

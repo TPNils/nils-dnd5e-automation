@@ -1,9 +1,9 @@
-import { LayOnHandsCardPart } from "./features/lay-on-hands-card-part";
-import { SneakAttackCardPart } from "./features/sneak-attack-card-part";
+import { SrdLayOnHandsCardPart } from "./features/lay-on-hands-card-part";
+import { SrdSneakAttackCardPart } from "./features/sneak-attack-card-part";
 
 export function registerHooks() {
-  LayOnHandsCardPart.instance.registerHooks();
-  SneakAttackCardPart.instance.registerHooks();
+  SrdLayOnHandsCardPart.instance.registerHooks();
+  SrdSneakAttackCardPart.instance.registerHooks();
 }
 
 export * from "./features/lay-on-hands-card-part";
