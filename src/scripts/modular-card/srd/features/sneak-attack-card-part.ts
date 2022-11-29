@@ -156,7 +156,7 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
       part: part,
     }, game.user);
     this.canEdit = actionResponse !== 'prevent-action';
-    this.damageOptions = part.data.calc$.damageOptions.map(dmg => {
+    this.damageOptions = part.data.calc$.damageOptions.sort().map(dmg => {
       return {
         value: dmg,
         label: game.i18n.localize(`DND5E.` + (dmg === '' ? 'None' : `Damage${dmg.capitalize()}`)),
@@ -324,7 +324,7 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
 
       // Convert all damage types to the selected
       const rolls = [newRow.part.data.calc$.damageSource.normalBaseRoll];
-      if (newRow.part.data.calc$.damageSource.versatileBaseRoll) {
+      if (newRow.part.data.calc$.damageSource.versatileBaseRoll?.length > 0) {
         rolls.push(newRow.part.data.calc$.damageSource.versatileBaseRoll);
       }
       for (const terms of rolls) {
