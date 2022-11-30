@@ -479,7 +479,13 @@ export class UtilsRoll {
           }
           baseTerms.push(operator);
         }
-        baseTerms.push(...Roll.simplifyTerms([...added.terms]));
+        // Roll.simplifyTerms only works for evaluated terms
+        const isEvaluated = added.terms.some(t => (t.toJSON() as TermData).evaluated);
+        if (isEvaluated) {
+          baseTerms.push(...Roll.simplifyTerms([...added.terms]));
+        } else {
+          baseTerms.push(...added.terms);
+        }
       }
     }
 
