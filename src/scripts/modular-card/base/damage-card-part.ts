@@ -840,7 +840,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
                 }
               }
             }
-            amount = Math.ceil(amount);
+            amount = Math.floor(amount);
             // Assume that negative amounts are from negative modifiers => should be 0.
             //  Negative healing does not become damage & negative damage does no become healing.
             amount = Math.max(0, amount);
