@@ -9,6 +9,7 @@ import { TermData, RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { staticValues } from "../../static-values";
 import { MyActor, DamageType, MyItemData, MyItem } from "../../types/fixed-types";
+import { UtilsArray } from "../../utils/utils-array";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
@@ -69,6 +70,7 @@ export interface DamageCardData {
   userBonus?: string;
   calc$: {
     actorUuid?: string;
+    properties: MyItem['data']['data']['properties'];
     damageSource: ItemDamageSource | ManualDamageSource;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     roll?: RollData;
@@ -399,6 +401,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       phase: 'mode-select',
       source: 'normal',
       calc$: {
+        properties: deepClone(item.data.data.properties),
         damageSource: await itemSourceToManualSource(item, true),
         targetCaches: [],
       },
@@ -818,13 +821,19 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
         cache.calcFailedDeathSaved = 0;
         if (newRow.part.data.calc$.roll?.evaluated) {
           for (let [dmgType, amount] of UtilsRoll.rollToDamageResults(UtilsRoll.fromRollData(newRow.part.data.calc$.roll)).entries()) {
-            if (cache.immunities.includes(dmgType)) {
+            const aliases: string[] = [dmgType];
+            if (dmgType === 'bludgeoning' || dmgType === 'piercing' || dmgType === 'slashing') {
+              if (!newRow.part.data.calc$.properties.mgc) {
+                aliases.push('physical'); // = non magical physical
+              }
+            }
+            if (UtilsArray.includesAny(cache.immunities, aliases)) {
               continue;
             }
-            if (cache.resistances.includes(dmgType)) {
+            if (UtilsArray.includesAny(cache.resistances, aliases)) {
               amount /= 2;
             }
-            if (cache.vulnerabilities.includes(dmgType)) {
+            if (UtilsArray.includesAny(cache.vulnerabilities, aliases)) {
               amount *= 2;
             }
             const checkResult = checkResultsBySelectionId.get(cache.selectionId);

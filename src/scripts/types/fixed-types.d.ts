@@ -242,6 +242,25 @@ export type MyItemData = {
       mode: 'always' | 'atwill' | 'innate' | 'pact' | 'prepared';
       prepared: boolean;
     }
+    properties: {
+      ada: boolean; // Adamantine
+      amm: boolean; // Ammo
+      fin: boolean; // Finesse
+      fir: boolean; // firearm
+      foc: boolean; // focus
+      hvy: boolean; // heavy
+      lgt: boolean; // light
+      lod: boolean; // loading
+      mgc: boolean; // magical
+      rch: boolean; // reach
+      rel: boolean; // reload
+      ret: boolean; // returning
+      sil: boolean; // silvered
+      spc: boolean; // special
+      thr: boolean; // thrown
+      two: boolean; // twohanded
+      ver: boolean; // versatile
+    }
     quantity?: number;
     range: {
       value?: number;
