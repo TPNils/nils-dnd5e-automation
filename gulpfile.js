@@ -18,6 +18,8 @@ import sassCompiler from 'sass';
 import gulpSass from 'gulp-sass';
 import git from 'gulp-git';
 import sourcemaps from 'gulp-sourcemaps';
+import gulpFilter from 'gulp-filter';
+import gulpUglify from 'gulp-uglify';
 import minifyCss from 'gulp-clean-css';
 import open from 'open';
 
@@ -545,29 +547,31 @@ class BuildActions {
   static createBuildTS(target) {
     return function buildTS() {
       const manifest = Meta.getManifest();
+      const urlPrefix = '/' + [(manifest.file.type === 'system' ? 'systems' : 'modules'), manifest.file.name].join('/');
+      const jsFilter = gulpFilter((file) => file.basename.endsWith('.js'), {restore: true})
+      const sourceMapConfig = {
+        addComment: true,
+        includeContent: false,
+        sourceMappingURL: (file) => {
+          const filePathParts = file.relative.split(path.sep);
+          return '/' + [(manifest.file.type === 'system' ? 'systems' : 'modules'), manifest.file.name, ...filePathParts].join('/') + '.map';
+        },
+      };
       return gulp.src('src/**/*.ts')
         .pipe(sourcemaps.init())
         .pipe(BuildActions.#getTsConfig()())
-        /*.pipe(minifyJs({
-          ext: { min: '.js' },
-          mangle: false,
-          noSource: true,
+        .pipe(sourcemaps.mapSources(function(sourcePath, file) {
+          const filePathParts = file.relative.split(path.sep);
+          return '/' + [urlPrefix, ...filePathParts].join('/').replace(/\.js$/, '.ts');
+        }))
+        .pipe(jsFilter)  // only let JavaScript files through to be minified
+        .pipe(gulpUglify({
           output: {
-            source_map: false,
             comments: false,
           }
-        }))*/
-        .pipe(sourcemaps.mapSources(function(sourcePath, file) {
-          const filePathParts = path.normalize(sourcePath).split(path.sep);
-          return filePathParts[filePathParts.length - 1];
         }))
-        .pipe(sourcemaps.write('./', {
-          //includeContent: false,
-          sourceMappingURL: (file) => {
-            const filePathParts = file.relative.split(path.sep);
-            return '/' + [(manifest.file.type === 'system' ? 'systems' : 'modules'), manifest.file.name, ...filePathParts].join('/') + '.map';
-          }
-        }))
+        .pipe(jsFilter.restore)
+        .pipe(sourcemaps.write('./', sourceMapConfig))
         .pipe(gulp.dest(target));
     }
   }
@@ -602,6 +606,7 @@ class BuildActions {
    */
   static getStaticCopyFiles() {
     return [
+      {from: ['src','scripts'], to: ['scripts']}, // include ts files for source mappings
       {from: ['src','lang'], to: ['lang']},
       {from: ['src','fonts'], to: ['fonts']},
       {from: ['src','assets'], to: ['assets']},
