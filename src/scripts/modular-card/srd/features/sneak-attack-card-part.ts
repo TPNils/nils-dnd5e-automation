@@ -267,8 +267,12 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
       return null;
     }
     for (const item of actor.items.values()) {
-      // Sneak attack imported from dnd5e compendium, also assigned during vanilla level up
+      // Sneak attack imported from dnd5e compendium
       if (item.getFlag('core', 'sourceId') === 'Compendium.dnd5e.classfeatures.DPN2Gfk8yi1Z5wp7') {
+        return item;
+      } 
+      if (item.getFlag('dnd5e', 'sourceId') === 'Compendium.dnd5e.classfeatures.OdrvL3afwLOPeuYZ') {
+        // Imported from dnd5e level up with the 1.6.0 advancement system
         return item;
       }
       // Fall back, doesn't work for player renaming the item, but idk what else to do
