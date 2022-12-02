@@ -40,30 +40,16 @@ export class UtilsItem {
       return false;
     }
 
-      // Imported from dnd5e compendium
-      if (item.getFlag('core', 'sourceId') === identifier.dnd5eCompendiumId) {
-        return true;
-      } else if (item.getFlag('dnd5e', 'sourceId') === identifier.dnd5eCompendiumId) {
-        // Imported from dnd5e level up with the 1.6.0 advancement system
-        return true;
-      }
+    // Imported from dnd5e compendium
+    if (item.getFlag('core', 'sourceId') === identifier.dnd5eCompendiumId) {
+      return true;
+    } else if (item.getFlag('dnd5e', 'sourceId') === identifier.dnd5eCompendiumId) {
+      // Imported from dnd5e level up with the 1.6.0 advancement system
+      return true;
+    }
 
     // Fall back, doesn't work for player renaming the item, but idk what else to do
     return identifier.name === normalizeName(item.name);
-  }
-
-  private static async initItemMap(...compendiums: Array<string | string[]>) {
-    const recordPromises: Array<Promise<FoundryDocument[]>> = [];
-    for (const compendium of compendiums.deepFlatten())  {
-      recordPromises.push(game.packs.get(compendium).getDocuments());
-    }
-
-    const itemMap: ItemMap = {};
-    for (const rows of await Promise.all(recordPromises)) {
-      for (const row of rows) {
-        
-      }
-    }
   }
 
 }
