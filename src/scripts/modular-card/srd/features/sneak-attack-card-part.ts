@@ -9,6 +9,7 @@ import { UtilsCompare } from "../../../lib/utils/utils-compare";
 import { ValueReader } from "../../../provider/value-provider";
 import { staticValues } from "../../../static-values";
 import { DamageType, MyActor, MyItem } from "../../../types/fixed-types";
+import { UtilsItem } from "../../../utils/utils-item";
 import { Action } from "../../action";
 import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ManualDamageSource } from "../../base/index";
@@ -267,16 +268,7 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
       return null;
     }
     for (const item of actor.items.values()) {
-      // Sneak attack imported from dnd5e compendium
-      if (item.getFlag('core', 'sourceId') === 'Compendium.dnd5e.classfeatures.DPN2Gfk8yi1Z5wp7') {
-        return item;
-      } 
-      if (item.getFlag('dnd5e', 'sourceId') === 'Compendium.dnd5e.classfeatures.OdrvL3afwLOPeuYZ') {
-        // Imported from dnd5e level up with the 1.6.0 advancement system
-        return item;
-      }
-      // Fall back, doesn't work for player renaming the item, but idk what else to do
-      if (item.name.toLowerCase() === 'sneak attack') {
+      if (UtilsItem.matchesItemIdentifier('sneakAttack', item)) {
         return item;
       }
     }

@@ -3,6 +3,7 @@ import { RunOnce } from "../../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
 import { UtilsRoll } from "../../../lib/roll/utils-roll";
 import { staticValues } from "../../../static-values";
+import { UtilsItem } from "../../../utils/utils-item";
 import { Action } from "../../action";
 import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ResourceCardData, ResourceCardPart, TargetCardData, TargetCardPart } from "../../base/index";
@@ -217,18 +218,7 @@ export class SrdLayOnHandsCardPart extends DamageCardPart implements ModularCard
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new SrdLayOnHandsCardTrigger());
     Hooks.on(`create${staticValues.code.capitalize()}ModuleCard`, (event: BeforeCreateModuleCardEvent) => {
-      let isItemLoh = false;
-      // Imported from dnd5e compendium
-      if (event.item.getFlag('core', 'sourceId') === 'Compendium.dnd5e.classfeatures.OdrvL3afwLOPeuYZ') {
-        isItemLoh = true;
-      } else if (event.item.getFlag('dnd5e', 'sourceId') === 'Compendium.dnd5e.classfeatures.OdrvL3afwLOPeuYZ') {
-        // Imported from dnd5e level up with the 1.6.0 advancement system
-        isItemLoh = true;
-      } else if (event.item.name.toLowerCase() === 'lay on hands') {
-        // Fall back, doesn't work for player renaming the item, but idk what else to do
-        isItemLoh = true;
-      }
-      if (isItemLoh) {
+      if (UtilsItem.matchesItemIdentifier('layOnHands', event.item)) {
         event.addBefore(DamageCardPart.instance, SrdLayOnHandsCardPart.instance);
         event.remove(DamageCardPart.instance);
       }
