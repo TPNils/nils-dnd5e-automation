@@ -85,7 +85,7 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
   }
 
   public localeHealing = game.i18n.localize('DND5E.Healing');
-  public localeCure = 'Cure'; // TODO translate
+  public localeCure =  game.i18n.localize(`${staticValues.moduleName}.Cure`);
   public currentHeal = 0;
   public currentCure = 0;
   public maxHeal = 0;

@@ -37,6 +37,13 @@
     {"id": "lib-wrapper", "name": "lib-wrapper", "type": "module"},
     {"id": "socketlib", "name": "socketlib", "type": "module"}
   ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
   "packs": [
     {
       "system": "dnd5e",

@@ -392,9 +392,8 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
               break;
             }
             case 'critical-mis': {
-              // TODO not great localization, should probably add my own
               styles.push('color: red');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('Minimum')}!">✗</div>`;
+              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize(`${staticValues.moduleName}.CriticalMiss`)}!">✗</div>`;
               break;
             }
             case 'hit': {
