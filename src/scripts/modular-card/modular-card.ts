@@ -139,7 +139,7 @@ async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...arg
         message.append(document.createTextNode("Internal error rendering the message."));
         const report = document.createElement('button');
         report.innerText = 'Please report the bug';
-        report.setAttribute('onclick', `game.modules.get("bug-reporter").api.bugWorkflow("nils-automated-compendium", "Error rendering a message", "${errorString.replace(/"/g, '\\"').replace(/\n/g, '\\n')}")`)
+        report.setAttribute('onclick', `game.modules.get("bug-reporter").api.bugWorkflow("${staticValues.moduleName}", "Error rendering a message", "${errorString.replace(/"/g, '\\"').replace(/\n/g, '\\n')}")`)
         message.append(report);
 
         const wrapper = document.createElement('div');

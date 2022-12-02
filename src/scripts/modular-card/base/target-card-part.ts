@@ -150,7 +150,7 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
             <button [disabled]="!this.isOwner || ((target.state === 'partial-applied' || target.state === 'applied'))" (click)="this.onDeleteClick(target.selectionId)" class="icon-button delete"><i class="fas fa-trash"></i></button>
             <button [disabled]="!this.isOwner" (click)="this.onCopyClick(target.tokenUuid)" class="icon-button copy"><i class="far fa-copy"></i></button>
           </div>
-          <div class="body-cell" [title]="target.name"><nac-token-img [data-token-uuid]="target.tokenUuid" [data-token-img]="target.img"></nac-token-img></div>
+          <div class="body-cell" [title]="target.name"><nda-token-img [data-token-uuid]="target.tokenUuid" [data-token-img]="target.img"></nda-token-img></div>
           <div *for="let row of target.row" class="body-cell" [innerHTML]="row"></div>
           <div class="body-cell"><!-- filler --></div>
           <div class="body-cell one-line">

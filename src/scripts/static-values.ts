@@ -1,7 +1,7 @@
 const staticValues = {
-  code: 'nac',
-  moduleName: "nils-automated-compendium",
-  moduleLabel: "Nils' automated compendium"
+  code: 'nda',
+  moduleName: "nils-dnd5e-automation",
+  moduleLabel: "Nils' dnd5e automation"
 };
 
 Object.freeze(staticValues);

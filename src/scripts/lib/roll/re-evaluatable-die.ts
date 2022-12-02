@@ -1,7 +1,7 @@
 import { staticValues } from "../../static-values";
 
 export type WrappedDie = Die & {
-  [`_nils-automated-compendium-original-reroll`]: Die['reroll'];
+  [`_nils-dnd5e-automation-original-reroll`]: Die['reroll'];
 }
 
 export class ReEvaluatableDie {
@@ -10,7 +10,7 @@ export class ReEvaluatableDie {
     dice = Array.isArray(dice) ? dice : [dice as Die];
 
     for (const die of dice) {
-      (die as WrappedDie)['_nils-automated-compendium-original-reroll'] = die.reroll;
+      (die as WrappedDie)['_nils-dnd5e-automation-original-reroll'] = die.reroll;
       die.reroll = ReEvaluatableDie.reroll;
     }
   }
@@ -19,8 +19,8 @@ export class ReEvaluatableDie {
     dice = Array.isArray(dice) ? dice : [dice as Die];
 
     for (const die of (dice as WrappedDie[])) {
-      if (die['_nils-automated-compendium-original-reroll']) {
-        die.reroll = die['_nils-automated-compendium-original-reroll'];
+      if (die['_nils-dnd5e-automation-original-reroll']) {
+        die.reroll = die['_nils-dnd5e-automation-original-reroll'];
       }
     }
   }
