@@ -21,7 +21,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
   tag: RollD20Element.selector(),
   html: /*html*/`
     <div class="roll-wrapper">
-      <nda-roll-result *if="this.roll?.total != null"
+      <nd5a-roll-result *if="this.roll?.total != null"
         [data-roll]="this.roll"
         [data-override-formula]="this.overrideFormula"
         [data-highlight-total-on-firstTerm]="this.highlightTotalOnFirstTerm"
@@ -35,7 +35,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
             (blur)="this.onBonusBlur($event)"
             (keyup)="this.onBonusKeyUp($event)"/>
         </div>
-      </nda-roll-result>
+      </nd5a-roll-result>
 
       <div class="bonus-container" *if="this.roll?.total == null">
         <button class="roll-button" [disabled]="!this.hasInteractPermission" (click)="this.onRollClick($event)">
@@ -109,7 +109,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
     top: 100%;
   }
   
-  nda-roll-result {
+  nd5a-roll-result {
     font-size: 1em;
   }
   

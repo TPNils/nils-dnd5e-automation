@@ -1,5 +1,5 @@
 const staticValues = {
-  code: 'nda',
+  code: 'nd5a',
   moduleName: "nils-dnd5e-automation",
   moduleLabel: "Nils' dnd5e automation"
 };

@@ -431,8 +431,8 @@ class BuildActions {
      * @param {string} css 
      */
     function doCssTransform(prefix, css) {
-      const hostAttr = `nda-hid-${prefix}`;
-      const itemAttr = `nda-cid-${prefix}`;
+      const hostAttr = `nd5a-hid-${prefix}`;
+      const itemAttr = `nd5a-cid-${prefix}`;
 
       const rootCss = postcss(new CssScoperPlugin(hostAttr, itemAttr)).process(css);
       

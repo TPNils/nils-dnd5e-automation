@@ -58,7 +58,7 @@ export interface AttackCardData {
     <div class="flavor">
       {{ this.flavor }}
     </div>
-    <nda-roll-d20
+    <nd5a-roll-d20
       [data-roll]="this.part.data.roll$"
       [data-label]="this.overrideRollLabel"
       [data-bonus-formula]="this.part.data.userBonus"
@@ -72,7 +72,7 @@ export interface AttackCardData {
       (doRoll)="this.onRollClick($event)"
       (rollMode)="this.onRollMode($event)"
       >
-    </nda-roll-d20>
+    </nd5a-roll-d20>
   `,
   style: /*css*/`
     .flavor {
