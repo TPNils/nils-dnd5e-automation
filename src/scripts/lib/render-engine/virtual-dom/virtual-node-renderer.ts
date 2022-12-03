@@ -11,10 +11,12 @@ type DomAction = {
   type: 'setAttribute';
   node: Element;
   attrName: string;
+  preventInput: boolean;
   value: any;
 } | {
   type: 'removeAttribute';
   node: Element;
+  preventInput: boolean;
   attrName: string;
 } | {
   type: 'addEventListener';
@@ -90,7 +92,8 @@ export class VirtualNodeRenderer {
               allSyncDomActions.push({
                 type: 'setAttribute',
                 node: (state.domNode as Element),
-                attrName: attr,
+                attrName: attr.replace(/^attr\./, ''),
+                preventInput: /^attr\./.test(attr),
                 value: process.node.getAttribute(attr)
               });
             }
@@ -132,7 +135,8 @@ export class VirtualNodeRenderer {
                 domActions.push({
                   type: 'setAttribute',
                   node: (state.domNode as Element),
-                  attrName: attr,
+                  attrName: attr.replace(/^attr\./, ''),
+                  preventInput: /^attr\./.test(attr),
                   value: value
                 });
               }
@@ -143,7 +147,8 @@ export class VirtualNodeRenderer {
                 domActions.push({
                   type: 'removeAttribute',
                   node: (state.domNode as Element),
-                  attrName: attr,
+                  attrName: attr.replace(/^attr\./, ''),
+                  preventInput: /^attr\./.test(attr),
                 });
               }
             }
@@ -322,7 +327,8 @@ export class VirtualNodeRenderer {
                 break;
               }
               case 'setAttribute': {
-                if (Component.isComponentElement(item.node)) {
+                const valueType = typeof item.value;
+                if (!item.preventInput && (valueType === 'function' || valueType === 'object') && Component.isComponentElement(item.node)) {
                   item.node.setInput(item.attrName, item.value);
                 } else {
                   const attrNs = AttributeParser.attrToNs(item.attrName);
