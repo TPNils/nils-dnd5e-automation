@@ -7,7 +7,7 @@ import { VirtualNodeParser } from "../virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
 
 const domParser = new DOMParser();
-const forAttrRegex = /^\s*let\s+([^\s]+\s)+of\s(.+)$/;
+const forAttrRegex = /^\s*let\s+([^\s]+\s)+(of|in)\s(.+)$/;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
   template: T;
   instance: T;
@@ -109,13 +109,25 @@ export class Template {
             if (!regexResult) {
               UtilsLog.error(`Unable to parse *for expression:`, process.instance.getAttribute('*for'));
             } else {
-              const resolvedExpr = this.parseExpression(regexResult[2], process.localVars);
-              if (!resolvedExpr[Symbol.iterator]) {                
-                UtilsLog.error(`The *for expression did not return an array/iterator:`, process.instance.getAttribute('*for'), resolvedExpr);
+              const resolvedExpr = this.parseExpression(regexResult[3], process.localVars);
+              let forIndex = 0;
+              let items: any[];
+              if (regexResult[2].toLowerCase() === 'in') {
+                if (typeof resolvedExpr === 'object') {
+                  items = Object.keys(resolvedExpr);
+                } else {
+                  UtilsLog.error(`The *for (in) expression did not return an object:`, process.instance.getAttribute('*for'), resolvedExpr);
+                }
               } else {
+                if (!resolvedExpr[Symbol.iterator]) {                
+                  UtilsLog.error(`The *for (of) expression did not return an array/iterator:`, process.instance.getAttribute('*for'), resolvedExpr);
+                } else {
+                  items = Object.values(resolvedExpr);
+                }
+              }
+              if (items) {
                 process.instance.removeAttribute('*for');
-                let forIndex = 0;
-                for (const item of resolvedExpr) {
+                for (const item of items) {
                   pending.push({
                     parentInstance: process.parentInstance,
                     template: process.template,
@@ -184,7 +196,7 @@ export class Template {
                       if (nodeValue.isChildNode()) {
                         process.instance.appendChild(nodeValue);
                       } else if (nodeValue.isParentNode()) {
-                        for (const child of nodeValue.childNodes) {
+                        for (const child of [...nodeValue.childNodes]) {
                           child.remove();
                           process.instance.appendChild(child);
                         }
