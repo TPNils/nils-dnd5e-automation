@@ -8,6 +8,7 @@ import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
+import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
@@ -509,6 +510,29 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
 }
 
 class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardData>> {
+
+  //#region beforeCreate
+  public beforeCreate(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): boolean | void {
+    this.calcAutoRoll(context);
+  }
+
+  private calcAutoRoll(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): boolean | void {
+    let autoRoll = false;
+    if (game.user.isGM) {
+      autoRoll = game.settings.get(staticValues.moduleName, 'gmAutorollAttack') === 'always';
+    } else {
+      autoRoll = game.settings.get(staticValues.moduleName, 'playerAutorollAttack') === 'always';
+    }
+
+    if (!autoRoll) {
+      return;
+    }
+
+    for (const {newRow} of context.rows) {
+      newRow.part.data.phase = 'result';
+    }
+  }
+  //#endregion
 
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<any>>): boolean | void {

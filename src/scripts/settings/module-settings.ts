@@ -115,6 +115,57 @@ export class ModuleSettings {
         <b>Player or permission</b>: Match 'Permission' or 'Player'.<br/>
       `,
     });
+    for (const variant of ['gm', 'player']) {
+      game.settings.register<string, string, string>(staticValues.moduleName, `${variant}AutorollAttack`, {
+        scope: 'world',
+        config: false,
+        type: String,
+        choices: {
+          never: 'Never',
+          always: 'Always',
+        },
+        default: 'never',
+        name: `${variant.capitalize()}: Auto roll attack`,
+        hint: `
+          <b>Never</b>: Never auto roll the attack.<br/>
+          <b>Always</b>: Always auto roll the attack.<br/>
+        `,
+      });
+      
+      game.settings.register<string, string, string>(staticValues.moduleName, `${variant}AutorollDamage`, {
+        scope: 'world',
+        config: false,
+        type: String,
+        choices: {
+          never: 'Never',
+          onAttackHit: 'Attack hits',
+          always: 'Always',
+        },
+        default: 'never',
+        name: `${variant.capitalize()}: Auto roll damage`,
+        hint: `
+          <b>Never</b>: Never auto roll the damage.<br/>
+          <b>Attack hits</b>: When hitting a target or if there is no attack, auto roll the damage.<br/>
+          <b>Always</b>: Always auto roll the damage.<br/>
+        `,
+      });
+      
+      game.settings.register<string, string, string>(staticValues.moduleName, `${variant}AutorollCheck`, {
+        scope: 'world',
+        config: false,
+        type: String,
+        choices: {
+          never: 'Never',
+          always: 'Always',
+        },
+        default: 'never',
+        name: `${variant.capitalize()}: Auto roll skill/ability checks & saves`,
+        hint: `
+          <b>Never</b>: Never auto roll the skill/ability checks & saves.<br/>
+          <b>Always</b>: Always auto roll the skill/ability checks & saves.<br/>
+        `,
+      });
+    }
     game.settings.register<string, string, string>(staticValues.moduleName, 'aoeTargetRule', {
       name: 'Area of effect rules (targeting)',
       hint: `

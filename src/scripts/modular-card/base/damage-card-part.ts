@@ -775,8 +775,30 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
 
 class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardData>> {
 
+  //#region beforeCreate
+  public beforeCreate(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): boolean | void {
+    this.calcAutoRollOnCreate(context);
+  }
+
+  private calcAutoRollOnCreate(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): boolean | void {
+    let autoRoll = false;
+    if (game.user.isGM) {
+      autoRoll = game.settings.get(staticValues.moduleName, 'gmAutorollDamage') === 'always';
+    } else {
+      autoRoll = game.settings.get(staticValues.moduleName, 'playerAutorollDamage') === 'always';
+    }
+
+    if (autoRoll) {
+      for (const {newRow} of context.rows) {
+        newRow.part.data.phase = 'result';
+      }
+    }
+  }
+  //#endregion
+
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): boolean | void {
+    this.calcAutoRollOnAttackHit(context);
     this.calculateRollDisplay(context);
     this.calcTargetCache(context);
   }
@@ -870,6 +892,40 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
           cache.calcHpChange = Math.floor(cache.calcHpChange);
           cache.calcHpChange = Math.floor(cache.calcHpChange);
         }
+      }
+    }
+  }
+
+  private calcAutoRollOnAttackHit(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): boolean | void {
+    let autoRoll = false;
+    if (game.user.isGM) {
+      autoRoll = game.settings.get(staticValues.moduleName, 'gmAutorollDamage') === 'onAttackHit';
+    } else {
+      autoRoll = game.settings.get(staticValues.moduleName, 'playerAutorollDamage') === 'onAttackHit';
+    }
+
+    if (!autoRoll) {
+      return;
+    }
+    
+    for (const {newRow} of context.rows) {
+      if (newRow.part.data.phase === 'result') {
+        continue;
+      }
+      const attack: ModularCardPartData<AttackCardData> = newRow.allParts.find(part => ModularCard.isType<AttackCardData>(AttackCardPart.instance, part));
+      let countAsHit = false;
+      if (attack == null) {
+        countAsHit = true;
+      } else {
+        for (const cache of attack.data.targetCaches$) {
+          if (cache.resultType$ === 'hit' || cache.resultType$ === 'critical-hit') {
+            countAsHit = true;
+            break;
+          }
+        }
+      }
+      if (countAsHit) {
+        newRow.part.data.phase = 'result';
       }
     }
   }

@@ -381,6 +381,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): boolean | void {
     this.calcResultCache(context);
+    this.calcAutoRoll(context);
   }
 
   private calcResultCache(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): void {
@@ -395,6 +396,33 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
           }
         } else if (targetCache.resultType$) {
           delete targetCache.resultType$;
+        }
+      }
+    }
+  }
+
+  private calcAutoRoll(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): boolean | void {
+    const playerActorsUuids = new Set<string>();
+    for (const user of game.users.values()) {
+      if (!user.isGM) {
+        playerActorsUuids.add((user.character as MyActor)?.uuid);
+      }
+    }
+    playerActorsUuids.delete(null);
+    playerActorsUuids.delete(undefined);
+    for (const {newRow} of context.rows) {
+      for (const cache of newRow.part.data.targetCaches$) {
+        if (cache.phase === 'result') {
+          continue;
+        }
+        let autoRoll = false;
+        if (playerActorsUuids.has(cache.actorUuid$)) {
+          autoRoll = game.settings.get(staticValues.moduleName, 'playerAutorollAttack') === 'always';
+        } else {
+          autoRoll = game.settings.get(staticValues.moduleName, 'gmAutorollAttack') === 'always';
+        }
+        if (autoRoll) {
+          cache.phase = 'result';
         }
       }
     }
