@@ -7,15 +7,15 @@ import { staticValues } from "../static-values";
   html: /*html*/`
     <label *if="this.renderType">
       <div class="label-text">{{this.setting.name}}</div>
-      <input *if="this.renderType === 'string'" type="string" [value]="this.currentValue" (blur)="this.setValue($event)"/>
+      <input *if="this.renderType === 'string'" type="string" [value]="this.currentValue" [disabled]="!this.canEdit" (blur)="this.setValue($event)"/>
 
-      <select *if="this.renderType === 'picklist'" (change)="this.setValue($event)">
+      <select *if="this.renderType === 'picklist'" [disabled]="!this.canEdit" (change)="this.setValue($event)">
         <option *for="let key in this.setting.choices" [value]="key" [selected]="this.currentValue === key">{{this.setting.choices[key]}}</option>
       </select>
 
-      <input *if="this.renderType === 'number'" type="number" [value]="this.currentValue" (blur)="this.setValue($event)"/>
+      <input *if="this.renderType === 'number'" type="number" [value]="this.currentValue" [disabled]="!this.canEdit" (blur)="this.setValue($event)"/>
 
-      <input *if="this.renderType === 'boolean'" type="checkbox" [checked]="!!this.currentValue" (change)="this.setValue($event)">
+      <input *if="this.renderType === 'boolean'" type="checkbox" [checked]="!!this.currentValue" [disabled]="!this.canEdit" (change)="this.setValue($event)">
     </label>
     <p class="notes" *if="this.renderType && this.setting?.hint" [innerHtml]="this.setting.hint"></p>
   `,
@@ -45,12 +45,19 @@ export class SettingsItemComponent {
   public setting: SettingConfig<any> & {module?: string};
   public renderType: 'string' | 'picklist' | 'number' | 'boolean';
   public currentValue: any;
+  public canEdit = false;
   @Attribute({name: 'data-setting', dataType: 'string'})
   public set settingKey(v: string) {
     this.setting = game.settings.settings.get(v);
     this.renderType = null;
     this.currentValue = null;
+    this.canEdit = false;
     if (this.setting) {
+      if (this.setting.scope === 'client') {
+        this.canEdit = true;
+      } else {
+        this.canEdit = game.user.isGM;
+      }
       const keyParts = v.split('.');
       const namespace = keyParts.splice(0, 1)[0];
       this.currentValue = game.settings.get(namespace, keyParts.join('.'));
