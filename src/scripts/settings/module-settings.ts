@@ -3,6 +3,8 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { ModularCard } from "../modular-card/modular-card";
 import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
+import { Nd5aSettingsFormApplication, SettingsComponent } from "./settings-component";
+import { SettingsItemComponent } from "./settings-item-component";
 
 // TODO make a component to render setting groups
 //  Add automation to add auto roll options
@@ -16,13 +18,13 @@ const refreshMessages = () => {
 
 const partialVisibilitySetting: ClientSettings.PartialSettingConfig<string> = {
   hint: `
-    *All details*: Nothing is hidden, all is visible to everyone.
-    *Permission*: Require the observer permission of the item.
-    *Player*: You can only see the rolls of other players, regardless of permissions.
-    *Player or permission*: Match 'Permission' or 'Player'.
+    <b>All details</b>: Nothing is hidden, all is visible to everyone.<br/>
+    <b>Permission</b>: Require the observer permission of the item.<br/>
+    <b>Player</b>: You can only see the rolls of other players, regardless of permissions.<br/>
+    <b>Player or permission</b>: Match 'Permission' or 'Player'.<br/>
   `,
   scope: 'world',
-  config: true,
+  config: false,
   type: String,
   choices: {
     allDetails: 'All details',
@@ -36,11 +38,11 @@ const partialVisibilitySetting: ClientSettings.PartialSettingConfig<string> = {
 
 const partialHidingRollSetting: ClientSettings.PartialSettingConfig<string> = {
   hint: `
-    *Hidden*: Nothing is shown.
-    *Show total*: Only the total is shown, the roll result and bonuses are hidden.
+    <b>Hidden</b>: Nothing is shown.<br/>
+    <b>Show total</b>: Only the total is shown, the roll result and bonuses are hidden.<br/>
   `,
   scope: 'world',
-  config: true,
+  config: false,
   type: String,
   choices: {
     hidden: 'Hidden',
@@ -54,6 +56,8 @@ export class ModuleSettings {
 
   @RunOnce()
   public static registerHooks(): void {
+    SettingsItemComponent.registerHooks();
+    SettingsComponent.registerHooks();
     ModuleSettings.registerCustomPermissions();
 
     Hooks.on('init', () => {
@@ -63,6 +67,15 @@ export class ModuleSettings {
 
   @RunOnce()
   private static registerSettings(): void {
+    game.settings.registerMenu(staticValues.moduleName, 'menu', {
+      // @ts-ignore form contructor has arguments, contact here is incorrect => ignore
+      type: Nd5aSettingsFormApplication,
+      name: "Settings",
+      label: "Settings",      
+      icon: "fas fa-bars",
+      restricted: false,
+    })
+
     // Define a new setting which can be stored and retrieved
     game.settings.register<string, string, string>(staticValues.moduleName, 'attackVisibility', {
       ...partialVisibilitySetting,
@@ -96,10 +109,10 @@ export class ModuleSettings {
       ...partialVisibilitySetting,
       name: 'Show skill check DC',
       hint: `
-        *All details*: Nothing is hidden, all is visible to everyone.
-        *Permission*: Require the observer permission of the item.
-        *Player*: You can only see the DC of other players, regardless of permissions.
-        *Player or permission*: Match 'Permission' or 'Player'.
+        <b>All details</b>: Nothing is hidden, all is visible to everyone.<br/>
+        <b>Permission</b>: Require the observer permission of the item.<br/>
+        <b>Player</b>: You can only see the DC of other players, regardless of permissions.<br/>
+        <b>Player or permission</b>: Match 'Permission' or 'Player'.<br/>
       `,
     });
     game.settings.register<string, string, string>(staticValues.moduleName, 'aoeTargetRule', {
