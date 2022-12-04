@@ -1,3 +1,5 @@
+import { UtilsRoll } from "./utils-roll";
+
 export interface ShowRollRequest {
   roll: Roll;
   user?: User;
@@ -46,7 +48,7 @@ export class UtilsDiceSoNice {
     // Simplified: only give DiceSoNice vanilla foundry dice
     const vanillaTerms: RollTerm[] = [];
     let hasCustomTerms = false;
-    for (const term of roll.terms) {
+    for (const term of UtilsRoll.rollAlwaysWithDamageType(roll).terms) {
       if (term instanceof Die && term.constructor !== Die) {
         vanillaTerms.push(new Die(term.toJSON()));
         hasCustomTerms = true;

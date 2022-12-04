@@ -119,7 +119,45 @@ export class UtilsRoll {
   public static rollToDamageResults(roll: Roll): Map<DamageType, number> {
     const damageFormulaMap = new Map<DamageType, Array<string | number>>();
 
-    const terms = roll.terms;
+    const terms = UtilsRoll.rollAlwaysWithDamageType(roll).terms;
+    for (let i = terms.length-1; i >= 0; i--) {
+      const damageType: DamageType = terms[i].options?.flavor as DamageType;
+      if (!damageFormulaMap.has(damageType)) {
+        damageFormulaMap.set(damageType, []);
+      }
+      if (typeof terms[i].total === 'number') {
+        damageFormulaMap.get(damageType).unshift(terms[i].total);
+      } else if (typeof (terms[i] as any).operator === 'string') {
+        const formula = damageFormulaMap.get(damageType);
+        formula[0] = `${(terms[i] as any).operator}${formula[0]}`;
+      }
+    }
+
+    const damageMap = new Map<DamageType, number>();
+
+    for (const [type, formula] of damageFormulaMap.entries()) {
+      const total = Roll.safeEval(formula.join(' + '));
+      if (total != 0) {
+        damageMap.set(type, total);
+      }
+    }
+
+    return damageMap;
+  }
+
+  /**
+   * Example formula and how it gets parsed (this is based on how I believe it will be user friendly)
+   * 1d12 + 1d10[cold] + 1d8 + 1d6[fire: my comment] + 1d4 
+   *  everything unlisted inherits from the right 
+   *   => 1d12 & 1d10 = cold
+   *   => 1d8  & 1d6  = fire
+   *  Everything at the end which is unlisted inherits from the left
+   *   => 1d4 = fire
+   */
+  public static rollAlwaysWithDamageType(roll: Roll): Roll {
+    const damageFormulaMap = new Map<DamageType, Array<string | number>>();
+
+    const terms = deepClone(roll.terms);
     let latestDamageType: DamageType | null = null;
     damageFormulaMap.set(latestDamageType, []);
     for (let i = terms.length-1; i >= 0; i--) {
@@ -135,24 +173,19 @@ export class UtilsRoll {
         }
         latestDamageType = damageType;
       }
-      if (typeof terms[i].total === 'number') {
-        damageFormulaMap.get(latestDamageType).unshift(terms[i].total);
-      } else if (typeof (terms[i] as any).operator === 'string') {
-        const formula = damageFormulaMap.get(latestDamageType);
-        formula[0] = `${(terms[i] as any).operator}${formula[0]}`;
+      if (terms[i].options == null) {
+        terms[i].options = {};
+      }
+      if (terms[i].options.flavor !== latestDamageType) {
+        if (terms[i].options.flavor) {
+          terms[i].options.flavor = `${latestDamageType}: ${terms[i].options.flavor}`
+        } else {
+          terms[i].options.flavor = latestDamageType;
+        }
       }
     }
 
-    const damageMap = new Map<DamageType, number>();
-
-    for (const [type, formula] of damageFormulaMap.entries()) {
-      const total = Roll.safeEval(formula.join(' + '));
-      if (total != 0) {
-        damageMap.set(type, total);
-      }
-    }
-
-    return damageMap;
+    return Roll.fromTerms(terms);
   }
 
   public static getNewRolledTerms(originalRoll: Roll | RollData | null, newRoll: Roll | RollData): Roll | null {
