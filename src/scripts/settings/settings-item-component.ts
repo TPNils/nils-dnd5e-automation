@@ -17,7 +17,7 @@ import { staticValues } from "../static-values";
 
       <input *if="this.renderType === 'boolean'" type="checkbox" [checked]="!!this.currentValue" [disabled]="!this.canEdit" (change)="this.setValue($event)">
     </label>
-    <p class="notes" *if="this.renderType && this.setting?.hint" [innerHtml]="this.setting.hint"></p>
+    <p class="notes" *if="this.renderType && this.setting?.hint">{{{this.setting.hint}}}</p>
   `,
   style: /*css*/`
     :host {

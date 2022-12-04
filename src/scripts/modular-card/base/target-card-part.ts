@@ -123,7 +123,7 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
       <div class="header-cell target-amount-summary">
         {{this.tableHeader.currentTargets}}{{this.tableHeader.expectedTargets ? '/' + this.tableHeader.expectedTargets : ''}}
       </div>
-      <div *for="let row of this.tableHeader.row" class="header-cell" [innerHTML]="row"></div>
+      <div *for="let row of this.tableHeader.row" class="header-cell">{{{row}}}</div>
       <div class="header-cell"></div>
       <div class="header-cell one-line">
         <virtual *if="this.tableHeader.canOneActorWrite">
@@ -151,7 +151,7 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
             <button [disabled]="!this.isOwner" (click)="this.onCopyClick(target.tokenUuid)" class="icon-button copy"><i class="far fa-copy"></i></button>
           </div>
           <div class="body-cell" [title]="target.name"><nd5a-token-img [data-token-uuid]="target.tokenUuid" [data-token-img]="target.img"></nd5a-token-img></div>
-          <div *for="let row of target.row" class="body-cell" [innerHTML]="row"></div>
+          <div *for="let row of target.row" class="body-cell">{{{row}}}</div>
           <div class="body-cell"><!-- filler --></div>
           <div class="body-cell one-line">
             <virtual *if="target.canActorWrite">

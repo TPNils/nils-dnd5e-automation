@@ -3,7 +3,7 @@ import { Template } from "../template/template";
 import { VirtualCommmentNode } from "./virtual-comment-node";
 import { VirtualFragmentNode } from "./virtual-fragment-node";
 import { VirtualHtmlNode } from "./virtual-html-node";
-import { VirtualNode, VirtualParentNode } from "./virtual-node";
+import { VirtualChildNode, VirtualNode, VirtualParentNode } from "./virtual-node";
 import { VirtualNodeRenderer } from "./virtual-node-renderer";
 import { VirtualTextNode } from "./virtual-text-node";
 
@@ -153,6 +153,19 @@ export class VirtualNodeParser {
 
   public static parse(html: string): VirtualNode & VirtualParentNode {
     return new VirtualNodeParser(html).startParse();
+  }
+  
+  public static parseRaw(html: string): Array<VirtualChildNode & VirtualNode> {
+    const root: Array<VirtualChildNode & VirtualNode> = [];
+
+    for (const node of VirtualNodeParser.parse(html).childNodes) {
+      root.push(node);
+    }
+    for (const node of root) {
+      node.remove();
+    }
+
+    return root;
   }
 
   public static init() {

@@ -2,9 +2,10 @@ import { UtilsLog } from "../../../utils/utils-log";
 import { UtilsCompare } from "../../utils/utils-compare";
 import { rerenderQueue } from "../virtual-dom/render-queue";
 import { VirtualFragmentNode } from "../virtual-dom/virtual-fragment-node";
-import { isVirtualNode, VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
+import { isVirtualNode, VirtualChildNode, VirtualNode, VirtualParentNode } from "../virtual-dom/virtual-node";
 import { VirtualNodeParser } from "../virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
+import { VirtualTextNode } from "../virtual-dom/virtual-text-node";
 
 const domParser = new DOMParser();
 const forAttrRegex = /^\s*let\s+([^\s]+\s)+(of|in)\s(.+)$/;
@@ -215,7 +216,7 @@ export class Template {
                 }
               }
             } else if (typeof value === 'string') {
-              const processedValue = this.processBindableString(value, process.localVars);
+              const processedValue = this.processBindableString(value, process.localVars, false);
               if (value !== processedValue) {
                 process.instance.setAttribute(name, processedValue);
               }
@@ -223,9 +224,15 @@ export class Template {
           }
         }
         if (process.instance.isTextNode()) {
-          let nodeValue = this.processBindableString(process.instance.getText(), process.localVars);
-          if (nodeValue !== process.instance.getText()) {
-            process.instance.setText(nodeValue);
+          let nodeValue = this.processBindableString(process.instance.getText(), process.localVars, true);
+          const isAllText = nodeValue.every(node => node.isTextNode());
+          if (isAllText) {
+            process.instance.setText(nodeValue.map(node => (node as VirtualTextNode).getText()).join(''));
+          } else {
+            if (process.instance.isChildNode()) {
+              process.parentInstance.appendChild(...nodeValue);
+              continue;
+            }
           }
         }
         const createDom = process.instance.nodeName !== 'VIRTUAL'; // TODO Don't create <virtual> dom nodes like angular <ng-container>. this may need to be tweaked
@@ -272,18 +279,26 @@ export class Template {
     this.#processedVirtualNodesMap = createdNodesByMap;
   }
 
-  private processBindableString(value: string, localVars: any | null): string {
+  private processBindableString(value: string, localVars: any | null, asNode: false): string
+  private processBindableString(value: string, localVars: any | null, asNode: true): Array<VirtualNode & VirtualChildNode>
+  private processBindableString(value: string, localVars: any | null, asNode: boolean): string | Array<VirtualNode & VirtualChildNode> {
     // TODO this is currently a dumb implementation and does not account for the 'keywords' {{ and }} to be present within the expression (example: in a javascript string)
     // Best to write an interpreter but thats a lot of work and maybe more process intensive so lets cross that bridge when we get there :)
     let startExpression = 0;
     let endExpression = -1;
-    const parsedParts: string[] = [];
+    let endExpressionStr = '{{';
+    const parsedParts: Array<(VirtualNode & VirtualChildNode) | string> = [];
     while ((startExpression = value.indexOf('{{', endExpression)) !== -1) {
       if (value[startExpression-1] === '\\') {
         // escaped, please continue
         parsedParts.push('{');
         startExpression++;
         continue;
+      }
+      if (value.substring(startExpression, 3) === '{{{') {
+        endExpressionStr = '}}}';
+      } else {
+        endExpressionStr = '}}';
       }
       
       // endExpression = the end of the last parsed expression
@@ -292,7 +307,7 @@ export class Template {
 
       endExpression = startExpression;
       do {
-        endExpression = value.indexOf('}}', endExpression);
+        endExpression = value.indexOf(endExpressionStr, endExpression);
         if (value[endExpression-1] === '\\') {
           // escaped, please continue
           endExpression++;
@@ -300,13 +315,22 @@ export class Template {
           break;
         }
       } while (endExpression !== -1)
-      parsedParts.push(String(this.parseExpression(value.substring(startExpression+2/*{{*/, endExpression), localVars)));
+      const parsedExpression = String(this.parseExpression(value.substring(startExpression+endExpressionStr.length/*{{ or {{{*/, endExpression), localVars));
+      if (endExpressionStr.length === 3 && asNode) {
+        parsedParts.push(...VirtualNodeParser.parseRaw(parsedExpression));
+      } else {
+        parsedParts.push(parsedExpression);
+      }
 
-      endExpression += 2 /*}}*/;
+      endExpression += endExpressionStr.length /*}} or }}}*/;
       startExpression = endExpression;
     }
     parsedParts.push(this.unescapeHtml(value.substring(endExpression)));
-    return parsedParts.join('');
+    if (asNode) {
+      return parsedParts.map(v => typeof v === 'string' ? new VirtualTextNode(v) : v);
+    } else {
+      return parsedParts.map(v => String(v)).join('');
+    }
   }
 
   private unescapeHtml(html: string): string {

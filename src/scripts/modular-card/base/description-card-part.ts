@@ -25,8 +25,7 @@ function getDefaultCardCollpased(): boolean {
   </div>
 
   <div class="section description {{this.collapsed ? '' : 'open'}}">
-    <div *if="this.description" [innerHTML]="this.description">
-    </div>
+    <div *if="this.description" class="desc">{{{this.description}}}</div>
     <p *if="this.materials">
       <strong>{{ this.localeRequiredMaterials }}.</strong>
       {{ this.materials }}

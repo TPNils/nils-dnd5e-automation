@@ -335,6 +335,9 @@ function VirtualParentNode<T extends Constructor>(clazz: T = PlaceholderClass as
       this.#childNodesSecurity.write = true;
       this.#childNodes.splice(index, 1, ...nodes)
       this.#childNodesSecurity.write = false;
+      for (const node of nodes) {
+        node[setParentOnChild](this);
+      }
       return child;
     }
     
