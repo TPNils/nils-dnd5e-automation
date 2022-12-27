@@ -376,11 +376,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             UtilsLog.error('missing currentDocument for some reason?', collection, result);
             continue;
           }
-          // TODO currently using toObject(source: false) everywhere
-          //  Don't think this is how foundry intended it to be used
-          //  I may be updating data wrong everywhere, but thats to much work to go though right now
-          //  If I want to focus on the V10 update (which changes data access) I may want to properly fix it and set the minimum version to V10
-          oldDocuments[currentDocument.uuid] = new currentDocument.constructor(currentDocument.toObject(false), {parent: currentDocument.parent, pack: currentDocument.pack});
+          oldDocuments[currentDocument.uuid] = new currentDocument.constructor(currentDocument.toObject(true), {parent: currentDocument.parent, pack: currentDocument.pack});
         }
         
         options[Wrapper.oldDocumentSymbol] = oldDocuments;
@@ -391,7 +387,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   //#region Before
   private onFoundryBeforeCreate(document: T & {constructor: new (...args: any[]) => T}, data: any, options: DmlOptions, userId: string): void | boolean {
-    const originalDocumentData = document.toObject(false);
+    const originalDocumentData = document.toObject(true);
     const context: IDmlContext<T> = {
       rows: [{
         newRow: document,
@@ -406,14 +402,14 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       }
     }
 
-    const totalDiff = UtilsCompare.findDiff(originalDocumentData, document.toObject(false));
+    const totalDiff = UtilsCompare.findDiff(originalDocumentData, document.toObject(true));
     if (totalDiff.changed) {
       document.data.update(totalDiff.diff);
     }
   }
   
   private onFoundryBeforeUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: DmlOptions, userId: string): void | boolean {
-    const modifiedData = mergeObject(document.toObject(false), change, {inplace: false});
+    const modifiedData = mergeObject(document.toObject(true), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     const context: IDmlContext<T> = {
       rows: [{
@@ -470,7 +466,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   private extendedOptionsById = new Map<number, any>();
   private async onFoundryAfterCreate(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
     // Don't allow updates directly on the original document
-    let documentSnapshot = new document.constructor(document.toObject(false), {parent: document.parent, pack: document.pack});
+    let documentSnapshot = new document.constructor(document.toObject(true), {parent: document.parent, pack: document.pack});
     let context = new AfterDmlContext<T>(
       [{
         newRow: documentSnapshot,
@@ -480,7 +476,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     );
 
     if (game.userId === userId) {
-      let documentSnapshot = new document.constructor(document.toObject(false), {parent: document.parent, pack: document.pack});
+      let documentSnapshot = new document.constructor(document.toObject(true), {parent: document.parent, pack: document.pack});
       const execs = context.endOfContextExecutes;
       context = new AfterDmlContext<T>(
         [{
@@ -518,7 +514,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             const queriedDocument = await UtilsDocument.fromUuid((document as any as FoundryDocument).uuid);
             context = new AfterDmlContext<T>(
               [{
-                newRow: new document.constructor(queriedDocument.toObject(false), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
+                newRow: new document.constructor(queriedDocument.toObject(true), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
                 changedByUserId: userId,
                 options: options
               }],
@@ -546,9 +542,9 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }));
 
     try {
-      const modifiedData = mergeObject(document.toObject(false), change, {inplace: false});
+      const modifiedData = mergeObject(document.toObject(true), change, {inplace: false});
       const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
-      let documentSnapshot = new document.constructor(modifiedDocument.toObject(false), {parent: document.parent, pack: document.pack});
+      let documentSnapshot = new document.constructor(modifiedDocument.toObject(true), {parent: document.parent, pack: document.pack});
       const oldDocument = this.extractOldValue(document as any, options);
       if (oldDocument === undefined) {
         // See injector (initOldValueInjector) for more info
@@ -566,7 +562,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
       const recursiveUpdate = options?.[staticValues.moduleName]?.recursiveUpdate ?? 0;
       if (game.userId === userId) {
-        documentSnapshot = new document.constructor(modifiedDocument.toObject(false), {parent: document.parent, pack: document.pack});
+        documentSnapshot = new document.constructor(modifiedDocument.toObject(true), {parent: document.parent, pack: document.pack});
         const execs = context.endOfContextExecutes;
         context = new AfterDmlContext<T>(
           [{
@@ -596,7 +592,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             });
           }
           if (recursiveUpdate > 5) {
-            UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, oldRow: oldDocument.toObject(false), newRow: modifiedDocument.toObject(false)});
+            UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, oldRow: oldDocument.toObject(true), newRow: modifiedDocument.toObject(true)});
             outputDiff = true;
           } else {
             const recursiveOptions: DmlOptions = {[staticValues.moduleName]: {recursiveUpdate: recursiveUpdate + 1}};
@@ -617,7 +613,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
               const queriedDocument = await UtilsDocument.fromUuid((document as any as FoundryDocument).uuid);
               context = new AfterDmlContext<T>(
                 [{
-                  newRow: new document.constructor(queriedDocument.toObject(false), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
+                  newRow: new document.constructor(queriedDocument.toObject(true), {parent: queriedDocument.parent, pack: queriedDocument.pack}),
                   oldRow: oldDocument,
                   changedByUserId: userId,
                   options: options
@@ -645,7 +641,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   private async onFoundryAfterDelete(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
     // Don't allow updates directly on the original document
-    let documentSnapshot = new document.constructor(document.toObject(false), {parent: document.parent, pack: document.pack});
+    let documentSnapshot = new document.constructor(document.toObject(true), {parent: document.parent, pack: document.pack});
     const context = new AfterDmlContext<T>(
       [{
         oldRow: documentSnapshot,
@@ -722,8 +718,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const user = game.users.get(userId);
 
       // Don't allow updates directly on the original document
-      const documentSnapshot = new User(user.toObject(false), {parent: user.parent, pack: user.pack});
-      const simulatedOldRow: User = new User(user.toObject(false), {parent: user.parent, pack: user.pack});
+      const documentSnapshot = new User(user.toObject(true), {parent: user.parent, pack: user.pack});
+      const simulatedOldRow: User = new User(user.toObject(true), {parent: user.parent, pack: user.pack});
       
       // Prevent the hook from going off again
       documentSnapshot.targets.add = Set.prototype.add;
