@@ -11,6 +11,7 @@ import { ValueReader } from "../../../provider/value-provider";
 import { staticValues } from "../../../static-values";
 import { DamageType, MyActor, MyItem } from "../../../types/fixed-types";
 import { UtilsItem } from "../../../utils/utils-item";
+import { UtilsLog } from "../../../utils/utils-log";
 import { Action } from "../../action";
 import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ManualDamageSource } from "../../base/index";
@@ -454,7 +455,7 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
         const executingUser = checks.sort((a, b) => a.requestedCheck.user.id.localeCompare(b.requestedCheck.user.id))
           .find(check => check.result)
           ?.requestedCheck.user
-        if (executingUser?.id === game.userId) {
+        if (executingUser?.id !== game.userId) {
           continue;
         }
 
