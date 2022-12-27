@@ -7,6 +7,10 @@
   "version": "2.1.4-beta",
   "minimumCoreVersion": "0.8.0",
   "compatibleCoreVersion": "9",
+  "compatibility": {
+      "minimum": 8,
+      "verified": 9
+  },
   "manifestPlusVersion": "1.0.0",
   "socket": true,
   "url": "https://github.com/TPNils/nils-dnd5e-automation",
@@ -28,15 +32,20 @@
     "./README.md"
   ],
   "dependencies": [
-    {
-      "id": "compendium-folders",
-      "name": "compendium-folders",
-      "type": "module",
-      "manifest": "https://raw.githubusercontent.com/earlSt1/vtt-compendium-folders/master/module.json"
-    },
+    {"id": "compendium-folders", "name": "compendium-folders", "type": "module"},
     {"id": "lib-wrapper", "name": "lib-wrapper", "type": "module"},
     {"id": "socketlib", "name": "socketlib", "type": "module"}
   ],
+  "relationships": {
+    "systems": [
+      {"id": "dnd5e", "type": "system"}
+    ],
+    "requires": [
+      {"id": "compendium-folders", "name": "compendium-folders", "type": "module"},
+      {"id": "lib-wrapper", "name": "lib-wrapper", "type": "module"},
+      {"id": "socketlib", "name": "socketlib", "type": "module"}
+    ]
+},
   "languages": [{"lang": "en", "name": "English", "path": "lang/en.json"}],
   "packs": [
     {
