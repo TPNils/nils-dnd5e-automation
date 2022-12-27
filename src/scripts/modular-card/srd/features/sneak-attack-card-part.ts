@@ -1,3 +1,4 @@
+import { data } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
 import { RoundData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/foundry.js/clientDocuments/combat";
 import { IAfterDmlContext, IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
 import { DocumentListener } from "../../../lib/db/document-listener";
@@ -439,6 +440,21 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
         }
         const combat = await UtilsDocument.combatFromUuid(newRow.part.data.createdCombatRound.combatUuid);
         if (!combat) {
+          continue;
+        }
+        const checks = await UtilsDocument.hasPermissions(Array.from(game.users.values())
+          .filter(user => user.active)
+          .map(user => {
+            return {
+              uuid: newRow.part.data.createdCombatRound.combatUuid,
+              permission: 'update',
+              user: user
+            }
+          }))
+        const executingUser = checks.sort((a, b) => a.requestedCheck.user.id.localeCompare(b.requestedCheck.user.id))
+          .find(check => check.result)
+          ?.requestedCheck.user
+        if (executingUser?.id === game.userId) {
           continue;
         }
 
