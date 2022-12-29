@@ -119,6 +119,7 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
       if (targetCache.userBonus === event.userBonus && targetCache.phase === 'result') {
         return;
       }
+      // TODO ge kunt de roll zien als player via dice so nice
       targetCache.userBonus = event.userBonus;
       targetCache.phase = 'result';
       return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
@@ -532,7 +533,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
           const roll = UtilsRoll.getNewRolledTerms(oldRollsBySelectionId.get(target.selectionId$), target.roll$);
           if (roll) {
             showRolls.push({
-              uuid: newRow.part.data.actorUuid$,
+              uuid: target.actorUuid$,
               permission: `${staticValues.code}ReadCheck`,
               user: game.user,
               meta: roll,
