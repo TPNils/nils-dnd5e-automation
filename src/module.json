@@ -4,18 +4,15 @@
   "title": "Nils' dnd5e automation",
   "description": "",
   "authors": [{"name": "TPNils"}],
-  "version": "2.1.4-beta",
+  "version": "2.1.5-beta",
   "minimumCoreVersion": "0.8.0",
   "compatibleCoreVersion": "9",
-  "compatibility": {
-      "minimum": 8,
-      "verified": 9
-  },
+  "compatibility": {"minimum": 8, "verified": 9},
   "manifestPlusVersion": "1.0.0",
   "socket": true,
   "url": "https://github.com/TPNils/nils-dnd5e-automation",
   "manifest": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/latest/module.json",
-  "download": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/v2.1.4-beta/module.zip",
+  "download": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/v2.1.5-beta/module.zip",
   "type": "module",
   "styles": [],
   "esmodules": ["scripts/main.js"],
@@ -32,20 +29,26 @@
     "./README.md"
   ],
   "dependencies": [
-    {"id": "compendium-folders", "name": "compendium-folders", "type": "module"},
+    {
+      "id": "compendium-folders",
+      "name": "compendium-folders",
+      "type": "module"
+    },
     {"id": "lib-wrapper", "name": "lib-wrapper", "type": "module"},
     {"id": "socketlib", "name": "socketlib", "type": "module"}
   ],
   "relationships": {
-    "systems": [
-      {"id": "dnd5e", "type": "system"}
-    ],
+    "systems": [{"id": "dnd5e", "type": "system"}],
     "requires": [
-      {"id": "compendium-folders", "name": "compendium-folders", "type": "module"},
+      {
+        "id": "compendium-folders",
+        "name": "compendium-folders",
+        "type": "module"
+      },
       {"id": "lib-wrapper", "name": "lib-wrapper", "type": "module"},
       {"id": "socketlib", "name": "socketlib", "type": "module"}
     ]
-},
+  },
   "languages": [{"lang": "en", "name": "English", "path": "lang/en.json"}],
   "packs": [
     {
