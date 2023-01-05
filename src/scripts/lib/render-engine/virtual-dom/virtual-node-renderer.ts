@@ -1,3 +1,4 @@
+import { UtilsLog } from "../../../utils/utils-log";
 import { AttributeParser } from "../attribute-parser";
 import { Component } from "../component";
 import { rerenderQueue } from "./render-queue";
@@ -327,8 +328,7 @@ export class VirtualNodeRenderer {
                 break;
               }
               case 'setAttribute': {
-                const valueType = typeof item.value;
-                if (!item.preventInput && (valueType === 'function' || valueType === 'object') && Component.isComponentElement(item.node)) {
+                if (!item.preventInput && Component.isComponentElement(item.node)) {
                   item.node.setInput(item.attrName, item.value);
                 } else {
                   const attrNs = AttributeParser.attrToNs(item.attrName);

@@ -181,10 +181,8 @@ export class Template {
           }
           for (let name of process.instance.getAttributeNames()) {
             let value = process.instance.getAttribute(name);
-            let updateValue = false;
             if (name.length > 2 && name.startsWith('[') && name.endsWith(']')) {
               process.instance.removeAttribute(name);
-              updateValue = true;
               name = name.substring(1, name.length - 1);
               switch (name) {
                 case 'innerhtml': {

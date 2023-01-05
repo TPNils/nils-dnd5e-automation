@@ -10,7 +10,7 @@ import { staticValues } from "../static-values";
       <div class="item {{this.selectedTab === 'visibility' ? 'active' : ''}}" (click)="this.selectedTab = 'visibility'"><i class="fas fa-eye"></i> Visibility</div>
       <div class="item {{this.selectedTab === 'auto-rolling' ? 'active' : ''}}" (click)="this.selectedTab = 'auto-rolling'"><i class="fas fa-dice-d20"></i> Auto rolling</div>
     </nav>
-    <div class="wrapper" selected-tab="{{this.selectedTab}}">
+    <div class="wrapper" attr.selected-tab="{{this.selectedTab}}">
       <div class="tab visibility">
         <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.attackVisibility" data-auto-save="true"></nd5a-settings-item-page>
         <nd5a-settings-item-page class="right" data-setting="${staticValues.moduleName}.attackHiddenRoll" data-auto-save="true"></nd5a-settings-item-page>
