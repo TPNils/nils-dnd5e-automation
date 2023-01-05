@@ -126,7 +126,7 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
       <div *for="let row of this.tableHeader.row" class="header-cell">{{{row}}}</div>
       <div class="header-cell"></div>
       <div class="header-cell one-line">
-        <virtual *if="this.tableHeader.canOneActorWrite">
+        <virtual *if="this.tableHeader.canOneActorWrite && this.tableBody.length > 1">
           <button (click)="this.onTargetActionClick('smart-apply', '*')" [data-state]="this.tableHeader.smartState" class="icon-button apply"><i class="fas fa-brain"></i></button>
           <button (click)="this.onTargetActionClick('force-apply', '*')" [data-state]="this.tableHeader.state" class="icon-button apply"><i class="fas fa-check"></i></button>
           <button (click)="this.onTargetActionClick('undo', '*')" [data-state]="this.tableHeader.state" class="icon-button undo"><i class="fas fa-undo"></i></button>
@@ -283,10 +283,9 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     .addSerializer(ItemCardHelpers.getRawSerializer('action'))
     .addSerializer(ItemCardHelpers.getRawSerializer('targetUuid'))
     .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
-    .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}, targetUuid: string}>(({part, targetUuid}) => {
-      const documents: CreatePermissionCheckArgs['documents'] = [];
-      documents.push({uuid: part.data.selected.find(s => s.selectionId === targetUuid).tokenUuid, permission: 'update', security: true});
-      return {documents: documents};
+    .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}, targetUuid: string | '*'}>(({part, targetUuid}) => {
+      // No need to check for target uuid permissions, this is handled by the build/execute
+      return {updatesMessage: true};
     }))
     .build(async ({messageId, part, allCardParts, action, targetUuid, user}) => {
       await TargetCardComponent.fireEvent(action, [targetUuid], part.data, messageId, allCardParts, user.id);
