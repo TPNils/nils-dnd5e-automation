@@ -418,9 +418,9 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
         }
         let autoRoll = false;
         if (playerActorsUuids.has(cache.actorUuid$)) {
-          autoRoll = game.settings.get(staticValues.moduleName, 'playerAutorollAttack') === 'always';
+          autoRoll = game.settings.get(staticValues.moduleName, 'playerAutorollCheck') === 'always';
         } else {
-          autoRoll = game.settings.get(staticValues.moduleName, 'gmAutorollAttack') === 'always';
+          autoRoll = game.settings.get(staticValues.moduleName, 'gmAutorollCheck') === 'always';
         }
         if (autoRoll) {
           cache.phase = 'result';
