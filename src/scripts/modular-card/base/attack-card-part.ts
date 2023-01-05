@@ -8,7 +8,6 @@ import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
-import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
@@ -62,6 +61,7 @@ export interface AttackCardData {
     <nd5a-roll-d20
       [data-roll]="this.part.data.roll$"
       [data-label]="this.overrideRollLabel"
+      [data-roll-mode]="this.part.data.mode"
       [data-bonus-formula]="this.part.data.userBonus"
       [data-show-bonus]="this.part.data.phase !== 'mode-select'"
       [data-override-max-roll]="this.part.data.critTreshold$"

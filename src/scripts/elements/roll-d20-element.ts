@@ -231,6 +231,19 @@ export class RollD20Element {
     }
   }
 
+  /**
+   * The roll mode when the roll was not rolled yet
+   */
+  @Attribute({name: 'data-roll-mode', dataType: 'string'})
+  public set setRollMode(value: RollMode) {
+    value = value.toLowerCase() as RollMode;
+    if (this._roll == null || !rollModeOrder.includes(value)) {
+      return;
+    }
+    this.rollMode = value;
+    this.calcRollMode();
+  }
+
   @Attribute({name: 'data-override-formula', dataType: 'string'})
   public overrideFormula: string;
 
@@ -270,9 +283,7 @@ export class RollD20Element {
   public rollMode: RollMode = 'normal';
   public rollModeLabel = game.i18n.localize(`DND5E.${this.rollMode.capitalize()}`);
   private calcRollMode() {
-    if (this._roll == null) {
-      this.rollMode = 'normal';
-    } else {
+    if (this._roll != null) {
       const firstTerm = this._roll.terms[0] as DiceTerm;
       if (firstTerm?.modifiers?.includes('kh')) {
         this.rollMode = 'advantage';
@@ -376,9 +387,11 @@ export class RollD20Element {
     if (this.rollMode === rollModeOrder[newIndex]) {
       return;
     }
+    this.rollMode = rollModeOrder[newIndex];
+    this.calcRollMode();
     this.rollModechange = {
       quickRoll: event.shiftKey,
-      data: rollModeOrder[newIndex],
+      data: this.rollMode,
     };
   }
   
