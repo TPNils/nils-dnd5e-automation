@@ -498,15 +498,8 @@ export class ModularCard {
     const createEvent = new BeforeCreateModuleCardEvent(data);
     // Ignore returned boolean
     Hooks.call(`create${staticValues.code.capitalize()}ModuleCard`, createEvent);
-
-    const cardParts: ModularCardPart[] = createEvent.getParts();
-
-    if (data.item.name === 'Lay on Hands') {
-      // TODO check if i can remove this
-      cardParts[cardParts.indexOf(DamageCardPart.instance)] = SrdLayOnHandsCardPart.instance;
-    }
     
-    for (const cardPart of cardParts) {
+    for (const cardPart of createEvent.getParts()) {
       const response = cardPart.create(data);
       if (response instanceof Promise) {
         parts.push(response.then(resp => ({data: resp, cardPart: cardPart})))
