@@ -8,6 +8,7 @@ import { staticValues } from "../../static-values";
 import { SpellData, MyActor } from "../../types/fixed-types";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
+import { ItemUtils } from "../item-utils";
 import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
@@ -28,7 +29,6 @@ export interface SpellLevelCardData {
   }
 }
 
-const originalLevelSymbol = Symbol('Original level');
 @Component({
   tag: SpellLevelCardComponent.getSelector(),
   html: /*html*/`
@@ -115,7 +115,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
             this.spellSlotOptions.push({
               label: game.i18n.format("DND5E.SpellLevelPact", {level: spellLevel, n: availableSlots}),
               value: 'pact',
-              selected: part.data.selectedLevel === spellLevel,
+              selected: part.data.selectedLevel === 'pact',
             });
           } else {
             const spellLevel = /spell([0-9]+)/.exec(spellKey)[1];
@@ -191,7 +191,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       }
     }
     // The item passed may have its level changed => vanilla foundry/dnd5e behaviour.
-    const originalLevel = item[originalLevelSymbol] !== undefined ? item[originalLevelSymbol] : (await UtilsDocument.itemFromUuid(item.uuid)).data.data.level;
+    const originalLevel = await ItemUtils.getOriginalLevel(item);
     spellSlots = spellSlots.filter(slot => slot.level >= originalLevel);
     
     // Sort pact before spell levels
@@ -206,15 +206,14 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
     // Find the first available spellslot
     // TODO innate casting (always?) also counts as known spells => allow to use either the (un)limited uses or (upcast) spell slots
     const spellIsPact = item.data.data?.preparation?.mode === 'pact';
-    let selectedLevel: SpellLevelCardData['selectedLevel'] = spellIsPact ?  'pact' : item.data.data.level;
-    const selectedLevelAvailableSlots = spellSlots.find(slot => selectedLevel === 'pact' ? (slot.type === 'pact') : (slot.type === 'spell' && slot.level === selectedLevel))?.availableSlots;
-    let selectedLevelNumber = selectedLevel === 'pact' ? spellSlots.find(slot => slot.type === 'pact')?.level : selectedLevel;
-    if (selectedLevelNumber < item.data.data.level || selectedLevelAvailableSlots < 1) {
-      for (const spellSlot of spellSlots) {
-        if (spellSlot.availableSlots > 0 && spellSlot.level >= item.data.data.level) {
-          selectedLevel = spellSlot.type === 'pact' ? 'pact' : spellSlot.level;
-          break;
-        }
+    let selectedLevel: SpellLevelCardData['selectedLevel'] = spellIsPact ? 'pact' : item.data.data.level;
+    if (selectedLevel === 'pact') {
+      if (actor.data.data.spells.pact.value < 1 && actor.data.data.spells[`spell${actor.data.data.spells.pact.level}`].value > 0) {
+        selectedLevel = actor.data.data.spells.pact.level;
+      }
+    } else {
+      if (actor.data.data.spells.pact.value > 0 && actor.data.data.spells.pact.level === selectedLevel) {
+        selectedLevel = 'pact';
       }
     }
 
@@ -300,14 +299,7 @@ class SpellLevelCardTrigger implements ITrigger<ModularCardTriggerData<SpellLeve
       ]);
   
       if (item.data.data.level !== level || (part.data.selectedLevel === 'pact' && item.data.data?.preparation?.mode !== 'pact')) {
-        const originalLevel = item.data.data.level;
-        const updateItem: {[key: string]: any} = {data: {level: level}};
-        if (part.data.selectedLevel === 'pact') {
-          updateItem.data.preparation = {mode: 'pact'};
-        }
-        item = item.clone(updateItem, {keepId: true});
-        item.prepareFinalAttributes(); // Spell save DC, etc...
-        item[originalLevelSymbol] = originalLevel;
+        item = ItemUtils.createUpcastItem(item, level);
       }
   
       const responses: Array<Promise<ModularCardPartData>> = [];

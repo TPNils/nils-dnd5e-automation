@@ -41,7 +41,7 @@ export interface ActorSkill {
   passive: number;
 }
 
-interface SpellData {
+export interface SpellData {
   max: number;
   override?: number | null;
   slotsAvailable: boolean;

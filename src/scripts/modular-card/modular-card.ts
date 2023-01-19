@@ -9,9 +9,10 @@ import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
-import { MyActor, MyItem } from "../types/fixed-types";
+import { MyActor, MyItem, SpellData } from "../types/fixed-types";
 import { UtilsLog } from "../utils/utils-log";
 import { ActiveEffectCardPart, AttackCardPart, CheckCardPart, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardPart, SpellLevelCardPart, TargetCardPart, TemplateCardPart } from "./base/index";
+import { ItemUtils } from "./item-utils";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { SrdLayOnHandsCardPart } from "./srd/index";
 
@@ -459,6 +460,40 @@ export class ModularCard {
   public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardPartData[]> {
     let id = 0;
     const parts: Promise<{data: any, cardPart: ModularCardPart}>[] = [];
+    
+    // Find the first available spellslot, auto upcast if missing spell slots
+    if (data.actor && data.item.data.data.level > 0) {
+      const itemLevel = data.item.data.data.level;
+      const spellIsPact = data.item.data.data?.preparation?.mode === 'pact';
+      let selectedLevel: number | 'pact' = spellIsPact ? data.actor.data.data.spells.pact.level : data.item.data.data.level;
+      let selectedSpell: SpellData = spellIsPact ? data.actor.data.data.spells.pact : data.actor.data.data.spells[`spell${selectedLevel}`];
+      
+      if (selectedLevel < itemLevel || selectedSpell.value < 1) {
+        let newItemLevel = itemLevel;
+        if (data.actor.data.data.spells.pact.level >= itemLevel && data.actor.data.data.spells.pact.value > 0) {
+          newItemLevel = data.actor.data.data.spells.pact.level;
+        } else {
+          const spellLevels = Object.keys(data.actor.data.data.spells)
+            .map(prop => /^spell([0-9]+)$/i.exec(prop))
+            .filter(rgx => !!rgx)
+            .map(rgx => Number(rgx[1]))
+            .sort();
+          for (const spellLevel of spellLevels) {
+            if (spellLevel <= itemLevel) {
+              continue;
+            }
+            let actorSpellData: SpellData = data.actor.data.data.spells[`spell${spellLevel}`];
+            if (actorSpellData.value > 0) {
+              newItemLevel = spellLevel;
+              break;
+            }
+          }
+        }
+        if (itemLevel != newItemLevel) {
+          data.item = ItemUtils.createUpcastItem(data.item, newItemLevel);
+        }
+      }
+    }
 
     const createEvent = new BeforeCreateModuleCardEvent(data);
     // Ignore returned boolean
@@ -467,6 +502,7 @@ export class ModularCard {
     const cardParts: ModularCardPart[] = createEvent.getParts();
 
     if (data.item.name === 'Lay on Hands') {
+      // TODO check if i can remove this
       cardParts[cardParts.indexOf(DamageCardPart.instance)] = SrdLayOnHandsCardPart.instance;
     }
     
