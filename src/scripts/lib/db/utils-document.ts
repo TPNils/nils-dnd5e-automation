@@ -1,5 +1,6 @@
 import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
+import { UtilsLog } from "../../utils/utils-log";
 
 export type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
 
@@ -46,18 +47,39 @@ export type PermissionCheckHandler = ({}: {user: User; document: FoundryDocument
 const defaultPermissionChecks: {[key: string]: PermissionCheckHandler} = {};
 for (const perm of Object.keys(UtilsFoundry.getUserRolls())) {
   defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
-    return document.testUserPermission(user, perm as any);
+    let doc = document;
+    while (doc != null) {
+      if (doc.testUserPermission(user, perm as any)) {
+        return true;
+      }
+      doc = doc.parent;
+    }
+    return false;
   }
 }
 for (const perm of Object.keys(UtilsFoundry.getDocumentPermissions())) {
   const level = UtilsFoundry.getDocumentPermissions()[perm];
   defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
-    return document.getUserLevel(user) >= level;
+    let doc = document;
+    while (doc != null) {
+      if (doc.getUserLevel(user) >= level) {
+        return true;
+      }
+      doc = doc.parent;
+    }
+    return false;
   }
 }
 for (const perm of (['create', 'update', 'delete'] as const)) {
   defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
-    return document.canUserModify(user, perm);
+    let doc = document;
+    while (doc != null) {
+      if (doc.canUserModify(user, perm)) {
+        return true;
+      }
+      doc = doc.parent;
+    }
+    return false;
   }
 }
 defaultPermissionChecks['GM'] = ({user}) => {
