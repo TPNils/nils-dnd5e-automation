@@ -6,8 +6,6 @@ import { MyActor } from "../types/fixed-types";
 import { Nd5aSettingsFormApplication, SettingsComponent } from "./settings-component";
 import { SettingsItemComponent } from "./settings-item-component";
 
-// TODO make a component to render setting groups
-//  Add automation to add auto roll options
 const refreshMessages = () => {
   for (const message of game.messages.contents) {
     if (ModularCard.getCardPartDatas(message) != null) {
