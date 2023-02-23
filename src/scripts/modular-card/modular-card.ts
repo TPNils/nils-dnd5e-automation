@@ -40,7 +40,7 @@ function getExtendedTypes(inputHandler: ModularCardPart | string): string[] {
 }
 
 export class ModularCardInstance {
-  private dataInst: ModularCardData = {};
+  private data: ModularCardData = {};
 
   public hasType<T>(partType: ModularCardPart<T> | string): boolean {
     return this.getTypeData(partType) != null;
@@ -50,9 +50,15 @@ export class ModularCardInstance {
   public getTypeData<T>(partType: ModularCardPart<T>): T | null;
   public getTypeData<T>(partType: ModularCardPart<T> | string): any | null
   public getTypeData<T>(partType: ModularCardPart<T> | string): T | null {
-    for (const type of getExtendedTypes(partType)) {
-      if (this.dataInst[type] != null) {
-        return this.dataInst[type];
+    const partTypeName = this.getTypeName(partType);
+    if (this.data[partTypeName] != null) {
+      return this.data[partTypeName];
+    }
+
+    for (const type in this.data) {
+      const extendedTypes = getExtendedTypes(type);
+      if (extendedTypes.includes(partTypeName)) {
+        return this.data[type];
       }
     }
     return null;
@@ -63,10 +69,10 @@ export class ModularCardInstance {
   public getTypeDataAndHandler<T>(partType: ModularCardPart<T> | string): {handler: ModularCardPart<any>; data: any} | null
   public getTypeDataAndHandler<T>(partType: ModularCardPart<T> | string): {handler: ModularCardPart<T>; data: T} | null {
     for (const type of getExtendedTypes(partType)) {
-      if (this.dataInst[type] != null) {
+      if (this.data[type] != null) {
         return {
           handler: ModularCard.getTypeHandler(type),
-          data: this.dataInst[type],
+          data: this.data[type],
         }
       }
     }
@@ -78,17 +84,20 @@ export class ModularCardInstance {
   public setTypeData<T>(partType: ModularCardPart<T> | string, data: any | null): void {
     // Reset all types, both itself and every type it extends
     for (const type of getExtendedTypes(partType)) {
-      delete this.dataInst[type];
+      delete this.data[type];
     }
     if (data != null) {
-      const typeName = typeof partType === 'string' ? partType : partType?.getType();
-      this.dataInst[typeName] = data;
+      this.data[this.getTypeName(partType)] = data;
     }
+  }
+
+  private getTypeName(partType: ModularCardPart | string): string {
+    return typeof partType === 'string' ? partType : partType?.getType()
   }
 
   public getAllTypes(): ModularCardPart[] {
     const parts: ModularCardPart[] = [];
-    for (const type in this.dataInst) {
+    for (const type in this.data) {
       const handler = ModularCard.getTypeHandler(type);
       if (handler != null) {
         parts.push(handler);
@@ -99,7 +108,7 @@ export class ModularCardInstance {
 
   public deepClone(): ModularCardInstance {
     const clone = new ModularCardInstance();
-    clone.dataInst = deepClone(this.dataInst);
+    clone.data = deepClone(this.data);
     return clone;
   }
 }
