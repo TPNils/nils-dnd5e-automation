@@ -1,12 +1,9 @@
-import { FoundryDocument } from "../lib/db/utils-document";
 import { MyItem } from "../types/fixed-types";
 
 interface ItemIdentifier {
   name: string;
   dnd5eCompendiumId: string;
 }
-
-type ItemMap = {[key: string]: ItemIdentifier};
 
 const itemMap = {
   layOnHands: {

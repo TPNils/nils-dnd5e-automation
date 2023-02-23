@@ -1,8 +1,5 @@
-import { ReEvaluatableDie } from "./re-evaluatable-die";
-import { DamageType, MyActor, MyActorData, MyItemData } from "../../types/fixed-types";
-import { UtilsDiceSoNice } from "./utils-dice-so-nice";
+import { DamageType, MyItemData } from "../../types/fixed-types";
 import { ReusableDiceTerm } from "./reusable-dice-term";
-import { staticValues } from "../../static-values";
 
 const validDamageTypes: DamageType[] = ['' /* none */, 'acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder', 'healing', 'temphp'];
 
