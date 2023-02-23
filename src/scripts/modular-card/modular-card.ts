@@ -68,12 +68,21 @@ export class ModularCardInstance {
   public getTypeDataAndHandler<T>(partType: ModularCardPart<T>): {handler: ModularCardPart<T>; data: T} | null;
   public getTypeDataAndHandler<T>(partType: ModularCardPart<T> | string): {handler: ModularCardPart<any>; data: any} | null
   public getTypeDataAndHandler<T>(partType: ModularCardPart<T> | string): {handler: ModularCardPart<T>; data: T} | null {
-    for (const type of getExtendedTypes(partType)) {
-      if (this.data[type] != null) {
+    const partTypeName = this.getTypeName(partType);
+    if (this.data[partTypeName] != null) {
+      return {
+        data: this.data[partTypeName],
+        handler: ModularCard.getTypeHandler(partTypeName),
+      };
+    }
+
+    for (const type in this.data) {
+      const extendedTypes = getExtendedTypes(type);
+      if (extendedTypes.includes(partTypeName)) {
         return {
-          handler: ModularCard.getTypeHandler(type),
           data: this.data[type],
-        }
+          handler: ModularCard.getTypeHandler(type),
+        };
       }
     }
     return null;
