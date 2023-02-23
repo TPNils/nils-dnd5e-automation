@@ -317,7 +317,11 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       if (integration.onChange) {
         const response = integration.onChange(callbackData);
         if (response instanceof Promise) {
-          await response;
+          try {
+            await response;
+          } catch (e) {
+            UtilsLog.error(`Error during target interaction`, {integration}, '\nError', e)
+          }
         }
       }
     }

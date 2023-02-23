@@ -182,6 +182,9 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       }
 
       const activeEffectCard = targetEvent.messageCardParts.getTypeData(ActiveEffectCardPart.instance);
+      if (activeEffectCard == null) {
+        continue;
+      }
       const expectedActiveEffectIndexes: number[] = [];
       const appliedActiveEffectIndexes: number[] = [];
       const cache = getTargetCache(activeEffectCard, actor.uuid);
@@ -235,6 +238,9 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       }
 
       const activeEffectCard = targetEvent.messageCardParts.getTypeData(ActiveEffectCardPart.instance);
+      if (activeEffectCard == null) {
+        continue;
+      }
       for (const targetCache of activeEffectCard.targetCaches$) {
         targetCache.appliedEffects$ = targetCache.appliedEffects$.filter(applied => {
           return !deleteActiveEffectUuids.has(applied.createdUuid$);
