@@ -1,7 +1,7 @@
 import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { MyActor, MyItem } from "../types/fixed-types";
-import { ChatPartIdData, UserIdData } from "./item-card-helpers";
-import { ModularCardPartData } from "./modular-card";
+import { ChatPartIdData } from "./item-card-helpers";
+import { ModularCardInstance } from "./modular-card";
 
 export interface CreatePermissionCheckArgs {
   documents?: Array<{
@@ -81,14 +81,13 @@ export interface ModularCardCreateArgs {
 
 export interface HtmlContext<T = any> {
   messageId: string;
-  partId: string;
   subType?: string;
   data: T;
-  allMessageParts: ModularCardPartData[];
+  allMessageParts: ModularCardInstance;
 }
 
 export interface ModularCardPart<D = any> {
-  getType(): string;
+  getType(): string; // TODO getType should be static => use as param when registering
   create(args: ModularCardCreateArgs): PromiseOrSync<D>;
   refresh(data: D, args: ModularCardCreateArgs): PromiseOrSync<D>;
   getHtml?(data: HtmlContext<D>): PromiseOrSync<string | null>;

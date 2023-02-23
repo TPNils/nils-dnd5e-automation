@@ -1,15 +1,14 @@
 import { DamageType, MyItemData } from "../types/fixed-types";
-import { ModularCard, ModularCardPartData } from "./modular-card";
+import { ModularCard, ModularCardInstance } from "./modular-card";
 import { ModularCardPart } from "./modular-card-part";
 
 export interface ChatPartIdData {
-  readonly partId: string;
   readonly messageId: string;
 }
 
 export interface ChatPartEnriched<T> {
-  readonly allCardParts: ModularCardPartData<any>[];
-  readonly part: ModularCardPartData<T>;
+  readonly cardParts: ModularCardInstance;
+  readonly part: T;
 }
 
 export interface UserIdData {
@@ -74,7 +73,6 @@ export class ItemCardHelpers {
       // TODO validate when values are missing
       return {
         messageId: element.closest('[data-message-id]')?.getAttribute('data-message-id'),
-        partId: element.closest('[data-part-id]')?.getAttribute('data-part-id'),
       }
     }
   }
@@ -120,45 +118,35 @@ export class ItemCardHelpers {
     }
   }
 
-  public static getChatPartEnricher<T>(): (data: ChatPartIdData) => ChatPartEnriched<T> {
+  public static getChatEnricher(): (data: ChatPartIdData) => ChatPartEnriched<undefined> {
     return data => {
       const message = game.messages.get(data.messageId);
       const originalAllCardParts = ModularCard.getCardPartDatas(message);
-
-      let allCardParts = deepClone(originalAllCardParts);
-      const messagePartData = allCardParts.find(part => part.id === data.partId);
-      if (messagePartData == null) {
-        throw {
-          success: false,
-          errorType: 'warn',
-          errorMessage: `Pressed an action button for message part ${data.messageId}.${data.partId} but no data was found`,
-        };
-      }
       return {
-        allCardParts,
-        part: messagePartData,
+        cardParts: originalAllCardParts.deepClone(),
+        part: undefined,
       }
     }
   }
 
-  public static ifAttrData<T>(args: {
-    attr: Partial<{readonly ['data-message-id']: string, readonly ['data-part-id']: string}>,
-    element: HTMLElement,
-    type: ModularCardPart<T>,
-    callback: (args: {allParts: ModularCardPartData<any>[], part: ModularCardPartData<T>}) => any
-  }): any {
-    const allParts = ModularCard.getCardPartDatas(game.messages.get(args.attr['data-message-id']));
-    if (allParts == null) {
-      args.element.innerText = '';
-      return;
-    }
-    const data: ModularCardPartData<T> = allParts.find(p => p.id === args.attr['data-part-id'] && p.type === args.type.getType());
-    if (data == null) {
-      args.element.innerText = '';
-      return;
-    }
+  public static getChatPartEnricher<T>(partType: ModularCardPart<T>): (data: ChatPartIdData) => ChatPartEnriched<T> {
+    return data => {
+      const message = game.messages.get(data.messageId);
+      const originalAllCardParts = ModularCard.getCardPartDatas(message);
 
-    return args.callback({allParts: allParts, part: data});
+      if (!originalAllCardParts.hasType(partType)) {
+        throw {
+          success: false,
+          errorType: 'warn',
+          errorMessage: `Pressed an action button for message part ${data.messageId}.${partType.getType()} but no data was found`,
+        };
+      }
+      const cardParts = originalAllCardParts.deepClone();
+      return {
+        cardParts: cardParts,
+        part: cardParts.getTypeData<T>(partType),
+      }
+    }
   }
   
 }

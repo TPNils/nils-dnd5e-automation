@@ -11,7 +11,7 @@ import { staticValues } from "../../static-values";
 import { MyActor, MyActorData } from "../../types/fixed-types";
 import { Action } from "../action";
 import { ItemCardHelpers, ChatPartIdData, ChatPartEnriched } from "../item-card-helpers";
-import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
+import { ModularCard, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, createPermissionCheckAction } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
@@ -95,13 +95,13 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
   });
 
   
-  private static getTargetCacheEnricher(this: null, data: ChatPartIdData & ChatPartEnriched<CheckCardData> & {targetId: string;}): {targetCache: TargetCache} {
-    const cache = getTargetCache(data.part.data, data.targetId);
+  private static getTargetCacheEnricher(this: null, data: ChatPartIdData & ChatPartEnriched<undefined> & {targetId: string;}): {targetCache: TargetCache} {
+    const cache = getTargetCache(data.cardParts.getTypeData<CheckCardData>(CheckCardPart.instance), data.targetId);
     if (!cache) {
       throw {
         success: false,
         errorType: 'warn',
-        errorMessage: `Pressed an action button for message part ${data.messageId}.${data.partId} but no data was found for subtype: ${data.targetId}`,
+        errorMessage: `Pressed an action button for message part ${data.messageId}.${CheckCardPart.instance.getType()} but no data was found for subtype: ${data.targetId}`,
       };
     }
     return {targetCache: cache};
@@ -109,31 +109,29 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
 
   private static rollClick = new Action<{event: CustomEvent<{userBonus?: string}>; targetId: string;} & ChatPartIdData>('CheckOnRollClick')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
     .addSerializer(ItemCardHelpers.getCustomEventSerializer())
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .addEnricher(CheckCardComponent.getTargetCacheEnricher)
     .setPermissionCheck(CheckCardComponent.actionPermissionCheck)
-    .build(({messageId, targetCache, event, allCardParts}) => {
+    .build(({messageId, targetCache, event, cardParts}) => {
       if (targetCache.userBonus === event.userBonus && targetCache.phase === 'result') {
         return;
       }
       // TODO ge kunt de roll zien als player via dice so nice
       targetCache.userBonus = event.userBonus;
       targetCache.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     })
     
 private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>; targetId: string;} & ChatPartIdData>('AttackOnModeChange')
   .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-  .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
   .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
   .addSerializer(ItemCardHelpers.getCustomEventSerializer())
-  .addEnricher(ItemCardHelpers.getChatPartEnricher<CheckCardData>())
+  .addEnricher(ItemCardHelpers.getChatEnricher())
   .addEnricher(CheckCardComponent.getTargetCacheEnricher)
   .setPermissionCheck(CheckCardComponent.actionPermissionCheck)
-  .build(({messageId, allCardParts, targetCache, event}) => {
+  .build(({messageId, cardParts, targetCache, event}) => {
     if (targetCache.mode === event.data) {
       return;
     }
@@ -142,7 +140,7 @@ private static modeChange = new Action<{event: CustomEvent<RollD20EventData<Roll
     if (event.quickRoll) {
       targetCache.phase = 'result';
     }
-    return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
   });
   //#endregion
 
@@ -174,7 +172,7 @@ private static modeChange = new Action<{event: CustomEvent<RollD20EventData<Roll
           targetId: this._targetId
         })
       }).listen(({part, targetId}) => {
-        this.cache = getTargetCache(part.data, targetId);
+        this.cache = getTargetCache(part, targetId);
     
         if (this.cache != null) {
           this.interactionPermission = `OwnerUuid:${this.cache.actorUuid$}`;
@@ -189,11 +187,11 @@ private static modeChange = new Action<{event: CustomEvent<RollD20EventData<Roll
     if (this.cache.userBonus === event.detail.userBonus && this.cache.phase === 'result') {
       return;
     }
-    CheckCardComponent.rollClick({event, partId: this.partId, messageId: this.messageId, targetId: this.targetId});
+    CheckCardComponent.rollClick({event, messageId: this.messageId, targetId: this.targetId});
   }
 
   public onRollMode(event: CustomEvent<RollD20EventData<RollMode>>): void {
-    CheckCardComponent.modeChange({event, partId: this.partId, messageId: this.messageId, targetId: this.targetId});
+    CheckCardComponent.modeChange({event, messageId: this.messageId, targetId: this.targetId});
   }
 
 }
@@ -258,7 +256,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return 'CheckCardPart';
   }
   
   //#region Targeting
@@ -266,39 +264,34 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
     const visualStatesBySelectionId = new Map<string, VisualState>();
 
     let partNr = 0;
-    for (const part of context.allMessageParts) {
-      if (this.isThisPartType(part)) {
-        for (const selected of context.selected) {
-          if (!visualStatesBySelectionId.get(selected.selectionId)) {
-            visualStatesBySelectionId.set(selected.selectionId, {
-              selectionId: selected.selectionId,
-              tokenUuid: selected.tokenUuid,
-              columns: [],
-            })
-          }
-          
-          const canReadCheckDc = part.data.actorUuid$ != null && UtilsDocument.hasAllPermissions([{
-            uuid: part.data.actorUuid$,
-            user: game.user,
-            permission: `${staticValues.code}ReadCheckDc`,
-          }], {sync: true});
-          const visualState = visualStatesBySelectionId.get(selected.selectionId);
-          visualState.columns.push({
-            key: `${this.getType()}-check-${partNr}`,
-            label: game.i18n.format('DND5E.SaveDC', {dc: canReadCheckDc ? part.data.dc : '?', ability: ''}),
-            rowValue: `<${CheckCardComponent.getSelector()} data-part-id="${part.id}" data-message-id="${context.messageId}" data-target-id="${selected.selectionId}"></${CheckCardComponent.getSelector()}>`
-          });
+    if (context.allMessageParts.hasType(CheckCardPart.instance)) {
+      const part = context.allMessageParts.getTypeData<CheckCardData>(CheckCardPart.instance)
+      for (const selected of context.selected) {
+        if (!visualStatesBySelectionId.get(selected.selectionId)) {
+          visualStatesBySelectionId.set(selected.selectionId, {
+            selectionId: selected.selectionId,
+            tokenUuid: selected.tokenUuid,
+            columns: [],
+          })
         }
-
-        partNr++;
+        
+        const canReadCheckDc = part.actorUuid$ != null && UtilsDocument.hasAllPermissions([{
+          uuid: part.actorUuid$,
+          user: game.user,
+          permission: `${staticValues.code}ReadCheckDc`,
+        }], {sync: true});
+        const visualState = visualStatesBySelectionId.get(selected.selectionId);
+        visualState.columns.push({
+          key: `${this.getType()}-check-${partNr}`,
+          label: game.i18n.format('DND5E.SaveDC', {dc: canReadCheckDc ? part.dc : '?', ability: ''}),
+          rowValue: `<${CheckCardComponent.getSelector()} data-message-id="${context.messageId}" data-target-id="${selected.selectionId}"></${CheckCardComponent.getSelector()}>`
+        });
       }
+
+      partNr++;
     }
 
     return Array.from(visualStatesBySelectionId.values());
-  }
-
-  private isThisPartType(row: ModularCardPartData): row is ModularCardPartData<CheckCardData> {
-    return row.type === this.getType() && ModularCard.getTypeHandler(row.type) instanceof CheckCardPart;
   }
   //#endregion
 
@@ -315,20 +308,19 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
   private async addTargetCache(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const missingTargetUuids = new Set<string>();
     for (const {newRow} of context.rows) {
+      if (!newRow.allParts.hasType(CheckCardPart.instance)) {
+        continue;
+      }
       const allTargetIds = new Set<string>();
       const cachedSelectionIds = new Set<string>();
-      for (const selected of newRow.part.data.selected) {
+      for (const selected of newRow.part.selected) {
         allTargetIds.add(selected.selectionId);
       }
-      for (const part of newRow.allParts) {
-        if (ModularCard.isType(CheckCardPart.instance, part)) {
-          for (const target of part.data.targetCaches$) {
-            cachedSelectionIds.add(target.selectionId$);
-          }
-        }
+      for (const target of newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance).targetCaches$) {
+        cachedSelectionIds.add(target.selectionId$);
       }
 
-      for (const selected of newRow.part.data.selected) {
+      for (const selected of newRow.part.selected) {
         if (!cachedSelectionIds.has(selected.selectionId)) {
           missingTargetUuids.add(selected.tokenUuid);
         }
@@ -342,33 +334,33 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     // Cache the values of the tokens
     const tokens = await UtilsDocument.tokenFromUuid(missingTargetUuids);
     for (const {newRow} of context.rows) {
-      const allSelected = newRow.part.data.selected;
+      if (!newRow.allParts.hasType(CheckCardPart.instance)) {
+        continue;
+      }
+      const allSelected = newRow.part.selected;
+      const part = newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance);
+      const cachedBySelectionId = new Set<string>();
 
-      for (const part of newRow.allParts) {
-        if (ModularCard.isType(CheckCardPart.instance, part)) {
-          const cachedBySelectionId = new Set<string>();
-          for (const target of part.data.targetCaches$) {
-            cachedBySelectionId.add(target.selectionId$);
+      for (const target of part.targetCaches$) {
+        cachedBySelectionId.add(target.selectionId$);
+      }
+
+      for (const selected of allSelected) {
+        if (!cachedBySelectionId.has(selected.selectionId)) {
+          const actor = (tokens.get(selected.tokenUuid).getActor() as MyActor);
+          const targetCache: TargetCache = {
+            targetUuid$: selected.tokenUuid,
+            selectionId$: selected.selectionId,
+            mode: 'normal',
+            phase: 'mode-select',
+            userBonus: '',
+          };
+          if (actor) {
+            targetCache.actorUuid$ = actor.uuid;
           }
 
-          for (const selected of allSelected) {
-            if (!cachedBySelectionId.has(selected.selectionId)) {
-              const actor = (tokens.get(selected.tokenUuid).getActor() as MyActor);
-              const targetCache: TargetCache = {
-                targetUuid$: selected.tokenUuid,
-                selectionId$: selected.selectionId,
-                mode: 'normal',
-                phase: 'mode-select',
-                userBonus: '',
-              };
-              if (actor) {
-                targetCache.actorUuid$ = actor.uuid;
-              }
-
-              part.data.targetCaches$.push(targetCache);
-              cachedBySelectionId.add(selected.selectionId);
-            }
-          }
+          part.targetCaches$.push(targetCache);
+          cachedBySelectionId.add(selected.selectionId);
         }
       }
     }
@@ -387,10 +379,10 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
 
   private calcResultCache(context: IDmlContext<ModularCardTriggerData<CheckCardData>>): void {
     for (const {newRow} of context.rows) {
-      for (const targetCache of newRow.part.data.targetCaches$) {
+      for (const targetCache of newRow.part.targetCaches$) {
         if (targetCache.roll$?.evaluated) {
           // Checks & saves are a success on a match
-          if (targetCache.roll$.total >= newRow.part.data.dc) {
+          if (targetCache.roll$.total >= newRow.part.dc) {
             targetCache.resultType$ = 'pass';
           } else {
             targetCache.resultType$ = 'fail';
@@ -412,7 +404,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
     playerActorsUuids.delete(null);
     playerActorsUuids.delete(undefined);
     for (const {newRow} of context.rows) {
-      for (const cache of newRow.part.data.targetCaches$) {
+      for (const cache of newRow.part.targetCaches$) {
         if (cache.phase === 'result') {
           continue;
         }
@@ -439,12 +431,12 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
     for (const {newRow, oldRow} of context.rows) {
       const oldCacheBySelectionId = new Map<string, TargetCache>();
       if (oldRow) {
-        for (const target of oldRow.part.data.targetCaches$) {
+        for (const target of oldRow.part.targetCaches$) {
           oldCacheBySelectionId.set(target.selectionId$, target);
         }
       }
       
-      for (const target of newRow.part.data.targetCaches$) {
+      for (const target of newRow.part.targetCaches$) {
         if (target.phase !== 'result') {
           continue;
         }
@@ -476,22 +468,22 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
           if (actor) {
             const newRoll = async () => {
               const rollPromises: Promise<Roll>[] = [];
-              if (newRow.part.data.skill) {
-                rollPromises.push(actor.rollSkill(newRow.part.data.skill, {
+              if (newRow.part.skill) {
+                rollPromises.push(actor.rollSkill(newRow.part.skill, {
                   advantage: target.mode === 'advantage',
                   disadvantage: target.mode === 'disadvantage',
                   fastForward: true,
                   chatMessage: false,
                 }));
-              } else if (newRow.part.data.iSave) {
-                rollPromises.push(actor.rollAbilitySave(newRow.part.data.ability, {
+              } else if (newRow.part.iSave) {
+                rollPromises.push(actor.rollAbilitySave(newRow.part.ability, {
                   advantage: target.mode === 'advantage',
                   disadvantage: target.mode === 'disadvantage',
                   fastForward: true,
                   chatMessage: false,
                 }));
               } else {
-                rollPromises.push(actor.rollAbilityTest(newRow.part.data.ability, {
+                rollPromises.push(actor.rollAbilityTest(newRow.part.ability, {
                   advantage: target.mode === 'advantage',
                   disadvantage: target.mode === 'disadvantage',
                   fastForward: true,
@@ -524,11 +516,11 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
       // Detect new rolled dice
       const oldRollsBySelectionId = new Map<string, RollData>();
       if (oldRow) {
-        for (const target of oldRow.part.data.targetCaches$) {
+        for (const target of oldRow.part.targetCaches$) {
           oldRollsBySelectionId.set(target.selectionId$, target.roll$);
         }
       }
-      for (const target of newRow.part.data.targetCaches$) {
+      for (const target of newRow.part.targetCaches$) {
         if (target.roll$?.evaluated) {
           const roll = UtilsRoll.getNewRolledTerms(oldRollsBySelectionId.get(target.selectionId$), target.roll$);
           if (roll) {

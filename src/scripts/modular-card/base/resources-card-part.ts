@@ -5,7 +5,7 @@ import { Component, OnInit, OnInitParam } from "../../lib/render-engine/componen
 import { staticValues } from "../../static-values";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
+import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
@@ -140,39 +140,37 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
   await UtilsDocument.bulkUpdate(bulkUpdate);
 }
 
-function getMessageState(allParts: ModularCardPartData[]): MessageState {
+function getMessageState(allParts: ModularCardInstance): MessageState {
   const messageState: MessageState = {
     hasStates: new Set<AutoConsumeAfter>(),
     completedStates: new Set<AutoConsumeAfter>(),
   };
 
-  for (const part of allParts) {
-    if (ModularCard.isType<AttackCardData>(AttackCardPart.instance, part)) {
-      messageState.hasStates.add('attack');
-      if (part.data.phase === 'result') {
-        messageState.completedStates.add('attack');
+  if (allParts.hasType(AttackCardPart.instance)) {
+    messageState.hasStates.add('attack');
+    if (allParts.getTypeData<AttackCardData>(AttackCardPart.instance).phase === 'result') {
+      messageState.completedStates.add('attack');
+    }
+  }
+  if (allParts.hasType(DamageCardPart.instance)) {
+    messageState.hasStates.add('damage');
+    if (allParts.getTypeData<DamageCardData>(DamageCardPart.instance).phase === 'result') {
+      messageState.completedStates.add('damage');
+    }
+  }
+  if (allParts.hasType(CheckCardPart.instance)) {
+    messageState.hasStates.add('check');
+    for (const target of (allParts.getTypeData<CheckCardData>(CheckCardPart.instance).targetCaches$ ?? [])) {
+      if (target.phase === 'result') {
+        messageState.completedStates.add('check');
+        break;
       }
     }
-    if (ModularCard.isType<DamageCardData>(DamageCardPart.instance, part)) {
-      messageState.hasStates.add('damage');
-      if (part.data.phase === 'result') {
-        messageState.completedStates.add('damage');
-      }
-    }
-    if (ModularCard.isType<CheckCardData>(CheckCardPart.instance, part)) {
-      messageState.hasStates.add('check');
-      for (const target of (part.data.targetCaches$ ?? [])) {
-        if (target.phase === 'result') {
-          messageState.completedStates.add('check');
-          break;
-        }
-      }
-    }
-    if (ModularCard.isType<TemplateCardData>(TemplateCardPart.instance, part)) {
-      messageState.hasStates.add('template-placed');
-      if (part.data.calc$.createdTemplateUuid) {
-        messageState.completedStates.add('template-placed');
-      }
+  }
+  if (allParts.hasType(TemplateCardPart.instance)) {
+    messageState.hasStates.add('template-placed');
+    if (allParts.getTypeData<TemplateCardData>(TemplateCardPart.instance).calc$.createdTemplateUuid) {
+      messageState.completedStates.add('template-placed');
     }
   }
 
@@ -251,18 +249,18 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
     .addSerializer(ItemCardHelpers.getRawSerializer('action'))
     .addSerializer(ItemCardHelpers.getRawSerializer('resourceIndex'))
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getUserIdSerializer())
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<ResourceCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(ResourceCardComponent.permissionCheck)
-    .build(async ({resourceIndex, part, allCardParts, messageId, action}) => {
+    .build(async ({resourceIndex, cardParts, messageId, action}) => {
+      const part = cardParts.getTypeData<ResourceCardData>(ResourceCardPart.instance);
       const consumeResources: ResourceCardData['consumeResources'] = [];
       if (resourceIndex === '*') {
-        for (const consumeResource of part.data.consumeResources) {
+        for (const consumeResource of part.consumeResources) {
           consumeResources.push(consumeResource)
         }
-      } else if (part.data.consumeResources.length >= resourceIndex-1) {
-        consumeResources.push(part.data.consumeResources[resourceIndex]);
+      } else if (part.consumeResources.length >= resourceIndex-1) {
+        consumeResources.push(part.consumeResources[resourceIndex]);
       }
 
       const changed: ResourceCardData['consumeResources'] = [];
@@ -276,7 +274,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
           messageDataById: new Map(),
           resources: [],
         }
-        request.messageDataById.set(messageId, getMessageState(allCardParts));
+        request.messageDataById.set(messageId, getMessageState(cardParts));
         for (const change of changed) {
           request.resources.push({
             messageId: messageId,
@@ -285,7 +283,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
         }
 
         await applyResourceConsumption(request);
-        return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+        return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
       }
     })
   //#endregion
@@ -308,7 +306,6 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
   public apply(index: '*' | number) {
     ResourceCardComponent.applyOrUndo({
       messageId: this.messageId,
-      partId: this.partId,
       resourceIndex: index,
       action: 'manual-apply',
     });
@@ -317,21 +314,20 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
   public undo(index: '*' | number) {
     ResourceCardComponent.applyOrUndo({
       messageId: this.messageId,
-      partId: this.partId,
       resourceIndex: index,
       action: 'undo',
     });
   }
 
-  private async setData(part: ModularCardPartData<ResourceCardData>) {
+  private async setData(part: ResourceCardData) {
     if (part) {
       const hasPerm = await UtilsDocument.hasAllPermissions([{
         permission: 'Observer',
-        uuid: part.data.calc$.actorUuid,
+        uuid: part.calc$.actorUuid,
         user: game.user,
       }]);
       if (hasPerm) {
-        this.consumeResources = part.data.consumeResources
+        this.consumeResources = part.consumeResources
           .filter(resource => {
             // Hide unused resources
             return resource.calc$.appliedChange !== 0 || resource.calc$.calcChange !== 0;
@@ -585,12 +581,12 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return 'ResourceCardPart';
   }
 
   //#region Front end
   public getHtml(data: HtmlContext): string {
-    return `<${ResourceCardComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${ResourceCardComponent.getSelector()}>`
+    return `<${ResourceCardComponent.getSelector()} data-message-id="${data.messageId}"></${ResourceCardComponent.getSelector()}>`
   }
   //#endregion
 
@@ -611,14 +607,14 @@ class ResourceTrigger implements ITrigger<ModularCardTriggerData<ResourceCardDat
     for (const {newRow, oldRow} of context.rows) {
       const oldResourceByKey = new Map<string, ResourceCardData['consumeResources'][number]>();
       if (oldRow) {
-        for (const consumeResource of oldRow.part.data.consumeResources) {
+        for (const consumeResource of oldRow.part.consumeResources) {
           oldResourceByKey.set(`${consumeResource.calc$.uuid}-${consumeResource.calc$.path}`, consumeResource);
         }
       }
 
       let originalResourceCount = applyRequest.resources.length;
       const newResourceByKey = new Map<string, ResourceCardData['consumeResources'][number]>();
-      for (const consumeResource of newRow.part.data.consumeResources) {
+      for (const consumeResource of newRow.part.consumeResources) {
         const key = `${consumeResource.calc$.uuid}-${consumeResource.calc$.path}`;
         const oldResouce = oldResourceByKey.get(key);
         newResourceByKey.set(key, consumeResource);
@@ -698,30 +694,24 @@ class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
         continue;
       }
 
-      const resources: ResourceCardData[] = [];
-      for (const part of allParts) {
-        if (ModularCard.isType<ResourceCardData>(ResourceCardPart.instance, part)) {
-          resources.push(part.data);
-        }
-      }
-      if (resources.length > 0) {
+      if (allParts.hasType(ResourceCardPart.instance)) {
         const state = getMessageState(allParts);
-        for (const resource of resources) {
-          for (const consumeResource of resource.consumeResources) {
-            if (consumeResource.calc$.autoconsumeAfter == null) {
-              if (state.hasStates.has('attack')) {
-                consumeResource.calc$.autoconsumeAfter = 'attack';
-              } else if (state.hasStates.has('damage')) {
-                consumeResource.calc$.autoconsumeAfter = 'damage';
-              } else if (state.hasStates.has('template-placed')) {
-                consumeResource.calc$.autoconsumeAfter = 'template-placed';
-              } else if (state.hasStates.has('check')) {
-                consumeResource.calc$.autoconsumeAfter = 'check';
-              } else {
-                consumeResource.calc$.autoconsumeAfter = 'init';
-              }
+        const resource = allParts.getTypeData<ResourceCardData>(ResourceCardPart.instance);
+        for (const consumeResource of resource.consumeResources) {
+          if (consumeResource.calc$.autoconsumeAfter == null) {
+            if (state.hasStates.has('attack')) {
+              consumeResource.calc$.autoconsumeAfter = 'attack';
+            } else if (state.hasStates.has('damage')) {
+              consumeResource.calc$.autoconsumeAfter = 'damage';
+            } else if (state.hasStates.has('template-placed')) {
+              consumeResource.calc$.autoconsumeAfter = 'template-placed';
+            } else if (state.hasStates.has('check')) {
+              consumeResource.calc$.autoconsumeAfter = 'check';
+            } else {
+              consumeResource.calc$.autoconsumeAfter = 'init';
             }
           }
+        
         }
       }
     }

@@ -1,4 +1,3 @@
-import { data } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/module.mjs";
 import { RoundData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/foundry.js/clientDocuments/combat";
 import { IAfterDmlContext, IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
 import { DocumentListener } from "../../../lib/db/document-listener";
@@ -11,12 +10,11 @@ import { ValueReader } from "../../../provider/value-provider";
 import { staticValues } from "../../../static-values";
 import { DamageType, MyActor, MyItem } from "../../../types/fixed-types";
 import { UtilsItem } from "../../../utils/utils-item";
-import { UtilsLog } from "../../../utils/utils-log";
 import { Action } from "../../action";
 import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ManualDamageSource } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
-import { BeforeCreateModuleCardEvent, ModularCard, ModularCardPartData, ModularCardTriggerData } from "../../modular-card";
+import { BeforeCreateModuleCardEvent, ModularCard, ModularCardTriggerData } from "../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
 
 export interface SrdSneakAttackCardData {
@@ -98,29 +96,29 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
   });
   private static setAddSneak = new Action<{addSneak: boolean} & ChatPartIdData>('SneakAttackToggle')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('addSneak'))
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<SrdSneakAttackCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(SrdSneakAttackComponent.actionPermissionCheck)
-    .build(({messageId, part, addSneak, allCardParts}) => {
-      if (part.data.shouldAdd === addSneak) {
+    .build(({messageId, addSneak, cardParts}) => {
+      const part = cardParts.getTypeData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance);
+      if (part.shouldAdd === addSneak) {
         return;
       }
-      part.data.shouldAdd = addSneak;
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+      part.shouldAdd = addSneak;
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     });
   private static setDamageType = new Action<{dmg: DamageType} & ChatPartIdData>('SneakAttackSetDamageType')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('dmg'))
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<SrdSneakAttackCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(SrdSneakAttackComponent.actionPermissionCheck)
-    .build(({messageId, part, dmg, allCardParts}) => {
-      if (part.data.selectedDamage === dmg) {
+    .build(({messageId, dmg, cardParts}) => {
+      const part = cardParts.getTypeData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance);
+      if (part.selectedDamage === dmg) {
         return;
       }
-      part.data.selectedDamage = dmg;
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+      part.selectedDamage = dmg;
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     });
   //#endregion
   
@@ -132,7 +130,7 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
     args.addStoppable(
       this.getData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance)
         .switchMap(args => {
-          const uuid = args.part.data.createdCombatRound?.combatUuid;
+          const uuid = args.part.createdCombatRound?.combatUuid;
           return ValueReader.mergeObject({
             ...args,
             combat: uuid == null ? null : DocumentListener.listenUuid<Combat>(uuid)
@@ -148,22 +146,21 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
   public addSneak: boolean = false;
   public usedInCombat = false;
   public damageOptions: Array<{value: string; label: string; selected: boolean;}> = [];
-  private async setData(part: ModularCardPartData<SrdSneakAttackCardData>, combat: Combat | null) {
+  private async setData(part: SrdSneakAttackCardData, combat: Combat | null) {
     // read permission are handled in SneakAttackCardPart.getHtml()
-    this.itemName = `${part.data.name}?`;
-    this.itemImg = part.data.itemImg;
-    this.addSneak = part.data.shouldAdd;
+    this.itemName = `${part.name}?`;
+    this.itemImg = part.itemImg;
+    this.addSneak = part.shouldAdd;
     const actionResponse = await SrdSneakAttackComponent.actionPermissionCheck({
       messageId: this.messageId,
-      partId: part.id,
-      part: part,
+      part: {data: part},
     }, game.user);
     this.canEdit = actionResponse !== 'prevent-action';
-    this.damageOptions = part.data.calc$.damageOptions.sort().map(dmg => {
+    this.damageOptions = part.calc$.damageOptions.sort().map(dmg => {
       return {
         value: dmg,
         label: game.i18n.localize(`DND5E.` + (dmg === '' ? 'None' : `Damage${dmg.capitalize()}`)),
-        selected: part.data.selectedDamage === dmg,
+        selected: part.selectedDamage === dmg,
       }
     });
     
@@ -171,12 +168,12 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
     if (!combat) {
       this.usedInCombat = false;
     } else {
-      if (part.data.calc$.actorUuid == null) {
+      if (part.calc$.actorUuid == null) {
         this.usedInCombat = false;
       } else {
         const usedSneakFlag = game.combat.getFlag(staticValues.moduleName, 'usedSneak') as {[turnKey: string]: Array<{source: string;}>} ?? {};
-        const source = `${this.messageId}/${part.id}`;
-        const key = `${part.data.createdCombatRound.combatantId}/${part.data.calc$.actorUuid.replace('.', '/')}`;
+        const source = `${this.messageId}/${SrdSneakAttackCardPart.instance.getType()}`;
+        const key = `${part.createdCombatRound.combatantId}/${part.calc$.actorUuid.replace('.', '/')}`;
         if (!usedSneakFlag[key]) {
           this.usedInCombat = false;
         } else {
@@ -189,7 +186,6 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
   public onSneakToggleClick(event: MouseEvent) {
     return SrdSneakAttackComponent.setAddSneak({
       messageId: this.messageId,
-      partId: this.partId,
       addSneak: (event.target as HTMLInputElement).checked,
     })
   }
@@ -197,7 +193,6 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
   public setDamageType(event: Event) {
     return SrdSneakAttackComponent.setDamageType({
       messageId: this.messageId,
-      partId: this.partId,
       dmg: (event.target as HTMLSelectElement).value as DamageType,
     })
   }
@@ -262,7 +257,7 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
   }
   
   public getType(): string {
-    return SrdSneakAttackCardPart.name;
+    return 'SrdSneakAttackCardPart';
   }
 
   private static getSneakItem(actor: MyActor): MyItem {
@@ -299,7 +294,7 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
     if (!canSeeSneak) {
       return null;
     }
-    return `<${SrdSneakAttackComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${SrdSneakAttackComponent.getSelector()}>`
+    return `<${SrdSneakAttackComponent.getSelector()} data-message-id="${data.messageId}"></${SrdSneakAttackComponent.getSelector()}>`
   }
   
 }
@@ -314,28 +309,28 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
 
   private selectedDamage(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
     for (const {newRow} of context.rows) {
-      if (newRow.part.data.calc$.damageOptions.length === 0) {
-        newRow.part.data.selectedDamage = '';
-      } else if (!newRow.part.data.calc$.damageOptions.includes(newRow.part.data.selectedDamage)) {
-        newRow.part.data.selectedDamage = newRow.part.data.calc$.damageOptions[0];
+      if (newRow.part.calc$.damageOptions.length === 0) {
+        newRow.part.selectedDamage = '';
+      } else if (!newRow.part.calc$.damageOptions.includes(newRow.part.selectedDamage)) {
+        newRow.part.selectedDamage = newRow.part.calc$.damageOptions[0];
       }
 
       // Convert all damage types to the selected
-      const rolls = [newRow.part.data.calc$.damageSource.normalBaseRoll];
-      if (newRow.part.data.calc$.damageSource.versatileBaseRoll?.length > 0) {
-        rolls.push(newRow.part.data.calc$.damageSource.versatileBaseRoll);
+      const rolls = [newRow.part.calc$.damageSource.normalBaseRoll];
+      if (newRow.part.calc$.damageSource.versatileBaseRoll?.length > 0) {
+        rolls.push(newRow.part.calc$.damageSource.versatileBaseRoll);
       }
       for (const terms of rolls) {
         let foundDamageType = false;
         for (const term of terms) {
           if (UtilsRoll.toDamageType(term.options?.flavor) != null) {
             foundDamageType = true;
-            term.options.flavor = newRow.part.data.selectedDamage;
+            term.options.flavor = newRow.part.selectedDamage;
           }
         }
         if (!foundDamageType) {
           terms[terms.length - 1].options = terms[terms.length - 1].options ?? {};
-          terms[terms.length - 1].options.flavor = newRow.part.data.selectedDamage;
+          terms[terms.length - 1].options.flavor = newRow.part.selectedDamage;
         }
       }
 
@@ -344,19 +339,17 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
 
   private syncWithBaseDamage(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
     for (const {newRow, oldRow} of context.rows) {
-      const baseDamage: ModularCardPartData<DamageCardData> = newRow.allParts.find(part => {
-        return ModularCard.isType<DamageCardData>(DamageCardPart.instance, part) && !ModularCard.isType(SrdSneakAttackCardPart.instance, part);
-      });
+      const baseDamage = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance)
 
       if (!baseDamage) {
         continue;
       }
       
-      if (newRow.part.data.shouldAdd !== (oldRow?.part?.data?.shouldAdd || false)) {
-        if (newRow.part.data.shouldAdd) {
-          baseDamage.data.extraDamageSources[SrdSneakAttackCardPart.instance.getType()] = deepClone(newRow.part.data.calc$.damageSource);
+      if (newRow.part.shouldAdd !== (oldRow?.part?.shouldAdd || false)) {
+        if (newRow.part.shouldAdd) {
+          baseDamage.extraDamageSources[SrdSneakAttackCardPart.instance.getType()] = deepClone(newRow.part.calc$.damageSource);
         } else {
-          delete baseDamage.data.extraDamageSources[SrdSneakAttackCardPart.instance.getType()];
+          delete baseDamage.extraDamageSources[SrdSneakAttackCardPart.instance.getType()];
         }
       }
     }
@@ -370,21 +363,19 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
 
   private async calcDamageTypeOptions(context: IAfterDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
     for (const {newRow, oldRow} of context.rows) {
-      const baseDamage: ModularCardPartData<DamageCardData> = newRow.allParts.find(part => {
-        return ModularCard.isType<DamageCardData>(DamageCardPart.instance, part) && !ModularCard.isType(SrdSneakAttackCardPart.instance, part);
-      });
+      const baseDamage = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance)
       if (!baseDamage) {
         continue;
       }
-      const oldDamage: ModularCardPartData<DamageCardData> = oldRow?.allParts?.find(part => part.id === baseDamage.id);
+      const oldDamage = oldRow?.allParts?.getTypeData<DamageCardData>(DamageCardPart.instance)
 
       const newChangeDetect = {
-        damageSource: baseDamage.data.calc$.damageSource,
-        extraDamageSources: baseDamage.data.extraDamageSources,
+        damageSource: baseDamage.calc$.damageSource,
+        extraDamageSources: baseDamage.extraDamageSources,
       }
       const oldChangeDetect = {
-        damageSource: oldDamage?.data?.calc$?.damageSource,
-        extraDamageSources: oldDamage?.data?.extraDamageSources,
+        damageSource: oldDamage?.calc$?.damageSource,
+        extraDamageSources: oldDamage?.extraDamageSources,
       }
 
       if (UtilsCompare.deepEquals(newChangeDetect, oldChangeDetect)) {
@@ -392,12 +383,12 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
       }
 
       const damageTypes = new Set<DamageType>();
-      const damageSources = Object.values(baseDamage.data.extraDamageSources);
-      damageSources.push(baseDamage.data.calc$.damageSource);
-      if (baseDamage.data.userBonus) {
+      const damageSources = Object.values(baseDamage.extraDamageSources);
+      damageSources.push(baseDamage.calc$.damageSource);
+      if (baseDamage.userBonus) {
         damageSources.push({
           type: 'Formula',
-          formula: baseDamage.data.userBonus,
+          formula: baseDamage.userBonus,
         });
       }
 
@@ -409,7 +400,7 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
           }
         }
         if (source.type === 'Manual') {
-          const terms = baseDamage.data.source === 'versatile' ? source.versatileBaseRoll : source.normalBaseRoll;
+          const terms = baseDamage.source === 'versatile' ? source.versatileBaseRoll : source.normalBaseRoll;
           for (const term of terms) {
             damageTypes.add(UtilsRoll.toDamageType(term.options?.flavor));
           }
@@ -423,7 +414,7 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
       }
       damageTypes.delete(null);
       damageTypes.delete(undefined);
-      newRow.part.data.calc$.damageOptions = Array.from(damageTypes);
+      newRow.part.calc$.damageOptions = Array.from(damageTypes);
     }
   }
   //#endregion
@@ -435,11 +426,11 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
 
   private async setSneakUsed(context: IAfterDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>): Promise<void> {
     for (const {newRow, oldRow} of context.rows) {
-      if (newRow.part.data.shouldAdd !== !!oldRow?.part?.data?.shouldAdd) {
-        if (!newRow.part.data.createdCombatRound) {
+      if (newRow.part.shouldAdd !== !!oldRow?.part?.shouldAdd) {
+        if (!newRow.part.createdCombatRound) {
           continue;
         }
-        const combat = await UtilsDocument.combatFromUuid(newRow.part.data.createdCombatRound.combatUuid);
+        const combat = await UtilsDocument.combatFromUuid(newRow.part.createdCombatRound.combatUuid);
         if (!combat) {
           continue;
         }
@@ -447,7 +438,7 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
           .filter(user => user.active)
           .map(user => {
             return {
-              uuid: newRow.part.data.createdCombatRound.combatUuid,
+              uuid: newRow.part.createdCombatRound.combatUuid,
               permission: 'update',
               user: user
             }
@@ -465,16 +456,16 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
         } else {
           usedSneakFlag = deepClone(usedSneakFlag);
         }
-        const key = `${newRow.part.data.createdCombatRound.combatantId}/${newRow.part.data.calc$.actorUuid.replace('.', '/')}`;
+        const key = `${newRow.part.createdCombatRound.combatantId}/${newRow.part.calc$.actorUuid.replace('.', '/')}`;
         usedSneakFlag[key] = usedSneakFlag[key] ?? [];
 
-        const source = `${newRow.messageId}/${newRow.part.id}`;
+        const source = `${newRow.messageId}/${SrdSneakAttackCardPart.instance.getType()}`;
         const hasSource = usedSneakFlag[key].some(flag => flag.source === source);
-        if (newRow.part.data.shouldAdd === hasSource) {
+        if (newRow.part.shouldAdd === hasSource) {
           continue;
         }
 
-        if (newRow.part.data.shouldAdd) {
+        if (newRow.part.shouldAdd) {
           usedSneakFlag[key].push({source: source});
         } else {
           usedSneakFlag[key] = usedSneakFlag[key].filter(flag => flag.source !== source);

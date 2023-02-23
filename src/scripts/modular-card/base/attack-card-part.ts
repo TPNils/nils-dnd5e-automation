@@ -10,7 +10,7 @@ import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
+import { ModularCard, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
@@ -59,12 +59,12 @@ export interface AttackCardData {
       {{ this.flavor }}
     </div>
     <nd5a-roll-d20
-      [data-roll]="this.part.data.roll$"
+      [data-roll]="this.part.roll$"
       [data-label]="this.overrideRollLabel"
-      [data-roll-mode]="this.part.data.mode"
-      [data-bonus-formula]="this.part.data.userBonus"
-      [data-show-bonus]="this.part.data.phase !== 'mode-select'"
-      [data-override-max-roll]="this.part.data.critTreshold$"
+      [data-roll-mode]="this.part.mode"
+      [data-bonus-formula]="this.part.userBonus"
+      [data-show-bonus]="this.part.phase !== 'mode-select'"
+      [data-override-max-roll]="this.part.critTreshold$"
 
       [data-interaction-permission]="this.interactionPermission"
       [data-read-permission]="this.readPermission"
@@ -93,34 +93,34 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   });
   private static rollClick = new Action<{event: CustomEvent<{userBonus?: string}>} & ChatPartIdData>('AttackOnRollClick')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getCustomEventSerializer())
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
-    .build(({messageId, part, event, allCardParts}) => {
-      if (part.data.userBonus === event.userBonus && part.data.phase === 'result') {
+    .build(({messageId, event, cardParts}) => {
+      const part = cardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      if (part.userBonus === event.userBonus && part.phase === 'result') {
         return;
       }
-      part.data.userBonus = event.userBonus;
-      part.data.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+      part.userBonus = event.userBonus;
+      part.phase = 'result';
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     });
   private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>} & ChatPartIdData>('AttackOnModeChange')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getCustomEventSerializer())
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<AttackCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
-    .build(({messageId, allCardParts, part, event}) => {
-      if (part.data.mode === event.data) {
+    .build(({messageId, cardParts, event}) => {
+      const part = cardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      if (part.mode === event.data) {
         return;
       }
 
-      part.data.mode = event.data;
+      part.mode = event.data;
       if (event.quickRoll) {
-        part.data.phase = 'result';
+        part.phase = 'result';
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     });
   //#endregion
 
@@ -128,7 +128,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
     return `${staticValues.code}-attack-part`;
   }
   
-  public part: ModularCardPartData<AttackCardData>;
+  public part: AttackCardData;
   public flavor: string;
   public interactionPermission: string;
   public readPermission: string;
@@ -139,29 +139,29 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
     args.addStoppable(
       this.getData<AttackCardData>(AttackCardPart.instance).listen(async ({part}) => {
         this.part = part;
-        this.interactionPermission = `OwnerUuid:${this.part.data.actorUuid$}`;
-        this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.data.actorUuid$}`;
+        this.interactionPermission = `OwnerUuid:${this.part.actorUuid$}`;
+        this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.actorUuid$}`;
         this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
         
-        const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.data.actorUuid$, permission: `${staticValues.code}ReadAttack`, user: game.user}])
-        if (!hasReadPermission || !part.data.roll$?.evaluated || part.data.mode === 'normal') {
+        const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.actorUuid$, permission: `${staticValues.code}ReadAttack`, user: game.user}])
+        if (!hasReadPermission || !part.roll$?.evaluated || part.mode === 'normal') {
           this.flavor = game.i18n.localize('DND5E.Attack');
         } else {
-          this.flavor = game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`);
+          this.flavor = game.i18n.localize(`DND5E.${part.mode.capitalize()}`);
         }
       })
     )
   }
 
   public onRollClick(event: CustomEvent<{userBonus?: string}>): void {
-    if (this.part.data.userBonus === event.detail.userBonus && this.part.data.phase === 'result') {
+    if (this.part.userBonus === event.detail.userBonus && this.part.phase === 'result') {
       return;
     }
-    AttackCardPartComponent.rollClick({event, partId: this.partId, messageId: this.messageId});
+    AttackCardPartComponent.rollClick({event, messageId: this.messageId});
   }
 
   public onRollMode(event: CustomEvent<RollD20EventData<RollMode>>): void {
-    AttackCardPartComponent.modeChange({event, partId: this.partId, messageId: this.messageId});
+    AttackCardPartComponent.modeChange({event, messageId: this.messageId});
   }
 }
 
@@ -326,7 +326,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return 'AttackCardPart';
   }
 
   //#region Front end
@@ -334,7 +334,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   public getHtml(data: HtmlContext): string {
     // TODO technically, you would roll an attack for each target
     //  UI idea: unrolled keep it as is, once rolled (1 button for multiple rolls) show a list below for each target
-    return `<${AttackCardPartComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${AttackCardPartComponent.getSelector()}>`
+    return `<${AttackCardPartComponent.getSelector()} data-message-id="${data.messageId}"></${AttackCardPartComponent.getSelector()}>`
   }
   //#endregion
 
@@ -342,87 +342,84 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   private getTargetState(context: StateContext): VisualState[] {
     const visualStates: VisualState[] = [];
 
-    const rolledAttacks: ModularCardPartData<AttackCardData>[] = context.allMessageParts.filter(part => part.type === this.getType() && ModularCard.getTypeHandler(part.type) instanceof AttackCardPart);
-    if (rolledAttacks.length === 0) {
+    const attack = context.allMessageParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+    if (attack == null) {
       return [];
     }
 
-    const cache = this.getTargetCache(rolledAttacks.map(attack => attack.data));
-    for (let i = 0; i < rolledAttacks.length; i++) {
-      const attack = rolledAttacks[i];
-      for (const selected of context.selected) {
-        let rowValue: string;
-        const canReadAttack = UtilsDocument.hasAllPermissions([{
-          uuid: attack.data.actorUuid$,
+    const cache = this.getTargetCache([attack]);
+    for (const selected of context.selected) {
+      let rowValue: string;
+      const canReadAttack = UtilsDocument.hasAllPermissions([{
+        uuid: attack.actorUuid$,
+        user: game.user,
+        permission: `${staticValues.code}ReadAttack`,
+      }], {sync: true});
+      let canSeeAc: boolean;
+      if (cache.has(selected.tokenUuid)) {
+        canSeeAc = UtilsDocument.hasAllPermissions([{
+          uuid: cache.get(selected.tokenUuid).actorUuid$,
           user: game.user,
-          permission: `${staticValues.code}ReadAttack`,
+          permission: `Observer`,
         }], {sync: true});
-        let canSeeAc: boolean;
-        if (cache.has(selected.tokenUuid)) {
-          canSeeAc = UtilsDocument.hasAllPermissions([{
-            uuid: cache.get(selected.tokenUuid).actorUuid$,
-            user: game.user,
-            permission: `Observer`,
-          }], {sync: true});
-        } else {
-          canSeeAc = false;
-        }
-        const canSeeTotal = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') === 'total';
-        if (!attack.data.roll$?.evaluated || !canSeeAc) {
-          if (attack.data.roll$?.evaluated) {
-            rowValue = '';
-          } else {
-            rowValue = '';
-          }
-        } else if (!canReadAttack && !canSeeTotal) {
+      } else {
+        canSeeAc = false;
+      }
+      const canSeeTotal = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') === 'total';
+      if (!attack.roll$?.evaluated || !canSeeAc) {
+        if (attack.roll$?.evaluated) {
           rowValue = '';
         } else {
-          const styles = ['text-align: center'];
-          let resultType = cache.get(selected.tokenUuid).resultType$;
-          if (!canReadAttack && canSeeTotal) {
-            if (resultType === 'critical-hit') {
-              resultType = 'hit';
-            } else if (resultType === 'critical-mis') {
-              resultType = 'mis';
-            }
-          }
-          switch (resultType) {
-            case 'critical-hit': {
-              styles.push('color: green');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.CriticalHit')}!">✓</div>`;
-              break;
-            }
-            case 'critical-mis': {
-              styles.push('color: red');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize(`${staticValues.moduleName}.CriticalMis`)}!">✗</div>`;
-              break;
-            }
-            case 'hit': {
-              styles.push('color: green');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac$} <= ${attack.data.roll$?.total}">✓</div>`;
-              break;
-            }
-            case 'mis': {
-              styles.push('color: red');
-              rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac$} <= ${attack.data.roll$?.total}">✗</div>`;
-              break;
-            }
+          rowValue = '';
+        }
+      } else if (!canReadAttack && !canSeeTotal) {
+        rowValue = '';
+      } else {
+        const styles = ['text-align: center'];
+        let resultType = cache.get(selected.tokenUuid).resultType$;
+        if (!canReadAttack && canSeeTotal) {
+          if (resultType === 'critical-hit') {
+            resultType = 'hit';
+          } else if (resultType === 'critical-mis') {
+            resultType = 'mis';
           }
         }
-        visualStates.push({
-          selectionId: selected.selectionId,
-          tokenUuid: selected.tokenUuid,
-          columns: [{
-            key: `${this.getType()}-attack-${i}`,
-            label: `<div style="font-size: 16px;" title="${game.i18n.localize('DND5E.Attack')}">
-            <svg height="1em" width="1em">
-              <use xlink:href="/modules/${staticValues.moduleName}/assets/icons/sword.svg#sword"/>
-            </svg>
-            </div> ${(rolledAttacks.length === 1) ? '' : ` ${i+1}`}`,
-            rowValue: rowValue,
-          }],
-        })
+        switch (resultType) {
+          case 'critical-hit': {
+            styles.push('color: green');
+            rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.CriticalHit')}!">✓</div>`;
+            break;
+          }
+          case 'critical-mis': {
+            styles.push('color: red');
+            rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize(`${staticValues.moduleName}.CriticalMis`)}!">✗</div>`;
+            break;
+          }
+          case 'hit': {
+            styles.push('color: green');
+            rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac$} <= ${attack.roll$?.total}">✓</div>`;
+            break;
+          }
+          case 'mis': {
+            styles.push('color: red');
+            rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac$} <= ${attack.roll$?.total}">✗</div>`;
+            break;
+          }
+        }
       }
+      visualStates.push({
+        selectionId: selected.selectionId,
+        tokenUuid: selected.tokenUuid,
+        columns: [{
+          key: `${this.getType()}-attack`,
+          label: `<div style="font-size: 16px;" title="${game.i18n.localize('DND5E.Attack')}">
+          <svg height="1em" width="1em">
+            <use xlink:href="/modules/${staticValues.moduleName}/assets/icons/sword.svg#sword"/>
+          </svg>
+          </div>`,
+          rowValue: rowValue,
+        }],
+      })
     }
 
     return visualStates;
@@ -450,18 +447,16 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
   private async addTargetCache(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const missingTargetUuids = new Set<string>();
     for (const {newRow} of context.rows) {
+      if (!newRow.allParts.hasType(AttackCardPart.instance)) {
+        continue;
+      }
       const allTargetUuids = new Set<string>();
       const cachedTargetUuids = new Set<string>();
-      for (const selected of newRow.part.data.selected) {
+      for (const selected of newRow.part.selected) {
         allTargetUuids.add(selected.tokenUuid);
       }
-      for (const part of newRow.allParts) {
-        if (!ModularCard.isType<AttackCardData>(AttackCardPart.instance, part)) {
-          continue;
-        }
-        for (const target of part.data.targetCaches$) {
-          cachedTargetUuids.add(target.targetUuid$);
-        }
+      for (const target of newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance).targetCaches$) {
+        cachedTargetUuids.add(target.targetUuid$);
       }
 
       for (const expectedUuid of allTargetUuids) {
@@ -478,31 +473,31 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     // Cache the values of the tokens
     const tokens = await UtilsDocument.tokenFromUuid(missingTargetUuids);
     for (const {newRow} of context.rows) {
+      if (!newRow.allParts.hasType(AttackCardPart.instance)) {
+        continue;
+      }
       const allTargetUuids = new Set<string>();
-      for (const selected of newRow.part.data.selected) {
+      for (const selected of newRow.part.selected) {
         allTargetUuids.add(selected.tokenUuid);
       }
 
-      for (const part of newRow.allParts) {
-        if (!ModularCard.isType<AttackCardData>(AttackCardPart.instance, part)) {
-          continue;
-        }
-        const cachedTargetUuids = new Set<string>();
-        for (const target of part.data.targetCaches$) {
-          cachedTargetUuids.add(target.targetUuid$);
-        }
+      const attackPart = newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const cachedTargetUuids = new Set<string>();
+      for (const target of attackPart.targetCaches$) {
+        cachedTargetUuids.add(target.targetUuid$);
+      }
 
-        for (const expectedUuid of allTargetUuids) {
-          if (!cachedTargetUuids.has(expectedUuid)) {
-            const actor = (tokens.get(expectedUuid).getActor() as MyActor);
-            part.data.targetCaches$.push({
-              targetUuid$: expectedUuid,
-              actorUuid$: actor.uuid,
-              ac$: actor.data.data.attributes.ac.value,
-            });
-            cachedTargetUuids.add(expectedUuid);
-          }
+      for (const expectedUuid of allTargetUuids) {
+        if (!cachedTargetUuids.has(expectedUuid)) {
+          const actor = (tokens.get(expectedUuid).getActor() as MyActor);
+          attackPart.targetCaches$.push({
+            targetUuid$: expectedUuid,
+            actorUuid$: actor.uuid,
+            ac$: actor.data.data.attributes.ac.value,
+          });
+          cachedTargetUuids.add(expectedUuid);
         }
+      
       }
     }
   }
@@ -529,7 +524,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
     }
 
     for (const {newRow} of context.rows) {
-      newRow.part.data.phase = 'result';
+      newRow.part.phase = 'result';
     }
   }
   //#endregion
@@ -544,30 +539,29 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
 
   private calcIsCrit(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow} of context.rows) {
-      if (!newRow.part.data.roll$?.evaluated) {
-        newRow.part.data.isCrit$ = false;
+      if (!newRow.part.roll$?.evaluated) {
+        newRow.part.isCrit$ = false;
         continue;
       }
 
-      const baseRollResult = newRow.part.data.roll$.terms[0].results.filter(result => result.active)[0];
-      newRow.part.data.isCrit$ = baseRollResult?.result >= newRow.part.data.critTreshold$;
+      const baseRollResult = newRow.part.roll$.terms[0].results.filter(result => result.active)[0];
+      newRow.part.isCrit$ = baseRollResult?.result >= newRow.part.critTreshold$;
     }
   }
 
   private setDamageAsCrit(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
-      if (newRow.part.data.isCrit$ !== oldRow?.part?.data?.isCrit$) {
-        for (const part of newRow.allParts) {
-          if (!ModularCard.isType<DamageCardData>(DamageCardPart.instance, part)) {
-            continue;
-          }
-          
-          if (part.data.phase === 'mode-select') {
-            if (newRow.part.data.isCrit$) {
-              part.data.mode = 'critical';
-            } else {
-              part.data.mode = 'normal';
-            }
+      if (newRow.part.isCrit$ !== oldRow?.part?.isCrit$) {
+        const damagePart = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+        if (damagePart != null) {
+          continue;
+        }
+        
+        if (damagePart.phase === 'mode-select') {
+          if (newRow.part.isCrit$) {
+            damagePart.mode = 'critical';
+          } else {
+            damagePart.mode = 'normal';
           }
         }
       }
@@ -576,12 +570,12 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
 
   private calcResultCache(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow} of context.rows) {
-      for (const targetCache of newRow.part.data.targetCaches$) {
-        if (newRow.part.data.roll$?.evaluated) {
-          const firstRoll = newRow.part.data.roll$.terms[0].results.find(r => r.active);
-          if (firstRoll.result === 20 || targetCache.ac$ <= newRow.part.data.roll$.total) {
+      for (const targetCache of newRow.part.targetCaches$) {
+        if (newRow.part.roll$?.evaluated) {
+          const firstRoll = newRow.part.roll$.terms[0].results.find(r => r.active);
+          if (firstRoll.result === 20 || targetCache.ac$ <= newRow.part.roll$.total) {
             // 20 always hits, lower crit treshold does not
-            if (firstRoll.result >= newRow.part.data.critTreshold$) {
+            if (firstRoll.result >= newRow.part.critTreshold$) {
               targetCache.resultType$ = 'critical-hit';
             } else {
               targetCache.resultType$ = 'hit';
@@ -600,13 +594,13 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
 
   private calcRollMode(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
-      const newMode = this.calcAutoMode(newRow.part.data);
+      const newMode = this.calcAutoMode(newRow.part);
       if (oldRow) {
-        if (newMode !== this.calcAutoMode(oldRow.part.data)) {
-          newRow.part.data.mode = newMode;
+        if (newMode !== this.calcAutoMode(oldRow.part)) {
+          newRow.part.mode = newMode;
         }
       } else {
-        newRow.part.data.mode = newMode;
+        newRow.part.mode = newMode;
       }
     }
   }
@@ -630,15 +624,15 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
 
   private async doRoll(context: IAfterDmlContext<ModularCardTriggerData<AttackCardData>>): Promise<void> {
     for (const {newRow, oldRow} of context.rows) {
-      if (newRow.part.data.phase !== 'result') {
+      if (newRow.part.phase !== 'result') {
         return;
       }
 
       // Only do roll when changed is detected
-      const newData = newRow.part.data;
-      const oldData = oldRow?.part?.data;
+      const newData = newRow.part;
+      const oldData = oldRow?.part;
 
-      let shouldModifyRoll = oldData == null || !newRow.part.data.roll$?.evaluated;
+      let shouldModifyRoll = oldData == null || !newRow.part.roll$?.evaluated;
       if (!shouldModifyRoll) {
         const newChangeDetectData: DeepPartial<AttackCardData> = {
           mode: newData.mode,
@@ -691,11 +685,11 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
     const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
       // Detect new rolled dice
-      if (newRow.part.data.roll$?.evaluated) {
-        const roll = UtilsRoll.getNewRolledTerms(oldRow?.part?.data?.roll$, newRow.part.data.roll$);
+      if (newRow.part.roll$?.evaluated) {
+        const roll = UtilsRoll.getNewRolledTerms(oldRow?.part?.roll$, newRow.part.roll$);
         if (roll) {
           showRolls.push({
-            uuid: newRow.part.data.actorUuid$,
+            uuid: newRow.part.actorUuid$,
             permission: `${staticValues.code}ReadAttack`,
             user: game.user,
             meta: roll,
