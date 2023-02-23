@@ -545,6 +545,37 @@ class BuildActions {
    * @param {string} target the destination directory
    */
   static createBuildTS(target) {
+    if (target !== 'dist') {
+      // When building locally, inject the mapping into the js file
+      // Can't figure out how to get the mapping working well otherwise
+      return function buildTS() {
+        const manifest = Meta.getManifest();
+        return gulp.src('src/**/*.ts')
+          .pipe(sourcemaps.init())
+          .pipe(BuildActions.#getTsConfig()())
+          /*.pipe(minifyJs({
+            ext: { min: '.js' },
+            mangle: false,
+            noSource: true,
+            output: {
+              source_map: false,
+              comments: false,
+            }
+          }))*/
+          .pipe(sourcemaps.mapSources(function(sourcePath, file) {
+            const filePathParts = path.normalize(sourcePath).split(path.sep);
+            return filePathParts[filePathParts.length - 1];
+          }))
+          .pipe(sourcemaps.write('./', {
+            //includeContent: false,
+            sourceMappingURL: (file) => {
+              const filePathParts = file.relative.split(path.sep);
+              return '/' + [(manifest.file.type === 'system' ? 'systems' : 'modules'), manifest.file.name, ...filePathParts].join('/') + '.map';
+            }
+          }))
+          .pipe(gulp.dest(target));
+      }
+    }
     return function buildTS() {
       const manifest = Meta.getManifest();
       const urlPrefix = '/' + [(manifest.file.type === 'system' ? 'systems' : 'modules'), manifest.file.name].join('/');
