@@ -387,11 +387,14 @@ export class RollD20Element {
     if (this.rollMode === rollModeOrder[newIndex]) {
       return;
     }
+    // If no roll is passed, set the new rollmode manually
     this.rollMode = rollModeOrder[newIndex];
+    // If a roll is present, recalc it
     this.calcRollMode();
+    
     this.rollModechange = {
       quickRoll: event.shiftKey,
-      data: this.rollMode,
+      data: rollModeOrder[newIndex],
     };
   }
   
