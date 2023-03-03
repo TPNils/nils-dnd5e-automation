@@ -1,12 +1,14 @@
 
 import { RollDamageEventData, RollDamageMode } from "../../elements/roll-damage-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
+import { DocumentListener } from "../../lib/db/document-listener";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { TermData, RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
+import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor, DamageType, MyItemData, MyItem } from "../../types/fixed-types";
 import { UtilsArray } from "../../utils/utils-array";
@@ -281,6 +283,15 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
     });
   //#endregion
 
+  private static inlineFlavorRegex: RegExp;
+  private static optionFlavorRegex: RegExp;
+
+  static {
+    const baseFlavorRegex = `(?:(?:${UtilsRoll.getValidDamageTypes().join('|')}):)?(.*)`;
+    DamageCardComponent.inlineFlavorRegex = new RegExp(`\\[${baseFlavorRegex}] *$`, 'i');
+    DamageCardComponent.optionFlavorRegex = new RegExp(`^ *${baseFlavorRegex} *$`, 'i');
+  }
+
   public static getSelector(): string {
     return `${staticValues.code}-damage-part`;
   }
@@ -298,7 +309,12 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData<DamageCardData>(DamageCardPart.instance).listen(async ({part}) => {
+      this.getData<DamageCardData>(DamageCardPart.instance).switchMap((data) => {
+        return ValueProvider.mergeObject({
+          ...data,
+          itemDamageSource: data.part.data.calc$.damageSource.type === 'Manual' ? null : DocumentListener.listenUuid(data.part.data.calc$.damageSource.itemUuid),
+        })
+      }).listen(async ({part, itemDamageSource}) => {
         this.roll = part.data.calc$.roll;
         this.rollMode = part.data.mode;
         this.rollSource = part.data.source;
@@ -312,10 +328,22 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
         const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.data.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}]);
         if (hasReadPermission) {
           let isHealing = false;
+          let damageSourceFlavor: string = null;
           if (!part.data.calc$.roll && part.data.calc$.damageSource.type === 'Item') {
-            const item = await UtilsDocument.itemFromUuid(part.data.calc$.damageSource.itemUuid);
-            if (item) {
-              isHealing = item.data.data.damage.parts.every(([dmg, type]) => ItemCardHelpers.healingDamageTypes.includes(type));
+            if (itemDamageSource) {
+              const dmg = itemDamageSource.data.data.damage;
+              isHealing = dmg.parts.every(([dmg, type]) => ItemCardHelpers.healingDamageTypes.includes(type));
+              if (this.rollSource === 'normal' && dmg.parts) {
+                const flavor = DamageCardComponent.inlineFlavorRegex.exec(dmg.parts[dmg.parts.length-1][0]);
+                if (flavor && UtilsRoll.toDamageType(flavor[1]) == null) {
+                  damageSourceFlavor = flavor[1];
+                }
+              } else if (this.rollSource === 'versatile' && dmg.versatile) {
+                const flavor = DamageCardComponent.inlineFlavorRegex.exec(dmg.versatile);
+                if (flavor && UtilsRoll.toDamageType(flavor[1]) == null) {
+                  damageSourceFlavor = flavor[1];
+                }
+              }
             } else {
               isHealing = false;
             }
@@ -329,9 +357,21 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
             
             const damageTypes: DamageType[] = rollTerms.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
             isHealing = damageTypes.length > 0 && damageTypes.every(damageType => ItemCardHelpers.healingDamageTypes.includes(damageType));
+            
+            let flavor: RegExpExecArray;
+            if (rollTerms[rollTerms.length-1].options?.flavor != null) {
+              flavor = DamageCardComponent.optionFlavorRegex.exec(rollTerms[rollTerms.length-1].options?.flavor ?? '');
+            } else if (rollTerms[rollTerms.length-1].class === 'StringTerm') {
+              flavor = DamageCardComponent.inlineFlavorRegex.exec(((rollTerms[rollTerms.length-1]) as any).term);
+            }
+            if (flavor && UtilsRoll.toDamageType(flavor[1]) == null) {
+              damageSourceFlavor = flavor[1];
+            }
           }
           
-          if (isHealing) {
+          if (damageSourceFlavor) {
+            this.flavor = damageSourceFlavor;
+          } else if (isHealing) {
             this.flavor = game.i18n.localize('DND5E.Healing');
             if (part.data.calc$.roll?.evaluated) {
               // Critical and/or versatile heals almost never happen (only in homebrew I think?), but just in case do specify that the crit is a heal

@@ -59,7 +59,7 @@ class CallbackTrigger<T extends FoundryDocument> implements IDmlTrigger<T> {
   }
 }
 
-export class DocumentListener<T extends FoundryDocument> extends ValueReader<T> {
+export class DocumentListener<T> extends ValueReader<T> {
 
   private readonly documentType: string;
   private constructor(
@@ -71,7 +71,7 @@ export class DocumentListener<T extends FoundryDocument> extends ValueReader<T> 
   }
 
   public listen(callback: (value?: T) => void): Stoppable {
-    UtilsDocument.fromUuid(this.uuid).then(init => callback(init as T));
+    UtilsDocument.fromUuid(this.uuid).then(init => callback(init as any as T));
     
     let trigger = triggersByDocumentType.get(this.documentType)?.trigger;
     if (trigger == null) {
@@ -83,7 +83,7 @@ export class DocumentListener<T extends FoundryDocument> extends ValueReader<T> 
     return trigger.addListener(this.uuid, callback);
   }
 
-  public static listenUuid<T extends FoundryDocument = FoundryDocument>(uuid: string): ValueReader<T> {
+  public static listenUuid<T = FoundryDocument>(uuid: string): ValueReader<T> {
     return new DocumentListener<T>(uuid);
   }
 }
