@@ -1084,7 +1084,11 @@ class Git {
 
   static async gitPushTag() {
     let version = 'v' + Meta.getManifest().file.version;
-    await execPromise(`git push origin ${version}`);
+    try {
+      await execPromise(`git push origin ${version}`);
+    } catch (e) {
+      console.log('git push tag error', e)
+    }
   }
 
   static async gitMoveTag() {
