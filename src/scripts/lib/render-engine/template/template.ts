@@ -189,7 +189,11 @@ export class Template {
                   if (process.instance.isParentNode()) {
                     let nodeValue = value;
                     if (typeof value === 'string') {
-                      nodeValue = VirtualNodeParser.parse(this.parseExpression(value, process.localVars));
+                      let expr = this.parseExpression(value, process.localVars);
+                      if (typeof expr === 'string') {
+                        expr = this.unescapeHtml(expr);
+                      }
+                      nodeValue = VirtualNodeParser.parse(expr);
                     }
                     if (isVirtualNode(nodeValue)) {
                       if (nodeValue.isChildNode()) {
@@ -313,7 +317,8 @@ export class Template {
           break;
         }
       } while (endExpression !== -1)
-      const parsedExpression = String(this.parseExpression(value.substring(startExpression+endExpressionStr.length/*{{ or {{{*/, endExpression), localVars));
+      const rawExpression = value.substring(startExpression+endExpressionStr.length/*{{ or {{{*/, endExpression);
+      const parsedExpression = this.unescapeHtml(String(this.parseExpression(rawExpression, localVars)));
       if (endExpressionStr.length === 3 && asNode) {
         parsedParts.push(...VirtualNodeParser.parseRaw(parsedExpression));
       } else {
