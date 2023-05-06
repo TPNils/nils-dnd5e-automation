@@ -27,3 +27,5 @@
 !/.vscode
 /.vscode/*
 !/.vscode/extensions.json
+
+!/docs
