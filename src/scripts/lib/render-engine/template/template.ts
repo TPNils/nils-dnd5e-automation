@@ -7,7 +7,6 @@ import { VirtualNodeParser } from "../virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
 import { VirtualTextNode } from "../virtual-dom/virtual-text-node";
 
-const domParser = new DOMParser();
 const forAttrRegex = /^\s*let\s+([^\s]+\s)+(of|in)\s(.+)$/;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
   template: T;
@@ -189,11 +188,7 @@ export class Template {
                   if (process.instance.isParentNode()) {
                     let nodeValue = value;
                     if (typeof value === 'string') {
-                      let expr = this.parseExpression(value, process.localVars);
-                      if (typeof expr === 'string') {
-                        expr = this.unescapeHtml(expr);
-                      }
-                      nodeValue = VirtualNodeParser.parse(expr);
+                      nodeValue = VirtualNodeParser.parse(this.parseExpression(value, process.localVars));
                     }
                     if (isVirtualNode(nodeValue)) {
                       if (nodeValue.isChildNode()) {
@@ -305,7 +300,7 @@ export class Template {
       
       // endExpression = the end of the last parsed expression
       // startExpression = a start of a new expression
-      parsedParts.push(this.unescapeHtml(value.substring(endExpression, startExpression)));
+      parsedParts.push(value.substring(endExpression, startExpression));
 
       endExpression = startExpression;
       do {
@@ -318,7 +313,7 @@ export class Template {
         }
       } while (endExpression !== -1)
       const rawExpression = value.substring(startExpression+endExpressionStr.length/*{{ or {{{*/, endExpression);
-      const parsedExpression = this.unescapeHtml(String(this.parseExpression(rawExpression, localVars)));
+      const parsedExpression = String(this.parseExpression(rawExpression, localVars));
       if (endExpressionStr.length === 3 && asNode) {
         parsedParts.push(...VirtualNodeParser.parseRaw(parsedExpression));
       } else {
@@ -328,19 +323,12 @@ export class Template {
       endExpression += endExpressionStr.length /*}} or }}}*/;
       startExpression = endExpression;
     }
-    parsedParts.push(this.unescapeHtml(value.substring(endExpression)));
+    parsedParts.push(value.substring(endExpression));
     if (asNode) {
       return parsedParts.map(v => typeof v === 'string' ? new VirtualTextNode(v) : v);
     } else {
       return parsedParts.map(v => String(v)).join('');
     }
-  }
-
-  private unescapeHtml(html: string): string {
-    // domParser.parseFromString removes the start whitespaces
-    const whitespacePrefix = /^ */.exec(html);
-    const unescapedHtml = domParser.parseFromString(html, 'text/html').documentElement.textContent;
-    return whitespacePrefix[0] + unescapedHtml;
   }
 
   private parsedExpressions = new Map<string, ParsedExpression>();

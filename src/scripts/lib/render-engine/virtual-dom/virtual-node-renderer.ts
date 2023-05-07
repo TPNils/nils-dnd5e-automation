@@ -45,8 +45,8 @@ type DomAction = {
   addBefore: Node;
 })
 
+const domParser = new DOMParser();
 const stateSymbol = Symbol('domCache');
-const rerenderIdSymbol = Symbol('rerenderId');
 export interface RenderState<T extends VirtualNode = VirtualNode> {
   domNode: ReturnType<T['createDom']>;
   lastRenderSelfState?: T;
@@ -354,7 +354,10 @@ export class VirtualNodeRenderer {
                 break;
               }
               case 'nodeValue': {
-                item.node.nodeValue = item.value;
+                // domParser.parseFromString removes the start whitespaces
+                const whitespacePrefix = /^ */.exec(item.value);
+                const unescapedHtml = domParser.parseFromString(item.value, 'text/html').documentElement.textContent;
+                item.node.nodeValue = whitespacePrefix + unescapedHtml;
                 break;
               }
               case 'removeNode': {
