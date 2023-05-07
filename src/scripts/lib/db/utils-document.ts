@@ -400,6 +400,22 @@ export class UtilsDocument {
     }).getValue() as any;
   }
   
+  public static chatMessageFromUuid(inputUuid: string): Promise<ChatMessage>
+  public static chatMessageFromUuid(inputUuid: Iterable<string>, options?: {sync?: false}): Promise<Map<string, ChatMessage>>
+  public static chatMessageFromUuid(inputUuid: string, options: {sync: true}): ChatMessage
+  public static chatMessageFromUuid(inputUuid: Iterable<string>, options: {sync: true}): Map<string, ChatMessage>
+  public static chatMessageFromUuid(inputUuid: string | Iterable<string>, options: {sync?: boolean} = {}): ChatMessage | Map<string, ChatMessage> | Promise<ChatMessage> | Promise<Map<string, ChatMessage>> {
+    let uuids: Iterable<string> = typeof inputUuid === 'string' ? [inputUuid] : inputUuid;
+    return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
+      for (let document of response.values()) {
+        if (document.documentName !== ChatMessage.documentName) {
+          throw new Error(`UUID '${document.uuid}' is not an ${ChatMessage.documentName}. In stead found: ${document.documentName}`)
+        }
+      }
+      return typeof inputUuid === 'string' ? response.get(inputUuid) : response;
+    }).getValue() as any;
+  }
+  
   public static sceneFromUuid(inputUuid: string): Promise<Scene>
   public static sceneFromUuid(inputUuid: Iterable<string>, options?: {sync?: false}): Promise<Map<string, Scene>>
   public static sceneFromUuid(inputUuid: string, options: {sync: true}): Scene
