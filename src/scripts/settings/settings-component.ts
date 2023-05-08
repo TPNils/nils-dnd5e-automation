@@ -7,11 +7,14 @@ import { staticValues } from "../static-values";
   tag: SettingsComponent.selector(),
   html: /*html*/`
     <nav class="tabs">
-      <div class="item {{this.selectedTab === 'visibility' ? 'active' : ''}}" (click)="this.selectedTab = 'visibility'"><i class="fas fa-eye"></i> Visibility</div>
-      <div class="item {{this.selectedTab === 'auto-rolling' ? 'active' : ''}}" (click)="this.selectedTab = 'auto-rolling'"><i class="fas fa-dice-d20"></i> Auto rolling</div>
+      <div *for="let tab of this.allTabs" class="item {{this.selectedTab === tab.key ? 'active' : ''}}">
+        <span class="nav-text" (click)="this.selectedTab = tab.key">
+          <i class="fas fa-eye"></i> {{tab.label}}
+        </span>
+      </div>
     </nav>
     <div class="wrapper" attr.selected-tab="{{this.selectedTab}}">
-      <div class="tab visibility">
+      <div class="tab Visibility">
         <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.attackVisibility" data-auto-save="true"></nd5a-settings-item-page>
         <nd5a-settings-item-page class="right" data-setting="${staticValues.moduleName}.attackHiddenRoll" data-auto-save="true"></nd5a-settings-item-page>
         <div class="seperator"></div>
@@ -24,7 +27,7 @@ import { staticValues } from "../static-values";
         <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.checkDcVisibility" data-auto-save="true"></nd5a-settings-item-page>
         <div class="seperator"></div>
       </div>
-      <div class="tab auto-rolling">
+      <div class="tab AutoRolling">
         <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.gmAutorollAttack" data-auto-save="true"></nd5a-settings-item-page>
         <nd5a-settings-item-page class="right" data-setting="${staticValues.moduleName}.playerAutorollAttack" data-auto-save="true"></nd5a-settings-item-page>
         <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.gmAutorollDamage" data-auto-save="true"></nd5a-settings-item-page>
@@ -37,6 +40,10 @@ import { staticValues } from "../static-values";
   style: /*css*/`
     :host {
       display: block;
+    }
+
+    .nav-text{
+      cursor: pointer;
     }
 
     .tabs {
@@ -63,8 +70,8 @@ import { staticValues } from "../static-values";
       border-bottom: 1px solid #7a7971;
     }
 
-    .wrapper:not([selected-tab="visibility"]) .visibility,
-    .wrapper:not([selected-tab="auto-rolling"]) .auto-rolling {
+    .wrapper:not([selected-tab="Visibility"]) .Visibility,
+    .wrapper:not([selected-tab="AutoRolling"]) .AutoRolling {
       display: none;
     }
   `
@@ -75,7 +82,9 @@ export class SettingsComponent implements OnInit {
     return `${staticValues.code}-settings-page`;
   }
 
-  public selectedTab = 'visibility'
+  public selectedTab = 'Visibility';
+  // TODO support variables in CSS during compile time so the CSS can be generated from this array
+  public allTabs = ['Visibility', 'AutoRolling'].map(tabKey => ({key: tabKey, label: game.i18n.localize(`${staticValues.moduleName}.${tabKey}`)}));
   public onInit(args: OnInitParam) {
     const settings: Array<Partial<SettingConfig>> = [];
     const prefix = `${staticValues.moduleName}.`;
@@ -93,8 +102,7 @@ export class SettingsComponent implements OnInit {
 
 }
 
-
- export class Nd5aSettingsFormApplication extends FormApplication<any, any> {
+export class Nd5aSettingsFormApplication extends FormApplication<any, any> {
    
   public getData() {
     return `<form><${SettingsComponent.selector()}></${SettingsComponent.selector()}></form>`;
@@ -113,6 +121,6 @@ export class SettingsComponent implements OnInit {
   }
 
   protected async _updateObject(event: Event, formData?: object): Promise<void> {
-    
+    // There is no update on submit, update happens when the setting changes
   }
 }

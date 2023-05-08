@@ -1,4 +1,6 @@
 {
+  "nils-dnd5e-automation.AutoRolling": "Auto rolling",
   "nils-dnd5e-automation.Cure": "Cure",
-  "nils-dnd5e-automation.CriticalMis": "Critical mis"
+  "nils-dnd5e-automation.CriticalMis": "Critical mis",
+  "nils-dnd5e-automation.Visibility": "Visibility"
 }
