@@ -164,9 +164,6 @@ class ChatMessageTransformer<T> extends TransformTrigger<ChatMessage, ModularCar
     return response;
   }
   
-  private static isType<T>(modularCardPart: ModularCardPart<T>, data: ModularCardPartDataLegacy): data is ModularCardPartDataLegacy<T> {
-    return ModularCard.getTypeHandler(data.type) instanceof modularCardPart.constructor;
-  }
 }
 
 class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {

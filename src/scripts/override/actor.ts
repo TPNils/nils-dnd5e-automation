@@ -21,7 +21,6 @@ function getLastCheckMessage(): CheckMessage | null {
       continue;
     }
 
-    const checkPartIndex = parts.hasType(CheckCardPart.instance);
     if (!parts.hasType(CheckCardPart.instance)) {
       // Don't go back further than 1 modular message to avoid rolls being consumed by something old
       // which will look as if no roll has been made.
