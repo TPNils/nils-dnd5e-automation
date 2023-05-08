@@ -98,13 +98,56 @@ async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args:
 }
 
 async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActor['data']['data']['abilities'], D20RollOptions]): Promise<Roll> {
-  const [abilitieId, options] = args;
+  const [abilityId, options] = args;
   if (options.chatMessage === false) {
     return wrapped(...args);
   }
 
-  // TODO
-  return wrapped(...args);
+  const lastCheckMessage = getLastCheckMessage();
+  if (lastCheckMessage == null || lastCheckMessage.checkPart.isSave || lastCheckMessage.checkPart.ability !== abilityId) {
+    // TODO custom roll message?
+    return wrapped(...args);
+  }
+
+  // Capture the roll request and provide it to the modular message
+  let selectionId: string;
+  const tokenUuid = getTokenUuid(options);
+  if (tokenUuid) {
+    // Only for this specific token
+    for (const target of lastCheckMessage.checkPart.targetCaches$) {
+      if (target.targetUuid$ === tokenUuid && target.phase !== 'result') {
+        target.phase = 'result';
+        selectionId = target.selectionId$;
+        break;
+      }
+    }
+  } else {
+    // For the first token matching the actor
+    for (const target of lastCheckMessage.checkPart.targetCaches$) {
+      if (target.actorUuid$ === this.uuid && target.phase !== 'result') {
+        target.phase = 'result';
+        selectionId = target.selectionId$;
+        break;
+      }
+    }
+  }
+
+  if (!selectionId) {
+    // Nothing found to roll in the modular card, just roll normally
+    // TODO custom roll message?
+    return wrapped(...args);
+  }
+
+  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.allParts);
+
+  const parts = ModularCard.getCardPartDatas(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
+  const target = (parts.find(part => ModularCard.getTypeHandler(part.type) instanceof CheckCardPart)?.data as CheckCardData)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
+  if (!target?.roll$) {
+    // This should never happen? but just in case.
+    return wrapped(...args);
+  }
+
+  return UtilsRoll.fromRollData(target.roll$);
 }
 
 async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActor['data']['data']['abilities'], D20RollOptions]): Promise<Roll> {
