@@ -114,7 +114,7 @@ async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ..
   }
 
   const lastCheckMessage = getLastCheckMessage();
-  if (lastCheckMessage == null || !lastCheckMessage.checkPart.iSave || lastCheckMessage.checkPart.ability !== abilityId) {
+  if (lastCheckMessage == null || !lastCheckMessage.checkPart.isSave || lastCheckMessage.checkPart.ability !== abilityId) {
     // TODO custom roll message?
     return wrapped(...args);
   }

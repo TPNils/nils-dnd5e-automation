@@ -34,7 +34,9 @@ export interface CheckCardData {
   ability: keyof MyActor['data']['data']['abilities'];
   dc: number;
   skill?: keyof MyActorData['data']['skills'];
+  /**@deprecated use isSave*/
   iSave?: boolean;
+  isSave?: boolean;
   targetCaches$: TargetCache[];
 }
 
@@ -212,7 +214,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
       actorUuid$: actor?.uuid,
       ability: item.data.data.save?.ability,
       dc: item.data.data.save.dc,
-      iSave: true,
+      isSave: true,
       targetCaches$: []
     };
   }
@@ -483,7 +485,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
                   fastForward: true,
                   chatMessage: false,
                 }));
-              } else if (newRow.part.data.iSave) {
+              } else if (newRow.part.data.isSave || newRow.part.data.iSave) {
                 rollPromises.push(actor.rollAbilitySave(newRow.part.data.ability, {
                   advantage: target.mode === 'advantage',
                   disadvantage: target.mode === 'disadvantage',
