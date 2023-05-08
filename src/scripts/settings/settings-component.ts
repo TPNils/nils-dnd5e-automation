@@ -2,6 +2,55 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../lib/render-engine/component";
 import { staticValues } from "../static-values";
 
+interface TabLayoutConfig {
+  key: string;
+  groups: Array<SettingLayout[]>
+}
+interface TabLayout {
+  key: string;
+  label?: string;
+  groups: Array<SettingLayout[]>
+}
+interface SettingLayout {
+  key: string;
+  autoSave: boolean;
+}
+
+const allTabConfigs: TabLayoutConfig[] = [
+  {
+    key: 'Visibility',
+    groups: [
+      [
+        {key: `${staticValues.moduleName}.attackVisibility`, autoSave: true},
+        {key: `${staticValues.moduleName}.attackHiddenRoll`, autoSave: true},
+      ],
+      [
+        {key: `${staticValues.moduleName}.damageVisibility`, autoSave: true},
+        {key: `${staticValues.moduleName}.damageHiddenRoll`, autoSave: true},
+        {key: `${staticValues.moduleName}.immunityVisibility`, autoSave: true},
+      ],
+      [
+        {key: `${staticValues.moduleName}.checkVisibility`, autoSave: true},
+        {key: `${staticValues.moduleName}.checkHiddenRoll`, autoSave: true},
+        {key: `${staticValues.moduleName}.checkDcVisibility`, autoSave: true},
+      ],
+    ],
+  },
+  {
+    key: 'AutoRolling',
+    groups: [
+      [
+        {key: `${staticValues.moduleName}.gmAutorollAttack`, autoSave: true},
+        {key: `${staticValues.moduleName}.playerAutorollAttack`, autoSave: true},
+        {key: `${staticValues.moduleName}.gmAutorollDamage`, autoSave: true},
+        {key: `${staticValues.moduleName}.playerAutorollDamage`, autoSave: true},
+        {key: `${staticValues.moduleName}.gmAutorollCheck`, autoSave: true},
+        {key: `${staticValues.moduleName}.playerAutorollCheck`, autoSave: true},
+      ],
+    ],
+  },
+]
+
 // new (game.settings.menus.get('nils-dnd5e-automation.menu').type)().render(true)
 @Component({
   tag: SettingsComponent.selector(),
@@ -14,26 +63,11 @@ import { staticValues } from "../static-values";
       </div>
     </nav>
     <div class="wrapper" selected-tab="{{this.selectedTab}}">
-      <div class="tab Visibility">
-        <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.attackVisibility" data-auto-save="true"></nd5a-settings-item-page>
-        <nd5a-settings-item-page class="right" data-setting="${staticValues.moduleName}.attackHiddenRoll" data-auto-save="true"></nd5a-settings-item-page>
-        <div class="seperator"></div>
-        <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.damageVisibility" data-auto-save="true"></nd5a-settings-item-page>
-        <nd5a-settings-item-page class="right" data-setting="${staticValues.moduleName}.damageHiddenRoll" data-auto-save="true"></nd5a-settings-item-page>
-        <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.immunityVisibility" data-auto-save="true"></nd5a-settings-item-page>
-        <div class="seperator"></div>
-        <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.checkVisibility" data-auto-save="true"></nd5a-settings-item-page>
-        <nd5a-settings-item-page class="right" data-setting="${staticValues.moduleName}.checkHiddenRoll" data-auto-save="true"></nd5a-settings-item-page>
-        <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.checkDcVisibility" data-auto-save="true"></nd5a-settings-item-page>
-        <div class="seperator"></div>
-      </div>
-      <div class="tab AutoRolling">
-        <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.gmAutorollAttack" data-auto-save="true"></nd5a-settings-item-page>
-        <nd5a-settings-item-page class="right" data-setting="${staticValues.moduleName}.playerAutorollAttack" data-auto-save="true"></nd5a-settings-item-page>
-        <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.gmAutorollDamage" data-auto-save="true"></nd5a-settings-item-page>
-        <nd5a-settings-item-page class="right" data-setting="${staticValues.moduleName}.playerAutorollDamage" data-auto-save="true"></nd5a-settings-item-page>
-        <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.gmAutorollCheck" data-auto-save="true"></nd5a-settings-item-page>
-        <nd5a-settings-item-page class="right" data-setting="${staticValues.moduleName}.playerAutorollCheck" data-auto-save="true"></nd5a-settings-item-page>
+      <div *for="let tab of this.allTabs" class="tab {{tab.key}}">
+        <virtual *for="let group of tab.groups">
+          <nd5a-settings-item-page *for="let setting of group" [data-setting]="setting.key" [data-auto-save]="setting.autoSave"></nd5a-settings-item-page>
+          <div class="seperator"></div>
+        </virtual>
       </div>
     </div>
   `,
@@ -82,9 +116,14 @@ export class SettingsComponent implements OnInit {
     return `${staticValues.code}-settings-page`;
   }
 
-  public selectedTab = 'Visibility';
+  public selectedTab = allTabConfigs[0].key;
   // TODO support variables in CSS during compile time so the CSS can be generated from this array
-  public allTabs = ['Visibility', 'AutoRolling'].map(tabKey => ({key: tabKey, label: game.i18n.localize(`${staticValues.moduleName}.${tabKey}`)}));
+  public allTabs: TabLayout[] = allTabConfigs.map(config => {
+    return {
+      ...deepClone(config),
+      label: game.i18n.localize(`${staticValues.moduleName}.${config.key}`)
+    };
+  });
   public onInit(args: OnInitParam) {
     const settings: Array<Partial<SettingConfig>> = [];
     const prefix = `${staticValues.moduleName}.`;
