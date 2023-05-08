@@ -164,6 +164,16 @@ export class ModuleSettings {
         `,
       });
     }
+    
+    game.settings.register<string, string, boolean>(staticValues.moduleName, 'captureManualRolls', {
+      name: 'Capture manual rolls',
+      hint: `When rolling a save manually (example: from the character sheet) and not from a item/spell message, capture the roll and use it on the item/spell message.`,
+      scope: 'world',
+      config: false,
+      type: Boolean,
+      default: true,
+    });
+
     game.settings.register<string, string, string>(staticValues.moduleName, 'aoeTargetRule', {
       name: 'Area of effect rules (targeting)',
       hint: `

@@ -47,6 +47,9 @@ const allTabConfigs: TabLayoutConfig[] = [
         {key: `${staticValues.moduleName}.gmAutorollCheck`, autoSave: true},
         {key: `${staticValues.moduleName}.playerAutorollCheck`, autoSave: true},
       ],
+      [
+        {key: `${staticValues.moduleName}.captureManualRolls`, autoSave: true},
+      ],
     ],
   },
 ]
