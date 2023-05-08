@@ -315,9 +315,9 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       ['preCreate', this.onFoundryBeforeCreate],
       ['preUpdate', this.onFoundryBeforeUpdate],
       ['preDelete', this.onFoundryBeforeDelete],
-      ['create', this.onFoundryAfterCreate],
-      ['update', this.onFoundryAfterUpdate],
-      ['delete', this.onFoundryAfterDelete],
+      ['create', this.onFoundryAfterCreateHook],
+      ['update', this.onFoundryAfterUpdateHook],
+      ['delete', this.onFoundryAfterDeleteHook],
     ] as Array<[string, (...args: any[]) => any]>).map(([prefix, callback]) => {
       const hookName = `${prefix}${this.documentName}`;
       const hookId = Hooks.on(hookName, callback.bind(this));
@@ -464,6 +464,12 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   //#region After
   private nextExtendedId = 0;
   private extendedOptionsById = new Map<number, any>();
+  
+  private onFoundryAfterCreateHook(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
+    const promise = this.onFoundryAfterCreate(document, options, userId);
+    UtilsDocument.addDmlEventPromise(options, promise);
+    return promise;
+  }
   private async onFoundryAfterCreate(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
     // Don't allow updates directly on the original document
     let documentSnapshot = new document.constructor(document.toObject(true), {parent: document.parent, pack: document.pack});
@@ -533,6 +539,11 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }
   }
   
+  private onFoundryAfterUpdateHook(document: T & {constructor: new (...args: any[]) => T}, change: any, options: DmlOptions, userId: string): Promise<void> {
+    const promise = this.onFoundryAfterUpdate(document, change, options, userId);
+    UtilsDocument.addDmlEventPromise(options, promise);
+    return promise;
+  }
   private async onFoundryAfterUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: DmlOptions, userId: string): Promise<void> {
     let doResolve: (value?: any) => void;
     let doReject: (err: any) => void;
@@ -639,6 +650,11 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }
   }
 
+  private onFoundryAfterDeleteHook(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
+    const promise = this.onFoundryAfterDelete(document, options, userId);
+    UtilsDocument.addDmlEventPromise(options, promise);
+    return promise;
+  }
   private async onFoundryAfterDelete(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
     // Don't allow updates directly on the original document
     let documentSnapshot = new document.constructor(document.toObject(true), {parent: document.parent, pack: document.pack});

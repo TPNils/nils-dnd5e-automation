@@ -1,3 +1,4 @@
+import { staticValues } from "../../static-values";
 import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
 import { UtilsLog } from "../../utils/utils-log";
@@ -92,6 +93,21 @@ interface DmlUpdateRequest {
   data: any;
 };
 
+const dmlEventPromisesByUuid = new Map<string, Promise<any>[]>();
+/**
+ * @param options 
+ * @returns A Promise which will complete when all async dmls are done
+ */
+function getDmlEventPromise(options: any): Promise<void> {
+  const uuid: string = options?.[staticValues.moduleName]?.dmlUuid;
+  if (typeof uuid !== 'string' || !dmlEventPromisesByUuid.has(uuid)) {
+    return Promise.resolve();
+  }
+  const promises = dmlEventPromisesByUuid.get(uuid);
+  dmlEventPromisesByUuid.delete(uuid);
+  return Promise.all(promises).then();
+}
+
 /**
  * This prevents updating the same record at the same time, but only for the local client, not for others
  */
@@ -185,12 +201,21 @@ class UpdateQueue {
                 if (parentDocument == null) {
                   parentDocument = fromUuid(bulkEntry.uuid);
                 }
-                promises.push(Promise.resolve(parentDocument).then(doc => doc.updateEmbeddedDocuments(embededDocumentName, embededByDocumentName.get(embededDocumentName))));
+                promises.push(Promise.resolve(parentDocument).then(async doc => {
+                  const options: any = {[staticValues.moduleName]: {dmlUuid: crypto.randomUUID()}};
+                  const returnValue = doc.updateEmbeddedDocuments(embededDocumentName, embededByDocumentName.get(embededDocumentName));
+                  await getDmlEventPromise(options);
+                  return returnValue;
+                }));
               }
             }
   
             if (rootRows.length > 0) {
-              promises.push(documentClass.updateDocuments(rootRows));
+              const options: any = {[staticValues.moduleName]: {dmlUuid: crypto.randomUUID()}};
+              promises.push(documentClass.updateDocuments(rootRows, options).then(async returnValue => {
+                await getDmlEventPromise(options);
+                return returnValue;
+              }));
             }
           }
   
@@ -573,24 +598,47 @@ export class UtilsDocument {
   //#endregion
 
   //#region dml
+  /**
+   * Foundry dmls do not support async functions. If you use a promise/async function in a trigger
+   * foundry will not wait on it to complete.
+   * 
+   * Pass any promises that should be waited for to this function.
+   * 
+   * @param options the options passed with the dml and present in dml hooks
+   * @param promise The promise that needs to be awaited to consider them DML complete
+   */
+  public static addDmlEventPromise(options: any, promise: Promise<any>): void {
+    const uuid: string = options?.[staticValues.moduleName]?.dmlUuid;
+    if (typeof uuid !== 'string') {
+      UtilsLog.warn('No uuid found for options', options, 'skipping promise');
+      return;
+    }
+    if (!dmlEventPromisesByUuid.has(uuid)) {
+      dmlEventPromisesByUuid.set(uuid, []);
+    }
+    dmlEventPromisesByUuid.get(uuid).push(promise);
+  }
+
   public static async bulkCreate(inputs: Iterable<FoundryDocument>): Promise<FoundryDocument[]> {
     const createsPerContext = UtilsDocument.groupDocumentsByContext(Array.from(inputs));
 
     const promises: Promise<FoundryDocument[]>[] = [];
     for (const documentContext of createsPerContext) {
+      const options: any = {[staticValues.moduleName]: {
+        dmlUuid: crypto.randomUUID(),
+        parent: documentContext.parent,
+        pack: documentContext.pack,
+      }};
       const promise = documentContext.documentClass.createDocuments.call(
-        documentContext.documentClass,
         documentContext.documents.map(doc => doc.data),
-        {
-          parent: documentContext.parent,
-          pack: documentContext.pack,
-        }
+        options,
       );
       promises.push(promise);
       if (documentContext.parent != null) {
         // Await per dml, otherwise there is a bug where it doesn't always come through to the server (it looks fine for the client)
         // I would guess this would be caused since it would update the same parent document
         await promise;
+        await getDmlEventPromise(options);
       }
     }
 
@@ -624,13 +672,15 @@ export class UtilsDocument {
 
     const promises: Promise<any>[] = [];
     for (const documentContext of deletesPerContext) {
+      const options: any = {[staticValues.moduleName]: {
+        dmlUuid: crypto.randomUUID(),
+        parent: documentContext.parent,
+        pack: documentContext.pack,
+      }};
       const promise = documentContext.documentClass.deleteDocuments.call(
         documentContext.documentClass,
         documentContext.documents.map(doc => doc.id),
-        {
-          parent: documentContext.parent,
-          pack: documentContext.pack,
-        }
+        options
       );
       if (documentContext.parent == null) {
         promises.push(promise);
@@ -638,6 +688,7 @@ export class UtilsDocument {
         // Await per dml, otherwise there is a bug where it doesn't always come through to the server (it looks fine for the client)
         // I would guess this would be caused since it would update the same parent document
         await promise;
+        await getDmlEventPromise(options);
       }
     }
 
