@@ -610,7 +610,6 @@ export class UtilsDocument {
   public static addDmlEventPromise(options: any, promise: Promise<any>): void {
     const uuid: string = options?.[staticValues.moduleName]?.dmlUuid;
     if (typeof uuid !== 'string') {
-      UtilsLog.warn('No uuid found for options', options, 'skipping promise');
       return;
     }
     if (!dmlEventPromisesByUuid.has(uuid)) {
