@@ -391,8 +391,9 @@ export class ComponentElement extends HTMLElement {
     if (this.setControllerFromAttribute(name, newValue)) {
       this.skipAttrCallback = true;
     }
-    if (this.hasAttribute(name)) {
+    if (this.hasAttribute(name) || !this.skipAttrCallback) {
       // If the attribute was set, reflect changes to it
+      // If the attribute is not an @Attribute, also reflect changes to it
       // If attribute was not set, keep it all internal
       // This aligns a bit (not 100%) with the best practices https://web.dev/custom-elements-best-practices/
       //   and teaked by my opinion

@@ -58,7 +58,7 @@ function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache 
     <nd5a-roll-d20
       *if="this.cache"
       class="snug"
-      attr.data-label-type="icon"
+      data-label-type="icon"
       [data-roll]="this.cache.roll$"
       [data-bonus-formula]="this.cache.userBonus"
       [data-show-bonus]="this.cache.phase !== 'mode-select'"

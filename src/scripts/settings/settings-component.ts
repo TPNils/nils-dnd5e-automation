@@ -13,7 +13,7 @@ import { staticValues } from "../static-values";
         </span>
       </div>
     </nav>
-    <div class="wrapper" attr.selected-tab="{{this.selectedTab}}">
+    <div class="wrapper" selected-tab="{{this.selectedTab}}">
       <div class="tab Visibility">
         <nd5a-settings-item-page class="left" data-setting="${staticValues.moduleName}.attackVisibility" data-auto-save="true"></nd5a-settings-item-page>
         <nd5a-settings-item-page class="right" data-setting="${staticValues.moduleName}.attackHiddenRoll" data-auto-save="true"></nd5a-settings-item-page>
