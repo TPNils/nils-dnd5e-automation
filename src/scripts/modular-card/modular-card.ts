@@ -14,19 +14,119 @@ import { UtilsLog } from "../utils/utils-log";
 import { ActiveEffectCardPart, AttackCardPart, CheckCardPart, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardPart, SpellLevelCardPart, TargetCardPart, TemplateCardPart } from "./base/index";
 import { ItemUtils } from "./item-utils";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
-import { SrdLayOnHandsCardPart } from "./srd/index";
 
-export interface ModularCardPartData<T = any> {
+interface ModularCardPartDataLegacy<T = any> {
   readonly id: string;
   readonly type: string;
   data: T;
 }
 
+export type ModularCardDataLegacy = ModularCardPartDataLegacy[];
+type ModularCardData = {[partType: string]: any};
+
+function getExtendedTypes(inputHandler: ModularCardPart | string): string[] {
+  inputHandler = typeof inputHandler === 'string' ? ModularCard.getTypeHandler(inputHandler) : inputHandler;
+  let prototypeIter = Object.getPrototypeOf(inputHandler);
+  const types: string[] = [];
+  while (prototypeIter != null) {
+    if (typeof prototypeIter.getType === 'function') {
+      types.push(prototypeIter.getType.call(inputHandler))
+    }
+    // get parent prototype
+    prototypeIter = Object.getPrototypeOf(prototypeIter);
+  }
+
+  return types;
+}
+
+export class ModularCardInstance {
+  private data: ModularCardData = {};
+
+  public hasType<T>(partType: ModularCardPart<T> | string): boolean {
+    return this.getTypeData(partType) != null;
+  }
+
+  public getTypeData<T>(partType: string): any | null;
+  public getTypeData<T>(partType: ModularCardPart<T>): T | null;
+  public getTypeData<T>(partType: ModularCardPart<T> | string): any | null
+  public getTypeData<T>(partType: ModularCardPart<T> | string): T | null {
+    const partTypeName = this.getTypeName(partType);
+    if (this.data[partTypeName] != null) {
+      return this.data[partTypeName];
+    }
+
+    for (const type in this.data) {
+      const extendedTypes = getExtendedTypes(type);
+      if (extendedTypes.includes(partTypeName)) {
+        return this.data[type];
+      }
+    }
+    return null;
+  }
+
+  public getTypeDataAndHandler<T>(partType: string): {handler: ModularCardPart<any>; data: any} | null;
+  public getTypeDataAndHandler<T>(partType: ModularCardPart<T>): {handler: ModularCardPart<T>; data: T} | null;
+  public getTypeDataAndHandler<T>(partType: ModularCardPart<T> | string): {handler: ModularCardPart<any>; data: any} | null
+  public getTypeDataAndHandler<T>(partType: ModularCardPart<T> | string): {handler: ModularCardPart<T>; data: T} | null {
+    const partTypeName = this.getTypeName(partType);
+    if (this.data[partTypeName] != null) {
+      return {
+        data: this.data[partTypeName],
+        handler: ModularCard.getTypeHandler(partTypeName),
+      };
+    }
+
+    for (const type in this.data) {
+      const extendedTypes = getExtendedTypes(type);
+      if (extendedTypes.includes(partTypeName)) {
+        return {
+          data: this.data[type],
+          handler: ModularCard.getTypeHandler(type),
+        };
+      }
+    }
+    return null;
+  }
+
+  public setTypeData<T>(partType: string, data: any | null): void;
+  public setTypeData<T>(partType: ModularCardPart<T>, data: T | null): void;
+  public setTypeData<T>(partType: ModularCardPart<T> | string, data: any | null): void {
+    // Reset all types, both itself and every type it extends
+    for (const type of getExtendedTypes(partType)) {
+      delete this.data[type];
+    }
+    if (data != null) {
+      this.data[this.getTypeName(partType)] = data;
+    }
+  }
+
+  private getTypeName(partType: ModularCardPart | string): string {
+    return typeof partType === 'string' ? partType : partType?.getType()
+  }
+
+  public getAllTypes(): ModularCardPart[] {
+    const parts: ModularCardPart[] = [];
+    for (const type in this.data) {
+      const handler = ModularCard.getTypeHandler(type);
+      if (handler != null) {
+        parts.push(handler);
+      }
+    }
+    return parts;
+  }
+
+  public deepClone(): ModularCardInstance {
+    const clone = new ModularCardInstance();
+    clone.data = deepClone(this.data);
+    return clone;
+  }
+}
+
 export interface ModularCardTriggerData<T = any> {
   readonly messageId: string;
   readonly typeHandler: ModularCardPart<T>;
-  readonly part: ModularCardPartData<T>;
-  readonly allParts: ModularCardPartData<any>[];
+  readonly part: T;
+  readonly allParts: ModularCardInstance;
 }
 
 class ChatMessageTransformer<T> extends TransformTrigger<ChatMessage, ModularCardTriggerData<T>> implements IDmlTrigger<ChatMessage> {
@@ -43,26 +143,29 @@ class ChatMessageTransformer<T> extends TransformTrigger<ChatMessage, ModularCar
 
   private transformFunc(from: ChatMessage): {uniqueKey: string, data: ModularCardTriggerData} | Array<{uniqueKey: string, data: ModularCardTriggerData}> {
     const parts = ModularCard.getCardPartDatas(from);
-    if (!Array.isArray(parts)) {
+    if (parts == null) {
       return [];
     }
 
     const response: Array<{uniqueKey: string, data: ModularCardTriggerData}> = [];
-    for (const part of parts) {
-      if (ModularCard.isType(this.cardPartType, part)) {
-        response.push({
-          uniqueKey: `${from.uuid}.${part.id}`,
-          data: {
-            part: part,
-            allParts: parts,
-            messageId: from.id,
-            typeHandler: ModularCard.getTypeHandler(part.type),
-          }
-        });
-      }
+    const dataWrapper = parts.getTypeDataAndHandler(this.cardPartType);
+    if (dataWrapper != null) {
+      response.push({
+        uniqueKey: `${from.uuid}.${this.cardPartType.getType()}`,
+        data: {
+          part: dataWrapper.data,
+          allParts: parts,
+          messageId: from.id,
+          typeHandler: dataWrapper.handler,
+        }
+      });
     }
 
     return response;
+  }
+  
+  private static isType<T>(modularCardPart: ModularCardPart<T>, data: ModularCardPartDataLegacy): data is ModularCardPartDataLegacy<T> {
+    return ModularCard.getTypeHandler(data.type) instanceof modularCardPart.constructor;
   }
 }
 
@@ -76,41 +179,10 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
       if (newRow == null) {
         continue;
       }
-      if (Array.isArray(ModularCard.getCardPartDatas(newRow))) {
+      if (ModularCard.getCardPartDatas(newRow) != null) {
         newRow.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
       }
     }
-  }
-  
-  public beforeUpdate(context: IDmlContext<ChatMessage>): boolean | void {
-    this.finalFields(context);
-  }
-  
-  private finalFields(context: IDmlContext<ChatMessage>): boolean {
-    for (const {newRow, oldRow} of context.rows) {
-      const parts = ModularCard.getCardPartDatas(newRow);
-      if (parts == null) {
-        continue;
-      }
-
-      const oldParts = new Map<string, ModularCardPartData>();
-      for (const part of ModularCard.getCardPartDatas(oldRow)) {
-        oldParts.set(part.id, part);
-      }
-
-      for (const part of parts) {
-        const oldPart = oldParts.get(part.id);
-        if (!oldPart) {
-          continue;
-        }
-        if (part.type !== oldPart?.type) {
-          UtilsLog.error(`Can't change the type of part and retain the same id.`)
-          return false;
-        }
-      }
-    }
-
-    return true;
   }
 }
 
@@ -349,6 +421,11 @@ export class BeforeCreateModuleCardEvent {
     this.add(addPart, {type: 'before', reference: reference});
   }
 
+  public replace(reference: ModularCardPart | string, addPart: ModularCardPart): void {
+    this.addBefore(reference, addPart);
+    this.remove(reference);
+  }
+
   public addAfter(reference: ModularCardPart | string, addPart: ModularCardPart): void {
     this.add(addPart, {type: 'after', reference: reference});
   }
@@ -421,7 +498,46 @@ export class BeforeCreateModuleCardEvent {
       }
     }
 
-    return resolvedParts.map(typeName => ModularCard.getTypeHandler(typeName));
+    // Try to detect conflics, only 1 ModularCardPart per type is allowed
+    // If you extend a ModularCardPart, that part is both itself and the extended part (= 2 different types or more)
+    const handlerMetas: Array<{type: ModularCardPart, extendedTypes: string[]}> = []
+    for (const resolvedPart of resolvedParts) {
+      const type = ModularCard.getTypeHandler(resolvedPart);
+      handlerMetas.push({
+        type: type,
+        extendedTypes: getExtendedTypes(type),
+      });
+    }
+    // Prioritize the handlers with the least extends if there is a conflict
+    handlerMetas.sort((a, b) => a.extendedTypes.length - b.extendedTypes.length);
+    
+    const whitelistTypes = new Set<string>()
+    for (const handlerMeta of handlerMetas) {
+      const conflicts: string[] = [];
+      for (const extendedType of handlerMeta.extendedTypes) {
+        if (whitelistTypes.has(extendedType)) {
+          conflicts.push(extendedType);
+        }
+      }
+
+      if (conflicts.length > 0) {
+        UtilsLog.buildError(
+          'Detected conflicts for',
+          {color: 'grey', message: handlerMeta.type.getType()},
+          'with the other original type(s)',
+          {color: 'grey', message: conflicts.join(', ')},
+          `. When you extend other types, you will need to remove the originals from that message during the event create${staticValues.code.capitalize()}ModuleCard`
+          )();
+      } else {
+        for (const extendedType of handlerMeta.extendedTypes) {
+          whitelistTypes.add(extendedType);
+        }
+      }
+    }
+
+    return resolvedParts
+      .filter(typeName => whitelistTypes.has(typeName))
+      .map(typeName => ModularCard.getTypeHandler(typeName));
   }
 }
 
@@ -454,10 +570,13 @@ export class ModularCard {
   }
 
   public static getTypeHandler<T extends ModularCardPart = ModularCardPart>(type: string): T | null {
+    if (ModularCard.registeredPartsByType.get(type) == null) {
+      UtilsLog.buildWarn('Could not find type handler for', {color: 'grey', message: type})();
+    }
     return ModularCard.registeredPartsByType.get(type).part as T;
   }
 
-  public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardPartData[]> {
+  public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardInstance> {
     let id = 0;
     const parts: Promise<{data: any, cardPart: ModularCardPart}>[] = [];
     
@@ -508,20 +627,16 @@ export class ModularCard {
       }
     }
 
-    const response: ModularCardPartData[] = [];
+    const response = new ModularCardInstance();
     for (const part of await Promise.all(parts)) {
       if (part.data != null) {
-        response.push({
-          id: `${id++}`,
-          data: part.data,
-          type: part.cardPart.getType(),
-        })
+        response.setTypeData(part.cardPart, part.data);
       }
     }
     return response;
   }
   
-  public static async createCard(parts: ModularCardPartData[], insert: boolean = true): Promise<ChatMessage> {
+  public static async createCard(parts: ModularCardInstance, insert: boolean = true): Promise<ChatMessage> {
     const chatMessageData: ChatMessageDataConstructorData = {
       flags: {
         [staticValues.moduleName]: {
@@ -556,10 +671,6 @@ export class ModularCard {
     } else {
       return new ChatMessage(chatMessageData);
     }
-  }
-
-  public static isType<T>(modularCardPart: ModularCardPart<T>, data: ModularCardPartData): data is ModularCardPartData<T> {
-    return ModularCard.getTypeHandler(data.type) instanceof modularCardPart.constructor;
   }
   
   @RunOnce()
@@ -633,28 +744,33 @@ export class ModularCard {
     })
   }
 
-  public static getCardPartDatas(message: ChatMessage): Array<ModularCardPartData> | null {
+  public static getCardPartDatas(message: ChatMessage): ModularCardInstance | null {
     if (message == null) {
       return null;
     }
 
-    let cards: Array<ModularCardPartData> | {[key: string]: ModularCardPartData} = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
-    if (typeof cards === 'object' && !Array.isArray(cards)) {
-      let cardsArray: Array<ModularCardPartData> = [];
+    const flagData: any = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
+    if (typeof flagData === 'object' && !Array.isArray(flagData)) {
+      const data = new ModularCardInstance();
 
-      const keys = Object.keys(cards).map(Number).sort();
+      const keys = Object.keys(flagData);
       for (const key of keys) {
-        if (cards[key] != null) {
-          cardsArray.push(cards[key]);
+        // Legacy format => parse to new format
+        if (!Number.isNaN(Number.parseInt(key))) {
+          data.setTypeData(flagData[key].type, flagData[key].data);
+        } else {
+          data.setTypeData(key, flagData[key]);
         }
       }
 
-      cards = cardsArray;
+      return data;
+    } else if (flagData != null) {
+      UtilsLog.warn('Unexpected modularCardData found for message', message.uuid, 'flagData:', flagData);
+      return null;
     }
-    return cards;
   }
   
-  public static async setBulkCardPartDatas(updates: Array<{message: ChatMessage, data: Array<ModularCardPartData>}>): Promise<void> {
+  public static async setBulkCardPartDatas(updates: Array<{message: ChatMessage, data: ModularCardInstance | ModularCardDataLegacy}>): Promise<void> {
     const bulkUpdateRequest: Parameters<typeof UtilsDocument.bulkUpdate>[0] = [];
     for (const update of updates) {
       if (update.message == null) {
@@ -672,44 +788,53 @@ export class ModularCard {
     return UtilsDocument.bulkUpdate(bulkUpdateRequest);
   }
 
-  public static setCardPartDatas(message: ChatMessage, data: Array<ModularCardPartData>): Promise<void> {
+  public static setCardPartDatas(message: ChatMessage, data: ModularCardInstance | ModularCardDataLegacy): Promise<void> {
     return ModularCard.setBulkCardPartDatas([{message, data}])
   }
 
-  /**
-   * Foundry change detection is not perfect.
-   * If a single part of an array has been changed the whole array needs to be updated, this is not a problem with objects.
-   * Ideally all arrays would be converted to object, but thats more complex and this solution will be fine for now.
-   */
-  private static createFlagObject(data: Array<ModularCardPartData>): {[key: string]: ModularCardPartData} {
-    const cardsObj: {[key: string]: ModularCardPartData} = {};
-    if (data) {
+  private static createFlagObject(data: ModularCardInstance | ModularCardDataLegacy): ModularCardData {
+    const cardsObj: ModularCardData = {};
+    if (Array.isArray(data)) {
       for (const part of data) {
         if (part.data != null) {
           cardsObj[part.id] = part;
+        }
+      }
+    } else if (data instanceof ModularCardInstance) {
+      for (const type of data.getAllTypes()) {
+        const typeData = data.getTypeData(type);
+        if (typeData != null) {
+          cardsObj[type.getType()] = typeData;
         }
       }
     }
     return cardsObj;
   }
 
-  public static async getHtml(messageId: string, parts: ModularCardPartData[]): Promise<string> {
-    const htmlParts$: Array<{html: string, id: string} | Promise<{html: string, id: string}>> = [];
-    for (const partData of parts) {
-      if (!ModularCard.registeredPartsByType.has(partData.type)) {
-        UtilsLog.error(`Could not render ModularCardPart ${partData.type} of module ${ModularCard.typeToModule.get(partData.type)}`);
-        // Don't throw(?), what if a module extention got disabled
-        continue;
+  private static migrateParts(parts: ModularCardInstance | ModularCardDataLegacy): ModularCardInstance {
+    if (Array.isArray(parts)) {
+      const obj = new ModularCardInstance();
+      for (const part of parts) {
+        obj.setTypeData(part.type, part.data);
       }
+      return obj;
+    }
+    return parts;
+  }
+
+  public static async getHtml(messageId: string, partsInput: ModularCardInstance | ModularCardDataLegacy): Promise<string> {
+    const htmlParts$: Array<{html: string} | Promise<{html: string}>> = [];
+    const parts = ModularCard.migrateParts(partsInput);
+    for (const typeHandler of parts.getAllTypes()) {
+      const partData = parts.getTypeData(typeHandler);
 
       // TODO error handeling during render
-      const typeHandler = ModularCard.getTypeHandler(partData.type);
       if (typeHandler?.getHtml) {
-        const htmlPart = typeHandler.getHtml({messageId: messageId, partId: partData.id, data: partData.data, allMessageParts: parts});
+        const htmlPart = typeHandler.getHtml({messageId: messageId, data: partData, allMessageParts: parts});
         if (htmlPart instanceof Promise) {
-          htmlParts$.push(htmlPart.then(html => {return {html: html, id: partData.id}}));
+          htmlParts$.push(htmlPart.then(html => {return {html: html}}));
         } else if (typeof htmlPart === 'string') {
-          htmlParts$.push({html: htmlPart, id: partData.id});
+          htmlParts$.push({html: htmlPart});
         }
       }
     }

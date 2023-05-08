@@ -1,4 +1,4 @@
-import { ModularCard, ModularCardPartData } from "../modular-card/modular-card";
+import { ModularCard, ModularCardInstance } from "../modular-card/modular-card";
 import { CheckCardData, CheckCardPart } from "../modular-card/base/check-card-part";
 import { staticValues } from "../static-values";
 import type { D20RollOptions, MyActor } from "../types/fixed-types";
@@ -7,7 +7,7 @@ import { UtilsRoll } from "../lib/roll/utils-roll";
 
 interface CheckMessage {
   chatMessage: ChatMessage;
-  allParts: ModularCardPartData[];
+  modularCard: ModularCardInstance;
   checkPart: CheckCardData;
 }
 
@@ -21,18 +21,18 @@ function getLastCheckMessage(): CheckMessage | null {
       continue;
     }
 
-    const checkPartIndex = parts.findIndex(part => ModularCard.getTypeHandler(part.type) instanceof CheckCardPart);
-    if (checkPartIndex === -1) {
+    const checkPartIndex = parts.hasType(CheckCardPart.instance);
+    if (!parts.hasType(CheckCardPart.instance)) {
       // Don't go back further than 1 modular message to avoid rolls being consumed by something old
       // which will look as if no roll has been made.
       return null;
     }
 
-    const clonedParts = deepClone(parts);
+    const clonedParts = parts.deepClone()
     return {
       chatMessage,
-      allParts: clonedParts,
-      checkPart: clonedParts[checkPartIndex].data,
+      modularCard: clonedParts,
+      checkPart: clonedParts.getTypeData(CheckCardPart.instance),
     }
   }
 }
@@ -85,10 +85,10 @@ async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args:
     return wrapped(...args);
   }
 
-  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.allParts);
+  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
 
   const parts = ModularCard.getCardPartDatas(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
-  const target = (parts.find(part => ModularCard.getTypeHandler(part.type) instanceof CheckCardPart)?.data as CheckCardData)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
+  const target = parts.getTypeData(CheckCardPart.instance)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
   if (!target?.roll$) {
     // This should never happen? but just in case.
     return wrapped(...args);
@@ -138,10 +138,10 @@ async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ..
     return wrapped(...args);
   }
 
-  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.allParts);
+  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
 
   const parts = ModularCard.getCardPartDatas(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
-  const target = (parts.find(part => ModularCard.getTypeHandler(part.type) instanceof CheckCardPart)?.data as CheckCardData)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
+  const target = parts.getTypeData(CheckCardPart.instance)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
   if (!target?.roll$) {
     // This should never happen? but just in case.
     return wrapped(...args);
@@ -191,10 +191,10 @@ async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ..
     return wrapped(...args);
   }
 
-  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.allParts);
+  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
 
   const parts = ModularCard.getCardPartDatas(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
-  const target = (parts.find(part => ModularCard.getTypeHandler(part.type) instanceof CheckCardPart)?.data as CheckCardData)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
+  const target = parts.getTypeData(CheckCardPart.instance)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
   if (!target?.roll$) {
     // This should never happen? but just in case.
     return wrapped(...args);

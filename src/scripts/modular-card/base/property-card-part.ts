@@ -2,7 +2,7 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { staticValues } from "../../static-values";
 import { MyItem } from "../../types/fixed-types";
-import { ModularCard, ModularCardPartData } from "../modular-card";
+import { ModularCard } from "../modular-card";
 import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
@@ -53,7 +53,7 @@ export class PropertyCardComponent extends BaseCardComponent implements OnInit {
   public onInit(args: OnInitParam): void {
     args.addStoppable(
       this.getData<PropertyCardData>(PropertyCardPart.instance).listen(({part}) => {
-        this.properties = part.data.properties$.map((prop: PropertyCardData['properties$'][number]) => typeof prop === 'string' ? {text: prop, highlight: false} : prop);
+        this.properties = part.properties$.map((prop: PropertyCardData['properties$'][number]) => typeof prop === 'string' ? {text: prop, highlight: false} : prop);
       })
     )
   }
@@ -86,12 +86,12 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return 'PropertyCardPart';
   }
 
   //#region Front end
   public getHtml(data: HtmlContext): string {
-    return `<${PropertyCardComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${PropertyCardComponent.getSelector()}>`
+    return `<${PropertyCardComponent.getSelector()} data-message-id="${data.messageId}"></${PropertyCardComponent.getSelector()}>`
   }
   //#endregion
 

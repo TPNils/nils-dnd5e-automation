@@ -14,7 +14,7 @@ import { MyActor, DamageType, MyItemData, MyItem } from "../../types/fixed-types
 import { UtilsArray } from "../../utils/utils-array";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ModularCard, ModularCardPartData, ModularCardTriggerData } from "../modular-card";
+import { ModularCard, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
@@ -235,51 +235,51 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   });
   private static rollClick = new Action<{event: CustomEvent<{userBonus?: string}>} & ChatPartIdData>('DamageOnRollClick')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getCustomEventSerializer())
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
-    .build(({messageId, part, event, allCardParts}) => {
-      if (part.data.userBonus === event.userBonus && part.data.phase === 'result') {
+    .build(({messageId, event, cardParts}) => {
+      const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      if (part.userBonus === event.userBonus && part.phase === 'result') {
         return;
       }
-      part.data.userBonus = event.userBonus;
-      part.data.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+      part.userBonus = event.userBonus;
+      part.phase = 'result';
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     });
   private static modeChange = new Action<{event: CustomEvent<RollDamageEventData<RollDamageMode>>} & ChatPartIdData>('DamageOnModeChange')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getCustomEventSerializer())
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
-    .build(({messageId, allCardParts, part, event}) => {
-      if (part.data.mode === event.data) {
+    .build(({messageId, cardParts, event}) => {
+      const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      if (part.mode === event.data) {
         return;
       }
 
-      part.data.mode = event.data;
+      part.mode = event.data;
       if (event.quickRoll) {
-        part.data.phase = 'result';
+        part.phase = 'result';
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     });
   private static sourceChange = new Action<{event: CustomEvent<RollDamageEventData<DamageCardData['source']>>} & ChatPartIdData>('DamageOnSourceChange')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getCustomEventSerializer())
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<DamageCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
-    .build(({messageId, allCardParts, part, event}) => {
-      if (part.data.source === event.data) {
+    .build(({messageId, cardParts, event}) => {
+      const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      if (part.source === event.data) {
         return;
       }
 
-      part.data.source = event.data;
+      part.source = event.data;
       if (event.quickRoll) {
-        part.data.phase = 'result';
+        part.phase = 'result';
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     });
   //#endregion
 
@@ -312,24 +312,24 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
       this.getData<DamageCardData>(DamageCardPart.instance).switchMap((data) => {
         return ValueProvider.mergeObject({
           ...data,
-          itemDamageSource: data.part.data.calc$.damageSource.type === 'Manual' ? null : DocumentListener.listenUuid(data.part.data.calc$.damageSource.itemUuid),
+          itemDamageSource: data.part.calc$.damageSource.type === 'Manual' ? null : DocumentListener.listenUuid(data.part.calc$.damageSource.itemUuid),
         })
       }).listen(async ({part, itemDamageSource}) => {
-        this.roll = part.data.calc$.roll;
-        this.rollMode = part.data.mode;
-        this.rollSource = part.data.source;
-        this.hasVersatile = part.data.calc$.damageSource.type === 'Item' ? part.data.calc$.damageSource.hasVersatile : (part.data.calc$.damageSource.versatileBaseRoll != null);
-        this.userBonus = part.data.userBonus;
-        this.overrideFormula = part.data.calc$.displayFormula
-        this.interactionPermission = `OwnerUuid:${part.data.calc$.actorUuid}`;
-        this.readPermission = `${staticValues.code}ReadDamageUuid:${part.data.calc$.actorUuid}`;
+        this.roll = part.calc$.roll;
+        this.rollMode = part.mode;
+        this.rollSource = part.source;
+        this.hasVersatile = part.calc$.damageSource.type === 'Item' ? part.calc$.damageSource.hasVersatile : (part.calc$.damageSource.versatileBaseRoll != null);
+        this.userBonus = part.userBonus;
+        this.overrideFormula = part.calc$.displayFormula
+        this.interactionPermission = `OwnerUuid:${part.calc$.actorUuid}`;
+        this.readPermission = `${staticValues.code}ReadDamageUuid:${part.calc$.actorUuid}`;
         this.flavor = game.i18n.localize('DND5E.Damage');
 
-        const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.data.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}]);
+        const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}]);
         if (hasReadPermission) {
           let isHealing = false;
           let damageSourceFlavor: string = null;
-          if (!part.data.calc$.roll && part.data.calc$.damageSource.type === 'Item') {
+          if (!part.calc$.roll && part.calc$.damageSource.type === 'Item') {
             if (itemDamageSource) {
               const dmg = itemDamageSource.data.data.damage;
               isHealing = dmg.parts.every(([dmg, type]) => ItemCardHelpers.healingDamageTypes.includes(type));
@@ -349,10 +349,10 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
             }
           } else {
             let rollTerms: TermData[];
-            if (part.data.calc$.roll) {
-              rollTerms = part.data.calc$.roll.terms;
+            if (part.calc$.roll) {
+              rollTerms = part.calc$.roll.terms;
             } else {
-              rollTerms = part.data.source === 'versatile' ? (part.data.calc$.damageSource as ManualDamageSource).versatileBaseRoll : (part.data.calc$.damageSource as ManualDamageSource).normalBaseRoll;
+              rollTerms = part.source === 'versatile' ? (part.calc$.damageSource as ManualDamageSource).versatileBaseRoll : (part.calc$.damageSource as ManualDamageSource).normalBaseRoll;
             }
             
             const damageTypes: DamageType[] = rollTerms.map(roll => roll.options?.flavor).map(flavor => UtilsRoll.toDamageType(flavor)).filter(type => type != null);
@@ -373,24 +373,24 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
             this.flavor = damageSourceFlavor;
           } else if (isHealing) {
             this.flavor = game.i18n.localize('DND5E.Healing');
-            if (part.data.calc$.roll?.evaluated) {
+            if (part.calc$.roll?.evaluated) {
               // Critical and/or versatile heals almost never happen (only in homebrew I think?), but just in case do specify that the crit is a heal
-              if (part.data.source === 'versatile') {
-                this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.source.capitalize()}`)}`;
-              }if (part.data.mode === 'critical') {
-                this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`)}`;
+              if (part.source === 'versatile') {
+                this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.source.capitalize()}`)}`;
+              }if (part.mode === 'critical') {
+                this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.mode.capitalize()}`)}`;
               }
             }
           } else {
-            if (!part.data.calc$.roll?.evaluated) {
+            if (!part.calc$.roll?.evaluated) {
               this.flavor = game.i18n.localize('DND5E.Damage');
-            } else if (part.data.source === 'versatile') {
-              this.flavor = game.i18n.localize(`DND5E.${part.data.source.capitalize()}`);
-              if (part.data.mode === 'critical') {
-                this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`)}`
+            } else if (part.source === 'versatile') {
+              this.flavor = game.i18n.localize(`DND5E.${part.source.capitalize()}`);
+              if (part.mode === 'critical') {
+                this.flavor = `${this.flavor}+${game.i18n.localize(`DND5E.${part.mode.capitalize()}`)}`
               }
-            } else if (part.data.mode === 'critical') {
-              this.flavor = game.i18n.localize(`DND5E.${part.data.mode.capitalize()}`);
+            } else if (part.mode === 'critical') {
+              this.flavor = game.i18n.localize(`DND5E.${part.mode.capitalize()}`);
             } else {
               this.flavor = game.i18n.localize('DND5E.Damage');
             }
@@ -404,15 +404,15 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
     if (this.userBonus === event.detail.userBonus && this.roll?.evaluated) {
       return;
     }
-    DamageCardComponent.rollClick({event, partId: this.partId, messageId: this.messageId});
+    DamageCardComponent.rollClick({event, messageId: this.messageId});
   }
   
   public onRollSource(event: CustomEvent<RollDamageEventData<DamageCardData['source']>>): void {
-    DamageCardComponent.sourceChange({event, partId: this.partId, messageId: this.messageId});
+    DamageCardComponent.sourceChange({event, messageId: this.messageId});
   }
 
   public onRollMode(event: CustomEvent<RollDamageEventData<RollDamageMode>>): void {
-    DamageCardComponent.modeChange({event, partId: this.partId, messageId: this.messageId});
+    DamageCardComponent.modeChange({event, messageId: this.messageId});
   }
 }
 
@@ -493,12 +493,12 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return 'DamageCardPart';
   }
 
   //#region Front end
   public getHtml(data: HtmlContext): string | null | Promise<string | null> {
-    return `<${DamageCardComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${DamageCardComponent.getSelector()}>`
+    return `<${DamageCardComponent.getSelector()} data-message-id="${data.messageId}"></${DamageCardComponent.getSelector()}>`
   }
   //#endregion
 
@@ -519,35 +519,30 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       const snapshot = tokenHpSnapshot.get(targetEvent.selected.tokenUuid);
       const tokenHp = deepClone(snapshot);
       
-      const attackCards: ModularCardPartData<AttackCardData>[] = targetEvent.messageCardParts
-        .filter(part => ModularCard.isType<AttackCardData>(AttackCardPart.instance, part));
-      const damagesCards: ModularCardPartData<DamageCardData>[] = targetEvent.messageCardParts
-        .filter(part => ModularCard.isType<DamageCardData>(DamageCardPart.instance, part));
+      const attackCard = targetEvent.messageCardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const damageCard = targetEvent.messageCardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
 
       // Undo already applied damage
-      for (const dmg of damagesCards) {
-        const cache = getTargetCache(dmg.data, targetEvent.selected.selectionId);
+      if (damageCard) {
+        const cache = deepClone(getTargetCache(damageCard, targetEvent.selected.selectionId));
         if (!cache) {
           continue;
         }
         tokenHp.hp -= cache.appliedHpChange;
         tokenHp.tempHp -= cache.appliedTmpHpChange;
         tokenHp.failedDeathSaves -= cache.appliedFailedDeathSaved;
-      }
-
-      // Calculate (new) damage
-      for (const dmg of damagesCards) {
-        const cache = deepClone(getTargetCache(dmg.data, targetEvent.selected.selectionId));
+        
         let apply = false;
         delete cache.smartState;
         switch (targetEvent.apply) {
           case 'smart-apply': {
-            const allHit = attackCards.every(attack => {
-              const hitType = attack.data.targetCaches$.find(target => target.targetUuid$ === targetEvent.selected.tokenUuid)?.resultType$;
-              return hitType === 'hit' || hitType === 'critical-hit';
-            });
+            let attackHits = true;
+            if (attackCard != null) {
+              const hitType = attackCard.targetCaches$.find(target => target.targetUuid$ === targetEvent.selected.tokenUuid)?.resultType$;
+              attackHits = hitType === 'hit' || hitType === 'critical-hit';
+            }
             cache.smartState = 'applied';
-            if (!allHit) {
+            if (!attackHits) {
               apply = false;
               break;
             }
@@ -586,7 +581,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           const hpDiff = tokenHp.hp - beforeApplyTokenHp.hp;
           const tempHpDiff = tokenHp.tempHp - beforeApplyTokenHp.tempHp;
           const failedDeathSavesDiff = tokenHp.failedDeathSaves - beforeApplyTokenHp.failedDeathSaves;
-          setTargetCache(dmg.data, {
+          setTargetCache(damageCard, {
             ...cache,
             selectionId: targetEvent.selected.selectionId,
             targetUuid: targetEvent.selected.tokenUuid,
@@ -599,7 +594,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           // When undoing damage after a heal, it could over heal above max hp.
           const originalHp = tokenHp.hp;
           tokenHp.hp = Math.min(snapshot.maxHp, tokenHp.hp);
-          setTargetCache(dmg.data, {
+          setTargetCache(damageCard, {
             ...cache,
             selectionId: targetEvent.selected.selectionId,
             targetUuid: targetEvent.selected.tokenUuid,
@@ -637,63 +632,64 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   private getTargetState(context: StateContext): VisualState[] {
+    const part = context.allMessageParts.getTypeData<DamageCardData>(this);
+    if (part == null) {
+      return [];
+    }
+    
     const states = new Map<string, Omit<VisualState, 'columns'> & {hpDiff: number, hidden: boolean}>();
     for (const selected of context.selected) {
       states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, hpDiff: 0, hidden: false});
     }
-    for (const part of context.allMessageParts) {
-      if (!ModularCard.isType<DamageCardData>(this, part)) {
-        continue;
+
+    for (const targetCache of part.calc$.targetCaches) {
+      if (!states.has(targetCache.selectionId)) {
+        states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, hpDiff: 0, hidden: false});
+      }
+      const state = states.get(targetCache.selectionId);
+      if (state.state == null) {
+        state.state = targetCache.appliedState;
+      }
+      if (state.smartState == null) {
+        state.smartState = targetCache.smartState;
+      }
+      
+      if (state.state !== targetCache.appliedState) {
+        state.state === 'partial-applied';
+      }
+      if (state.smartState !== targetCache.smartState) {
+        state.smartState === 'partial-applied';
       }
 
-      for (const targetCache of part.data.calc$.targetCaches) {
-        if (!states.has(targetCache.selectionId)) {
-          states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, hpDiff: 0, hidden: false});
+      // TODO this is weird right now, if damage is hidden you cant see it
+      //      but you can apply it to yourself, this should be improved
+      let canSeeDamage: boolean;
+      if (part.calc$.actorUuid) {
+        canSeeDamage = game.settings.get(staticValues.moduleName, 'damageHiddenRoll') === 'total';
+        if (!canSeeDamage) {
+          UtilsDocument.hasAllPermissions([{
+            uuid: part.calc$.actorUuid,
+            permission: `${staticValues.code}ReadDamage`,
+            user: game.user,
+          }], {sync: true});
         }
-        const state = states.get(targetCache.selectionId);
-        if (state.state == null) {
-          state.state = targetCache.appliedState;
-        }
-        if (state.smartState == null) {
-          state.smartState = targetCache.smartState;
-        }
-        
-        if (state.state !== targetCache.appliedState) {
-          state.state === 'partial-applied';
-        }
-        if (state.smartState !== targetCache.smartState) {
-          state.smartState === 'partial-applied';
-        }
-
-        // TODO this is weird right now, if damage is hidden you cant see it
-        //      but you can apply it to yourself, this should be improved
-        let canSeeDamage: boolean;
-        if (part.data.calc$.actorUuid) {
-          canSeeDamage = game.settings.get(staticValues.moduleName, 'damageHiddenRoll') === 'total';
-          if (!canSeeDamage) {
-            UtilsDocument.hasAllPermissions([{
-              uuid: part.data.calc$.actorUuid,
-              permission: `${staticValues.code}ReadDamage`,
-              user: game.user,
-            }], {sync: true});
-          }
-        } else {
-          canSeeDamage = game.user.isGM;
-        }
-        const canSeeTarget = UtilsDocument.hasAllPermissions([{
-          uuid: targetCache.actorUuid,
-          permission: `${staticValues.code}ReadImmunity`,
-          user: game.user,
-        }], {sync: true});
-        if (canSeeDamage && canSeeTarget) {
-          state.hpDiff += (targetCache.calcHpChange ?? 0);
-          state.hpDiff += (targetCache.calcAddTmpHp ?? 0);
-        } else {
-          state.hpDiff = null;
-          state.hidden = true;
-        }
+      } else {
+        canSeeDamage = game.user.isGM;
+      }
+      const canSeeTarget = UtilsDocument.hasAllPermissions([{
+        uuid: targetCache.actorUuid,
+        permission: `${staticValues.code}ReadImmunity`,
+        user: game.user,
+      }], {sync: true});
+      if (canSeeDamage && canSeeTarget) {
+        state.hpDiff += (targetCache.calcHpChange ?? 0);
+        state.hpDiff += (targetCache.calcAddTmpHp ?? 0);
+      } else {
+        state.hpDiff = null;
+        state.hidden = true;
       }
     }
+    
 
     const contextSelectionIds = context.selected.map(s => s.selectionId);
     return Array.from(states.values())
@@ -746,18 +742,14 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
   private async calcTargetCache(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const recalcTokens: Array<{selectionId: string, tokenUuid: string, data: DamageCardData}> = [];
     for (const {newRow, oldRow} of context.rows) {
-      const damageParts: DamageCardData[] = newRow.allParts
-        .filter(part => ModularCard.isType<DamageCardData>(DamageCardPart.instance, part))
-        .map(part => part.data);
-      if (damageParts.length === 0) {
+      const damagePart = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      if (damagePart == null) {
         continue;
       }
-      const oldSelectionIds = (oldRow as ModularCardTriggerData<TargetCardData>)?.part?.data?.selected.map(s => s.selectionId) ?? [];
-      for (const target of newRow.part.data.selected) {
+      const oldSelectionIds = oldRow?.part?.selected.map(s => s.selectionId) ?? [];
+      for (const target of newRow.part.selected) {
         if (!oldSelectionIds.includes(target.selectionId)) {
-          for (const dmg of damageParts) {
-            recalcTokens.push({selectionId: target.selectionId, tokenUuid: target.tokenUuid, data: dmg});
-          }
+          recalcTokens.push({selectionId: target.selectionId, tokenUuid: target.tokenUuid, data: damagePart});
         }
       }
     }
@@ -830,7 +822,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
 
     if (autoRoll) {
       for (const {newRow} of context.rows) {
-        newRow.part.data.phase = 'result';
+        newRow.part.phase = 'result';
       }
     }
   }
@@ -845,14 +837,14 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
 
   private calculateRollDisplay(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
     for (const {newRow} of context.rows) {
-      if (!newRow.part.data.calc$.roll) {
-        newRow.part.data.calc$.displayFormula = null;
-        newRow.part.data.calc$.displayDamageTypes = null;
+      if (!newRow.part.calc$.roll) {
+        newRow.part.calc$.displayFormula = null;
+        newRow.part.calc$.displayDamageTypes = null;
         continue;
       }
     
       const damageTypes: DamageType[] = [];
-      let shortenedFormula = newRow.part.data.calc$.roll.formula;
+      let shortenedFormula = newRow.part.calc$.roll.formula;
       for (const damageType of UtilsRoll.getValidDamageTypes()) {
         if (shortenedFormula.match(`\\[${damageType}\\]`)) {
           damageTypes.push(damageType);
@@ -861,31 +853,31 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
       }
 
       // formula without damage comments
-      newRow.part.data.calc$.displayFormula = shortenedFormula;
-      newRow.part.data.calc$.displayDamageTypes = damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined;
+      newRow.part.calc$.displayFormula = shortenedFormula;
+      newRow.part.calc$.displayDamageTypes = damageTypes.length > 0 ? `(${damageTypes.sort().map(s => s.capitalize()).join(', ')})` : undefined;
     }
   }
   
   private calcTargetCache(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
     for (const {newRow} of context.rows) {
-      let checkPart: ModularCardPartData<CheckCardData> = newRow.allParts.find(part => ModularCard.isType<CheckCardData>(CheckCardPart.instance, part));
+      const checkPart = newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance);
       
       const checkResultsBySelectionId = new Map<string, CheckTargetCache>();
       if (checkPart) {
-        for (const target of checkPart.data.targetCaches$) {
+        for (const target of checkPart.targetCaches$) {
           checkResultsBySelectionId.set(target.selectionId$, target);
         }
       }
 
-      for (const cache of newRow.part.data.calc$.targetCaches) {
+      for (const cache of newRow.part.calc$.targetCaches) {
         cache.calcAddTmpHp = 0;
         cache.calcHpChange = 0;
         cache.calcFailedDeathSaved = 0;
-        if (newRow.part.data.calc$.roll?.evaluated) {
-          for (let [dmgType, amount] of UtilsRoll.rollToDamageResults(UtilsRoll.fromRollData(newRow.part.data.calc$.roll)).entries()) {
+        if (newRow.part.calc$.roll?.evaluated) {
+          for (let [dmgType, amount] of UtilsRoll.rollToDamageResults(UtilsRoll.fromRollData(newRow.part.calc$.roll)).entries()) {
             const aliases: string[] = [dmgType];
             if (dmgType === 'bludgeoning' || dmgType === 'piercing' || dmgType === 'slashing') {
-              if (!newRow.part.data.calc$.properties.mgc) {
+              if (!newRow.part.calc$.properties.mgc) {
                 aliases.push('physical'); // = non magical physical
               }
             }
@@ -900,7 +892,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
             }
             const checkResult = checkResultsBySelectionId.get(cache.selectionId);
             if (checkResult?.resultType$ === 'pass') {
-              switch (newRow.part.data.calc$.modfierRule) {
+              switch (newRow.part.calc$.modfierRule) {
                 case 'save-halve-dmg': {
                   amount /= 2;
                   break;
@@ -949,15 +941,15 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
     }
     
     for (const {newRow} of context.rows) {
-      if (newRow.part.data.phase === 'result') {
+      if (newRow.part.phase === 'result') {
         continue;
       }
-      const attack: ModularCardPartData<AttackCardData> = newRow.allParts.find(part => ModularCard.isType<AttackCardData>(AttackCardPart.instance, part));
+      const attack = newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance);
       let countAsHit = false;
       if (attack == null) {
         countAsHit = true;
       } else {
-        for (const cache of attack.data.targetCaches$) {
+        for (const cache of attack.targetCaches$) {
           if (cache.resultType$ === 'hit' || cache.resultType$ === 'critical-hit') {
             countAsHit = true;
             break;
@@ -965,7 +957,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
         }
       }
       if (countAsHit) {
-        newRow.part.data.phase = 'result';
+        newRow.part.phase = 'result';
       }
     }
   }
@@ -979,15 +971,15 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
 
   private async doRoll(context: IAfterDmlContext<ModularCardTriggerData<DamageCardData>>): Promise<void> {
     for (const {newRow, oldRow} of context.rows) {
-      if (newRow.part.data.phase !== 'result') {
+      if (newRow.part.phase !== 'result') {
         return;
       }
 
       // Only do roll when changed is detected
-      const newData = newRow.part.data;
-      const oldData = oldRow?.part?.data;
+      const newData = newRow.part;
+      const oldData = oldRow?.part;
 
-      let shouldModifyRoll = oldData == null || !newRow.part.data.calc$.roll?.evaluated;
+      let shouldModifyRoll = oldData == null || !newRow.part.calc$.roll?.evaluated;
       if (!shouldModifyRoll) {
         const newChangeDetectData: DeepPartial<DamageCardData> = {
           ...newData,
@@ -1041,7 +1033,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
 
           // TODO ammo
           // TODO event hooks
-          const dmgRoll = UtilsRoll.createDamageRoll(UtilsRoll.mergeRolls(...rollRolls).terms, {critical: newRow.part.data.mode === 'critical'});
+          const dmgRoll = UtilsRoll.createDamageRoll(UtilsRoll.mergeRolls(...rollRolls).terms, {critical: newRow.part.mode === 'critical'});
 
           return dmgRoll.roll({async: true});
         }
@@ -1067,11 +1059,11 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
     const showRolls: PermissionCheck<Roll>[] = [];
     for (const {newRow, oldRow} of context.rows) {
       // Detect new rolled dice
-      if (newRow.part.data.calc$.roll?.evaluated) {
-        const roll = UtilsRoll.getNewRolledTerms(oldRow?.part?.data?.calc$?.roll, newRow.part.data.calc$.roll);
+      if (newRow.part.calc$.roll?.evaluated) {
+        const roll = UtilsRoll.getNewRolledTerms(oldRow?.part?.calc$?.roll, newRow.part.calc$.roll);
         if (roll) {
           showRolls.push({
-            uuid: newRow.part.data.calc$.actorUuid,
+            uuid: newRow.part.calc$.actorUuid,
             permission: `${staticValues.code}ReadDamage`,
             user: game.user,
             meta: roll,

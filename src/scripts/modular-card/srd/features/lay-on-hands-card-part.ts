@@ -8,7 +8,7 @@ import { Action } from "../../action";
 import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ResourceCardData, ResourceCardPart, TargetCardData, TargetCardPart } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
-import { BeforeCreateModuleCardEvent, ModularCard, ModularCardPartData, ModularCardTriggerData } from "../../modular-card";
+import { BeforeCreateModuleCardEvent, ModularCard, ModularCardTriggerData } from "../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
 
 export interface SrdLayOnHandsCardData extends DamageCardData {
@@ -55,22 +55,22 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
   });
   private static readonly setHealAndCure = new Action<ChatPartIdData & {heal?: number; cure?: number;}>('LayOnHandsHeal')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('cure'))
     .addSerializer(ItemCardHelpers.getRawSerializer('heal'))
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<SrdLayOnHandsCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(SrdLayOnHandsComponent.permissionCheck)
-    .build(async ({messageId, part, allCardParts, heal, cure}) => {
+    .build(async ({messageId, cardParts, heal, cure}) => {
+      const part = cardParts.getTypeData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance);
       if (heal != null) {
-        part.data.heal = heal;
+        part.heal = heal;
       }
       if (cure != null) {
-        part.data.cure = cure;
+        part.cure = cure;
       }
-      if ((part.data.heal + (part.data.cure * 5)) > part.data.maxUsage) {
+      if ((part.heal + (part.cure * 5)) > part.maxUsage) {
         return;
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     });
   //#endregion
   
@@ -91,13 +91,12 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
   public maxHeal = 0;
   public maxCure = 0;
   public missingPermission = true;
-  private async setData(part: ModularCardPartData<SrdLayOnHandsCardData>) {
+  private async setData(part: SrdLayOnHandsCardData) {
     let hasPermission = false;
     if (part) {
       const result = await SrdLayOnHandsComponent.permissionCheck({
         messageId: this.messageId,
-        partId: part.id,
-        part: part
+        part: {data: part}
       }, game.user);
       hasPermission = result !== 'prevent-action';
     }
@@ -111,9 +110,9 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
       return;
     }
 
-    this.currentHeal = part.data.heal;
-    this.currentCure = part.data.cure;
-    const remainingUsage = part.data.maxUsage - this.currentHeal - (this.currentCure * 5);
+    this.currentHeal = part.heal;
+    this.currentCure = part.cure;
+    const remainingUsage = part.maxUsage - this.currentHeal - (this.currentCure * 5);
     this.maxHeal = this.currentHeal + remainingUsage;
     this.maxCure = this.currentCure + Math.floor(remainingUsage / 5);
   }
@@ -146,7 +145,6 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
 
     SrdLayOnHandsComponent.setHealAndCure({
       messageId: this.messageId,
-      partId: this.partId,
       heal: value
     });
   }
@@ -179,7 +177,6 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
 
     SrdLayOnHandsComponent.setHealAndCure({
       messageId: this.messageId,
-      partId: this.partId,
       cure: value
     });
   }
@@ -219,14 +216,17 @@ export class SrdLayOnHandsCardPart extends DamageCardPart implements ModularCard
     ModularCard.registerModularCardTrigger(this, new SrdLayOnHandsCardTrigger());
     Hooks.on(`create${staticValues.code.capitalize()}ModuleCard`, (event: BeforeCreateModuleCardEvent) => {
       if (UtilsItem.matchesItemIdentifier('layOnHands', event.item)) {
-        event.addBefore(DamageCardPart.instance, SrdLayOnHandsCardPart.instance);
-        event.remove(DamageCardPart.instance);
+        event.replace(DamageCardPart.instance, SrdLayOnHandsCardPart.instance);
       }
     })
   }
 
   public getHtml(data: HtmlContext<any>): string {
-    return `<${SrdLayOnHandsComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${SrdLayOnHandsComponent.getSelector()}>`
+    return `<${SrdLayOnHandsComponent.getSelector()} data-message-id="${data.messageId}"></${SrdLayOnHandsComponent.getSelector()}>`
+  }
+
+  public getType(): string {
+    return 'SrdLayOnHandsCardPart';
   }
   
 }
@@ -241,12 +241,12 @@ class SrdLayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<SrdLay
 
   private calcRoll(context: IDmlContext<ModularCardTriggerData<SrdLayOnHandsCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
-      if (newRow.part.data.heal > 0) {
-        newRow.part.data.phase = 'result';
+      if (newRow.part.heal > 0) {
+        newRow.part.phase = 'result';
       }
-      if (newRow.part.data.heal !== oldRow?.part?.data?.heal) {
-        const terms = [new NumericTerm({number: newRow.part.data.heal, options: {flavor: 'healing'}})];
-        newRow.part.data.calc$.damageSource = {
+      if (newRow.part.heal !== oldRow?.part?.heal) {
+        const terms = [new NumericTerm({number: newRow.part.heal, options: {flavor: 'healing'}})];
+        newRow.part.calc$.damageSource = {
           type: 'Manual',
           normalBaseRoll: UtilsRoll.toRollData(new Roll(Roll.getFormula(terms))).terms,
         }
@@ -256,28 +256,21 @@ class SrdLayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<SrdLay
 
   private calcResource(context: IDmlContext<ModularCardTriggerData<SrdLayOnHandsCardData>>): void {
     for (const {newRow} of context.rows) {
-      const resources: ResourceCardData[] = [];
+      if (!newRow.allParts.hasType(ResourceCardPart.instance)) {
+        continue;
+      }
       let amountOfTargets = 0;
-
-      let healAmount = 0;
-      for (const part of newRow.allParts) {
-        if (ModularCard.isType<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance, part)) {
-          // If for some reason there are multiple instances
-          healAmount += part.data.heal;
-          healAmount += (part.data.cure * 5);
-        }
-        if (ModularCard.isType<ResourceCardData>(ResourceCardPart.instance, part)) {
-          resources.push(part.data);
-        }
-        if (ModularCard.isType<TargetCardData>(TargetCardPart.instance, part)) {
-          amountOfTargets += part.data.selected.length;
-        }
+      if (newRow.allParts.hasType(TargetCardPart.instance)) {
+        amountOfTargets += newRow.allParts.getTypeData<TargetCardData>(TargetCardPart.instance).selected.length;
       }
       // If there are no targets, assume it has been mentioned verbally => set to 1
       amountOfTargets = Math.max(1, amountOfTargets);
+
+      let healAmount = newRow.part.heal;
+      healAmount += (newRow.part.cure * 5);
       
       const resourceAmount = healAmount * amountOfTargets;
-      for (const resource of resources.map(r => r.consumeResources).deepFlatten()) {
+      for (const resource of newRow.allParts.getTypeData<ResourceCardData>(ResourceCardPart.instance).consumeResources) {
         if (resource.calc$.uuid.includes('Item.') && resource.calc$.path === 'data.uses.value') {
           resource.calc$.autoconsumeAfter = 'never';
           resource.calc$.calcChange = resourceAmount;

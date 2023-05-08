@@ -7,7 +7,7 @@ import MyAbilityTemplate from "../../pixi/ability-template";
 import { staticValues } from "../../static-values";
 import { MyItemData } from "../../types/fixed-types";
 import { UtilsTemplate } from "../../utils/utils-template";
-import { ModularCard, ModularCardTriggerData, ModularCardPartData } from "../modular-card";
+import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-part";
@@ -52,14 +52,14 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
 
   public hasPermission = false;
   private target: TemplateCardData['calc$']['target'];
-  private async setData(part: ModularCardPartData<TemplateCardData>) {
+  private async setData(part: TemplateCardData) {
     if (part) {
       this.hasPermission = await UtilsDocument.hasAllPermissions([{
-        uuid: part.data.calc$.actorUuid,
+        uuid: part.calc$.actorUuid,
         permission: 'Owner',
         user: game.user,
       }]);
-      this.target = part.data.calc$.target;
+      this.target = part.calc$.target;
     } else {
       this.hasPermission = false;
     }
@@ -71,7 +71,6 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
       flags: {
         [staticValues.moduleName]: {
           dmlCallbackMessageId: this.messageId,
-          dmlCallbackPartId: this.partId,
         }
       }
     });
@@ -128,12 +127,12 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return 'TemplateCardPart';
   }
 
   //#region Front end
   public getHtml(data: HtmlContext): string {
-    return `<${TemplateCardComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${TemplateCardComponent.getSelector()}>`
+    return `<${TemplateCardComponent.getSelector()} data-message-id="${data.messageId}"></${TemplateCardComponent.getSelector()}>`
   }
   //#endregion
 
@@ -156,17 +155,16 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData<TemplateCar
       }
       // Initiate measured template creation
       const template = MyAbilityTemplate.fromItem({
-        target: newRow.part.data.calc$.target,
+        target: newRow.part.calc$.target,
         flags: {
           [staticValues.moduleName]: {
             dmlCallbackMessageId: newRow.messageId,
-            dmlCallbackPartId: newRow.part.id,
           }
         }
       });
       // Auto place circle templates with range self
-      if (newRow.part.data.calc$.tokenUuid && newRow.part.data.calc$.rangeUnit === 'self' && template.document.data.t === 'circle') {
-        const token = await UtilsDocument.tokenFromUuid(newRow.part.data.calc$.tokenUuid);
+      if (newRow.part.calc$.tokenUuid && newRow.part.calc$.rangeUnit === 'self' && template.document.data.t === 'circle') {
+        const token = await UtilsDocument.tokenFromUuid(newRow.part.calc$.tokenUuid);
         if (token) {
           template.document.data.update({
             x: token.data.x + (token.data.width * token.parent.data.grid / 2),
@@ -197,7 +195,7 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData<TemplateCar
         continue;
       }
 
-      templateUuids.add(oldRow.part.data.calc$.createdTemplateUuid)
+      templateUuids.add(oldRow.part.calc$.createdTemplateUuid)
     }
     templateUuids.delete(null);
     templateUuids.delete(undefined);
@@ -225,7 +223,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
   }
   
   public async afterUpsert(context: IDmlContext<MeasuredTemplateDocument>): Promise<void> {
-    const updateChatMessageMap = new Map<string, ModularCardPartData[]>();
+    const updateChatMessageMap = new Map<string, ModularCardInstance>();
     const deleteTemplateUuids = new Set<string>();
     for (const {newRow: newTemplate, oldRow: oldTemplate, changedByUserId} of context.rows) {
       const messageId = newTemplate.getFlag(staticValues.moduleName, 'dmlCallbackMessageId') as string;
@@ -233,7 +231,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         continue;
       }
       const chatMessage = game.messages.get(messageId);
-      const parts = updateChatMessageMap.has(messageId) ? updateChatMessageMap.get(messageId) : deepClone(ModularCard.getCardPartDatas(chatMessage));
+      const parts = updateChatMessageMap.has(messageId) ? updateChatMessageMap.get(messageId) : ModularCard.getCardPartDatas(chatMessage).deepClone();
       if (parts == null) {
         continue;
       }
@@ -257,17 +255,16 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         }
       }
 
-      const partId = newTemplate.getFlag(staticValues.moduleName, 'dmlCallbackPartId') as string;
-      let templatePart: ModularCardPartData<TemplateCardData> = parts.find(part => part.id === partId && ModularCard.getTypeHandler(part.type) instanceof TemplateCardPart);
-      let targetPart: ModularCardPartData<TargetCardData> = parts.find(part => ModularCard.getTypeHandler(part.type) instanceof TargetCardPart);
+      let templatePart = parts.getTypeData<TemplateCardData>(TemplateCardPart.instance)
+      let targetPart = parts.getTypeData<TargetCardData>(TargetCardPart.instance)
       if (!templatePart || !targetPart) {
         continue;
       }
 
-      if (templatePart.data.calc$.createdTemplateUuid !== newTemplate.uuid) {
-        deleteTemplateUuids.add(templatePart.data.calc$.createdTemplateUuid);
+      if (templatePart.calc$.createdTemplateUuid !== newTemplate.uuid) {
+        deleteTemplateUuids.add(templatePart.calc$.createdTemplateUuid);
         
-        templatePart.data.calc$.createdTemplateUuid = newTemplate.uuid;
+        templatePart.calc$.createdTemplateUuid = newTemplate.uuid;
         updateChatMessageMap.set(chatMessage.id, parts);
       }
 
@@ -281,8 +278,8 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
           }
         }
         const targets = Array.from(newTargets).sort();
-        if (!UtilsCompare.deepEquals(targetPart.data.selected.map(s => s.tokenUuid).sort(), targets)) {
-          targetPart.data.selected = uuidsToSelected(targets);
+        if (!UtilsCompare.deepEquals(targetPart.selected.map(s => s.tokenUuid).sort(), targets)) {
+          targetPart.selected = uuidsToSelected(targets);
           updateChatMessageMap.set(chatMessage.id, parts);
         }
       }

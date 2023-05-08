@@ -1,7 +1,7 @@
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { staticValues } from "../../static-values";
-import { ModularCard, ModularCardPartData } from "../modular-card";
+import { ModularCard } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
@@ -77,10 +77,10 @@ export class DescriptionCardComponent extends BaseCardComponent implements OnIni
   public onInit(args: OnInitParam): void {
     args.addStoppable(
       this.getData<DescriptionCardData>(DescriptionCardPart.instance).listen(async ({part}) => {
-        this.name = part.data.name$;
-        this.image = part.data.img$;
-        this.materials = part.data.materials$;
-        this.description = part.data.description$;
+        this.name = part.name$;
+        this.image = part.img$;
+        this.materials = part.materials$;
+        this.description = part.description$;
         if (this.description) {
           const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {async: true} as any;
           if (game.user.isGM) {
@@ -123,12 +123,12 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return 'DescriptionCardPart';
   }
 
   //#region Front end
   public getHtml(data: HtmlContext): string {
-    return `<${DescriptionCardComponent.getSelector()} data-part-id="${data.partId}" data-message-id="${data.messageId}"></${DescriptionCardComponent.getSelector()}>`
+    return `<${DescriptionCardComponent.getSelector()} data-message-id="${data.messageId}"></${DescriptionCardComponent.getSelector()}>`
   }
 
   private static setCollpasedState(element: HTMLElement, shouldBeCollapsed: boolean): void {

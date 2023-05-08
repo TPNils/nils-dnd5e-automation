@@ -11,7 +11,7 @@ import { UtilsLog } from "../../utils/utils-log";
 import { UtilsTemplate } from "../../utils/utils-template";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ModularCardPartData, ModularCard, ModularCardTriggerData } from "../modular-card";
+import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { ActiveEffectCardPart } from "./active-effect-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
@@ -79,7 +79,7 @@ export interface VisualState extends State {
 
 export interface TargetCallbackData {
   readonly messageId: string;
-  readonly messageCardParts: ModularCardPartData[];
+  readonly messageCardParts: ModularCardInstance;
   readonly selected: TargetCardData['selected'][0];
   readonly apply: 'undo' | 'smart-apply' | 'force-apply';
 }
@@ -87,7 +87,7 @@ export interface TargetCallbackData {
 export interface StateContext {
   messageId: string;
   selected: TargetCardData['selected'];
-  allMessageParts: ModularCardPartData[];
+  allMessageParts: ModularCardInstance;
 }
 
 interface TargetIntegrationCallback {
@@ -228,9 +228,8 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
   
   private static copyUuid = new Action<{uuid: string;} & ChatPartIdData>('TargetCopyUuid')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('uuid'))
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}}>(({part}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (part.data.calc$.actorUuid) {
@@ -238,16 +237,16 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       }
       return {documents: documents};
     }))
-    .build(async ({messageId, part, allCardParts, uuid}) => {
-      part.data.selected = uuidsToSelected([...part.data.selected.map(s => s.tokenUuid), uuid]);
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    .build(async ({messageId, cardParts, uuid}) => {
+      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      part.selected = uuidsToSelected([...part.selected.map(s => s.tokenUuid), uuid]);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     })
     
   private static deleteUuid = new Action<{uuid: string;} & ChatPartIdData>('TargetDeleteUuid')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('uuid'))
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}}>(({part}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (part.data.calc$.actorUuid) {
@@ -255,16 +254,16 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       }
       return {documents: documents};
     }))
-    .build(async ({messageId, part, allCardParts, uuid, user}) => {
-      part.data.selected = part.data.selected.filter(s => s.selectionId !== uuid);
-      await TargetCardComponent.fireEvent('undo', [uuid], part.data, messageId, allCardParts, user.id);
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    .build(async ({messageId, cardParts, uuid, user}) => {
+      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      part.selected = part.selected.filter(s => s.selectionId !== uuid);
+      await TargetCardComponent.fireEvent('undo', [uuid], part, messageId, cardParts, user.id);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     })
     
   private static refreshTargets = new Action<ChatPartIdData>('TargetRefresh')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
+    .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}}>(({part}) => {
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (part.data.calc$.actorUuid) {
@@ -272,28 +271,29 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       }
       return {documents: documents};
     }))
-    .build(async ({messageId, part, allCardParts, user}) => {
-      await setTargetsFromUser(part.data, user);
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    .build(async ({messageId, cardParts, user}) => {
+      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      await setTargetsFromUser(part, user);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     })
     
   private static setTargetstate = new Action<{action: TargetCallbackData['apply']; targetUuid: string;} & ChatPartIdData>('TargetSetState')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
-    .addSerializer(ItemCardHelpers.getRawSerializer('partId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('action'))
     .addSerializer(ItemCardHelpers.getRawSerializer('targetUuid'))
-    .addEnricher(ItemCardHelpers.getChatPartEnricher<TargetCardData>())
-    .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}, targetUuid: string | '*'}>(({part, targetUuid}) => {
+    .addEnricher(ItemCardHelpers.getChatEnricher())
+    .setPermissionCheck(createPermissionCheckAction(() => {
       // No need to check for target uuid permissions, this is handled by the build/execute
       return {updatesMessage: true};
     }))
-    .build(async ({messageId, part, allCardParts, action, targetUuid, user}) => {
-      await TargetCardComponent.fireEvent(action, [targetUuid], part.data, messageId, allCardParts, user.id);
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), allCardParts);
+    .build(async ({messageId, cardParts, action, targetUuid, user}) => {
+      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      await TargetCardComponent.fireEvent(action, [targetUuid], part, messageId, cardParts, user.id);
+      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     })
   //#endregion
   
-  private static async fireEvent(type: TargetCallbackData['apply'], requestIds: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardPartData[], userId: string): Promise<void> {
+  private static async fireEvent(type: TargetCallbackData['apply'], requestIds: (string | '*')[], data: TargetCardData, messageId: string, allCardParts: ModularCardInstance, userId: string): Promise<void> {
     const tokenPermissions = await UtilsDocument.hasPermissions(TargetCardComponent.getSelected(requestIds, data, messageId, allCardParts).map(selected => ({
       uuid: selected.tokenUuid,
       permission: 'update',
@@ -315,15 +315,19 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
 
     for (const integration of callbacks.values()) {
       if (integration.onChange) {
-        const response = integration.onChange(callbackData);
-        if (response instanceof Promise) {
-          await response;
+        try {
+          const response = integration.onChange(callbackData);
+          if (response instanceof Promise) {
+            await response;
+          }
+        } catch (e) {
+          UtilsLog.error(`Error during target interaction`, {integration}, '\nError', e)
         }
       }
     }
   }
 
-  private static getSelected(requestSelectIds: (string | '*')[], data: TargetCardData, messageId: string, allMessageParts: ModularCardPartData[]): Array<TargetCardData['selected'][0] & {state: typeof visualStates[number]}> {
+  private static getSelected(requestSelectIds: (string | '*')[], data: TargetCardData, messageId: string, allMessageParts: ModularCardInstance): Array<TargetCardData['selected'][0] & {state: typeof visualStates[number]}> {
     const allSelected = new Map<string, TargetCardData['selected'][0] & {state: typeof visualStates[number]}>();
     const stateContext: StateContext = {messageId: messageId, allMessageParts: allMessageParts, selected: data.selected};
     for (const selected of data.selected) {
@@ -382,16 +386,16 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
   }> = [];
   public isOwner = false;
   public autoChangeTarget = false;
-  private async calc(message: ChatMessage, allParts: Array<ModularCardPartData>, part: ModularCardPartData<TargetCardData>) {
-    this.autoChangeTarget = part.data.calc$.autoChangeTarget;
-    UtilsDocument.hasAllPermissions([{uuid: part.data.calc$.actorUuid, permission: 'OWNER', user: game.user}]).then(isOwner => {
+  private async calc(message: ChatMessage, allParts: ModularCardInstance, part: TargetCardData) {
+    this.autoChangeTarget = part.calc$.autoChangeTarget;
+    UtilsDocument.hasAllPermissions([{uuid: part.calc$.actorUuid, permission: 'OWNER', user: game.user}]).then(isOwner => {
       this.isOwner = isOwner;
     });
 
     // TODO check if token is invisible
     const stateContext: StateContext = {
       messageId: message.id,
-      selected: part.data.selected,
+      selected: part.selected,
       allMessageParts: allParts,
     };
     const fetchedVisualStates: Promise<VisualState[]>[] = [];
@@ -415,7 +419,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     const columnsByKey = new Map<string, {label: string}>();
     const columnKeyOrder: string[] = [];
     const tokenData = new Map<string, {uuid: string, state?: VisualState['state'], smartState?: VisualState['state'], columnData: Map<string, string>}>();
-    for (const selected of part.data.selected) {
+    for (const selected of part.selected) {
       tokenData.set(selected.selectionId, {uuid: selected.tokenUuid, columnData: new Map()});
     }
     for (const visualState of await Promise.all(fetchedVisualStates).then(states => states.deepFlatten())) {
@@ -452,13 +456,13 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       }
     }
 
-    if (columnsByKey.size === 0 && part.data.calc$.expectedTargets < 1) {
+    if (columnsByKey.size === 0 && part.calc$.expectedTargets < 1) {
       return '';
     }
 
     const htmlTableHeader: this['tableHeader'] = {
       currentTargets: tokenData.size,
-      expectedTargets: part.data.calc$.expectedTargets,
+      expectedTargets: part.calc$.expectedTargets,
       canOneActorWrite: false,
       row: [],
       state: 'not-applied',
@@ -470,7 +474,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     const htmlTableBody: this['tableBody'] = [];
 
     const tokenCacheByUuid = new Map<string, TargetCardData['calc$']['tokenData'][number]>();
-    for (const token of part.data.calc$.tokenData) {
+    for (const token of part.calc$.tokenData) {
       tokenCacheByUuid.set(token.tokenUuid, token);
     }
     
@@ -496,7 +500,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       .map(([key]) => key);
     const allStates = new Set<VisualState['state']>();
     const allSmartStates = new Set<VisualState['state']>();
-    const hardSelectionIds = part.data.selected.map(sel => sel.selectionId);
+    const hardSelectionIds = part.selected.map(sel => sel.selectionId);
     const notAppliedValues = [null, undefined, 'not-applied'];
     for (const selectionId of sortedSelectionIds) {
       const data = tokenData.get(selectionId);
@@ -530,7 +534,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
         isPlaceholder: false
       });
     }
-    for (let i = htmlTableBody.length; i < part.data.calc$.expectedTargets; i++) {
+    for (let i = htmlTableBody.length; i < part.calc$.expectedTargets; i++) {
       htmlTableBody.push({isPlaceholder: true});
     }
     allStates.delete(null);
@@ -574,7 +578,6 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
   public onCopyClick(uuid: string) {
     TargetCardComponent.copyUuid({
       messageId: this.messageId,
-      partId: this.partId,
       uuid: uuid,
     });
   }
@@ -582,7 +585,6 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
   public onDeleteClick(uuid: string) {
     TargetCardComponent.deleteUuid({
       messageId: this.messageId,
-      partId: this.partId,
       uuid: uuid,
     });
   }
@@ -590,14 +592,12 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
   public onRefreshClick() {
     TargetCardComponent.refreshTargets({
       messageId: this.messageId,
-      partId: this.partId,
     });
   }
   
   public onTargetActionClick(action: TargetCallbackData['apply'], targetUuid: string) {
     TargetCardComponent.setTargetstate({
       messageId: this.messageId,
-      partId: this.partId,
       action: action,
       targetUuid: targetUuid,
     });
@@ -672,13 +672,13 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   }
 
   public getType(): string {
-    return this.constructor.name;
+    return 'TargetCardPart';
   }
 
   //#region Front end
 
   public getHtml(data: HtmlContext): string {
-    return `<${TargetCardComponent.getSelector()} data-test data-part-id="${data.partId}" data-message-id="${data.messageId}"></${TargetCardComponent.getSelector()}>`
+    return `<${TargetCardComponent.getSelector()} data-message-id="${data.messageId}"></${TargetCardComponent.getSelector()}>`
   }
   //#endregion
 
@@ -693,43 +693,31 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
 
   private calcAutoChangeTarget(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): void {
     rowLoop: for (const {newRow} of context.rows) {
-      if (!newRow.part.data.calc$.autoChangeTarget) {
+      if (!newRow.part.calc$.autoChangeTarget) {
         continue;
       }
-      if (newRow.part.data.selected.length < newRow.part.data.calc$.expectedTargets ?? 1) {
+      if (newRow.part.selected.length < newRow.part.calc$.expectedTargets ?? 1) {
         // Don't disable autoChangeTarget while it's active and not all selected
         continue;
       }
 
-      let attackCardData: AttackCardData;
-      let checkCardData: CheckCardData;
-      let damageCardData: DamageCardData;
-      let resourceCardData: ResourceCardData;
-      for (const part of newRow.allParts) {
-        const handler = ModularCard.getTypeHandler(part.type);
-        if (handler instanceof AttackCardPart) {
-          attackCardData = part.data;
-        } else if (handler instanceof CheckCardPart) {
-          checkCardData = part.data;
-        } else if (handler instanceof DamageCardPart) {
-          damageCardData = part.data;
-        } else if (handler instanceof ResourceCardPart) {
-          resourceCardData = part.data;
-        }
-      }
+      const attackCardData = newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const checkCardData = newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance);
+      const damageCardData = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const resourceCardData = newRow.allParts.getTypeData<ResourceCardData>(ResourceCardPart.instance);
 
       if (damageCardData != null && damageCardData.phase === 'result') {
-        newRow.part.data.calc$.autoChangeTarget = false;
+        newRow.part.calc$.autoChangeTarget = false;
         continue rowLoop;
       }
       if (attackCardData != null && attackCardData.phase === 'result') {
-        newRow.part.data.calc$.autoChangeTarget = false;
+        newRow.part.calc$.autoChangeTarget = false;
         continue rowLoop;
       }
       if (checkCardData != null) {
         for (const cache of checkCardData.targetCaches$) {
           if (cache.phase === 'result') {
-            newRow.part.data.calc$.autoChangeTarget = false;
+            newRow.part.calc$.autoChangeTarget = false;
             continue rowLoop;
           }
         }
@@ -737,7 +725,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       if (resourceCardData != null) {
         for (const cache of resourceCardData.consumeResources) {
           if (cache.calc$.appliedChange > 0) {
-            newRow.part.data.calc$.autoChangeTarget = false;
+            newRow.part.calc$.autoChangeTarget = false;
             continue rowLoop;
           }
         }
@@ -757,47 +745,37 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       if (game.userId !== changedByUserId) {
         continue;
       }
-      if (newRow.part.data.calc$.tokenUuid == null) {
+      if (newRow.part.calc$.tokenUuid == null) {
         continue;
       }
-      if (newRow.part.data.calc$.rangeDefinition?.units !== 'self') {
+      if (newRow.part.calc$.rangeDefinition?.units !== 'self') {
         continue;
       }
       
       let hasTargettableAction = false;
-      for (const part of newRow.allParts) {
-        if (ModularCard.isType(ActiveEffectCardPart.instance, part)) {
-          hasTargettableAction = true;
-          break;
-        }
-        if (ModularCard.isType(AttackCardPart.instance, part)) {
-          hasTargettableAction = true;
-          break;
-        }
-        if (ModularCard.isType(DamageCardPart.instance, part)) {
-          hasTargettableAction = true;
-          break;
-        }
-        if (ModularCard.isType(CheckCardPart.instance, part)) {
-          hasTargettableAction = true;
-          break;
-        }
+      if (newRow.allParts.hasType(ActiveEffectCardPart.instance)) {
+        hasTargettableAction = true;
+      } else if (newRow.allParts.hasType(AttackCardPart.instance)) {
+        hasTargettableAction = true;
+      } else if (newRow.allParts.hasType(DamageCardPart.instance)) {
+        hasTargettableAction = true;
+      } else if (newRow.allParts.hasType(CheckCardPart.instance)) {
+        hasTargettableAction = true;
       }
       if (!hasTargettableAction) {
         continue;
       }
 
-      if (newRow.part.data.calc$.targetDefinition.type === 'self') {
-        await UtilsDocument.setTargets({tokenUuids: [newRow.part.data.calc$.tokenUuid]});
+      if (newRow.part.calc$.targetDefinition.type === 'self') {
+        await UtilsDocument.setTargets({tokenUuids: [newRow.part.calc$.tokenUuid]});
         return;
       }
 
       const template = MyAbilityTemplate.fromItem({
-        target: newRow.part.data.calc$.targetDefinition,
+        target: newRow.part.calc$.targetDefinition,
         flags: {
           [staticValues.moduleName]: {
             dmlCallbackMessageId: newRow.messageId,
-            dmlCallbackPartId: newRow.part.id,
           }
         }
       });
@@ -805,7 +783,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         continue;
       }
 
-      const token = await UtilsDocument.tokenFromUuid(newRow.part.data.calc$.tokenUuid);
+      const token = await UtilsDocument.tokenFromUuid(newRow.part.calc$.tokenUuid);
       if (token == null) {
         continue;
       }
@@ -871,11 +849,11 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         continue;
       }
 
-      const targetIndex = parts.findIndex(part => ModularCard.getTypeHandler(part.type) instanceof TargetCardPart);
-      if (targetIndex) {
-        if ((parts[targetIndex].data as TargetCardData).calc$.autoChangeTarget) {
+      const targetData = parts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      if (targetData) {
+        if (targetData.calc$.autoChangeTarget) {
           const partsClone = deepClone(parts);
-          (partsClone[targetIndex].data as TargetCardData).calc$.autoChangeTarget = false;
+          targetData.calc$.autoChangeTarget = false;
           bulkUpdateRequest.push({message: chatMessage, data: partsClone});
         } else {
           // Once you find 1 which is marked false, assume all of the previous have aswel
@@ -895,8 +873,8 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
   private async calcTargetCache(context: IAfterDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const missingTokenCaches = new Set<string>();
     for (const {newRow} of context.rows) {
-      const cachedUuids = newRow.part.data.calc$.tokenData.map(t => t.tokenUuid);
-      for (const selected of newRow.part.data.selected) {
+      const cachedUuids = newRow.part.calc$.tokenData.map(t => t.tokenUuid);
+      for (const selected of newRow.part.selected) {
         if (!cachedUuids.includes(selected.tokenUuid)) {
           missingTokenCaches.add(selected.tokenUuid);
         }
@@ -910,10 +888,10 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     const tokenMap = await UtilsDocument.tokenFromUuid(missingTokenCaches);
     for (const {newRow} of context.rows) {
       const cache = new Map<string, TargetCardData['calc$']['tokenData'][0]>();
-      for (const entry of newRow.part.data.calc$.tokenData) {
+      for (const entry of newRow.part.calc$.tokenData) {
         cache.set(entry.tokenUuid, entry);
       }
-      for (const selected of newRow.part.data.selected) {
+      for (const selected of newRow.part.selected) {
         if (!cache.has(selected.tokenUuid) && tokenMap.has(selected.tokenUuid)) {
           const token = tokenMap.get(selected.tokenUuid);
           cache.set(token.uuid, {
@@ -926,8 +904,8 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         }
       }
 
-      if (cache.size !== newRow.part.data.calc$.tokenData.length) {
-        newRow.part.data.calc$.tokenData = Array.from(cache.values());
+      if (cache.size !== newRow.part.calc$.tokenData.length) {
+        newRow.part.calc$.tokenData = Array.from(cache.values());
       }
     }
   }
@@ -962,27 +940,25 @@ class DmlTriggerUser implements IDmlTrigger<User> {
     }
 
     let chatMessage: ChatMessage;
-    let parts: ModularCardPartData[];
-    let targetData: TargetCardData;
+    let partsWithTarget: ModularCardInstance;
     for (let messageIndex = game.messages.contents.length - 1; messageIndex >= 0; messageIndex--) {
       chatMessage = game.messages.contents[messageIndex];
-      parts = ModularCard.getCardPartDatas(chatMessage);
+      const parts = ModularCard.getCardPartDatas(chatMessage);
       if (!parts) {
         continue;
       }
 
-      const targetIndex = parts.findIndex(part => ModularCard.getTypeHandler(part.type) instanceof TargetCardPart);
-      if (targetIndex) {
-        // To allow editing, need to clone parts so its not updating the instance which is in the message itself
-        // Otherwise when updating, change detection won't pick it up
-        // TODO This should be improved by not updating this instance, but since saving does some custom stuff, it makes it tricky
-        parts = deepClone(parts);
-        targetData = parts[targetIndex].data;
-        break;
+      if (parts.hasType(TargetCardPart.instance)) {
+        partsWithTarget = parts.deepClone();
       }
     }
 
-    if (!targetData || !targetData.calc$.autoChangeTarget || chatMessage.data.user !== game.userId) {
+    if (!partsWithTarget) {
+      return;
+    }
+    
+    const targetData = partsWithTarget.getTypeData<TargetCardData>(TargetCardPart.instance);
+    if (!targetData.calc$.autoChangeTarget || chatMessage.data.user !== game.userId) {
       return;
     }
     
@@ -993,7 +969,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
 
     // Don't auto change targets after
     await setTargetsFromUser(targetData, game.user);
-    await ModularCard.setCardPartDatas(chatMessage, parts);
+    await ModularCard.setCardPartDatas(chatMessage, partsWithTarget);
   }
   
 }
