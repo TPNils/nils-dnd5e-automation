@@ -2,11 +2,61 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { Attribute, Component, Output } from "../lib/render-engine/component";
 import { staticValues } from "../static-values";
 
+interface ForceClientSettingsPreV2 {
+  readonly forcedSettings: {[settingKey: string]: boolean};
+
+  setup(): void;
+  clickToggleForceSettings(event: MouseEvent): Promise<void>;
+  renderSettingsConfig(app: any, html: JQuery): void;
+}
+
+
+interface ForceClientSettingsV2 {
+  setup(): void;
+  clickToggleForceSettings(event: MouseEvent, key: string, app: JQuery): Promise<void>;
+
+  /**
+   * modes:
+   *  - hard: treat it as if the setting scope is "world"
+   *  - soft: may optionally be edited by the clients, otherwise follows the simulated "world" scope
+   *  - open (not in map): no interaction from force-client-settings
+   */
+  readonly forced: ReadonlyMap<string, {mode: 'soft' | 'hard'}>;
+  forceSetting(key: string, mode: 'soft' | 'hard'): Promise<void>;
+  unforceSetting(key: string): Promise<void>;
+  
+  readonly unlocked: ReadonlyMap<string, boolean>;
+  /**
+   * When soft locked, lock the setting to follow the "world" scope setting for this client.
+   */
+  lockSetting(key: string): Promise<void>;
+  /**
+   * When soft locked, unlock the setting so this client can have a different setting than the "world" scope.
+   */
+  unlockSetting(key: string): Promise<void>;
+}
+
+type ForceClientSettings = ForceClientSettingsPreV2 | ForceClientSettingsV2;
+
+declare global {
+  var ForceClientSettings: ForceClientSettings;
+}
+
 @Component({
   tag: SettingsItemComponent.selector(),
   html: /*html*/`
-    <label *if="this.renderType">
-      <div class="label-text">{{this.setting.name}}</div>
+    <label *if="this.renderType" for="this.settingKey + ''">
+      <div class="label-text">
+        <div class="integration-dummy form-group" *if="this.forceClientSettings.render">
+          <label class="integration-dummy">
+            <span [title]="this.forceClientSettings.hint" class="fa {{this.forceClientSettings.icon}}" (click)="this.toggleForceClientSetting($event)">&nbsp;</span>
+          </label>
+          <div class="integration-dummy form-fields">
+            <input [name]="this.settingKey"/>
+          </div>
+        </div>
+        {{this.setting.name}}
+      </div>
       <input *if="this.renderType === 'string'" type="string" [value]="this.currentValue" [disabled]="!this.canEdit" (blur)="this.setValue($event)"/>
 
       <select *if="this.renderType === 'picklist'" [disabled]="!this.canEdit" (change)="this.setValue($event)">
@@ -34,6 +84,14 @@ import { staticValues } from "../static-values";
       font-weight: bold;
       flex-grow: 1;
     }
+
+    /* Used to help with 3th party integrations who count on a fixed html structure */
+    .integration-dummy {
+      display: contents !important;
+    }
+    .integration-dummy input {
+      display: none !important;
+    }
   `
 })
 export class SettingsItemComponent {
@@ -46,6 +104,7 @@ export class SettingsItemComponent {
   public renderType: 'string' | 'picklist' | 'number' | 'boolean';
   public currentValue: any;
   public canEdit = false;
+
   @Attribute({name: 'data-setting', dataType: 'string'})
   public set settingKey(v: string) {
     this.setting = game.settings.settings.get(v);
@@ -72,6 +131,18 @@ export class SettingsItemComponent {
       } else if (this.setting.type === Boolean) {
         this.renderType = 'boolean';
       }
+    }
+
+    this.calcForceClientSettingsInteraction();
+  }
+  public get settingKey(): string {
+    if (this.setting == null) {
+      return null;
+    }
+    if (this.setting.module) {
+      return `${this.setting.module}.${this.setting.key}`
+    } else {
+      return `${this.setting.namespace}.${this.setting.key}`
     }
   }
 
@@ -111,6 +182,112 @@ export class SettingsItemComponent {
   @RunOnce()
   public static registerHooks() {
 
+  }
+
+  public forceClientSettings = {
+    render: false,
+    mode: 'open' as 'open' | 'soft' | 'hard',
+    icon: '',
+    hint: '',
+  };
+  private calcForceClientSettingsInteraction() {
+    this.forceClientSettings = {
+      render: false,
+      mode: 'open',
+      icon: '',
+      hint: '',
+    }
+
+    if (!this.setting || !game.modules.get('force-client-settings')?.active) {
+      return;
+    }
+    
+    let isClientSetting = this.setting.scope === 'client';
+    // Client settings gets overwittten to 'world' when forced
+    if (!isClientSetting) {
+      if (this.isForceClientSettingsPreV2(ForceClientSettings)) {
+        isClientSetting = !!ForceClientSettings.forcedSettings[this.settingKey];
+      } else {
+        isClientSetting = ForceClientSettings.forced.has(this.settingKey);
+      }
+    }
+    if (!isClientSetting) {
+      return;
+    }
+    
+    if (this.isForceClientSettingsPreV2(ForceClientSettings)) {
+      // Only GM can edit
+      this.forceClientSettings.render = game.user.isGM;
+      this.forceClientSettings.mode = !!ForceClientSettings.forcedSettings[this.settingKey] ? 'hard' : 'open';
+      this.forceClientSettings.hint = game.i18n.localize("FORCECLIENTSETTINGS.ui.unforced-settings-hint");
+    } else {
+      if (ForceClientSettings.forced.has(this.settingKey)) {
+        this.forceClientSettings.mode = ForceClientSettings.forced.get(this.settingKey).mode;
+      } else {
+        this.forceClientSettings.mode = 'open';
+      }
+      // non GM user can toggle if it has a soft lock
+      this.forceClientSettings.render = game.user.isGM || this.forceClientSettings.mode === 'soft';
+      this.forceClientSettings.hint = game.i18n.localize(`FORCECLIENTSETTINGS.ui.${this.forceClientSettings.mode}-${game.user.isGM ? 'gm' : 'client'}-hint`);
+      if (!game.user.isGM && this.forceClientSettings.mode === 'soft' && ForceClientSettings.unlocked.has(this.settingKey)) {
+        // Client can change it to open on their side in soft mode
+        this.forceClientSettings.mode = 'open';
+        this.forceClientSettings.hint = game.i18n.localize(`FORCECLIENTSETTINGS.ui.unlocked-client-hint`);
+      }
+    }
+
+    switch (this.forceClientSettings.mode) {
+      case 'hard': {
+        this.forceClientSettings.icon = 'fa-lock';
+        break;
+      }
+      case 'soft': {
+        this.forceClientSettings.icon = 'fa-unlock';
+        break;
+      }
+      case 'open': {
+        this.forceClientSettings.icon = 'fa-lock-open';
+        break;
+      }
+    }
+  }
+
+  public async toggleForceClientSetting(event: MouseEvent) {
+    if (this.isForceClientSettingsPreV2(ForceClientSettings)) {
+      await ForceClientSettings.clickToggleForceSettings(event);
+    } else {
+      if (game.user.isGM) {
+        const mode = ForceClientSettings.forced.get(this.settingKey)?.mode;
+        switch (mode) {
+          case null:
+          case undefined: {
+            await ForceClientSettings.forceSetting(this.settingKey, "soft");
+            break;
+          }
+          case 'soft': {
+            await ForceClientSettings.forceSetting(this.settingKey, "hard");
+            break;
+          }
+          case 'hard': {
+            await ForceClientSettings.unforceSetting(this.settingKey);
+            break;
+          }
+        }
+      } else {
+        if (ForceClientSettings.forced.get(this.settingKey)?.mode === "soft") {
+          if (ForceClientSettings.unlocked.has(this.settingKey)) {
+            await ForceClientSettings.lockSetting(this.settingKey);
+          } else {
+            await ForceClientSettings.unlockSetting(this.settingKey);
+          }
+        }
+      }
+    }
+    this.calcForceClientSettingsInteraction();
+  }
+
+  private isForceClientSettingsPreV2(setting: ForceClientSettings): setting is ForceClientSettingsPreV2 {
+    return typeof (setting as ForceClientSettingsPreV2).forcedSettings === 'object';
   }
 
 }
