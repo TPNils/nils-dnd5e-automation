@@ -21,6 +21,11 @@ const allTabConfigs: TabLayoutConfig[] = [
     key: 'Visibility',
     groups: [
       [
+        {key: `${staticValues.moduleName}.itemNameVisibility`, autoSave: true},
+        {key: `${staticValues.moduleName}.itemImageVisibility`, autoSave: true},
+        {key: `${staticValues.moduleName}.itemDescriptionVisibility`, autoSave: true},
+      ],
+      [
         {key: `${staticValues.moduleName}.attackVisibility`, autoSave: true},
         {key: `${staticValues.moduleName}.attackHiddenRoll`, autoSave: true},
       ],

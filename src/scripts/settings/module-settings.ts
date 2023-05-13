@@ -1,6 +1,8 @@
-import { UtilsDocument } from "../lib/db/utils-document";
+import { DocumentListener } from "../lib/db/document-listener";
+import { PermissionCheckHandler, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { ModularCard } from "../modular-card/modular-card";
+import { ValueProvider } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
 import { Nd5aSettingsFormApplication, SettingsComponent } from "./settings-component";
@@ -76,6 +78,18 @@ export class ModuleSettings {
     })
 
     // Define a new setting which can be stored and retrieved
+    game.settings.register<string, string, string>(staticValues.moduleName, 'itemNameVisibility', {
+      ...partialVisibilitySetting,
+      name: 'Show item name',
+    });
+    game.settings.register<string, string, string>(staticValues.moduleName, 'itemImageVisibility', {
+      ...partialVisibilitySetting,
+      name: 'Show item image',
+    });
+    game.settings.register<string, string, string>(staticValues.moduleName, 'itemDescriptionVisibility', {
+      ...partialVisibilitySetting,
+      name: 'Show item description',
+    });
     game.settings.register<string, string, string>(staticValues.moduleName, 'attackVisibility', {
       ...partialVisibilitySetting,
       name: 'Show attack roll',
@@ -203,20 +217,23 @@ export class ModuleSettings {
   @RunOnce()
   private static registerCustomPermissions(): void {
     for (const permission of [
+      {permissionName: `${staticValues.code}ReadItemName`, setting: 'itemNameVisibility'},
+      {permissionName: `${staticValues.code}ReadItemImage`, setting: 'itemImageVisibility'},
+      {permissionName: `${staticValues.code}ReadItemDescription`, setting: 'itemDescriptionVisibility'},
       {permissionName: `${staticValues.code}ReadAttack`, setting: 'attackVisibility'},
       {permissionName: `${staticValues.code}ReadDamage`, setting: 'damageVisibility'},
       {permissionName: `${staticValues.code}ReadImmunity`, setting: 'immunityVisibility'},
       {permissionName: `${staticValues.code}ReadCheck`, setting: 'checkVisibility'},
       {permissionName: `${staticValues.code}ReadCheckDc`, setting: 'checkDcVisibility'},
     ]) {
-      UtilsDocument.registerCustomPermission(permission.permissionName, args => {
+      const syncHandler: PermissionCheckHandler['sync'] = args => {
         const setting = game.settings.get(staticValues.moduleName, permission.setting) as keyof (typeof partialVisibilitySetting)['choices'];
         switch (setting) {
           case 'allDetails': {
             return true;
           }
           case 'permission': {
-            return UtilsDocument.getPermissionHandler('Observer')(args);
+            return UtilsDocument.getPermissionHandler('Observer').sync(args);
           }
           case 'player': {
             for (const user of game.users.values()) {
@@ -232,9 +249,42 @@ export class ModuleSettings {
                 return true;
               }
             }
-            return UtilsDocument.getPermissionHandler('Observer')(args);
+            return UtilsDocument.getPermissionHandler('Observer').sync(args);
           }
         }
+      }
+      const asyncHandler: PermissionCheckHandler['async'] = args => {
+        return DocumentListener.listenSettingValue<keyof (typeof partialVisibilitySetting)['choices']>(staticValues.moduleName, permission.setting).switchMap(setting => {
+          switch (setting) {
+            case 'allDetails': {
+              return new ValueProvider(true);
+            }
+            case 'permission': {
+              return UtilsDocument.getPermissionHandler('Observer').async(args);
+            }
+            case 'player': {
+              for (const user of game.users.values()) {
+                if ((user.character as MyActor)?.uuid === args.document.uuid) {
+                  return new ValueProvider(true);
+                }
+              }
+              return new ValueProvider(false);
+            }
+            default: /* playerOrPermission */ {
+              for (const user of game.users.values()) {
+                if ((user.character as MyActor)?.uuid === args.document.uuid) {
+                  return new ValueProvider(true);
+                }
+              }
+              return UtilsDocument.getPermissionHandler('Observer').async(args);
+            }
+          }
+        })
+        
+      }
+      UtilsDocument.registerCustomPermission(permission.permissionName, {
+        sync: syncHandler,
+        async: asyncHandler,
       });
     }
   }

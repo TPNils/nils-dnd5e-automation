@@ -1,12 +1,15 @@
 import { DocumentListener } from "../../lib/db/document-listener";
+import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
+import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { ModularCard } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
 interface DescriptionCardData {
+  uuid$: string;
   name$: string;
   img$: string;
   description$?: string;
@@ -78,20 +81,31 @@ export class DescriptionCardComponent extends BaseCardComponent implements OnIni
   public materials: string;
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData<DescriptionCardData>(DescriptionCardPart.instance).listen(async ({part}) => {
-        this.name = part.name$;
-        this.image = part.img$;
-        this.materials = part.materials$;
-        this.description = part.description$;
-        if (this.description) {
-          const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {async: true} as any;
-          if (game.user.isGM) {
-            enrichOptions.secrets = true;
+      this.getData<DescriptionCardData>(DescriptionCardPart.instance)
+        .switchMap((data) => {
+          return ValueReader.mergeObject({
+            ...data,
+            namePermission: UtilsDocument.hasAllPermissions([{user: game.user, uuid: data.part.uuid$, permission: `${staticValues.code}ReadItemName`}]),
+            imagePermission: UtilsDocument.hasAllPermissions([{user: game.user, uuid: data.part.uuid$, permission: `${staticValues.code}ReadItemImage`}]),
+            descriptionPermission: UtilsDocument.hasAllPermissions([{user: game.user, uuid: data.part.uuid$, permission: `${staticValues.code}ReadItemDescription`}]),
+          })
+        })
+        .listen(async ({part, namePermission, imagePermission, descriptionPermission}) => {
+          this.name = namePermission ? part.name$ : `${game.i18n.localize(`Hidden`)}`;
+          this.image = imagePermission ? part.img$ : 'icons/svg/combat.svg';
+          this.materials = descriptionPermission ? part.materials$ : '';
+
+          let description = descriptionPermission ? part.description$ : '';
+          if (description) {
+            const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {async: true} as any;
+            if (game.user.isGM) {
+              enrichOptions.secrets = true;
+            }
+            this.description = await TextEditor.enrichHTML(description, enrichOptions as any);
+          } else {
+            this.description = description;
           }
-          // TODO Command of Caspian has unescaped characters like &nbsp;
-          this.description = await TextEditor.enrichHTML(this.description, enrichOptions as any);
-        }
-      })
+        })
     )
   }
 
@@ -112,6 +126,7 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
       img$: item.img,
       description$: item.data?.data?.description?.value,
       materials$: item.data?.data?.materials?.value,
+      uuid$: item.uuid,
     };
   }
 
