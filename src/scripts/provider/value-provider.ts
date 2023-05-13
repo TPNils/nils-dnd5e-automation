@@ -37,6 +37,12 @@ export abstract class ValueReader<T> implements ValueReader<T> {
     return new Filter<T>(this, predicate);
   }
 
+  public static fromPromise<T>(promise: Promise<T>): ValueReader<T> {
+    const provider = new ValueProvider<T>();
+    promise.then(value => provider.set(value));
+    return provider;
+  }
+
   public static mergeObject<T extends { [key: string]: ValueReader<any> | any }>(obj: T): ValueReader<ObjectWithRefReturnTypes<T>> {
     return new MergeObject<T>(obj);
   }

@@ -1,5 +1,8 @@
 import { provider } from "../provider/provider";
+import { ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
+import { ChatPartIdData } from "./item-card-helpers";
+import { ActionPermissionCheck } from "./modular-card-part";
 
 type ServerResponse<T> = {success: true; response: T} | {success: false; errorMessage: any[], stackTrace?: string[], errorType: 'warn' | 'error'};
 
@@ -11,7 +14,7 @@ export interface ActionResponse<ClientData, ServerData, R> {
 /* Using this symbol as a security measure to prevent full GM access */
 const runningLocalSymbol = Symbol('runningLocal');
 export type PermissionCheckResult = 'can-run-local' | 'can-run-as-gm' | 'prevent-action';
-export class Action<ClientData, ServerData extends object = {user: User}> {
+export class Action<ClientData, ServerData = {user: User}> {
 
   constructor(private readonly name: string){}
 
@@ -48,7 +51,7 @@ export class Action<ClientData, ServerData extends object = {user: User}> {
     return this as Action<ClientData, any>;
   }
 
-  private permissionCheckFunc: (data: ServerData, user: User) => Promise<PermissionCheckResult> | PermissionCheckResult;
+  private permissionCheckFunc: ActionPermissionCheck<ServerData>;
   /**
    * <b>Optional</b>
    * Validate if the user is allowed to execute this action
@@ -56,7 +59,7 @@ export class Action<ClientData, ServerData extends object = {user: User}> {
    * @param permissionCheckFunc function which will do the permission check
    * @returns this
    */
-  public setPermissionCheck(permissionCheckFunc: (data: ServerData, user: User) => Promise<PermissionCheckResult> | PermissionCheckResult): this {
+  public setPermissionCheck(permissionCheckFunc: ActionPermissionCheck<ServerData>): this {
     this.permissionCheckFunc = permissionCheckFunc;
     return this;
   }
@@ -78,7 +81,10 @@ export class Action<ClientData, ServerData extends object = {user: User}> {
         enrichedData.user = user;
         
         if (this.permissionCheckFunc && !user.isGM) {
-          const permissionResponse = await this.permissionCheckFunc(enrichedData, user);
+          let permissionResponse = await this.permissionCheckFunc(enrichedData as typeof enrichedData & ChatPartIdData, user);
+          if (permissionResponse instanceof ValueReader) {
+            permissionResponse = await permissionResponse.listenFirst();
+          }
           if (permissionResponse === 'can-run-local' || (permissionResponse === 'can-run-as-gm' && game.user.isGM)) {
             const response = await serverExecutor(enrichedData);
             return {success: true, response: response};

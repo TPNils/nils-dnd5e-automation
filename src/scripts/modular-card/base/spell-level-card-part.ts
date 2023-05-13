@@ -10,7 +10,7 @@ import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ItemUtils } from "../item-utils";
 import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction, PermissionResponse } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
 export interface SpellLevelCardData {
@@ -69,32 +69,25 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
         return ValueReader.mergeObject({
           ...data,
           actor: data.part == null ? null : DocumentListener.listenUuid<MyActor & FoundryDocument>(data.part.calc$.actorUuid),
+          interactPermission: SpellLevelCardComponent.actionPermissionCheck({part: {data: data.part}, messageId: this.messageId}, game.user),
+          isObserver: UtilsDocument.hasAnyPermissions([
+            {
+              uuid: data.part.calc$.actorUuid,
+              // TODO Don't know if I want to bloat more settings
+              //  ReadImmunity has the same idea as read spell slots => are you allowed to see details in the character sheet
+              //  Maybe make a proper setting settings page with a global behaviour with the option to fine tune
+              permission: `${staticValues.code}ReadImmunity`,
+              user: game.user,
+            },
+          ])
         })
-      }).listen(async ({part, actor}) => this.setData(part, actor)),
+      }).listen(async ({part, actor, interactPermission, isObserver}) => this.setData(part, actor, interactPermission, isObserver)),
     )
   }
 
-  private async setData(part: SpellLevelCardData, actor: MyActor) {
+  private async setData(part: SpellLevelCardData, actor: MyActor, interactPermission: PermissionResponse, isObserver: boolean) {
     this.spellSlotOptions = [];
     if (part) {
-      const [interactPermission, isObserver] = await Promise.all([
-        SpellLevelCardComponent.actionPermissionCheck({
-          part: {data: part},
-          messageId: this.messageId,
-        }, game.user),
-        UtilsDocument.hasAnyPermissions([
-          {
-            uuid: part.calc$.actorUuid,
-            // TODO keep actively listening
-            // TODO Don't know if I want to bloat more settings
-            //  ReadImmunity has the same idea as read spell slots => are you allowed to see details in the character sheet
-            //  Maybe make a proper setting settings page with a global behaviour with the option to fine tune
-            permission: `${staticValues.code}ReadImmunity`,
-            user: game.user,
-          },
-        ]).listenFirst()
-      ]);
-      
       if (!isObserver) {
         // Only show the selected slot
         this.spellSlotOptions.push({

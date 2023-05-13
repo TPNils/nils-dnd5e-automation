@@ -15,7 +15,7 @@ import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ManualDamageSource } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
 import { BeforeCreateModuleCardEvent, ModularCard, ModularCardTriggerData } from "../../modular-card";
-import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
+import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart, PermissionResponse } from "../../modular-card-part";
 
 export interface SrdSneakAttackCardData {
   itemUuid: string;
@@ -38,7 +38,7 @@ export interface SrdSneakAttackCardData {
 @Component({
   tag: SrdSneakAttackComponent.getSelector(),
   html: /*html*/`
-    <label class="wrapper{{!this.canEdit ? ' disabled' : ''}}">
+    <label *if="this.canRead" class="wrapper{{!this.canEdit ? ' disabled' : ''}}">
       <input [disabled]="!this.canEdit" (click)="this.onSneakToggleClick($event)" [checked]="this.addSneak" type="checkbox"/>
       <i *if="this.usedInCombat" class="used-in-combat-warning {{this.addSneak ? 'this-is-active' : ''}} fas fa-exclamation-triangle"></i>
       <img *if="this.itemImg" [src]="this.itemImg">
@@ -123,7 +123,7 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
   //#endregion
   
   public static getSelector(): string {
-    return `srd-sneak-attack-part`;
+    return `${staticValues.code}-srd-sneak-attack-part`;
   }
 
   public onInit(args: OnInitParam) {
@@ -133,28 +133,27 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
           const uuid = args.part.createdCombatRound?.combatUuid;
           return ValueReader.mergeObject({
             ...args,
-            combat: uuid == null ? null : DocumentListener.listenUuid<Combat>(uuid)
+            combat: uuid == null ? null : DocumentListener.listenUuid<Combat>(uuid),
+            readDamagePermission: UtilsDocument.hasAllPermissions([{uuid: args.part.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}]),
+            actionResponse: SrdSneakAttackComponent.actionPermissionCheck({messageId: this.messageId, part: {data: args.part},}, game.user),
           })
         })
-        .listen(({part, combat}) => this.setData(part, combat))
+        .listen(({part, combat, readDamagePermission, actionResponse}) => this.setData(part, combat, readDamagePermission, actionResponse))
     );
   }
 
+  public canRead = false;
   public canEdit = false;
   public itemName: string = '';
   public itemImg: string;
   public addSneak: boolean = false;
   public usedInCombat = false;
   public damageOptions: Array<{value: string; label: string; selected: boolean;}> = [];
-  private async setData(part: SrdSneakAttackCardData, combat: Combat | null) {
-    // read permission are handled in SneakAttackCardPart.getHtml()
+  private async setData(part: SrdSneakAttackCardData, combat: Combat | null, readDamagePermission: boolean, actionResponse: PermissionResponse) {
+    this.canRead = readDamagePermission;
     this.itemName = `${part.name}?`;
     this.itemImg = part.itemImg;
     this.addSneak = part.shouldAdd;
-    const actionResponse = await SrdSneakAttackComponent.actionPermissionCheck({
-      messageId: this.messageId,
-      part: {data: part},
-    }, game.user);
     this.canEdit = actionResponse !== 'prevent-action';
     this.damageOptions = part.calc$.damageOptions.sort().map(dmg => {
       return {
@@ -283,17 +282,7 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
     })
   }
 
-  public async getHtml(data: HtmlContext<SrdSneakAttackCardData>): Promise<string> {
-    const canSeeSneak = await UtilsDocument.hasAllPermissions([
-      {
-        uuid: data.data.calc$.actorUuid,
-        permission: `${staticValues.code}ReadDamage`,
-        user: game.user,
-      }
-    ]).listenFirst();
-    if (!canSeeSneak) {
-      return null;
-    }
+  public getHtml(data: HtmlContext<SrdSneakAttackCardData>): string {
     return `<${SrdSneakAttackComponent.getSelector()} data-message-id="${data.messageId}"></${SrdSneakAttackComponent.getSelector()}>`
   }
   

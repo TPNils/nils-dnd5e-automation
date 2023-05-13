@@ -2,6 +2,7 @@ import { IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
 import { RunOnce } from "../../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
 import { UtilsRoll } from "../../../lib/roll/utils-roll";
+import { ValueReader } from "../../../provider/value-provider";
 import { staticValues } from "../../../static-values";
 import { UtilsItem } from "../../../utils/utils-item";
 import { Action } from "../../action";
@@ -9,7 +10,7 @@ import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ResourceCardData, ResourceCardPart, TargetCardData, TargetCardPart } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
 import { BeforeCreateModuleCardEvent, ModularCard, ModularCardTriggerData } from "../../modular-card";
-import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
+import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart, PermissionResponse } from "../../modular-card-part";
 
 export interface SrdLayOnHandsCardData extends DamageCardData {
   heal: number;
@@ -75,12 +76,17 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
   //#endregion
   
   public static getSelector(): string {
-    return `srd-lay-on-hands-part`;
+    return `${staticValues.code}-srd-lay-on-hands-part`;
   }
 
   public onInit(args: OnInitParam) {
     args.addStoppable(
-      this.getData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance).listen(({part}) => this.setData(part))
+      this.getData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance).switchMap((data) => {
+        return ValueReader.mergeObject({
+          ...data,
+          hasPermission: SrdLayOnHandsComponent.permissionCheck({messageId: this.messageId, part: {data: data.part}}, game.user)
+        })
+      }).listen(async ({part, hasPermission}) => this.setData(part, hasPermission)),
     );
   }
 
@@ -91,15 +97,7 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
   public maxHeal = 0;
   public maxCure = 0;
   public missingPermission = true;
-  private async setData(part: SrdLayOnHandsCardData) {
-    let hasPermission = false;
-    if (part) {
-      const result = await SrdLayOnHandsComponent.permissionCheck({
-        messageId: this.messageId,
-        part: {data: part}
-      }, game.user);
-      hasPermission = result !== 'prevent-action';
-    }
+  private async setData(part: SrdLayOnHandsCardData, hasPermission: PermissionResponse) {
     this.missingPermission = !hasPermission;
 
     if (!part || this.missingPermission) {

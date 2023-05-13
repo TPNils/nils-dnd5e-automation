@@ -2,7 +2,6 @@ import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
-import { UtilsLog } from "../../utils/utils-log";
 import { DocumentListener } from "./document-listener";
 
 export type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
