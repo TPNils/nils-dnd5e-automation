@@ -906,12 +906,19 @@ export class UtilsDocument {
 
     if (options.sync) {
       const documents = UtilsDocument.fromUuid(permissionChecksByUuid.keys(), {sync: true});
-      for (let [uuid, document] of documents.entries()) {
-        for (const permissionCheck of permissionChecksByUuid.get(uuid)) {
-          const handler = UtilsDocument.permissionChecks[permissionCheck.permission.toUpperCase()];
-          if (!handler) {
-            throw new Error(`Unknown permission: ${permissionCheck.permission.toUpperCase()}`);
-          }
+      for (let permissionCheck of permissionChecks) {
+        const document = documents.get(permissionCheck.uuid);
+        const handler = UtilsDocument.permissionChecks[permissionCheck.permission.toUpperCase()];
+        if (!handler) {
+          throw new Error(`Unknown permission: ${permissionCheck.permission.toUpperCase()}`);
+        }
+        if (document == null) {
+          // Assume document is deleted
+          syncResponse.push({
+            requestedCheck: permissionCheck,
+            result: false,
+          });
+        } else {
           syncResponse.push({
             requestedCheck: permissionCheck,
             result: handler.sync({user: permissionCheck.user, document: document}),
@@ -929,15 +936,24 @@ export class UtilsDocument {
       return ValueReader.all(Array.from(listeners.values())).switchMap(documentArray => {
         const docMap = new Map<string, FoundryDocument>();
         for (const document of documentArray) {
-          docMap.set(document.uuid, document);
+          if (document) {
+            docMap.set(document.uuid, document);
+          }
         }
         const asyncResponse: ValueReader<PermissionResponse>[] = [];
-        for (let [uuid, document] of docMap.entries()) {
-          for (const permissionCheck of permissionChecksByUuid.get(uuid)) {
-            const handler = UtilsDocument.permissionChecks[permissionCheck.permission.toUpperCase()];
-            if (!handler) {
-              throw new Error(`Unknown permission: ${permissionCheck.permission.toUpperCase()}`);
-            }
+        for (let permissionCheck of permissionChecks) {
+          const document = docMap.get(permissionCheck.uuid);
+          const handler = UtilsDocument.permissionChecks[permissionCheck.permission.toUpperCase()];
+          if (!handler) {
+            throw new Error(`Unknown permission: ${permissionCheck.permission.toUpperCase()}`);
+          }
+          if (document == null) {
+            // Assume document is deleted
+            asyncResponse.push(new ValueProvider({
+              requestedCheck: permissionCheck,
+              result: false,
+            }));
+          } else {
             asyncResponse.push(handler.async({user: permissionCheck.user, document: document}).map(result => {
               return {
                 requestedCheck: permissionCheck,
@@ -946,6 +962,7 @@ export class UtilsDocument {
             }));
           }
         }
+        
         return ValueReader.all(asyncResponse);
       });
     }
