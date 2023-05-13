@@ -583,7 +583,7 @@ export class ComponentElement extends HTMLElement {
       if (!parsedHtml) {
         this.template = null;
       } else {
-        this.template = new Template(parsedHtml, this.#controller);
+        this.template = new Template(this.nodeName, parsedHtml, this.#controller);
         this.templateRenderResult = await this.template.render();
         const rootNodes = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
         this.findSlots();

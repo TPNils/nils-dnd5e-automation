@@ -27,6 +27,7 @@ export class Template {
   
   private readonly template: VirtualNode & VirtualParentNode;
   public constructor (
+    public readonly name: string,
     template: VirtualNode & VirtualParentNode,
     context?: any
   ) {
@@ -357,7 +358,7 @@ export class Template {
       }
       return this.parsedExpressions.get(funcKey).apply(this.#context, paramValues);
     } catch (e) {
-      UtilsLog.error('Error executing expression with context', {expression: expression, thisContext: this.#context, localVars: localVars, err: e})
+      UtilsLog.error('Error executing expression with context', {templateName: this.name, expression: expression, thisContext: this.#context, localVars: localVars, err: e})
       throw e;
     }
   }
