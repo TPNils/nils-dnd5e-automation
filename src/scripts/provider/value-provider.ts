@@ -42,6 +42,9 @@ export abstract class ValueReader<T> implements ValueReader<T> {
   }
 
   public static all<T extends readonly unknown[] | []>(values: T): ValueReader<{ -readonly [P in keyof T]: ValueReaderType<T[P]> }> {
+    if (values.length === 0) {
+      return new ValueProvider<any>([]);
+    }
     const obj = {};
     for (let i = 0; i < values.length; i++) {
       obj[i] = values[i];
