@@ -55,7 +55,7 @@ export class ValueProvider<T = any> extends ValueReader<T> {
   constructor(value?: T) {
     super();
     this.value = value;
-    this.valueProvided = value !== undefined;
+    this.valueProvided = arguments.length > 0;
   }
 
   public get(): T {
