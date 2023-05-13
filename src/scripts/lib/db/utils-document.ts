@@ -1,7 +1,9 @@
+import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
 import { UtilsLog } from "../../utils/utils-log";
+import { DocumentListener } from "./document-listener";
 
 export type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
 
@@ -44,23 +46,34 @@ class MaybePromise<T> {
   }
 }
 
-export type PermissionCheckHandler = ({}: {user: User; document: FoundryDocument;}) => boolean;
+export interface PermissionCheckHandler {
+  sync: ({}: {user: User; document: FoundryDocument;}) => boolean;
+  async: ({}: {user: User; document: FoundryDocument;}) => ValueReader<boolean>;
+};
 const defaultPermissionChecks: {[key: string]: PermissionCheckHandler} = {};
 for (const perm of Object.keys(UtilsFoundry.getUserRolls())) {
-  defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
+  const syncHandler: PermissionCheckHandler['sync'] = ({document, user}) => {
     let doc = document;
-    while (doc != null) {
-      if (doc.testUserPermission(user, perm as any)) {
-        return true;
+      while (doc != null) {
+        if (doc.testUserPermission(user, perm as any)) {
+          return true;
+        }
+        doc = doc.parent;
       }
-      doc = doc.parent;
+      return false;
+  }
+  defaultPermissionChecks[perm.toUpperCase()] = {
+    sync: syncHandler,
+    async: ({document, user}) => {
+      return DocumentListener.listenUuid(document.uuid).map(listenDoc => {
+        return syncHandler({user: user, document: listenDoc});
+      });
     }
-    return false;
   }
 }
 for (const perm of Object.keys(UtilsFoundry.getDocumentPermissions())) {
   const level = UtilsFoundry.getDocumentPermissions()[perm];
-  defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
+  const syncHandler: PermissionCheckHandler['sync'] = ({document, user}) => {
     let doc = document;
     while (doc != null) {
       if (doc.getUserLevel(user) >= level) {
@@ -70,9 +83,17 @@ for (const perm of Object.keys(UtilsFoundry.getDocumentPermissions())) {
     }
     return false;
   }
+  defaultPermissionChecks[perm.toUpperCase()] = {
+    sync: syncHandler,
+    async: ({document, user}) => {
+      return DocumentListener.listenUuid(document.uuid).map(listenDoc => {
+        return syncHandler({user: user, document: listenDoc});
+      });
+    }
+  }
 }
 for (const perm of (['create', 'update', 'delete'] as const)) {
-  defaultPermissionChecks[perm.toUpperCase()] = ({document, user}) => {
+  const syncHandler: PermissionCheckHandler['sync'] = ({document, user}) => {
     let doc = document;
     while (doc != null) {
       if (doc.canUserModify(user, perm)) {
@@ -82,9 +103,30 @@ for (const perm of (['create', 'update', 'delete'] as const)) {
     }
     return false;
   }
+  defaultPermissionChecks[perm.toUpperCase()] = {
+    sync: syncHandler,
+    async: ({document, user}) => {
+      return DocumentListener.listenUuid(document.uuid).map(listenDoc => {
+        return syncHandler({user: user, document: listenDoc});
+      });
+    }
+  }
 }
-defaultPermissionChecks['GM'] = ({user}) => {
-  return user.isGM;
+defaultPermissionChecks['player'] = {
+  sync: ({user}) => {
+    return !user.isGM;
+  },
+  async: ({user}) => {
+    return DocumentListener.listenUuid<User>(user.uuid).map(listenUser => !listenUser.isGM);
+  }
+}
+defaultPermissionChecks['GM'] = {
+  sync: ({user}) => {
+    return user.isGM;
+  },
+  async: ({user}) => {
+    return DocumentListener.listenUuid<User>(user.uuid).map(listenUser => listenUser.isGM);
+  }
 }
 defaultPermissionChecks['DM'] = defaultPermissionChecks['GM'];
 
@@ -551,13 +593,13 @@ export class UtilsDocument {
         const pack = game.packs.get(packName);
         for (const idParts of ids) {
           if (pack.has(idParts[0])) {
-            documentPromises.push(Promise.resolve(pack.get(idParts[0])));
+            documentPromises.push(Promise.resolve((pack as any).get(idParts[0])));
           } else {
             missingIds.push()
           }
         }
         if (missingIds.length > 0) {
-          documentPromises.push(game.packs.get(`${packName}`).getDocuments({_id: {$in: missingIds}} as any));
+          documentPromises.push((game.packs.get(`${packName}`) as any).getDocuments({_id: {$in: missingIds}}));
         }
       }
 
@@ -728,7 +770,7 @@ export class UtilsDocument {
       if (!responsesByKey.has(contextKey)) {
         responsesByKey.set(contextKey, {
           contextKey: contextKey,
-          documentClass: CONFIG[document.documentName].documentClass,
+          documentClass: CONFIG[document.documentName].documentClass as any,
           parent: document.parent,
           pack: document.pack,
           documents: [],
@@ -755,10 +797,10 @@ export class UtilsDocument {
     return UtilsDocument.permissionChecks[permissionName.toUpperCase()];
   }
   
-  public static hasPermissionsFromString(stringChecks: string[]): Promise<PermissionResponse[]>
+  public static hasPermissionsFromString(stringChecks: string[]): ValueReader<PermissionResponse[]>
   public static hasPermissionsFromString(stringChecks: string[], options: {sync: true}): PermissionResponse[]
-  public static hasPermissionsFromString(stringChecks: string[], options: {sync?: boolean}): PermissionResponse[] | Promise<PermissionResponse[]>
-  public static hasPermissionsFromString(stringChecks: string[], options: {sync?: boolean} = {}): PermissionResponse[] | Promise<PermissionResponse[]> {
+  public static hasPermissionsFromString(stringChecks: string[], options: {sync?: boolean}): PermissionResponse[] | ValueReader<PermissionResponse[]>
+  public static hasPermissionsFromString(stringChecks: string[], options: {sync?: boolean} = {}): PermissionResponse[] | ValueReader<PermissionResponse[]> {
     const permissionChecks: PermissionCheck[] = [];
     for (const check of stringChecks) {
       const documentMatch = /^(.+?)(uuid|actorid):(.*)/i.exec(check);
@@ -802,43 +844,43 @@ export class UtilsDocument {
     return UtilsDocument.hasPermissions(permissionChecks, options);
   }
   
-  public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<boolean>
+  public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[]): ValueReader<boolean>
   public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync: true}): boolean
-  public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean}): boolean | Promise<boolean>
-  public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): boolean | Promise<boolean> {
+  public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean}): boolean | ValueReader<boolean>
+  public static hasAnyPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): boolean | ValueReader<boolean> {
     const response = UtilsDocument.hasPermissions(permissionChecks, options);
-    if (response instanceof Promise) {
-      return response.then(r => r.some(check => check.result));
+    if (response instanceof ValueReader) {
+      return response.map(r => r.some(check => check.result));
     } else {
       return response.some(check => check.result);
     }
   }
   
-  public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<boolean>
+  public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[]): ValueReader<boolean>
   public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync: true}): boolean
-  public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean}): boolean | Promise<boolean>
-  public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): boolean | Promise<boolean> {
+  public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean}): boolean | ValueReader<boolean>
+  public static hasAllPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): boolean | ValueReader<boolean> {
     const response = UtilsDocument.hasPermissions(permissionChecks, options);
-    if (response instanceof Promise) {
-      return response.then(r => r.every(check => check.result));
+    if (response instanceof ValueReader) {
+      return response.map(r => r.every(check => check.result));
     } else {
       return response.every(check => check.result);
     }
   }
 
-  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[]): Promise<PermissionResponse<T>[]>
+  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[]): ValueReader<PermissionResponse<T>[]>
   public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync: true}): PermissionResponse<T>[]
-  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean}): PermissionResponse<T>[] | Promise<PermissionResponse<T>[]>
-  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): PermissionResponse<T>[] | Promise<PermissionResponse<T>[]> {
+  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean}): PermissionResponse<T>[] | ValueReader<PermissionResponse<T>[]>
+  public static hasPermissions<T>(permissionChecks: PermissionCheck<T>[], options: {sync?: boolean} = {}): PermissionResponse<T>[] | ValueReader<PermissionResponse<T>[]> {
     permissionChecks = permissionChecks.filter(check => check != null);
-    const response: PermissionResponse[] = [];
+    const syncResponse: PermissionResponse[] = [];
     {
       // GM can do anything
       const processing = permissionChecks;
       permissionChecks = [];
       for (const permissionCheck of processing) {
         if (permissionCheck.user.isGM) {
-          response.push({
+          syncResponse.push({
             requestedCheck: permissionCheck,
             result: permissionCheck.permission !== 'player',
           })
@@ -849,9 +891,9 @@ export class UtilsDocument {
     }
     if (permissionChecks.length === 0) {
       if (options.sync) {
-        return response;
+        return syncResponse;
       } else {
-        return Promise.resolve(response);
+        return new ValueProvider(syncResponse);
       }
     }
     const permissionChecksByUuid = new Map<string, PermissionCheck[]>();
@@ -861,21 +903,51 @@ export class UtilsDocument {
       }
       permissionChecksByUuid.get(permissionCheck.uuid).push(permissionCheck);
     }
-    return new MaybePromise(UtilsDocument.fromUuidInternal(permissionChecksByUuid.keys(), options as any)).then(documents => {
+
+    if (options.sync) {
+      const documents = UtilsDocument.fromUuid(permissionChecksByUuid.keys(), {sync: true});
       for (let [uuid, document] of documents.entries()) {
         for (const permissionCheck of permissionChecksByUuid.get(uuid)) {
           const handler = UtilsDocument.permissionChecks[permissionCheck.permission.toUpperCase()];
           if (!handler) {
             throw new Error(`Unknown permission: ${permissionCheck.permission.toUpperCase()}`);
           }
-          response.push({
+          syncResponse.push({
             requestedCheck: permissionCheck,
-            result: handler({user: permissionCheck.user, document: document}),
+            result: handler.sync({user: permissionCheck.user, document: document}),
           });
         }
       }
-      return response;
-    }).getValue();
+      return syncResponse;
+    } else {
+      const listeners = new Map<string, ValueReader<FoundryDocument>>();
+      for (const uuid of permissionChecksByUuid.keys()) {
+        listeners.set(uuid, DocumentListener.listenUuid(uuid));
+      }
+      return ValueReader.all(Array.from(listeners.values())).switchMap(documentArray => {
+        const docMap = new Map<string, FoundryDocument>();
+        for (const document of documentArray) {
+          docMap.set(document.uuid, document);
+        }
+        const asyncResponse: ValueReader<PermissionResponse>[] = [];
+        
+        for (let [uuid, document] of docMap.entries()) {
+          for (const permissionCheck of permissionChecksByUuid.get(uuid)) {
+            const handler = UtilsDocument.permissionChecks[permissionCheck.permission.toUpperCase()];
+            if (!handler) {
+              throw new Error(`Unknown permission: ${permissionCheck.permission.toUpperCase()}`);
+            }
+            asyncResponse.push(handler.async({user: permissionCheck.user, document: document}).map(result => {
+              return {
+                requestedCheck: permissionCheck,
+                result: result,
+              }
+            }));
+          }
+          return ValueReader.all(asyncResponse);
+        }
+      });
+    }
   }
   //#endregion
 

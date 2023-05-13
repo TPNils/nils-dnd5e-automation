@@ -1,6 +1,7 @@
-import { UtilsDocument } from "../lib/db/utils-document";
+import { DocumentListener } from "../lib/db/document-listener";
 import { RunOnce } from "../lib/decorator/run-once";
-import { Attribute, Component } from "../lib/render-engine/component";
+import { Attribute, Component, OnInit, OnInitParam } from "../lib/render-engine/component";
+import { ValueProvider, ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 
 @Component({
@@ -19,30 +20,44 @@ import { staticValues } from "../static-values";
     }
   `
 })
-export class TokenImgElement {
+export class TokenImgElement implements OnInit {
 
   public static selector(): string {
     return `${staticValues.code}-token-img`;
   }
 
-  private token: TokenDocument;
+  private tokenUuid$ = new ValueProvider<string>(null);
   @Attribute('data-token-uuid')
   public set tokenUuid(value: string) {
-    UtilsDocument.tokenFromUuid(value).then(token => {
-      this.token = token;
-    })
+    this.tokenUuid$.set(value)
   };
-  @Attribute('data-token-img')
-  public tokenImg: string;
 
-  public get tokenImgResult(): string {
-    if (this.token?.data?.img) {
-      return this.token.data.img;
-    }
-    if (this.tokenImg) {
-      return this.tokenImg;
-    }
-    return CONST.DEFAULT_TOKEN;
+  private tokenImg$ = new ValueProvider<string>(null);
+  @Attribute('data-token-img')
+  public set tokenImg(value: string) {
+    this.tokenImg$.set(value)
+  };
+
+  public tokenImgResult: string = CONST.DEFAULT_TOKEN;
+  
+  private token: TokenDocument;
+  public onInit(args: OnInitParam): void {
+    args.addStoppable(
+      ValueReader.mergeObject({
+        token: this.tokenUuid$.switchMap(uuid => DocumentListener.listenUuid<TokenDocument>(uuid)),
+        tokenImg: this.tokenImg$,
+      }).listen(({token, tokenImg}) => {
+        this.token = token;
+
+        if (token?.data?.img) {
+          this.tokenImgResult = token.data.img;
+        } else if (tokenImg) {
+          this.tokenImgResult = tokenImg;
+        } else {
+          this.tokenImgResult = CONST.DEFAULT_TOKEN;
+        }
+      })
+    );
   }
 
   public onMouseEnter(): void {

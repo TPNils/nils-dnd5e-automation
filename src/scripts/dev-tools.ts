@@ -46,7 +46,7 @@ export class DevTools {
     for (const item of game.items.values()) {
       const sourceUuid = item.getFlag(staticValues.moduleName, 'source-uuid');
       if (typeof sourceUuid === 'string') {
-        worldItemsBySourceUuid.set(item.getFlag(staticValues.moduleName, 'source-uuid'), item);
+        worldItemsBySourceUuid.set(item.getFlag(staticValues.moduleName, 'source-uuid') as any, item);
       }
     }
 

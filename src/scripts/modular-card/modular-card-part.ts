@@ -60,7 +60,7 @@ export function createPermissionCheckAction<T = unknown>(args: CreatePermissionC
         });
       }
     }
-    for (const checkResult of await UtilsDocument.hasPermissions(permissionChecks)) {
+    for (const checkResult of await UtilsDocument.hasPermissions(permissionChecks).listenFirst()) {
       if (!checkResult.result) {
         if (checkResult.requestedCheck.meta.security) {
           return 'prevent-action';

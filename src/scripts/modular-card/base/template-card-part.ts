@@ -4,6 +4,7 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
 import MyAbilityTemplate from "../../pixi/ability-template";
+import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyItemData } from "../../types/fixed-types";
 import { UtilsTemplate } from "../../utils/utils-template";
@@ -46,19 +47,22 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
   public placeTemplateLocale = game.i18n.localize('DND5E.PlaceTemplate');
   public onInit(args: OnInitParam) {
     args.addStoppable(
-      this.getData<TemplateCardData>(TemplateCardPart.instance).listen(data => this.setData(data.part))
+      this.getData<TemplateCardData>(TemplateCardPart.instance)
+        .switchMap(data => {
+          return ValueReader.mergeObject({
+            ...data,
+            hasPermission: UtilsDocument.hasAllPermissions([{uuid: data.part.calc$.actorUuid, permission: 'Owner', user: game.user}]),
+          })
+        })
+        .listen(data => this.setData(data.part, data.hasPermission))
     );
   }
 
   public hasPermission = false;
   private target: TemplateCardData['calc$']['target'];
-  private async setData(part: TemplateCardData) {
+  private async setData(part: TemplateCardData, hasPermission: boolean) {
     if (part) {
-      this.hasPermission = await UtilsDocument.hasAllPermissions([{
-        uuid: part.calc$.actorUuid,
-        permission: 'Owner',
-        user: game.user,
-      }]);
+      this.hasPermission = this.hasPermission;
       this.target = part.calc$.target;
     } else {
       this.hasPermission = false;

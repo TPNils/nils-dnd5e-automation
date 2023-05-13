@@ -10,6 +10,7 @@ import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
+import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardTriggerData } from "../modular-card";
@@ -60,7 +61,7 @@ export interface AttackCardData {
     <div class="flavor">
       {{ this.flavor }}
     </div>
-    <nd5a-roll-d20
+    <nd5a-roll-d20 *if="this.part"
       [data-roll]="this.part.roll$"
       [data-label]="this.overrideRollLabel"
       [data-roll-mode]="this.part.mode"
@@ -144,15 +145,15 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
           return ValueProvider.mergeObject({
             ...args,
             readHiddenDisplayType: DocumentListener.listenSettingValue<string>(staticValues.moduleName, 'attackHiddenRoll'),
+            hasReadPermission: UtilsDocument.hasAllPermissions([{uuid: args.part.actorUuid$, permission: `${staticValues.code}ReadAttack`, user: game.user}]),
           })
         })
-        .listen(async ({part, readHiddenDisplayType}) => {
+        .listen(async ({part, readHiddenDisplayType, hasReadPermission}) => {
           this.part = part;
           this.interactionPermission = `OwnerUuid:${this.part.actorUuid$}`;
           this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.actorUuid$}`;
           this.readHiddenDisplayType = readHiddenDisplayType;
           
-          const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.actorUuid$, permission: `${staticValues.code}ReadAttack`, user: game.user}])
           if (!hasReadPermission || !part.roll$?.evaluated || part.mode === 'normal') {
             this.flavor = game.i18n.localize('DND5E.Attack');
           } else {
@@ -707,7 +708,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
       }
     }
     
-    UtilsDocument.hasPermissions(showRolls).then(responses => {
+    UtilsDocument.hasPermissions(showRolls).listenFirst().then(responses => {
       const rolls: Roll[] = [];
       for (const response of responses) {
         if (response.result) {

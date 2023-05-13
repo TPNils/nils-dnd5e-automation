@@ -1,7 +1,8 @@
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
-import { Attribute, Component, Output } from "../lib/render-engine/component";
+import { Attribute, Component, OnInit, OnInitParam, Output } from "../lib/render-engine/component";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
+import { ValueProvider } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 import { RollResultElement } from "./roll-result-element";
 
@@ -190,7 +191,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
   }
   `
 })
-export class RollD20Element {
+export class RollD20Element implements OnInit {
 
   public static selector(): string {
     return `${staticValues.code}-roll-d20`;
@@ -250,24 +251,22 @@ export class RollD20Element {
   @Attribute({name: 'data-highlight-total-on-firstTerm', dataType: 'boolean'})
   public highlightTotalOnFirstTerm: boolean = true;
 
-  private _interactionPermission: string[];
+  private _interactionPermission = new ValueProvider<string[]>()
   @Attribute({name: 'data-interaction-permission'})
   public get interactionPermission(): string[] {
-    return this._interactionPermission;
+    return this._interactionPermission.get();
   }
   public set interactionPermission(v: string | string[]) {
-    this._interactionPermission = Array.isArray(v) ? v : [v];
-    this.calcInteractPermission();
+    this._interactionPermission.set(Array.isArray(v) ? v : [v]);
   }
 
-  private _readPermission: string[];
+  private _readPermission = new ValueProvider<string[]>()
   @Attribute({name: 'data-read-permission'})
   public get readPermission(): string[] {
-    return this._readPermission;
+    return this._readPermission.get();
   }
   public set readPermission(v: string | string[]) {
-    this._readPermission = Array.isArray(v) ? v : [v];
-    this.calcReadPermission();
+    this._readPermission.set(Array.isArray(v) ? v : [v]);
   }
   
   @Attribute({name: 'data-read-hidden-display-type', dataType: 'string'})
@@ -306,24 +305,21 @@ export class RollD20Element {
   }
   
   public hasReadPermission = true;
-  private async calcReadPermission() {
-    if (!this.readPermission || this.readPermission.length === 0) {
-      this.hasReadPermission = true;
-    }
-
-    const response = await UtilsDocument.hasPermissionsFromString(this.readPermission);
-    this.hasReadPermission = response.some(check => check.result);
-    this.calcRollMode()
-  }
-  
   public hasInteractPermission = true;
-  private async calcInteractPermission() {
-    if (!this.interactionPermission || this.interactionPermission.length === 0) {
-      this.hasInteractPermission = true;
-    }
-
-    const response = await UtilsDocument.hasPermissionsFromString(this.interactionPermission);
-    this.hasInteractPermission = response.some(check => check.result);
+  public onInit(args: OnInitParam): void {
+    args.addStoppable(
+      this._readPermission
+        .switchMap(readPermission => UtilsDocument.hasPermissionsFromString(readPermission))
+        .listen(response => {
+          this.hasReadPermission = response.some(check => check.result);
+          this.calcRollMode();
+        }),
+      this._interactionPermission
+        .switchMap(interactionPermission => UtilsDocument.hasPermissionsFromString(interactionPermission))
+        .listen(response => {
+          this.hasInteractPermission = response.some(check => check.result);
+        })
+    )
   }
 
   //#region template callbacks

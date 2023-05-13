@@ -2,6 +2,7 @@ import { DmlTrigger, IDmlTrigger, IDmlContext, IAfterDmlContext, ITrigger } from
 import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
+import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
@@ -299,7 +300,13 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
   
   public onInit(args: OnInitParam) {
     args.addStoppable(
-      this.getData<ResourceCardData>(ResourceCardPart.instance).listen(({part}) => this.setData(part))
+      this.getData<ResourceCardData>(ResourceCardPart.instance).switchMap(data => {
+        return ValueReader.mergeObject({
+          ...data,
+          hasObserverPerm: UtilsDocument.hasAllPermissions([{permission: 'Observer', uuid: data.part.calc$.actorUuid, user: game.user}]),
+        })
+      })
+      .listen(({part, hasObserverPerm}) => this.setData(part, hasObserverPerm))
     );
   }
 
@@ -319,14 +326,9 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
     });
   }
 
-  private async setData(part: ResourceCardData) {
+  private async setData(part: ResourceCardData, hasObserverPerm: boolean) {
     if (part) {
-      const hasPerm = await UtilsDocument.hasAllPermissions([{
-        permission: 'Observer',
-        uuid: part.calc$.actorUuid,
-        user: game.user,
-      }]);
-      if (hasPerm) {
+      if (hasObserverPerm) {
         this.consumeResources = part.consumeResources
           .filter(resource => {
             // Hide unused resources

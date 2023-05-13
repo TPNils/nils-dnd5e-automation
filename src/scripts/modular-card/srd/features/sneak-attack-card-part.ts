@@ -442,7 +442,7 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
               permission: 'update',
               user: user
             }
-          }))
+          })).listenFirst();
         const executingUser = checks.sort((a, b) => a.requestedCheck.user.id.localeCompare(b.requestedCheck.user.id))
           .find(check => check.result)
           ?.requestedCheck.user

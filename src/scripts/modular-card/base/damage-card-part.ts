@@ -121,7 +121,7 @@ function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache
 }
 
 
-function isItem(item: any): item is MyItem {
+function isItem(item: any): boolean {
   return item instanceof Item;
 }
 
@@ -313,8 +313,9 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
         return ValueProvider.mergeObject({
           ...data,
           itemDamageSource: data.part.calc$.damageSource.type === 'Manual' ? null : DocumentListener.listenUuid(data.part.calc$.damageSource.itemUuid),
+          hasReadPermission: UtilsDocument.hasAllPermissions([{uuid: data.part.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}]),
         })
-      }).listen(async ({part, itemDamageSource}) => {
+      }).listen(async ({part, itemDamageSource, hasReadPermission}) => {
         this.roll = part.calc$.roll;
         this.rollMode = part.mode;
         this.rollSource = part.source;
@@ -325,7 +326,6 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
         this.readPermission = `${staticValues.code}ReadDamageUuid:${part.calc$.actorUuid}`;
         this.flavor = game.i18n.localize('DND5E.Damage');
 
-        const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}]);
         if (hasReadPermission) {
           let isHealing = false;
           let damageSourceFlavor: string = null;
@@ -1072,7 +1072,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
       }
     }
     
-    UtilsDocument.hasPermissions(showRolls).then(responses => {
+    UtilsDocument.hasPermissions(showRolls).listenFirst().then(responses => {
       const rolls: Roll[] = [];
       for (const response of responses) {
         if (response.result) {

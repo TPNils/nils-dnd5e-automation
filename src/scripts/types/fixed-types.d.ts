@@ -336,38 +336,8 @@ export interface D20RollOptions {
   flavor?: string;
 }
 
-export type MyItem = BaseDocument<MyItemData> & {
-  name: string;
-  img: string;
-  type: 'weapon' | 'equipment' | 'consumable' | 'tool' | 'loot' | 'class' | 'spell' | 'feat' | 'backpack';
-  actor?: MyActor;
-  parent?: MyActor;
-  readonly abilityMod: keyof MyActorData['data']['abilities']
-  readonly hasAttack: boolean;
-  readonly hasDamage: boolean;
-  getRollData: () => {[key: string]: any};
-  getChatData: () => any;
-  rollAttack(options?: D20RollOptions): Promise<Roll | null>;
-  rollDamage(args?: {critical?: boolean, spellLevel?: MyItemData['data']['level'], versatile?: boolean, options?: {fastForward?: boolean, chatMessage?: boolean}}): Promise<Roll>;
-  roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
-  displayCard({}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
-  getCriticalThreshold(): number | null;
-  protected prepareFinalAttributes: () => void;
-  pack?: string;
-  hasAreaTarget: boolean;
-  effects: Map<string, ActiveEffect>;
-};
+export type MyItem = {[key: string | symbol]: any};
 
-export type MyActor = Actor & BaseDocument<MyActorData> & {
-  type: 'character' | 'npc' | 'vehicle';
-  items: Map<string, MyItem>;
-  parent: any;
-  pack: any;
-  isOwner: boolean;
-  update(data: any, context?: any);
-  rollSkill(skillId: keyof MyActor['data']['data']['skills'], options?: D20RollOptions): Promise<Roll>;
-  rollAbilityTest(abilityId: keyof MyActor['data']['data']['abilities'], options?: D20RollOptions): Promise<Roll>;
-  rollAbilitySave(abilityId: keyof MyActor['data']['data']['abilities'], options?: D20RollOptions): Promise<Roll>;
-}
+export type MyActor = MyItem;
 
 export type MyCompendiumCollection = CompendiumCollection & BaseDocument<CompendiumCollection.Metadata>;

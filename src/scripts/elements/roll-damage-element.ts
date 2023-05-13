@@ -5,6 +5,7 @@ import { Attribute, Component, OnInit, OnInitParam, Output } from "../lib/render
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { Stoppable } from "../lib/utils/stoppable";
 import { DamageCardData } from "../modular-card/base";
+import { ValueProvider } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 import { RollResultElement } from "./roll-result-element";
 
@@ -237,24 +238,22 @@ export class RollDamageElement implements OnInit {
   @Attribute({name: 'data-override-formula', dataType: 'string'})
   public overrideFormula: string;
 
-  private _interactionPermission: string[];
+  private _interactionPermission = new ValueProvider<string[]>()
   @Attribute({name: 'data-interaction-permission'})
-  public get setInteractionPermission(): string[] {
-    return this._interactionPermission;
+  public get interactionPermission(): string[] {
+    return this._interactionPermission.get();
   }
-  public set setInteractionPermission(v: string | string[]) {
-    this._interactionPermission = Array.isArray(v) ? v : [v];
-    this.calcInteractPermission();
+  public set interactionPermission(v: string | string[]) {
+    this._interactionPermission.set(Array.isArray(v) ? v : [v]);
   }
 
-  private _readPermission: string[];
+  private _readPermission = new ValueProvider<string[]>()
   @Attribute({name: 'data-read-permission'})
   public get readPermission(): string[] {
-    return this._readPermission;
+    return this._readPermission.get();
   }
   public set readPermission(v: string | string[]) {
-    this._readPermission = Array.isArray(v) ? v : [v];
-    this.calcReadPermission();
+    this._readPermission.set(Array.isArray(v) ? v : [v]);
   }
   
   private readHiddenDisplayTypeListener: Stoppable;
@@ -313,14 +312,31 @@ export class RollDamageElement implements OnInit {
   
   //#endregion
 
+  
+  public hasReadPermission = true;
+  public hasInteractPermission = true;
   public onInit(args: OnInitParam): void {
     if (this._readHiddenDisplayType == null) {
       // If no type is provided, set a default.
-      this.readHiddenDisplayTypeListener = DocumentListener.listenSettingValue(`${staticValues.moduleName}.damageHiddenRoll`).listen(value => {
+      args.addStoppable(this.readHiddenDisplayTypeListener = DocumentListener.listenSettingValue(`${staticValues.moduleName}.damageHiddenRoll`).listen(value => {
         this._readHiddenDisplayType = value;
         this.calcRollModeLabel();
-      });
+      }));
     }
+    
+    args.addStoppable(
+      this._readPermission
+        .switchMap(readPermission => UtilsDocument.hasPermissionsFromString(readPermission))
+        .listen(response => {
+          this.hasReadPermission = response.some(check => check.result);
+          this.calcRollModeLabel();
+        }),
+      this._interactionPermission
+        .switchMap(interactionPermission => UtilsDocument.hasPermissionsFromString(interactionPermission))
+        .listen(response => {
+          this.hasInteractPermission = response.some(check => check.result);
+        })
+    )
   }
 
   public localeBonus = game.i18n.localize(`DND5E.Bonus`);
@@ -340,27 +356,6 @@ export class RollDamageElement implements OnInit {
     } else {
       this.rollModeLabel = game.i18n.localize('DND5E.Normal');
     }
-  }
-  
-  public hasReadPermission = true;
-  private async calcReadPermission() {
-    if (!this.readPermission || this.readPermission.length === 0) {
-      this.hasReadPermission = true;
-    }
-
-    const response = await UtilsDocument.hasPermissionsFromString(this.readPermission);
-    this.hasReadPermission = response.some(check => check.result);
-    this.calcRollModeLabel();
-  }
-  
-  public hasInteractPermission = true;
-  private async calcInteractPermission() {
-    if (!this.setInteractionPermission || this.setInteractionPermission.length === 0) {
-      this.hasInteractPermission = true;
-    }
-
-    const response = await UtilsDocument.hasPermissionsFromString(this.setInteractionPermission);
-    this.hasInteractPermission = response.some(check => check.result);
   }
 
   //#region template callbacks

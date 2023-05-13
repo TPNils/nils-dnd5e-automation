@@ -65,10 +65,10 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
   public spellSlotOptions: Array<{label: string; value: string; selected: boolean}> = [];
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData<SpellLevelCardData>(SpellLevelCardPart.instance).switchMap(({part}) => {
+      this.getData<SpellLevelCardData>(SpellLevelCardPart.instance).switchMap((data) => {
         return ValueReader.mergeObject({
-          part,
-          actor: part == null ? null : DocumentListener.listenUuid<MyActor & FoundryDocument>(part.calc$.actorUuid)
+          ...data,
+          actor: data.part == null ? null : DocumentListener.listenUuid<MyActor & FoundryDocument>(data.part.calc$.actorUuid),
         })
       }).listen(async ({part, actor}) => this.setData(part, actor)),
     )
@@ -85,13 +85,14 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
         UtilsDocument.hasAnyPermissions([
           {
             uuid: part.calc$.actorUuid,
+            // TODO keep actively listening
             // TODO Don't know if I want to bloat more settings
             //  ReadImmunity has the same idea as read spell slots => are you allowed to see details in the character sheet
             //  Maybe make a proper setting settings page with a global behaviour with the option to fine tune
             permission: `${staticValues.code}ReadImmunity`,
             user: game.user,
           },
-        ])
+        ]).listenFirst()
       ]);
       
       if (!isObserver) {
