@@ -39,10 +39,8 @@ class CallbackDocumentTrigger<T extends FoundryDocument> implements IDmlTrigger<
           if (callbacks.size === 0) {
             this.callbacksByUuid.delete(uuid);
           }
-          if (this.callbacksByUuid.size === 0) {
-            triggersByDocumentType.get(this.type.documentName).stoppable.stop();
-            triggersByDocumentType.delete(this.type.documentName);
-          }
+          // Don't unregister self to prevent foundry console spam
+          // Every register & unregister create a console log
         }
       }
     }
@@ -91,10 +89,8 @@ class CallbackSettingKeyTrigger implements IDmlTrigger<Setting> {
           if (callbacks.size === 0) {
             this.callbacksByKey.delete(key);
           }
-          if (this.callbacksByKey.size === 0) {
-            triggersByDocumentType.get(this.type.documentName).stoppable.stop();
-            triggersByDocumentType.delete(this.type.documentName);
-          }
+          // Don't unregister self to prevent foundry console spam
+          // Every register & unregister create a console log
         }
       }
     }
