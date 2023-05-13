@@ -10,7 +10,6 @@ import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
-import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardTriggerData } from "../modular-card";
@@ -173,6 +172,112 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   public onRollMode(event: CustomEvent<RollD20EventData<RollMode>>): void {
     AttackCardPartComponent.modeChange({event, messageId: this.messageId});
   }
+}
+
+@Component({
+  tag: AttackTargetComponent.getSelector(),
+  html: /*html*/`
+    <div *if="this.resultType === 'critical-hit'" class="critical-hit" [title]="this.title">✓</div>
+    <div *if="this.resultType === 'critical-mis'" class="critical-mis" [title]="this.title">✗</div>
+    <div *if="this.resultType === 'hit'" class="hit" [title]="this.title">✓</div>
+    <div *if="this.resultType === 'mis'" class="mis" [title]="this.title">✗</div>
+  `,
+  style: /*css*/`
+    :host {
+      display: content;
+    }
+
+    div {
+      text-align: center;
+    }
+
+    .critical-hit,
+    .hit {
+      color: green;
+    }
+
+    .critical-mis,
+    .mis {
+      color: red;
+    }
+  `
+})
+class AttackTargetComponent extends BaseCardComponent implements OnInit {
+
+  public static getSelector(): string {
+    return `${staticValues.code}-attack-target`;
+  }
+
+  //#region input
+  private _selectionId = new ValueProvider<string>();
+  @Attribute('data-selection-id')
+  public get selectionId(): string {
+    return this._selectionId.get();
+  }
+  public set selectionId(v: string) {
+    this._selectionId.set(v);
+  }
+  //#endregion
+  
+  public resultType: string;
+  public title: string;
+  public onInit(args: OnInitParam): void {
+    args.addStoppable(
+      ValueProvider.mergeObject({
+        data: this.getData<AttackCardData>(AttackCardPart.instance),
+        selectionId: this._selectionId,
+      })
+      .switchMap(({data, selectionId}) => {
+        const targetPart = data.allParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+        const targetUuid = targetPart?.selected?.find(target => target.selectionId === selectionId)?.tokenUuid;
+        const cache = data.part.targetCaches$.find(cache => cache.targetUuid$ === targetUuid);
+        return ValueProvider.mergeObject({
+          ...data,
+          selectionId: selectionId,
+          cache: cache,
+          attackHiddenRoll: DocumentListener.listenSettingValue<string>(staticValues.moduleName, 'attackHiddenRoll'),
+          canReadAttack: UtilsDocument.hasAllPermissions([{uuid: data.part.actorUuid$, user: game.user, permission: `${staticValues.code}ReadAttack`}]),
+          canSeeAc: UtilsDocument.hasAllPermissions([{uuid: cache?.actorUuid$, user: game.user, permission: `Observer`}]),
+        })
+      })
+      .listen(async ({part, cache, canReadAttack, canSeeAc, attackHiddenRoll}) => {
+        this.resultType = null;
+        this.title = null;
+        if (!cache) {
+          return;
+        }
+
+        const canSeeTotal = attackHiddenRoll === 'total';
+        if (!part.roll$?.evaluated || !canSeeAc) {
+          return;
+        } else if (!canReadAttack && !canSeeTotal) {
+          return;
+        } else {
+          let resultType = cache.resultType$;
+          if (!canReadAttack && canSeeTotal) {
+            if (resultType === 'critical-hit') {
+              resultType = 'hit';
+            } else if (resultType === 'critical-mis') {
+              resultType = 'mis';
+            }
+          }
+          this.resultType = resultType;
+          this.title = `${game.i18n.localize('DND5E.AC')}: ${cache.ac$} <= ${part.roll$?.total}`;
+          switch (resultType) {
+            case 'critical-hit': {
+              this.title = `${game.i18n.localize('DND5E.CriticalHit')}!`;
+              break;
+            }
+            case 'critical-mis': {
+              this.title = `${game.i18n.localize(`${staticValues.moduleName}.CriticalMis`)}!`;
+              break;
+            }
+          }
+        }
+      })
+    )
+  }
+  
 }
 
 export class AttackCardPart implements ModularCardPart<AttackCardData> {
@@ -352,71 +457,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   private getTargetState(context: StateContext): VisualState[] {
     const visualStates: VisualState[] = [];
 
-    const attack = context.allMessageParts.getTypeData<AttackCardData>(AttackCardPart.instance);
-    if (attack == null) {
-      return [];
-    }
-
-    const cache = this.getTargetCache([attack]);
     for (const selected of context.selected) {
-      let rowValue: string;
-      const canReadAttack = UtilsDocument.hasAllPermissions([{
-        uuid: attack.actorUuid$,
-        user: game.user,
-        permission: `${staticValues.code}ReadAttack`,
-      }], {sync: true});
-      let canSeeAc: boolean;
-      if (cache.has(selected.tokenUuid)) {
-        canSeeAc = UtilsDocument.hasAllPermissions([{
-          uuid: cache.get(selected.tokenUuid).actorUuid$,
-          user: game.user,
-          permission: `Observer`,
-        }], {sync: true});
-      } else {
-        canSeeAc = false;
-      }
-      const canSeeTotal = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') === 'total';
-      if (!attack.roll$?.evaluated || !canSeeAc) {
-        if (attack.roll$?.evaluated) {
-          rowValue = '';
-        } else {
-          rowValue = '';
-        }
-      } else if (!canReadAttack && !canSeeTotal) {
-        rowValue = '';
-      } else {
-        const styles = ['text-align: center'];
-        let resultType = cache.get(selected.tokenUuid).resultType$;
-        if (!canReadAttack && canSeeTotal) {
-          if (resultType === 'critical-hit') {
-            resultType = 'hit';
-          } else if (resultType === 'critical-mis') {
-            resultType = 'mis';
-          }
-        }
-        switch (resultType) {
-          case 'critical-hit': {
-            styles.push('color: green');
-            rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.CriticalHit')}!">✓</div>`;
-            break;
-          }
-          case 'critical-mis': {
-            styles.push('color: red');
-            rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize(`${staticValues.moduleName}.CriticalMis`)}!">✗</div>`;
-            break;
-          }
-          case 'hit': {
-            styles.push('color: green');
-            rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac$} <= ${attack.roll$?.total}">✓</div>`;
-            break;
-          }
-          case 'mis': {
-            styles.push('color: red');
-            rowValue = `<div style="${styles.join(';')};" title="${game.i18n.localize('DND5E.AC')}: ${cache.get(selected.tokenUuid).ac$} <= ${attack.roll$?.total}">✗</div>`;
-            break;
-          }
-        }
-      }
       visualStates.push({
         selectionId: selected.selectionId,
         tokenUuid: selected.tokenUuid,
@@ -427,7 +468,7 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
             <use xlink:href="/modules/${staticValues.moduleName}/assets/icons/sword.svg#sword"/>
           </svg>
           </div>`,
-          rowValue: rowValue,
+          rowValue: `<${AttackTargetComponent.getSelector()} data-message-id="${context.messageId}" data-selection-id="${selected.selectionId}"></${AttackTargetComponent.getSelector()}>`,
         }],
       })
     }
