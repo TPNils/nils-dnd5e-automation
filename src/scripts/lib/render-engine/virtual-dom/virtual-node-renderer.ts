@@ -356,7 +356,8 @@ export class VirtualNodeRenderer {
               case 'nodeValue': {
                 // domParser.parseFromString removes the start whitespaces
                 const whitespacePrefix = /^ */.exec(item.value);
-                const unescapedHtml = domParser.parseFromString(item.value, 'text/html').documentElement.textContent;
+                const escaped = item.value.replace(/&/, '&amp').replace(/</, '&lt').replace(/>/, '&gt');
+                const unescapedHtml = domParser.parseFromString(escaped, 'text/html').documentElement.textContent;
                 item.node.nodeValue = whitespacePrefix + unescapedHtml;
                 break;
               }

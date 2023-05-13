@@ -81,7 +81,7 @@ export class Template {
     return this.#processedVirtualNode;
   }
 
-  public rerenderCallback = () => {
+  private rerenderCallback = () => {
     this.calcVirtualNode();
   }
 

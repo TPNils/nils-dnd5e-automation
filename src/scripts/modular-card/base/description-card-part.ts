@@ -91,7 +91,7 @@ export class DescriptionCardComponent extends BaseCardComponent implements OnIni
           })
         })
         .listen(async ({part, namePermission, imagePermission, descriptionPermission}) => {
-          this.name = namePermission ? part.name$ : `${game.i18n.localize(`Hidden`)}`;
+          this.name = namePermission ? part.name$ : `<${game.i18n.localize(`Hidden`)}>`;
           this.image = imagePermission ? part.img$ : 'icons/svg/combat.svg';
           this.materials = descriptionPermission ? part.materials$ : '';
 
