@@ -1,4 +1,5 @@
-import { ValueReader } from "../../provider/value-provider";
+import { ValueProvider, ValueReader } from "../../provider/value-provider";
+import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { DmlTrigger, IAfterDmlContext, IDmlTrigger } from "./dml-trigger";
 import { FoundryDocument, UtilsDocument } from "./utils-document";
@@ -86,4 +87,28 @@ export class DocumentListener<T> extends ValueReader<T> {
   public static listenUuid<T = FoundryDocument>(uuid: string): ValueReader<T> {
     return new DocumentListener<T>(uuid);
   }
+
+  public static listenSettingValue<T = any>(...settingKeyParts: string[]): ValueReader<T> {
+    const settingKey = settingKeyParts.join('.');
+    const settingConfig = game.settings.settings.get(settingKey);
+    if (settingConfig == null) {
+      return new ValueProvider(undefined);
+    }
+    const storage = game.settings.storage.get(settingConfig.scope);
+    let uuid: string;
+    if (storage instanceof WorldSettings) {
+      uuid = storage.getSetting(settingKey).uuid;
+    } else {
+      // TODO there is no uuid or hooks for client side settings in foundry V8, V9 & V10
+      // Find a way around this, probably overwrite the client storage methods
+      UtilsLog.warn('Setting', settingKey, 'is a client setting and does not support listening to changes.');
+      const keyParts = settingKey.split('.');
+      const namespace = keyParts.splice(0, 1)[0];
+      const currentValue: any = game.settings.get(namespace, keyParts.join('.'));
+      return new ValueProvider(currentValue);
+    }
+    
+    return new DocumentListener<T>(uuid);
+  }
+
 }

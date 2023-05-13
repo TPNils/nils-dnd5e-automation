@@ -1,3 +1,4 @@
+import { DocumentListener } from "../../lib/db/document-listener";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { staticValues } from "../../static-values";
@@ -12,9 +13,10 @@ interface DescriptionCardData {
   materials$?: string;
 }
 
-function getDefaultCardCollpased(): boolean {
-  return !!game.settings.get('dnd5e', 'autoCollapseItemCards');
-}
+let defaultCardCollpased = false;
+DocumentListener.listenSettingValue<boolean>('dnd5e', 'autoCollapseItemCards').listen(value => {
+  defaultCardCollpased = value;
+})
 
 @Component({
   tag: DescriptionCardComponent.getSelector(),
@@ -68,7 +70,7 @@ export class DescriptionCardComponent extends BaseCardComponent implements OnIni
     return `${staticValues.code}-description-part`;
   }
   
-  public collapsed = getDefaultCardCollpased();
+  public collapsed = defaultCardCollpased;
   public localeRequiredMaterials = game.i18n.localize('DND5E.RequiredMaterials')
   public name: string = '';
   public image: string = '';

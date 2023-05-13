@@ -1,11 +1,13 @@
 import { RollD20EventData, RollMode } from "../../elements/roll-d20-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
+import { DocumentListener } from "../../lib/db/document-listener";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
+import { Attribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
+import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
 import { Action } from "../action";
@@ -137,18 +139,25 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData<AttackCardData>(AttackCardPart.instance).listen(async ({part}) => {
-        this.part = part;
-        this.interactionPermission = `OwnerUuid:${this.part.actorUuid$}`;
-        this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.actorUuid$}`;
-        this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'attackHiddenRoll') as string;
-        
-        const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.actorUuid$, permission: `${staticValues.code}ReadAttack`, user: game.user}])
-        if (!hasReadPermission || !part.roll$?.evaluated || part.mode === 'normal') {
-          this.flavor = game.i18n.localize('DND5E.Attack');
-        } else {
-          this.flavor = game.i18n.localize(`DND5E.${part.mode.capitalize()}`);
-        }
+      this.getData<AttackCardData>(AttackCardPart.instance)
+        .switchMap((args) => {
+          return ValueProvider.mergeObject({
+            ...args,
+            readHiddenDisplayType: DocumentListener.listenSettingValue<string>(staticValues.moduleName, 'attackHiddenRoll'),
+          })
+        })
+        .listen(async ({part, readHiddenDisplayType}) => {
+          this.part = part;
+          this.interactionPermission = `OwnerUuid:${this.part.actorUuid$}`;
+          this.readPermission = `${staticValues.code}ReadAttackUuid:${this.part.actorUuid$}`;
+          this.readHiddenDisplayType = readHiddenDisplayType;
+          
+          const hasReadPermission = await UtilsDocument.hasAllPermissions([{uuid: part.actorUuid$, permission: `${staticValues.code}ReadAttack`, user: game.user}])
+          if (!hasReadPermission || !part.roll$?.evaluated || part.mode === 'normal') {
+            this.flavor = game.i18n.localize('DND5E.Attack');
+          } else {
+            this.flavor = game.i18n.localize(`DND5E.${part.mode.capitalize()}`);
+          }
       })
     )
   }

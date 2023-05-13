@@ -1,5 +1,6 @@
 import { RollD20EventData, RollMode } from "../../elements/roll-d20-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
+import { DocumentListener } from "../../lib/db/document-listener";
 import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Attribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
@@ -168,18 +169,19 @@ private static modeChange = new Action<{event: CustomEvent<RollD20EventData<Roll
 
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData<CheckCardData>(CheckCardPart.instance).switchMap(({part}) => {
+      this.getData<CheckCardData>(CheckCardPart.instance).switchMap((args) => {
         return ValueProvider.mergeObject({
-          part,
-          targetId: this._targetId
+          ...args,
+          targetId: this._targetId,
+          readHiddenDisplayType: DocumentListener.listenSettingValue<string>(staticValues.moduleName, 'checkHiddenRoll'),
         })
-      }).listen(({part, targetId}) => {
+      }).listen(({part, targetId, readHiddenDisplayType}) => {
         this.cache = getTargetCache(part, targetId);
     
         if (this.cache != null) {
           this.interactionPermission = `OwnerUuid:${this.cache.actorUuid$}`;
           this.readPermission = `${staticValues.code}ReadCheckUuid:${this.cache.actorUuid$}`;
-          this.readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'checkHiddenRoll') as string;
+          this.readHiddenDisplayType = readHiddenDisplayType;
         }
       })
     )

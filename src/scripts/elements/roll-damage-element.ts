@@ -1,7 +1,9 @@
+import { DocumentListener } from "../lib/db/document-listener";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
-import { Attribute, Component, Output } from "../lib/render-engine/component";
+import { Attribute, Component, OnInit, OnInitParam, Output } from "../lib/render-engine/component";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
+import { Stoppable } from "../lib/utils/stoppable";
 import { DamageCardData } from "../modular-card/base";
 import { staticValues } from "../static-values";
 import { RollResultElement } from "./roll-result-element";
@@ -190,7 +192,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
     }
   `
 })
-export class RollDamageElement {
+export class RollDamageElement implements OnInit {
 
   public static selector(): string {
     return `${staticValues.code}-roll-damage`;
@@ -255,13 +257,19 @@ export class RollDamageElement {
     this.calcReadPermission();
   }
   
-  private _readHiddenDisplayType = game.settings.get(staticValues.moduleName, 'damageHiddenRoll') as RollResultElement['displayType'];
+  private readHiddenDisplayTypeListener: Stoppable;
+  private _readHiddenDisplayType: RollResultElement['displayType'];
   @Attribute({name: 'data-read-hidden-display-type', dataType: 'string'})
   public get readHiddenDisplayType(): RollResultElement['displayType'] {
     return this._readHiddenDisplayType;
   }
   public set readHiddenDisplayType(v: RollResultElement['displayType']) {
     this._readHiddenDisplayType = v;
+    // When the value is provided, stop listener for the default value.
+    if (this.readHiddenDisplayTypeListener) {
+      this.readHiddenDisplayTypeListener.stop();
+      this.readHiddenDisplayTypeListener = null;
+    }
     this.calcRollModeLabel();
   }
 
@@ -304,6 +312,16 @@ export class RollDamageElement {
   }
   
   //#endregion
+
+  public onInit(args: OnInitParam): void {
+    if (this._readHiddenDisplayType == null) {
+      // If no type is provided, set a default.
+      this.readHiddenDisplayTypeListener = DocumentListener.listenSettingValue(`${staticValues.moduleName}.damageHiddenRoll`).listen(value => {
+        this._readHiddenDisplayType = value;
+        this.calcRollModeLabel();
+      });
+    }
+  }
 
   public localeBonus = game.i18n.localize(`DND5E.Bonus`);
   public localeRollExample = game.i18n.localize(`DND5E.RollExample`);
