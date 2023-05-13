@@ -9,7 +9,6 @@ import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-
 import { BaseCardComponent } from "./base-card-component";
 
 interface DescriptionCardData {
-  uuid$: string;
   name$: string;
   img$: string;
   description$?: string;
@@ -85,9 +84,9 @@ export class DescriptionCardComponent extends BaseCardComponent implements OnIni
         .switchMap((data) => {
           return ValueReader.mergeObject({
             ...data,
-            namePermission: UtilsDocument.hasAllPermissions([{user: game.user, uuid: data.part.uuid$, permission: `${staticValues.code}ReadItemName`}]),
-            imagePermission: UtilsDocument.hasAllPermissions([{user: game.user, uuid: data.part.uuid$, permission: `${staticValues.code}ReadItemImage`}]),
-            descriptionPermission: UtilsDocument.hasAllPermissions([{user: game.user, uuid: data.part.uuid$, permission: `${staticValues.code}ReadItemDescription`}]),
+            namePermission: UtilsDocument.hasAllPermissions([{user: game.user, uuid: data.allParts.getItemUuid(), permission: `${staticValues.code}ReadItemName`}]),
+            imagePermission: UtilsDocument.hasAllPermissions([{user: game.user, uuid: data.allParts.getItemUuid(), permission: `${staticValues.code}ReadItemImage`}]),
+            descriptionPermission: UtilsDocument.hasAllPermissions([{user: game.user, uuid: data.allParts.getItemUuid(), permission: `${staticValues.code}ReadItemDescription`}]),
           })
         })
         .listen(async ({part, namePermission, imagePermission, descriptionPermission}) => {
@@ -126,7 +125,6 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
       img$: item.img,
       description$: item.data?.data?.description?.value,
       materials$: item.data?.data?.materials?.value,
-      uuid$: item.uuid,
     };
   }
 
