@@ -11,7 +11,7 @@ import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem, SpellData } from "../types/fixed-types";
 import { UtilsLog } from "../utils/utils-log";
-import { ActiveEffectCardPart, AttackCardPart, CheckCardPart, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardPart, SpellLevelCardPart, TargetCardPart, TemplateCardPart } from "./base/index";
+import { ActiveEffectCardPart, AttackCardData, AttackCardPart, CheckCardData, CheckCardPart, DamageCardData, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardData, ResourceCardPart, SpellLevelCardData, SpellLevelCardPart, TargetCardData, TargetCardPart, TemplateCardData, TemplateCardPart } from "./base/index";
 import { ItemUtils } from "./item-utils";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
@@ -23,6 +23,13 @@ interface ModularCardPartDataLegacy<T = any> {
 
 export type ModularCardDataLegacy = ModularCardPartDataLegacy[];
 type ModularCardData = {[partType: string]: any};
+interface ModularCardMeta {
+  created: {
+    actorUuid?: string;
+    tokenUuid?: string;
+    itemUuid?: string;
+  }
+}
 
 function getExtendedTypes(inputHandler: ModularCardPart | string): string[] {
   inputHandler = typeof inputHandler === 'string' ? ModularCard.getTypeHandler(inputHandler) : inputHandler;
@@ -41,6 +48,11 @@ function getExtendedTypes(inputHandler: ModularCardPart | string): string[] {
 
 export class ModularCardInstance {
   private data: ModularCardData = {};
+  private meta: ModularCardMeta;
+
+  constructor({meta}: {meta?: ModularCardMeta} = {}) {
+    this.meta = meta;
+  }
 
   public hasType<T>(partType: ModularCardPart<T> | string): boolean {
     return this.getTypeData(partType) != null;
@@ -98,6 +110,72 @@ export class ModularCardInstance {
     if (data != null) {
       this.data[this.getTypeName(partType)] = data;
     }
+  }
+
+  public getItemUuid(): string {
+    if (this.meta != null) {
+      return this.meta.created.itemUuid;
+    }
+
+    // legacy
+    let itemUuid = this.getTypeData<AttackCardData>(AttackCardPart.instance)?.attackSource$?.itemUuid;
+    if (itemUuid == null) {
+      const calc = this.getTypeData<DamageCardData>(DamageCardPart.instance)?.calc$;
+      if (calc && calc.damageSource.type === 'Item') {
+        itemUuid = calc.damageSource.itemUuid;
+      }
+    }
+    if (itemUuid == null) {
+      itemUuid = this.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance)?.calc$?.itemUuid;
+    }
+    
+    return itemUuid;
+  }
+
+  public getActorUuid(): string {
+    if (this.meta != null) {
+      return this.meta.created.actorUuid;
+    }
+
+    // legacy
+    let actorUuid = this.getTypeData<AttackCardData>(AttackCardPart.instance)?.actorUuid$;
+    if (actorUuid == null) {
+      actorUuid = this.getTypeData<CheckCardData>(CheckCardPart.instance)?.actorUuid$;
+    }
+    if (actorUuid == null) {
+      actorUuid = this.getTypeData<DamageCardData>(DamageCardPart.instance)?.calc$?.actorUuid;
+    }
+    if (actorUuid == null) {
+      actorUuid = this.getTypeData<ResourceCardData>(ResourceCardPart.instance)?.calc$?.actorUuid;
+    }
+    if (actorUuid == null) {
+      actorUuid = this.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance)?.calc$?.actorUuid;
+    }
+    if (actorUuid == null) {
+      actorUuid = this.getTypeData<TargetCardData>(TargetCardPart.instance)?.calc$?.actorUuid;
+    }
+    if (actorUuid == null) {
+      actorUuid = this.getTypeData<TemplateCardData>(TemplateCardPart.instance)?.calc$?.actorUuid;
+    }
+
+    return actorUuid;
+  }
+
+  public getTokenUuid(): string {
+    if (this.meta != null) {
+      return this.meta.created.tokenUuid;
+    }
+
+    // legacy
+    let tokenUuid = this.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance)?.calc$?.tokenUuid;
+    if (tokenUuid == null) {
+      tokenUuid = this.getTypeData<TargetCardData>(TargetCardPart.instance)?.calc$?.tokenUuid;
+    }
+    if (tokenUuid == null) {
+      tokenUuid = this.getTypeData<TemplateCardData>(TemplateCardPart.instance)?.calc$?.tokenUuid;
+    }
+
+    return tokenUuid;
   }
 
   private getTypeName(partType: ModularCardPart | string): string {
@@ -574,7 +652,6 @@ export class ModularCard {
   }
 
   public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardInstance> {
-    let id = 0;
     const parts: Promise<{data: any, cardPart: ModularCardPart}>[] = [];
     
     // Find the first available spellslot, auto upcast if missing spell slots
@@ -624,7 +701,13 @@ export class ModularCard {
       }
     }
 
-    const response = new ModularCardInstance();
+    const response = new ModularCardInstance({meta: {
+      created: {
+        actorUuid: data.actor?.uuid,
+        tokenUuid: data.token?.uuid,
+        itemUuid: data.item?.uuid,
+      }
+    }});
     for (const part of await Promise.all(parts)) {
       if (part.data != null) {
         response.setTypeData(part.cardPart, part.data);
@@ -634,10 +717,18 @@ export class ModularCard {
   }
   
   public static async createCard(parts: ModularCardInstance, insert: boolean = true): Promise<ChatMessage> {
+    const modularCardDataMeta: ModularCardMeta = {
+      created: {
+        actorUuid: parts.getActorUuid(),
+        itemUuid: parts.getItemUuid(),
+        tokenUuid: parts.getTokenUuid(),
+      }
+    }
     const chatMessageData: ChatMessageDataConstructorData = {
       flags: {
         [staticValues.moduleName]: {
           modularCardData: ModularCard.createFlagObject(parts),
+          modularCardDataMeta: modularCardDataMeta,
         }
       }
     };
@@ -748,6 +839,7 @@ export class ModularCard {
 
     const flagData: any = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
     if (typeof flagData === 'object' && !Array.isArray(flagData)) {
+      const flagMetaData: any = message.getFlag(staticValues.moduleName, 'modularCardDataMeta') as any;
       const data = new ModularCardInstance();
 
       const keys = Object.keys(flagData);

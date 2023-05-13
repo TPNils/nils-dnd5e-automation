@@ -1,5 +1,7 @@
+import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
+import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyItem } from "../../types/fixed-types";
 import { ModularCard } from "../modular-card";
@@ -52,9 +54,20 @@ export class PropertyCardComponent extends BaseCardComponent implements OnInit {
   public properties: Property[] = [];
   public onInit(args: OnInitParam): void {
     args.addStoppable(
-      this.getData<PropertyCardData>(PropertyCardPart.instance).listen(({part}) => {
-        this.properties = part.properties$.map((prop: PropertyCardData['properties$'][number]) => typeof prop === 'string' ? {text: prop, highlight: false} : prop);
-      })
+      this.getData<PropertyCardData>(PropertyCardPart.instance)
+        .switchMap((data) => {
+          return ValueReader.mergeObject({
+            ...data,
+            descriptionPermission: UtilsDocument.hasAllPermissions([{user: game.user, uuid: data.allParts.getItemUuid(), permission: `${staticValues.code}ReadItemDescription`}]),
+          })
+        })
+        .listen(({part, descriptionPermission}) => {
+          if (descriptionPermission) {
+            this.properties = part.properties$.map((prop: PropertyCardData['properties$'][number]) => typeof prop === 'string' ? {text: prop, highlight: false} : prop);
+          } else {
+            this.properties = [];
+          }
+        })
     )
   }
 
