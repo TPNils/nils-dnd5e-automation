@@ -895,16 +895,15 @@ export class UtilsDocument {
         return new ValueProvider(syncResponse);
       }
     }
-    const permissionChecksByUuid = new Map<string, PermissionCheck[]>();
+    const allUuids = new Set<string>();
     for (const permissionCheck of permissionChecks) {
-      if (!permissionChecksByUuid.has(permissionCheck.uuid)) {
-        permissionChecksByUuid.set(permissionCheck.uuid, []);
-      }
-      permissionChecksByUuid.get(permissionCheck.uuid).push(permissionCheck);
+      allUuids.add(permissionCheck.uuid);
     }
+    allUuids.delete(null);
+    allUuids.delete(undefined);
 
     if (options.sync) {
-      const documents = UtilsDocument.fromUuid(permissionChecksByUuid.keys(), {sync: true});
+      const documents = UtilsDocument.fromUuid(allUuids, {sync: true});
       for (let permissionCheck of permissionChecks) {
         const document = documents.get(permissionCheck.uuid);
         const handler = UtilsDocument.permissionChecks[permissionCheck.permission.toUpperCase()];
@@ -927,9 +926,16 @@ export class UtilsDocument {
       return syncResponse;
     } else {
       const listeners = new Map<string, ValueReader<FoundryDocument>>();
-      for (const uuid of permissionChecksByUuid.keys()) {
+      for (const uuid of allUuids) {
         if (uuid != null) {
-          listeners.set(uuid, DocumentListener.listenUuid(uuid));
+          // Also listen to changes on the parent, since permissions are managed on parent levels
+          const uuidParts = uuid.split('.');
+          while (uuidParts.length) {
+            let partialUuid = uuidParts.join('.');
+            listeners.set(partialUuid, DocumentListener.listenUuid(partialUuid));
+            uuidParts.pop();
+            uuidParts.pop();
+          }
         }
       }
       return ValueReader.all(Array.from(listeners.values())).switchMap(documentArray => {
