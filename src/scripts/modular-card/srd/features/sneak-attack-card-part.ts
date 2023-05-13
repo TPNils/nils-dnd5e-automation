@@ -1,4 +1,4 @@
-import { RoundData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/foundry.js/clientDocuments/combat";
+import type { RoundData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/client/data/documents/combat";
 import { IAfterDmlContext, IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
 import { DocumentListener } from "../../../lib/db/document-listener";
 import { UtilsDocument } from "../../../lib/db/utils-document";

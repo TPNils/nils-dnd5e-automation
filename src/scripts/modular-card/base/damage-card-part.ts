@@ -121,7 +121,7 @@ function getTargetCache(cache: DamageCardData, selectionId: string): TargetCache
 }
 
 
-function isItem(item: any): boolean {
+function isItem(item: any): item is MyItem {
   return item instanceof Item;
 }
 
