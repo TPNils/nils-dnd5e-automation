@@ -922,7 +922,9 @@ export class UtilsDocument {
     } else {
       const listeners = new Map<string, ValueReader<FoundryDocument>>();
       for (const uuid of permissionChecksByUuid.keys()) {
-        listeners.set(uuid, DocumentListener.listenUuid(uuid));
+        if (uuid != null) {
+          listeners.set(uuid, DocumentListener.listenUuid(uuid));
+        }
       }
       return ValueReader.all(Array.from(listeners.values())).switchMap(documentArray => {
         const docMap = new Map<string, FoundryDocument>();
@@ -930,7 +932,6 @@ export class UtilsDocument {
           docMap.set(document.uuid, document);
         }
         const asyncResponse: ValueReader<PermissionResponse>[] = [];
-        
         for (let [uuid, document] of docMap.entries()) {
           for (const permissionCheck of permissionChecksByUuid.get(uuid)) {
             const handler = UtilsDocument.permissionChecks[permissionCheck.permission.toUpperCase()];
@@ -944,14 +945,16 @@ export class UtilsDocument {
               }
             }));
           }
-          return ValueReader.all(asyncResponse);
         }
+        return ValueReader.all(asyncResponse);
       });
     }
   }
   //#endregion
 
 }
+
+globalThis.UtilsDocument = UtilsDocument;
 
 interface BulkEntry {
   uuid: string;
