@@ -7,6 +7,7 @@ import { Nd5aSettingsFormApplication, SettingsComponent } from "./settings-compo
 import { SettingsItemComponent } from "./settings-item-component";
 
 const refreshMessages = () => {
+  // TODO refresh will not longer be needed when all components are adaptive
   for (const message of game.messages.contents) {
     if (ModularCard.getCardPartDatas(message) != null) {
       ui.chat.updateMessage(message);
