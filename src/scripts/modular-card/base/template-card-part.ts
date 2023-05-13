@@ -62,7 +62,7 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
   private target: TemplateCardData['calc$']['target'];
   private async setData(part: TemplateCardData, hasPermission: boolean) {
     if (part) {
-      this.hasPermission = this.hasPermission;
+      this.hasPermission = hasPermission;
       this.target = part.calc$.target;
     } else {
       this.hasPermission = false;

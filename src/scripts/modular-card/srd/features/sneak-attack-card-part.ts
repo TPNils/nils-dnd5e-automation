@@ -290,7 +290,7 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
         permission: `${staticValues.code}ReadDamage`,
         user: game.user,
       }
-    ]);
+    ]).listenFirst();
     if (!canSeeSneak) {
       return null;
     }
