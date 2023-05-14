@@ -512,7 +512,6 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   
   private onFoundryAfterCreateHook(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
     const promise = this.onFoundryAfterCreate(document, options, userId);
-    UtilsDocument.addDmlEventPromise(options, promise);
     return promise;
   }
   private async onFoundryAfterCreate(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
@@ -604,7 +603,6 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   
   private onFoundryAfterUpdateHook(document: T & {constructor: new (...args: any[]) => T}, change: any, options: DmlOptions, userId: string): Promise<void> {
     const promise = this.onFoundryAfterUpdate(document, change, options, userId);
-    UtilsDocument.addDmlEventPromise(options, promise);
     return promise;
   }
   private async onFoundryAfterUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: DmlOptions, userId: string): Promise<void> {
@@ -733,7 +731,6 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   private onFoundryAfterDeleteHook(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {
     const promise = this.onFoundryAfterDelete(document, options, userId);
-    UtilsDocument.addDmlEventPromise(options, promise);
     return promise;
   }
   private async onFoundryAfterDelete(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): Promise<void> {

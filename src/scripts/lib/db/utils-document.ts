@@ -2,6 +2,7 @@ import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
+import { UtilsLog } from "../../utils/utils-log";
 import { DocumentListener } from "./document-listener";
 
 export type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
@@ -134,21 +135,6 @@ interface DmlUpdateRequest {
   data: any;
 };
 
-const dmlEventPromisesByUuid = new Map<string, Promise<any>[]>();
-/**
- * @param options 
- * @returns A Promise which will complete when all async dmls are done
- */
-function getDmlEventPromise(options: any): Promise<void> {
-  const uuid: string = options?.[staticValues.moduleName]?.dmlUuid;
-  if (typeof uuid !== 'string' || !dmlEventPromisesByUuid.has(uuid)) {
-    return Promise.resolve();
-  }
-  const promises = dmlEventPromisesByUuid.get(uuid);
-  dmlEventPromisesByUuid.delete(uuid);
-  return Promise.all(promises).then();
-}
-
 /**
  * This prevents updating the same record at the same time, but only for the local client, not for others
  */
@@ -245,7 +231,6 @@ class UpdateQueue {
                 promises.push(Promise.resolve(parentDocument).then(async doc => {
                   const options: any = {[staticValues.moduleName]: {dmlUuid: crypto.randomUUID()}};
                   const returnValue = doc.updateEmbeddedDocuments(embededDocumentName, embededByDocumentName.get(embededDocumentName));
-                  await getDmlEventPromise(options);
                   return returnValue;
                 }));
               }
@@ -254,7 +239,6 @@ class UpdateQueue {
             if (rootRows.length > 0) {
               const options: any = {[staticValues.moduleName]: {dmlUuid: crypto.randomUUID()}};
               promises.push(documentClass.updateDocuments(rootRows, options).then(async returnValue => {
-                await getDmlEventPromise(options);
                 return returnValue;
               }));
             }
@@ -639,25 +623,6 @@ export class UtilsDocument {
   //#endregion
 
   //#region dml
-  /**
-   * Foundry dmls do not support async functions. If you use a promise/async function in a trigger
-   * foundry will not wait on it to complete.
-   * 
-   * Pass any promises that should be waited for to this function.
-   * 
-   * @param options the options passed with the dml and present in dml hooks
-   * @param promise The promise that needs to be awaited to consider them DML complete
-   */
-  public static addDmlEventPromise(options: any, promise: Promise<any>): void {
-    const uuid: string = options?.[staticValues.moduleName]?.dmlUuid;
-    if (typeof uuid !== 'string') {
-      return;
-    }
-    if (!dmlEventPromisesByUuid.has(uuid)) {
-      dmlEventPromisesByUuid.set(uuid, []);
-    }
-    dmlEventPromisesByUuid.get(uuid).push(promise);
-  }
 
   public static async bulkCreate(inputs: Iterable<FoundryDocument>): Promise<FoundryDocument[]> {
     const createsPerContext = UtilsDocument.groupDocumentsByContext(Array.from(inputs));
@@ -678,7 +643,6 @@ export class UtilsDocument {
         // Await per dml, otherwise there is a bug where it doesn't always come through to the server (it looks fine for the client)
         // I would guess this would be caused since it would update the same parent document
         await promise;
-        await getDmlEventPromise(options);
       }
     }
 
@@ -728,7 +692,6 @@ export class UtilsDocument {
         // Await per dml, otherwise there is a bug where it doesn't always come through to the server (it looks fine for the client)
         // I would guess this would be caused since it would update the same parent document
         await promise;
-        await getDmlEventPromise(options);
       }
     }
 
