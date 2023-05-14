@@ -6,6 +6,7 @@ import { VirtualFragmentNode } from "./virtual-fragment-node";
 import { StoredEventCallback, VirtualAttributeNode, VirtualChildNode, VirtualEventNode, VirtualNode, VirtualParentNode } from "./virtual-node";
 import { VirtualTextNode } from "./virtual-text-node";
 
+const domEscapeCharactersByCode = new Map<string, string>();
 type DomAction = {
 
 } & ({
@@ -356,9 +357,21 @@ export class VirtualNodeRenderer {
               case 'nodeValue': {
                 // domParser.parseFromString removes the start whitespaces
                 const whitespacePrefix = /^ */.exec(item.value);
-                const escaped = item.value.replace(/&/, '&amp').replace(/</, '&lt').replace(/>/, '&gt');
-                const unescapedHtml = domParser.parseFromString(escaped, 'text/html').documentElement.textContent;
+                const escaped = item.value.replace(/&/, '&amp').replace(/</, '&lt;').replace(/>/, '&gt;');
+                const unescapedHtml = item.value.replace(/&(#[0-9]+|[a-z]+);/ig, (fullMatch, group1: string) => {
+                  if (group1.startsWith('#')) {
+                    return String.fromCharCode(Number.parseInt(group1.substring(1)));
+                  }
+
+                  if (!domEscapeCharactersByCode.has(group1)) {
+                    domEscapeCharactersByCode.set(group1, domParser.parseFromString(fullMatch, 'text/html').documentElement.textContent);
+                  }
+                  return domEscapeCharactersByCode.get(group1);
+                });
                 item.node.nodeValue = whitespacePrefix + unescapedHtml;
+                if (item.value.includes('&lt;')) {
+                  UtilsLog.debug({value: item.value, escaped, unescapedHtml})
+                }
                 break;
               }
               case 'removeNode': {
