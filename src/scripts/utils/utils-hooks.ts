@@ -1,6 +1,5 @@
 import { RunOnce } from "../lib/decorator/run-once";
 import { UtilsFoundry, Version } from "./utils-foundry";
-import { UtilsLog } from "./utils-log";
 
 type HookResolve<T = void> = (value: T | PromiseLike<T>) => void;
 
@@ -89,12 +88,6 @@ export class UtilsHooks {
     Hooks.once('setup', setupResolve);
     Hooks.once('ready', readyResolve);
     Hooks.once('init', chatRenderedResolve);
-
-    init.then(() => UtilsLog.debug('init'))
-    i18nInit.then(() => UtilsLog.debug('i18nInit', deepClone(game.i18n)))
-    setup.then(() => UtilsLog.debug('setup'))
-    ready.then(() => UtilsLog.debug('ready'))
-    chatRendered.then(() => UtilsLog.debug('chatRendered'))
   }
 
 }
