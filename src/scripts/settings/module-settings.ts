@@ -8,15 +8,6 @@ import { MyActor } from "../types/fixed-types";
 import { Nd5aSettingsFormApplication, SettingsComponent } from "./settings-component";
 import { SettingsItemComponent } from "./settings-item-component";
 
-const refreshMessages = () => {
-  // TODO refresh will not longer be needed when all components are adaptive
-  for (const message of game.messages.contents) {
-    if (ModularCard.getCardPartDatas(message) != null) {
-      ui.chat.updateMessage(message);
-    }
-  }
-};
-
 const partialVisibilitySetting: ClientSettings.PartialSettingConfig<string> = {
   hint: `
     <b>All details</b>: Nothing is hidden, all is visible to everyone.<br/>
@@ -34,7 +25,6 @@ const partialVisibilitySetting: ClientSettings.PartialSettingConfig<string> = {
     playerOrPermission: 'Player or permission',
   },
   default: 'playerOrPermission',
-  onChange: refreshMessages,
 };
 
 const partialHidingRollSetting: ClientSettings.PartialSettingConfig<string> = {
@@ -50,7 +40,6 @@ const partialHidingRollSetting: ClientSettings.PartialSettingConfig<string> = {
     total: 'Show total',
   },
   default: 'total',
-  onChange: refreshMessages,
 };
 
 export class ModuleSettings {
