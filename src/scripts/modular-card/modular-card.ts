@@ -25,7 +25,7 @@ interface ModularCardPartDataLegacy<T = any> {
 export type ModularCardDataLegacy = ModularCardPartDataLegacy[];
 type ModularCardData = {[partType: string]: any};
 interface ModularCardMeta {
-  created: {
+  created?: {
     actorUuid?: string;
     tokenUuid?: string;
     itemUuid?: string;
@@ -49,10 +49,25 @@ function getExtendedTypes(inputHandler: ModularCardPart | string): string[] {
 
 export class ModularCardInstance {
   private data: ModularCardData = {};
-  private meta: ModularCardMeta;
+  private meta: ModularCardMeta = {};
 
-  constructor({meta}: {meta?: ModularCardMeta} = {}) {
-    this.meta = meta;
+  constructor(message?: ChatMessage) {
+    if (!message) {
+      return;
+    }
+    
+    // It's important that we use the same data & meta instance
+    // So changes made within this instance are also reflected on the chat message
+    this.data = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
+    this.meta = message.getFlag(staticValues.moduleName, 'modularCardDataMeta') as any;
+
+    for (const key of Object.keys(this.data)) {
+      if (!Number.isNaN(Number.parseInt(key))) {
+        // Legacy format => parse to new format
+        this.data[this.data[key].type] = this.data[key].data;
+        delete this.data[key];
+      }
+    }
   }
 
   public hasType<T>(partType: ModularCardPart<T> | string): boolean {
@@ -104,13 +119,11 @@ export class ModularCardInstance {
   public setTypeData<T>(partType: string, data: any | null): void;
   public setTypeData<T>(partType: ModularCardPart<T>, data: T | null): void;
   public setTypeData<T>(partType: ModularCardPart<T> | string, data: any | null): void {
-    // Reset all types, both itself and every type it extends
-    for (const type of getExtendedTypes(partType)) {
-      delete this.data[type];
-    }
-    if (data != null) {
-      this.data[this.getTypeName(partType)] = data;
-    }
+    mergeObject(this.data[this.getTypeName(partType)], data, {inplace: true, recursive: false});
+  }
+  
+  public setMeta(meta: ModularCardMeta): void {
+    mergeObject(this.meta, meta, {inplace: true, recursive: false});
   }
 
   public getItemUuid(): string {
@@ -197,6 +210,7 @@ export class ModularCardInstance {
   public deepClone(): ModularCardInstance {
     const clone = new ModularCardInstance();
     clone.data = deepClone(this.data);
+    clone.meta = deepClone(this.meta);
     return clone;
   }
 }
@@ -702,13 +716,14 @@ export class ModularCard {
       }
     }
 
-    const response = new ModularCardInstance({meta: {
+    const response = new ModularCardInstance();
+    response.setMeta({
       created: {
         actorUuid: data.actor?.uuid,
         tokenUuid: data.token?.uuid,
         itemUuid: data.item?.uuid,
       }
-    }});
+    });
     for (const part of await Promise.all(parts)) {
       if (part.data != null) {
         response.setTypeData(part.cardPart, part.data);
@@ -845,21 +860,8 @@ export class ModularCard {
     }
 
     const flagData: any = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
-    if (typeof flagData === 'object' && !Array.isArray(flagData)) {
-      const flagMetaData: any = message.getFlag(staticValues.moduleName, 'modularCardDataMeta') as any;
-      const data = new ModularCardInstance(flagMetaData);
-
-      const keys = Object.keys(flagData);
-      for (const key of keys) {
-        // Legacy format => parse to new format
-        if (!Number.isNaN(Number.parseInt(key))) {
-          data.setTypeData(flagData[key].type, flagData[key].data);
-        } else {
-          data.setTypeData(key, flagData[key]);
-        }
-      }
-
-      return data;
+    if (typeof message.getFlag(staticValues.moduleName, 'modularCardData') === 'object' && !Array.isArray(flagData)) {
+      return new ModularCardInstance(message);
     } else if (flagData != null) {
       UtilsLog.warn('Unexpected modularCardData found for message', message.uuid, 'flagData:', flagData);
       return null;
