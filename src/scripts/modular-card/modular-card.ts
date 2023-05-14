@@ -847,7 +847,7 @@ export class ModularCard {
     const flagData: any = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
     if (typeof flagData === 'object' && !Array.isArray(flagData)) {
       const flagMetaData: any = message.getFlag(staticValues.moduleName, 'modularCardDataMeta') as any;
-      const data = new ModularCardInstance();
+      const data = new ModularCardInstance(flagMetaData);
 
       const keys = Object.keys(flagData);
       for (const key of keys) {
