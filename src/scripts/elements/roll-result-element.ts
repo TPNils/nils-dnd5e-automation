@@ -3,14 +3,14 @@ import { Attribute, BindEvent, Component } from "../lib/render-engine/component"
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { staticValues } from "../static-values";
 
-const supprtedDisplayTypes = ['hidden', 'total', 'result'] as const;
+const supprtedDisplayTypes = ['rolled', 'total', 'result'] as const;
 type DisplayType = typeof supprtedDisplayTypes[number];
 const defaultDisplayType: DisplayType = 'result';
 @Component({
   tag: RollResultElement.selector(),
   html: /*html*/`
   <div class="wrapper{{this.isOpen ? ' open' : ''}}">
-    <div *if="this.displayType === 'hidden'" class="boxed">
+    <div *if="this.displayType === 'rolled'" class="boxed">
       &lt;{{this.i18nHidden}}&gt;
     </div>
     <div *if="this.displayType === 'total'" class="roll-total boxed">

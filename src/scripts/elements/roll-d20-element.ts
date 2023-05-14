@@ -22,7 +22,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
   tag: RollD20Element.selector(),
   html: /*html*/`
     <div class="roll-wrapper">
-      <nd5a-roll-result *if="this.roll?.total != null"
+      <nd5a-roll-result *if="this.roll?.total != null && (this.readHiddenDisplayType !== 'hidden' || this.hasInteractPermission)"
         [data-roll]="this.roll"
         [data-override-formula]="this.overrideFormula"
         [data-highlight-total-on-firstTerm]="this.highlightTotalOnFirstTerm"
@@ -38,7 +38,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
         </div>
       </nd5a-roll-result>
 
-      <div class="bonus-container" *if="this.roll?.total == null">
+      <div class="bonus-container" *if="this.roll?.total == null || (this.readHiddenDisplayType === 'hidden' && !this.hasInteractPermission)">
         <button class="roll-button" [disabled]="!this.hasInteractPermission" (click)="this.onRollClick($event)">
           <slot name="label">
             <div class="label-text" *if="this.label && this.rollMode === 'normal'">
@@ -270,7 +270,7 @@ export class RollD20Element implements OnInit {
   }
   
   @Attribute({name: 'data-read-hidden-display-type', dataType: 'string'})
-  public readHiddenDisplayType: RollResultElement['displayType'];
+  public readHiddenDisplayType: RollResultElement['displayType'] | 'hidden';
 
   @Attribute({name: 'data-override-max-roll', dataType: 'number'})
   public overrideMaxRoll: string;
@@ -296,7 +296,7 @@ export class RollD20Element implements OnInit {
     if (this.hasReadPermission && this.readHiddenDisplayType !== 'result') {
       this.rollModeLabel = game.i18n.localize(`DND5E.${this.rollMode.capitalize()}`);
     } else {
-      if (this._roll?.total == null) {
+      if (this._roll?.total == null || this.readHiddenDisplayType === 'hidden') {
         this.rollModeLabel = game.i18n.localize(`DND5E.Normal`);
       } else {
         this.rollModeLabel = `<${game.i18n.localize(`Hidden`)}>`;

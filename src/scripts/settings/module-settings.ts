@@ -30,14 +30,16 @@ const partialVisibilitySetting: ClientSettings.PartialSettingConfig<string> = {
 
 const partialHidingRollSetting: ClientSettings.PartialSettingConfig<string> = {
   hint: `
-    <b>Hidden</b>: Nothing is shown.<br/>
-    <b>Show total</b>: Only the total is shown, the roll result and bonuses are hidden.<br/>
+    <b>Hidden</b>: The player does not know if a roll happend.<br/>
+    <b>Rolled</b>: The player knows if the GM has rolled or not, but not what was rolled.<br/>
+    <b>Show total</b>: The player can see the total result, the individual rolls, bonuses and critical hits/misses are hidden.<br/>
   `,
   scope: 'world',
   config: false,
   type: String,
   choices: {
     hidden: 'Hidden',
+    rolled: 'Rolled',
     total: 'Show total',
   },
   default: 'total',
