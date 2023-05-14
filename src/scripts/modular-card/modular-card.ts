@@ -10,6 +10,7 @@ import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem, SpellData } from "../types/fixed-types";
+import { UtilsHooks } from "../utils/utils-hooks";
 import { UtilsLog } from "../utils/utils-log";
 import { ActiveEffectCardPart, AttackCardData, AttackCardPart, CheckCardData, CheckCardPart, DamageCardData, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardData, ResourceCardPart, SpellLevelCardData, SpellLevelCardPart, TargetCardData, TargetCardPart, TemplateCardData, TemplateCardPart } from "./base/index";
 import { ItemUtils } from "./item-utils";
@@ -765,7 +766,7 @@ export class ModularCard {
   public static registerHooks(): void {
     // Override render behaviour
     DmlTrigger.registerTrigger(new ChatMessageTrigger());
-    Hooks.on('setup', () => {
+    UtilsHooks.setup().then(() => {
       libWrapper.register(staticValues.moduleName, 'ChatMessage.prototype.getHTML', getHTML, 'WRAPPER');
       libWrapper.register(staticValues.moduleName, 'ChatLog.prototype.updateMessage', updateMessage, 'MIXED');
     });

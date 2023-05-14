@@ -1,6 +1,7 @@
 import { MeasuredTemplateData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 import { RunOnce } from "../lib/decorator/run-once.js";
 import { MyItemData } from "../types/fixed-types.js";
+import { UtilsHooks } from "../utils/utils-hooks.js";
 import { TemplateDetails, UtilsTemplate } from "../utils/utils-template.js";
 
 /**
@@ -10,7 +11,7 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
 
   @RunOnce()
   public static registerHooks() {
-    Hooks.on('init', () => {
+    UtilsHooks.init().then(() => {
       // TODO Look into working nicely with the module df-templates
       CONFIG.MeasuredTemplate.objectClass = MyAbilityTemplate;
     })

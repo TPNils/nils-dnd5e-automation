@@ -1,10 +1,11 @@
 import { staticValues } from "./static-values";
+import { UtilsHooks } from "./utils/utils-hooks";
 
 class GlobalHtmlListener {
   private static radioClickedTimeouts = new Map<HTMLInputElement, NodeJS.Timeout>();
 
   public static registerHooks(): void {
-    Hooks.on('ready', () => {
+    UtilsHooks.chatRendered().then(() => {
       // Register that a click happend
       document.addEventListener('click', GlobalHtmlListener.toggleRadioClick);
       // If a change event is fired immidatly after the click, cancel the delayed click toggle

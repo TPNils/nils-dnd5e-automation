@@ -5,6 +5,7 @@ import { ModularCard } from "../modular-card/modular-card";
 import { ValueProvider } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
+import { UtilsHooks } from "../utils/utils-hooks";
 import { Nd5aSettingsFormApplication, SettingsComponent } from "./settings-component";
 import { SettingsItemComponent } from "./settings-item-component";
 
@@ -50,8 +51,8 @@ export class ModuleSettings {
     SettingsComponent.registerHooks();
     ModuleSettings.registerCustomPermissions();
 
-    Hooks.on('init', () => {
-      ModuleSettings.registerSettings();
+    UtilsHooks.i18nInit().then(() => {
+      ModuleSettings.registerSettings()
     });
   }
 

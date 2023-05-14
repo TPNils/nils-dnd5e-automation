@@ -14,7 +14,9 @@ import { ItemSheetHooks } from "./modular-card/item-sheet-hooks";
 import { TokenImgElement } from "./elements/token-img-element";
 import { VirtualNodeParser } from "./lib/render-engine/virtual-dom/virtual-node-parser";
 import { RollDamageElement } from "./elements/roll-damage-element";
+import { UtilsHooks } from "./utils/utils-hooks";
 
+UtilsHooks.registerHooks();
 VirtualNodeParser.init();
 TokenImgElement.registerHooks();
 RollResultElement.registerHooks();

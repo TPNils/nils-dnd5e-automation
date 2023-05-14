@@ -1,6 +1,7 @@
 import { ModularCard } from "../modular-card/modular-card";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
+import { UtilsHooks } from "../utils/utils-hooks";
 
 // Source: https://gitlab.com/foundrynet/dnd5e/-/blob/e0e7ac62469046b0bf51a2fa933b7be34a476b2e/module/item/entity.js#L415
 async function roll(this: MyItem, wrapped: (...args: any) => any, ...args: [{configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean}]) {
@@ -35,7 +36,7 @@ async function displayCard(this: MyItem, wrapped: (...args: any) => any, ...args
 }
 
 export function registerHooks(): void {
-  Hooks.on('setup', () => {
+  UtilsHooks.setup().then(() => {
     libWrapper.register(staticValues.moduleName, 'CONFIG.Item.documentClass.prototype.roll', roll, 'MIXED');
     libWrapper.register(staticValues.moduleName, 'CONFIG.Item.documentClass.prototype.displayCard', displayCard, 'MIXED');
   });

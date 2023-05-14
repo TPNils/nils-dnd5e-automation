@@ -2,6 +2,7 @@ import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { MyItem, MyItemData } from "../types/fixed-types";
+import { UtilsHooks } from "../utils/utils-hooks";
 
 /**
  * Implement formulas for amount og targets
@@ -10,7 +11,7 @@ export class ItemSheetHooks {
   
   @RunOnce()
   public static registerHooks(): void {
-    Hooks.once('init', () => {
+    UtilsHooks.init().then(() => {
       libWrapper.register(staticValues.moduleName, 'CONFIG.Item.documentClass.prototype.prepareDerivedData', ItemSheetHooks.prepareDerivedData, 'WRAPPER');
     })
     Hooks.on('renderItemSheet5e', ItemSheetHooks.renderItemSheet);

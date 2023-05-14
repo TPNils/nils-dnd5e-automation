@@ -4,6 +4,7 @@ import { staticValues } from "../static-values";
 import type { D20RollOptions, MyActor } from "../types/fixed-types";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { UtilsRoll } from "../lib/roll/utils-roll";
+import { UtilsHooks } from "../utils/utils-hooks";
 
 interface CheckMessage {
   chatMessage: ChatMessage;
@@ -204,7 +205,7 @@ async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ..
 
 
 export function registerHooks(): void {
-  Hooks.on('setup', () => {
+  UtilsHooks.setup().then(() => {
     libWrapper.register(staticValues.moduleName, 'CONFIG.Actor.documentClass.prototype.rollSkill', rollSkill, 'MIXED');
     libWrapper.register(staticValues.moduleName, 'CONFIG.Actor.documentClass.prototype.rollAbilityTest', rollAbilityTest, 'MIXED');
     libWrapper.register(staticValues.moduleName, 'CONFIG.Actor.documentClass.prototype.rollAbilitySave', rollAbilitySave, 'MIXED');
