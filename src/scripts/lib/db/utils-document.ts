@@ -50,7 +50,7 @@ export interface PermissionCheckHandler {
   async: ({}: {user: User; document: FoundryDocument;}) => ValueReader<boolean>;
 };
 const defaultPermissionChecks: {[key: string]: PermissionCheckHandler} = {};
-for (const perm of Object.keys(UtilsFoundry.getUserRolls())) {
+for (const perm of Object.keys(UtilsFoundry.getUserRoles())) {
   const syncHandler: PermissionCheckHandler['sync'] = ({document, user}) => {
     let doc = document;
       while (doc != null) {
