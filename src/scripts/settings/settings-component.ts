@@ -16,10 +16,14 @@ interface SettingLayout {
   autoSave: boolean;
 }
 
+// new (game.settings.menus.get('nils-dnd5e-automation.menu').type)().render(true)
 const allTabConfigs: TabLayoutConfig[] = [
   {
     key: 'Visibility',
     groups: [
+      [
+        {key: `${staticValues.moduleName}.forceRollModeItem`, autoSave: true},
+      ],
       [
         {key: `${staticValues.moduleName}.itemNameVisibility`, autoSave: true},
         {key: `${staticValues.moduleName}.itemImageVisibility`, autoSave: true},
@@ -59,7 +63,6 @@ const allTabConfigs: TabLayoutConfig[] = [
   },
 ]
 
-// new (game.settings.menus.get('nils-dnd5e-automation.menu').type)().render(true)
 @Component({
   tag: SettingsComponent.selector(),
   html: /*html*/`

@@ -734,7 +734,13 @@ export class ModularCard {
       }
     };
 
-    if (game.settings.get('core', 'rollMode') === 'gmroll') {
+    let rollMode: string = game.settings.get('core', 'rollMode');
+    const rollModeOverride = game.settings.get(staticValues.moduleName, 'forceRollModeItem') as string;
+    if (rollModeOverride !== 'default') {
+      rollMode = rollModeOverride;
+    }
+
+    if (rollMode === 'gmroll' || rollMode === 'private') {
       chatMessageData.whisper = [game.userId];
       for (const user of game.users.values()) {
         if (user.isGM) {
@@ -742,7 +748,7 @@ export class ModularCard {
         }
       }
     }
-    if (game.settings.get('core', 'rollMode') === 'blindroll') {
+    if (rollMode === 'blindroll' || rollMode === 'blind') {
       chatMessageData.whisper = [];
       chatMessageData.blind = true;
       for (const user of game.users.values()) {
@@ -751,7 +757,7 @@ export class ModularCard {
         }
       }
     }
-    if (game.settings.get('core', 'rollMode') === 'selfroll') {
+    if (rollMode === 'selfroll' || rollMode === 'self') {
       chatMessageData.whisper = [game.userId];
     }
 

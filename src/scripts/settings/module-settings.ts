@@ -1,10 +1,10 @@
 import { DocumentListener } from "../lib/db/document-listener";
 import { PermissionCheckHandler, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
-import { ModularCard } from "../modular-card/modular-card";
 import { ValueProvider } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
+import { UtilsFoundry } from "../utils/utils-foundry";
 import { UtilsHooks } from "../utils/utils-hooks";
 import { Nd5aSettingsFormApplication, SettingsComponent } from "./settings-component";
 import { SettingsItemComponent } from "./settings-item-component";
@@ -42,6 +42,31 @@ const partialHidingRollSetting: ClientSettings.PartialSettingConfig<string> = {
   },
   default: 'total',
 };
+
+function partialRollModeSetting(): ClientSettings.PartialSettingConfig<string> {
+  const hintLines = [
+    `<b>Default</b>: Use the same default roll mode for all chat messages.`
+  ];
+  const choices = {
+    default: game.i18n.localize(`CHAT.RollDefault`),
+  }
+
+  const rollModes = UtilsFoundry.getDiceRoleModes();
+  for (const key in rollModes) {
+    const i18n = game.i18n.localize(`CHAT.Roll${key.toLowerCase().capitalize()}`);
+    choices[key.toLowerCase()] = i18n;
+    hintLines.push(`<b>${i18n}</b>: Force this kind of message as a ${i18n}`);
+  }
+
+  return {
+    hint: hintLines.join('<br>'),
+    scope: 'world',
+    config: false,
+    type: String,
+    choices: choices,
+    default: 'default',
+  }
+}
 
 export class ModuleSettings {
 
@@ -117,6 +142,10 @@ export class ModuleSettings {
         <b>Player</b>: You can only see the DC of other players, regardless of permissions.<br/>
         <b>Player or permission</b>: Match 'Permission' or 'Player'.<br/>
       `,
+    });
+    game.settings.register<string, string, string>(staticValues.moduleName, 'forceRollModeItem', {
+      ...partialRollModeSetting(),
+      name: 'Force roll mode for item usage',
     });
     for (const variant of ['gm', 'player']) {
       const scope = variant === 'player' ? 'client' : 'world';
