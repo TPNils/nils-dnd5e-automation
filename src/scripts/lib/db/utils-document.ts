@@ -629,12 +629,15 @@ export class UtilsDocument {
 
     const promises: Promise<FoundryDocument[]>[] = [];
     for (const documentContext of createsPerContext) {
-      const options: any = {[staticValues.moduleName]: {
-        dmlUuid: crypto.randomUUID(),
+      const options: any = {
+        [staticValues.moduleName]: {
+          dmlUuid: crypto.randomUUID(),
+        },
         parent: documentContext.parent,
         pack: documentContext.pack,
-      }};
+      };
       const promise = documentContext.documentClass.createDocuments.call(
+        documentContext.documentClass,
         documentContext.documents.map(doc => doc.data),
         options,
       );
@@ -676,11 +679,13 @@ export class UtilsDocument {
 
     const promises: Promise<any>[] = [];
     for (const documentContext of deletesPerContext) {
-      const options: any = {[staticValues.moduleName]: {
-        dmlUuid: crypto.randomUUID(),
+      const options: any = {
+        [staticValues.moduleName]: {
+          dmlUuid: crypto.randomUUID(),
+        },
         parent: documentContext.parent,
         pack: documentContext.pack,
-      }};
+      };
       const promise = documentContext.documentClass.deleteDocuments.call(
         documentContext.documentClass,
         documentContext.documents.map(doc => doc.id),
