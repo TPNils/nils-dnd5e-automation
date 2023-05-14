@@ -46,7 +46,7 @@ const allTabConfigs: TabLayoutConfig[] = [
     ],
   },
   {
-    key: 'AutoRolling',
+    key: 'Automation',
     groups: [
       [
         {key: `${staticValues.moduleName}.gmAutorollAttack`, autoSave: true},
@@ -58,6 +58,9 @@ const allTabConfigs: TabLayoutConfig[] = [
       ],
       [
         {key: `${staticValues.moduleName}.captureManualRolls`, autoSave: true},
+      ],
+      [
+        {key: `${staticValues.moduleName}.autoConsumeResources`, autoSave: true},
       ],
     ],
   },
@@ -116,7 +119,7 @@ const allTabConfigs: TabLayoutConfig[] = [
     }
 
     .wrapper:not([selected-tab="Visibility"]) .Visibility,
-    .wrapper:not([selected-tab="AutoRolling"]) .AutoRolling {
+    .wrapper:not([selected-tab="Automation"]) .Automation {
       display: none;
     }
   `

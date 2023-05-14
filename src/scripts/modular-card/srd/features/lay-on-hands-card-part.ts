@@ -270,7 +270,6 @@ class SrdLayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<SrdLay
       const resourceAmount = healAmount * amountOfTargets;
       for (const resource of newRow.allParts.getTypeData<ResourceCardData>(ResourceCardPart.instance).consumeResources) {
         if (resource.calc$.uuid.includes('Item.') && resource.calc$.path === 'data.uses.value') {
-          resource.calc$.autoconsumeAfter = 'never';
           resource.calc$.calcChange = resourceAmount;
           break;
         }

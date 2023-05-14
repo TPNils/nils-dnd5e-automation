@@ -4,6 +4,7 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
+import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
@@ -24,7 +25,6 @@ export interface ResourceCardData {
       path: string;
       calcChange: number;
       appliedChange: number;
-      autoconsumeAfter?: AutoConsumeAfter;
     }
   }[];
   calc$: {
@@ -52,25 +52,23 @@ interface MessageState {
 }
 
 async function applyResourceConsumption({messageDataById, resources}: ApplyResourceConsumptionRequest): Promise<void> {
+  UtilsLog.debug('applyResourceConsumption', deepClone(resources))
   const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
   const applyResources: ApplyResourceConsumptionRequest['resources'] = [];
   {
     const requestUuids = new Set<string>();
     for (const resource of resources) {
+      UtilsLog.debug('resource', resource, messageDataById.get(resource.messageId));
       let tryToApply = false;
       if (resource.resource.consumeResourcesAction === 'undo') {
         tryToApply = resource.resource.calc$.appliedChange !== 0;
       } else if (resource.resource.consumeResourcesAction === 'manual-apply') {
         tryToApply = resource.resource.calc$.appliedChange !== resource.resource.calc$.calcChange;
       } else {
-        switch (resource.resource.calc$.autoconsumeAfter) {
-          case 'init': {
+        const states = messageDataById.get(resource.messageId);
+        for (const state of states.hasStates) {
+          if (states.completedStates.has(state)) {
             tryToApply = true;
-            break;
-          }
-          default: {
-            tryToApply = messageDataById.get(resource.messageId).completedStates.has(resource.resource.calc$.autoconsumeAfter);
-            break;
           }
         }
       }
@@ -90,6 +88,7 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
     return;
   }
 
+  UtilsLog.debug('applyResources', applyResources)
   const updatesByUuid = new Map<string, any>();
   for (const resource of applyResources) {
     if (!updatesByUuid.has(resource.resource.calc$.uuid)) {
@@ -102,13 +101,30 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
     } else if (resource.resource.consumeResourcesAction === 'manual-apply') {
       shouldApply = true;
     } else {
-      switch (resource.resource.calc$.autoconsumeAfter) {
-        case 'init': {
+      const autoBehaviour = game.settings.get(staticValues.moduleName, 'autoConsumeResources') as string;
+      switch (autoBehaviour) {
+        case 'detection': {
+          const states = messageDataById.get(resource.messageId);
+          UtilsLog.debug(states);
+          if (states.hasStates.size > 0) {
+            // No states detected, probably a very limited item => just auto consume
+              shouldApply = true;
+          } else {
+            for (const state of states.hasStates) {
+              if (states.completedStates.has(state)) {
+                shouldApply = true;
+              }
+            }
+          }
+          break;
+        }
+        case 'always': {
           shouldApply = true;
           break;
         }
+        case 'never':
         default: {
-          shouldApply = messageDataById.get(resource.messageId).completedStates.has(resource.resource.calc$.autoconsumeAfter);
+          shouldApply = false;
           break;
         }
       }
@@ -579,7 +595,6 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
   public registerHooks(): void {
     ModularCard.registerModularCardTrigger(this, new ResourceTrigger());
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
-    DmlTrigger.registerTrigger(new ChatMessageCardTrigger());
   }
 
   public getType(): string {
@@ -624,7 +639,7 @@ class ResourceTrigger implements ITrigger<ModularCardTriggerData<ResourceCardDat
         const changed = consumeResource.consumeResourcesAction !== (oldResouce?.consumeResourcesAction || 'undo') ||
           consumeResource.calc$.calcChange != (oldResouce?.calc$.calcChange || 0);
 
-        if (changed) {
+        if (changed || consumeResource.consumeResourcesAction == 'auto') {
           switch (consumeResource.consumeResourcesAction) {
             case 'auto': {
               applyRequest.resources.push({
@@ -677,47 +692,4 @@ class ResourceTrigger implements ITrigger<ModularCardTriggerData<ResourceCardDat
   }
   //#endregion
 
-}
-
-class ChatMessageCardTrigger implements IDmlTrigger<ChatMessage> {
-  get type(): typeof ChatMessage {
-    return ChatMessage;
-  }
-  
-  //#region beforeUpsert
-  public beforeUpsert(context: IDmlContext<ChatMessage>): boolean | void {
-    this.calcAutoApply(context);
-  }
-
-  private calcAutoApply(context: IDmlContext<ChatMessage>): void {
-    for (const {newRow} of context.rows) {
-      const allParts = ModularCard.getCardPartDatas(newRow);
-      if (!allParts) {
-        continue;
-      }
-
-      if (allParts.hasType(ResourceCardPart.instance)) {
-        const state = getMessageState(allParts);
-        const resource = allParts.getTypeData<ResourceCardData>(ResourceCardPart.instance);
-        for (const consumeResource of resource.consumeResources) {
-          if (consumeResource.calc$.autoconsumeAfter == null) {
-            if (state.hasStates.has('attack')) {
-              consumeResource.calc$.autoconsumeAfter = 'attack';
-            } else if (state.hasStates.has('damage')) {
-              consumeResource.calc$.autoconsumeAfter = 'damage';
-            } else if (state.hasStates.has('template-placed')) {
-              consumeResource.calc$.autoconsumeAfter = 'template-placed';
-            } else if (state.hasStates.has('check')) {
-              consumeResource.calc$.autoconsumeAfter = 'check';
-            } else {
-              consumeResource.calc$.autoconsumeAfter = 'init';
-            }
-          }
-        
-        }
-      }
-    }
-  }
-  //#endregion
-  
 }

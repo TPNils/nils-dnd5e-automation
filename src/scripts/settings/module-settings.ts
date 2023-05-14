@@ -145,6 +145,33 @@ export class ModuleSettings {
         <b>Player or permission</b>: Match 'Permission' or 'Player'.<br/>
       `,
     });
+    game.settings.register<string, string, string>(staticValues.moduleName, 'autoConsumeResources', {
+      name: 'Auto consume resouces (spell slots, item usage, ...)',
+      scope: 'client',
+      config: false,
+      type: String,
+      choices: {
+        never: 'Never',
+        detection: 'Detection',
+        always: 'Always',
+      },
+      default: 'detection',
+      hint: `
+        <b>Never</b>: Will need to manually click. Not recomended for those who forget a lot.<br>
+        <b>Always</b>: Resouces will be used when the on item use.<br/>
+        <b>Detection</b>: Auto consume after an interaction. Possible interactions:
+          <ul>
+            <li>Attack rolled</li>
+            <li>Damage rolled</li>
+            <li>Saving throw rolled</li>
+            <li>Template placed rolled</li>
+            <li>If the item has non of these, use the same rule as "Always"</li>
+          </ul><br/>
+        <p>
+          <b>NOTE</b>: You can easly undo the usage and in my experience people will remember the undo button faster than the apply button for manual actions.
+        </p>
+      `,
+    });
     game.settings.register<string, string, string>(staticValues.moduleName, 'forceRollModeItem', {
       ...partialRollModeSetting(),
       name: 'Force roll mode for item usage',
