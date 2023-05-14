@@ -9,6 +9,7 @@ import { CheckCardData, CheckCardPart } from "./check-card-part";
 import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
 import { ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 import { StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
+import { UtilsLog } from "../../utils/utils-log";
 
 interface TargetCache {
   actorUuid$: string;
@@ -128,15 +129,19 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
         }
       }
 
-      for (const cache of attack.targetCaches$) {
-        if (cache.resultType$ == null || cache.resultType$ === 'critical-mis' || cache.resultType$ === 'mis') {
-          shouldApplyToActors.set(cache.actorUuid$, false);
+      if (attack) {
+        for (const cache of attack.targetCaches$) {
+          if (cache.resultType$ == null || cache.resultType$ === 'critical-mis' || cache.resultType$ === 'mis') {
+            shouldApplyToActors.set(cache.actorUuid$, false);
+          }
         }
       }
       
-      for (const cache of check.targetCaches$) {
-        if (cache.resultType$ === 'pass') {
-          shouldApplyToActors.set(cache.actorUuid$, false);
+      if (check) {
+        for (const cache of check.targetCaches$) {
+          if (cache.resultType$ === 'pass') {
+            shouldApplyToActors.set(cache.actorUuid$, false);
+          }
         }
       }
     }
@@ -228,7 +233,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
     }
     for (const effectDocument of await UtilsDocument.bulkCreate(createActiveEffects)) {
       const origin = (effectDocument.data.flags[staticValues.moduleName] as any).origin;
-      createdUuidsByOriginKey.set(`${origin.messageId}/${origin.partId}/${effectDocument.parent.uuid}/${origin.activeEffectIndex}`, effectDocument.uuid);
+      createdUuidsByOriginKey.set(`${origin.messageId}/${effectDocument.parent.uuid}/${origin.activeEffectIndex}`, effectDocument.uuid);
     }
     
     for (const targetEvent of targetEvents) {
