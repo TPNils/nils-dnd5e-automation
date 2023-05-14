@@ -66,6 +66,7 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
         for (const state of states.hasStates) {
           if (states.completedStates.has(state)) {
             tryToApply = true;
+            break;
           }
         }
       }
@@ -108,6 +109,7 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
             for (const state of states.hasStates) {
               if (states.completedStates.has(state)) {
                 shouldApply = true;
+                break;
               }
             }
           }

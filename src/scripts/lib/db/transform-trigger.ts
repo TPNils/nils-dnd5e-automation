@@ -1,11 +1,14 @@
+import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
-import { IDmlContext, ITrigger, IAfterDmlContext, IDmlContextRow } from "./dml-trigger";
+import { TimeoutError, UtilsPromise } from "../utils/utils-promise";
+import { IDmlContext, ITrigger, IAfterDmlContext, IDmlContextRow, maxTriggerDurationMs as maxTriggerDmlDurationMs } from "./dml-trigger";
 
 interface TransformResult<T extends IDmlContext<D>, D> {
   create: T;
   update: T;
   delete: T;
 };
+const maxTriggerDurationMs = maxTriggerDmlDurationMs * .9;
 export class TransformTrigger<FROM, TO> implements ITrigger<FROM> {
 
   constructor(
@@ -68,21 +71,35 @@ export class TransformTrigger<FROM, TO> implements ITrigger<FROM> {
   private async localAfter<C extends IAfterDmlContext<any>>(context: TransformResult<C, TO>): Promise<void> {
     if (context.create.rows.length > 0) {
       for (const trigger of this.triggers.values()) {
-        if (trigger.create) {
-          await trigger.create(context.create);
-        }
-        if (trigger.upsert) {
-          await trigger.upsert(context.create);
+        for (const key of ['create', 'upsert'] as Array<keyof ITrigger<TO>>) {
+          if (trigger[key]) {
+            try {
+              await UtilsPromise.maxDuration(trigger[key](context.create), maxTriggerDurationMs);
+            } catch (err) {
+              if (err instanceof TimeoutError) {
+                UtilsLog.error(trigger, key, err);
+              } else {
+                throw err;
+              }
+            }
+          }
         }
       }
     }
     if (context.update.rows.length > 0) {
       for (const trigger of this.triggers.values()) {
-        if (trigger.update) {
-          await trigger.update(context.update);
-        }
-        if (trigger.upsert) {
-          await trigger.upsert(context.update);
+        for (const key of ['update', 'upsert'] as Array<keyof ITrigger<TO>>) {
+          if (trigger[key]) {
+            try {
+              await UtilsPromise.maxDuration(trigger[key](context.update), maxTriggerDurationMs);
+            } catch (err) {
+              if (err instanceof TimeoutError) {
+                UtilsLog.error(trigger, key, err);
+              } else {
+                throw err;
+              }
+            }
+          }
         }
       }
     }
@@ -94,28 +111,54 @@ export class TransformTrigger<FROM, TO> implements ITrigger<FROM> {
   private async after<C extends IAfterDmlContext<any>>(context: TransformResult<C, TO>): Promise<void> {
     if (context.create.rows.length > 0) {
       for (const trigger of this.triggers.values()) {
-        if (trigger.afterCreate) {
-          await trigger.afterCreate(context.create);
-        }
-        if (trigger.afterUpsert) {
-          await trigger.afterUpsert(context.create);
+        for (const key of ['afterCreate', 'afterUpsert'] as Array<keyof ITrigger<TO>>) {
+          if (trigger[key]) {
+            try {
+              await UtilsPromise.maxDuration(trigger[key](context.create), maxTriggerDurationMs);
+            } catch (err) {
+              if (err instanceof TimeoutError) {
+                UtilsLog.error(trigger, key, err);
+              } else {
+                throw err;
+              }
+            }
+          }
         }
       }
     }
+    
     if (context.update.rows.length > 0) {
       for (const trigger of this.triggers.values()) {
-        if (trigger.afterUpdate) {
-          await trigger.afterUpdate(context.update);
-        }
-        if (trigger.afterUpsert) {
-          await trigger.afterUpsert(context.update);
+        for (const key of ['afterUpdate', 'afterUpsert'] as Array<keyof ITrigger<TO>>) {
+          if (trigger[key]) {
+            try {
+              await UtilsPromise.maxDuration(trigger[key](context.update), maxTriggerDurationMs);
+            } catch (err) {
+              if (err instanceof TimeoutError) {
+                UtilsLog.error(trigger, key, err);
+              } else {
+                throw err;
+              }
+            }
+          }
         }
       }
     }
+
     if (context.delete.rows.length > 0) {
       for (const trigger of this.triggers.values()) {
-        if (trigger.afterDelete) {
-          await trigger.afterDelete(context.delete);
+        for (const key of ['afterDelete'] as Array<keyof ITrigger<TO>>) {
+          if (trigger[key]) {
+            try {
+              await UtilsPromise.maxDuration(trigger[key](context.delete), maxTriggerDurationMs);
+            } catch (err) {
+              if (err instanceof TimeoutError) {
+                UtilsLog.error(trigger, key, err);
+              } else {
+                throw err;
+              }
+            }
+          }
         }
       }
     }

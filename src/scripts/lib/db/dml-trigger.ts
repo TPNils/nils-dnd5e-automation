@@ -4,6 +4,7 @@ import { buffer } from "../decorator/buffer";
 import { RunOnce } from "../decorator/run-once";
 import { Stoppable } from "../utils/stoppable";
 import { UtilsCompare } from "../utils/utils-compare";
+import { TimeoutError, UtilsPromise } from "../utils/utils-promise";
 import { FoundryDocument, UtilsDocument } from "./utils-document";
 
 const unsupportedAfterDocuments = [
@@ -96,6 +97,40 @@ export interface ITrigger<T> {
 
 export interface IDmlTrigger<T extends foundry.abstract.Document<any, any>> extends ITrigger<T> {
   readonly type: {new(...args: any[]): T, documentName: string};
+}
+
+export const maxTriggerDurationMs = 5000;
+class MinifierHelper implements Required<{[PropertyKey in keyof ITrigger<any>]: PropertyKey;}> {
+
+  private constructor() {}
+  readonly beforeCreate = 'beforeCreate';
+  readonly beforeUpdate = 'beforeUpdate';
+  readonly beforeUpsert = 'beforeUpsert';
+  readonly beforeDelete = 'beforeDelete';
+  readonly create = 'create';
+  readonly update = 'update';
+  readonly upsert = 'upsert';
+  readonly afterCreate = 'afterCreate';
+  readonly afterUpdate = 'afterUpdate';
+  readonly afterUpsert = 'afterUpsert';
+  readonly afterDelete = 'afterDelete';
+
+  private static functionMap: Map<string, string>;
+
+  /**
+   * Get the name of the function (key) transated to the label.
+   * This is to support minifying
+   */
+  public static getFunctionMap(): Map<string, string> {
+    if (MinifierHelper.functionMap == null) {
+      const helper = new MinifierHelper();
+      MinifierHelper.functionMap = new Map();
+      for (const key in helper) {
+        MinifierHelper.functionMap.set(key, helper[key]);
+      }
+    }
+    return MinifierHelper.functionMap;
+  }
 }
 
 interface DmlOptions {
@@ -213,6 +248,7 @@ type OnFoundryTargetToken = (user: User, token: Token, targeted: boolean) => Pro
  * Automatically gets activated AFTER the first infinit loop is detected
  */
 let outputDiff = false;
+const functionLabelSymbol = Symbol('functionLabel');
 class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   private isInit: boolean = false;
@@ -234,59 +270,68 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       this.init();
     }
 
+    const bindWrapper: ITrigger<T> = {};
+    for (const [key, name] of MinifierHelper.getFunctionMap()) {
+      if (typeof trigger[key] === 'function') {
+        const bindFunc = trigger[key].bind(trigger);
+        bindFunc[functionLabelSymbol] = `${trigger.type.documentName}-${trigger.constructor.name}.${name}`;
+        bindWrapper[key] = bindFunc;
+      }
+    }
+
     const unregisterTriggers: Stoppable[] = [];
     // before
-    if (typeof trigger.beforeCreate === 'function') {
-      unregisterTriggers.push(this.beforeCallbackGroups.get('preCreate').register(trigger.beforeCreate.bind(trigger)));
+    if (typeof bindWrapper.beforeCreate === 'function') {
+      unregisterTriggers.push(this.beforeCallbackGroups.get('preCreate').register(bindWrapper.beforeCreate));
     }
-    if (typeof trigger.beforeUpdate === 'function') {
-      unregisterTriggers.push(this.beforeCallbackGroups.get('preUpdate').register(trigger.beforeUpdate.bind(trigger)));
+    if (typeof bindWrapper.beforeUpdate === 'function') {
+      unregisterTriggers.push(this.beforeCallbackGroups.get('preUpdate').register(bindWrapper.beforeUpdate));
     }
-    if (typeof trigger.beforeUpsert === 'function') {
-      unregisterTriggers.push(this.beforeCallbackGroups.get('preCreate').register(trigger.beforeUpsert.bind(trigger)));
-      unregisterTriggers.push(this.beforeCallbackGroups.get('preUpdate').register(trigger.beforeUpsert.bind(trigger)));
+    if (typeof bindWrapper.beforeUpsert === 'function') {
+      unregisterTriggers.push(this.beforeCallbackGroups.get('preCreate').register(bindWrapper.beforeUpsert));
+      unregisterTriggers.push(this.beforeCallbackGroups.get('preUpdate').register(bindWrapper.beforeUpsert));
     }
-    if (typeof trigger.beforeDelete === 'function') {
-      unregisterTriggers.push(this.beforeCallbackGroups.get('preDelete').register(trigger.beforeDelete.bind(trigger)));
+    if (typeof bindWrapper.beforeDelete === 'function') {
+      unregisterTriggers.push(this.beforeCallbackGroups.get('preDelete').register(bindWrapper.beforeDelete));
     }
   
     // after
-    if (typeof trigger.afterCreate === 'function') {
+    if (typeof bindWrapper.afterCreate === 'function') {
       if (unsupportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
-      unregisterTriggers.push(this.afterCallbackGroups.get('create').register(trigger.afterCreate.bind(trigger)));
+      unregisterTriggers.push(this.afterCallbackGroups.get('create').register(bindWrapper.afterCreate));
     }
-    if (typeof trigger.afterUpdate === 'function') {
+    if (typeof bindWrapper.afterUpdate === 'function') {
       if (unsupportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
-      unregisterTriggers.push(this.afterCallbackGroups.get('update').register(trigger.afterUpdate.bind(trigger)));
+      unregisterTriggers.push(this.afterCallbackGroups.get('update').register(bindWrapper.afterUpdate));
     }
-    if (typeof trigger.afterUpsert === 'function') {
+    if (typeof bindWrapper.afterUpsert === 'function') {
       if (unsupportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
-      unregisterTriggers.push(this.afterCallbackGroups.get('create').register(trigger.afterUpsert.bind(trigger)));
-      unregisterTriggers.push(this.afterCallbackGroups.get('update').register(trigger.afterUpsert.bind(trigger)));
+      unregisterTriggers.push(this.afterCallbackGroups.get('create').register(bindWrapper.afterUpsert));
+      unregisterTriggers.push(this.afterCallbackGroups.get('update').register(bindWrapper.afterUpsert));
     }
-    if (typeof trigger.afterDelete === 'function') {
+    if (typeof bindWrapper.afterDelete === 'function') {
       if (unsupportedAfterDocumentNames.includes(this.documentName)) {
         throw new Error(`${this.documentName} does not support the after trigger`);
       }
-      unregisterTriggers.push(this.afterCallbackGroups.get('delete').register(trigger.afterDelete.bind(trigger)));
+      unregisterTriggers.push(this.afterCallbackGroups.get('delete').register(bindWrapper.afterDelete));
     }
 
     // after but you can update
-    if (typeof trigger.create === 'function') {
-      unregisterTriggers.push(this.afterCallbackGroups.get('create').registerDml(trigger.create.bind(trigger)));
+    if (typeof bindWrapper.create === 'function') {
+      unregisterTriggers.push(this.afterCallbackGroups.get('create').registerDml(bindWrapper.create));
     }
-    if (typeof trigger.update === 'function') {
-      unregisterTriggers.push(this.afterCallbackGroups.get('update').registerDml(trigger.update.bind(trigger)));
+    if (typeof bindWrapper.update === 'function') {
+      unregisterTriggers.push(this.afterCallbackGroups.get('update').registerDml(bindWrapper.update));
     }
-    if (typeof trigger.upsert === 'function') {
-      unregisterTriggers.push(this.afterCallbackGroups.get('create').registerDml(trigger.upsert.bind(trigger)));
-      unregisterTriggers.push(this.afterCallbackGroups.get('update').registerDml(trigger.upsert.bind(trigger)));
+    if (typeof bindWrapper.upsert === 'function') {
+      unregisterTriggers.push(this.afterCallbackGroups.get('create').registerDml(bindWrapper.upsert));
+      unregisterTriggers.push(this.afterCallbackGroups.get('update').registerDml(bindWrapper.upsert));
     }
 
     return {
@@ -494,7 +539,16 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       context.endOfContext(...execs);
 
       for (const callback of this.afterCallbackGroups.get('create').getDmlCallbacks()) {
-        await callback(context);
+        try {
+          await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
+        } catch (err) {
+          if (err instanceof TimeoutError) {
+            ui.notifications.error('An error occured during the save');
+            UtilsLog.error(callback[functionLabelSymbol], err);
+          } else {
+            throw err;
+          }
+        }
       }
 
       const diff = UtilsCompare.findDiff(document.data, documentSnapshot.data);
@@ -531,7 +585,16 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }
     
     for (const callback of this.afterCallbackGroups.get('create').getCallbacks()) {
-      await callback(context);
+      try {
+        await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
+      } catch (err) {
+        if (err instanceof TimeoutError) {
+          ui.notifications.error('An error occured during the save');
+          UtilsLog.error(callback[functionLabelSymbol], err);
+        } else {
+          throw err;
+        }
+      }
     }
 
     for (const exec of context.endOfContextExecutes) {
@@ -561,7 +624,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         // See injector (initOldValueInjector) for more info
         return;
       }
-      const originalDiff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
+      const originalDiff = UtilsCompare.findDiff(modifiedDocument.data, oldDocument.data);
       let context = new AfterDmlContext<T>(
         [{
           newRow: documentSnapshot,
@@ -586,7 +649,16 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         context.endOfContext(...execs);
 
         for (const callback of this.afterCallbackGroups.get('update').getDmlCallbacks()) {
-          await callback(context);
+          try {
+            await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
+          } catch (err) {
+            if (err instanceof TimeoutError) {
+              ui.notifications.error('An error occured during the save');
+              UtilsLog.error(callback[functionLabelSymbol], err);
+            } else {
+              throw err;
+            }
+          }
         }
 
         const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
@@ -637,7 +709,16 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       
       if (recursiveUpdate === 0 || game.userId !== userId) {
         for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
-          await callback(context);
+          try {
+            await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
+          } catch (err) {
+            if (err instanceof TimeoutError) {
+              ui.notifications.error('An error occured during the save');
+              UtilsLog.error(callback[functionLabelSymbol], err);
+            } else {
+              throw err;
+            }
+          }
         }
       }
       
@@ -667,7 +748,16 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     );
 
     for (const callback of this.afterCallbackGroups.get('delete').getCallbacks()) {
-      await callback(context);
+      try {
+        await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
+      } catch (err) {
+        if (err instanceof TimeoutError) {
+          ui.notifications.error('An error occured during the save');
+          UtilsLog.error(callback[functionLabelSymbol], err);
+        } else {
+          throw err;
+        }
+      }
     }
 
     // deletes do not support registerDml 
