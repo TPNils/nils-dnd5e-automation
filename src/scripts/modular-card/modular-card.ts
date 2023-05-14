@@ -803,6 +803,8 @@ export class ModularCard {
       chatMessageData.whisper = [game.userId];
     }
 
+    chatMessageData.speaker = ChatMessage.getSpeaker();
+
     if (insert) {
       return await ChatMessage.createDocuments([chatMessageData]).then(documents => documents[0]);
     } else {
@@ -960,7 +962,7 @@ export class ModularCard {
     const htmlParts = (await Promise.all(htmlParts$)).filter(part => part.html != null);
 
     const enrichedHtmlParts: string[] = [];
-    enrichedHtmlParts.push(`<div class="${staticValues.moduleName}-item-card" ${parts.getItemUuid() == null ? '' : `data-item-id="${parts.getItemUuid()}"`}>`);
+    enrichedHtmlParts.push(`<div class="${staticValues.moduleName}-item-card" ${parts.getItemUuid() == null ? '' : `data-item-id="${/Item\.([^\.]+)/i.exec(parts.getItemUuid())[1]}"`}>`);
     for (const enrichedPart of await Promise.all(htmlParts.map(part => TextEditor.enrichHTML(part.html, enrichOptions as any)))) {
       enrichedHtmlParts.push(enrichedPart);
     }
