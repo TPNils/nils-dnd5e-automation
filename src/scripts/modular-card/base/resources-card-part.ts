@@ -1,10 +1,9 @@
-import { DmlTrigger, IDmlTrigger, IDmlContext, IAfterDmlContext, ITrigger } from "../../lib/db/dml-trigger";
+import { IAfterDmlContext, ITrigger } from "../../lib/db/dml-trigger";
 import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
@@ -52,13 +51,11 @@ interface MessageState {
 }
 
 async function applyResourceConsumption({messageDataById, resources}: ApplyResourceConsumptionRequest): Promise<void> {
-  UtilsLog.debug('applyResourceConsumption', deepClone(resources))
   const documentsByUuid = new Map<string, foundry.abstract.Document<any, any>>();
   const applyResources: ApplyResourceConsumptionRequest['resources'] = [];
   {
     const requestUuids = new Set<string>();
     for (const resource of resources) {
-      UtilsLog.debug('resource', resource, messageDataById.get(resource.messageId));
       let tryToApply = false;
       if (resource.resource.consumeResourcesAction === 'undo') {
         tryToApply = resource.resource.calc$.appliedChange !== 0;
@@ -88,7 +85,6 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
     return;
   }
 
-  UtilsLog.debug('applyResources', applyResources)
   const updatesByUuid = new Map<string, any>();
   for (const resource of applyResources) {
     if (!updatesByUuid.has(resource.resource.calc$.uuid)) {
@@ -105,7 +101,6 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
       switch (autoBehaviour) {
         case 'detection': {
           const states = messageDataById.get(resource.messageId);
-          UtilsLog.debug(states);
           if (states.hasStates.size > 0) {
             // No states detected, probably a very limited item => just auto consume
               shouldApply = true;
