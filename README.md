@@ -39,8 +39,8 @@ Any other module that managed roll automation will not be compatible. Ideally _N
 The following modules have been verified as compatible with the latest version of _Nils' dnd5e automation_ and the specified module version.
 - [Combat Utility Belt](https://github.com/death-save/combat-utility-belt#combat-utility-belt) <sup>(1.6.0+)</sup>
 - [Dice So Nice](https://gitlab.com/riccisi/foundryvtt-dice-so-nice#installation) <sup>(2.0.0+)</sup>
-- [Dynamic Active Effects](https://gitlab.com/tposney/dae) <sup>( TODO )</sup>
-- [Force Client Settings](https://gitlab.com/kimitsu_desu/force-client-settings#force-client-settings) <sup>( 1.0.4 )</sup>
+- [Dynamic Active Effects](https://gitlab.com/tposney/dae) <sup>(TODO)</sup>
+- [Force Client Settings](https://gitlab.com/kimitsu_desu/force-client-settings#force-client-settings) <sup>(1.0.4+)</sup>
 - [Token Action HUD](https://github.com/Larkinabout/fvtt-token-action-hud-dnd5e#token-action-hud-dd-5eken-action-hud-dnd5e) <sup>Foundry v8, v9 (2.2.3+)</sup>
 - [Token Action HUD Core](https://github.com/Larkinabout/fvtt-token-action-hud-core#token-action-hud-core) <sup>Foundry v10+ (1.2.3+)</sup> + [Token Action HUD D&D 5e](https://github.com/Larkinabout/fvtt-token-action-hud-dnd5e#token-action-hud-dd-5eken-action-hud-dnd5e) <sup>Foundry v10+ (1.2.2+)</sup>
 - TODO verify more interactions, especially other big modules, even if it seems silly that they might cause compatibility issues
