@@ -17,6 +17,8 @@ if (game.settings) {
   });
 }
 
+afterSettingHook.listenFirst().then(() => SettingListener.initClientSideSettingsHook());
+
 class CallbackDocumentTrigger<T extends FoundryDocument> implements IDmlTrigger<T> {
   private callbacksByUuid = new Map<string, Map<number, (value?: T) => void>>();
   
@@ -173,17 +175,11 @@ class SettingListener<T> extends ValueReader<T> {
     const currentValue: any = game.settings.get(namespace, keyParts.join('.'));
     callback(currentValue);
 
-    if (settingConfig.scope === 'client') {
-      // there is no uuid or hooks for client side settings in foundry V8, V9 & V10
-      // TODO: compatibility with force client settings
-      SettingListener.initClientSideSettingsHook();
-    }
-
     return getCallbackSettingKeyTrigger().addListener(this.settingKey, callback);
   }
 
   @RunOnce()
-  private static initClientSideSettingsHook(): void {
+  public static initClientSideSettingsHook(): void {
     const clientStorage = game.settings.storage.get('client') as Storage;
 
     const originalSetItem = clientStorage.setItem;
