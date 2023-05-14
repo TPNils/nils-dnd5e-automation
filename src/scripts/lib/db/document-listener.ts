@@ -1,5 +1,6 @@
 import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { UtilsLog } from "../../utils/utils-log";
+import { RunOnce } from "../decorator/run-once";
 import { Stoppable } from "../utils/stoppable";
 import { DmlTrigger, IAfterDmlContext, IDmlTrigger } from "./dml-trigger";
 import { FoundryDocument, UtilsDocument } from "./utils-document";
@@ -98,20 +99,20 @@ class CallbackSettingKeyTrigger implements IDmlTrigger<Setting> {
 
   public afterUpsert(context: IAfterDmlContext<Setting>): void | Promise<void> {
     for (const row of context.rows) {
-      if (this.callbacksByKey.has(row.newRow.key)) {
-        for (const callback of this.callbacksByKey.get(row.newRow.key).values()) {
-          callback(row.newRow?.value);
-        }
-      }
+      this.callbackChange(row.newRow.key, row.newRow.value);
     }
   }
 
   public afterDelete(context: IAfterDmlContext<Setting>): void | Promise<void> {
     for (const row of context.rows) {
-      if (this.callbacksByKey.has(row.oldRow.key)) {
-        for (const callback of this.callbacksByKey.get(row.oldRow.key).values()) {
-          callback(null);
-        }
+      this.callbackChange(row.oldRow.key, null);
+    }
+  }
+
+  public callbackChange(key: string, newValue: any): void {
+    if (this.callbacksByKey.has(key)) {
+      for (const callback of this.callbacksByKey.get(key).values()) {
+        callback(newValue);
       }
     }
   }
@@ -172,14 +173,29 @@ class SettingListener<T> extends ValueReader<T> {
     const currentValue: any = game.settings.get(namespace, keyParts.join('.'));
     callback(currentValue);
 
-    const storage = game.settings.storage.get(settingConfig.scope);
-    if (storage instanceof WorldSettings) {
-      return getCallbackSettingKeyTrigger().addListener(this.settingKey, callback);
-    } else {
-      // TODO there is no uuid or hooks for client side settings in foundry V8, V9 & V10
-      // Find a way around this, probably overwrite the client storage methods
-      UtilsLog.warn('Setting', this.settingKey, 'is a client setting and does not support listening to changes. Should get supported in a future update.');
-      return {stop: () => {}};
+    if (settingConfig.scope === 'client') {
+      // there is no uuid or hooks for client side settings in foundry V8, V9 & V10
+      // TODO: compatibility with force client settings
+      SettingListener.initClientSideSettingsHook();
+    }
+
+    return getCallbackSettingKeyTrigger().addListener(this.settingKey, callback);
+  }
+
+  @RunOnce()
+  private static initClientSideSettingsHook(): void {
+    const clientStorage = game.settings.storage.get('client') as Storage;
+
+    const originalSetItem = clientStorage.setItem;
+    clientStorage.setItem = function(this: Storage, ...args: any[]) {
+      getCallbackSettingKeyTrigger().callbackChange(args[0], args[1]);
+      return originalSetItem.apply(this, ...args);
+    }
+    
+    const originalRemoveItem = clientStorage.removeItem;
+    clientStorage.removeItem = function(this: Storage, ...args: any[]) {
+      getCallbackSettingKeyTrigger().callbackChange(args[0], null);
+      return originalRemoveItem.apply(this, ...args);
     }
   }
 
@@ -195,7 +211,9 @@ export class DocumentListener {
     const settingKey = settingKeyParts.join('.');
     return afterSettingHook.switchMap(() => {
       return new SettingListener(settingKey);
-    })
+    });
   }
 
 }
+
+globalThis.DocumentListener = DocumentListener;
