@@ -119,16 +119,43 @@ export class ModularCardInstance {
   public setTypeData<T>(partType: string, data: any | null): void;
   public setTypeData<T>(partType: ModularCardPart<T>, data: T | null): void;
   public setTypeData<T>(partType: ModularCardPart<T> | string, data: any | null): void {
-    mergeObject(this.data[this.getTypeName(partType)], data, {inplace: true, recursive: false});
+    if (data == null) {
+      delete this.data[this.getTypeName(partType)];
+      return;
+    }
+    
+    if (this.data[this.getTypeName(partType)] == null) {
+      this.data[this.getTypeName(partType)] = {};
+    }
+
+    ModularCardInstance.update(this.data[this.getTypeName(partType)], data);
   }
   
   public setMeta(meta: ModularCardMeta): void {
-    mergeObject(this.meta, meta, {inplace: true, recursive: false});
+    ModularCardInstance.update(this.meta, meta);
+  }
+
+  private static update(original: object, newValue: object) {
+    if (newValue == null) {
+      newValue = {};
+    }
+    const originalKeys = new Set(Object.keys(original));
+    const newKeys = new Set(Object.keys(newValue));
+
+    for (const newKey of newKeys) {
+      original[newKey] = newValue[newKey];
+    }
+
+    for (const originalKey of originalKeys) {
+      if (!newKeys.has(originalKey)) {
+        delete original[originalKey];
+      }
+    }
   }
 
   public getItemUuid(): string {
     if (this.meta != null) {
-      return this.meta.created.itemUuid;
+      return this.meta.created?.itemUuid;
     }
 
     // legacy
@@ -148,7 +175,7 @@ export class ModularCardInstance {
 
   public getActorUuid(): string {
     if (this.meta != null) {
-      return this.meta.created.actorUuid;
+      return this.meta.created?.actorUuid;
     }
 
     // legacy
@@ -177,7 +204,7 @@ export class ModularCardInstance {
 
   public getTokenUuid(): string {
     if (this.meta != null) {
-      return this.meta.created.tokenUuid;
+      return this.meta.created?.tokenUuid;
     }
 
     // legacy
@@ -909,20 +936,8 @@ export class ModularCard {
     return cardsObj;
   }
 
-  private static migrateParts(parts: ModularCardInstance | ModularCardDataLegacy): ModularCardInstance {
-    if (Array.isArray(parts)) {
-      const obj = new ModularCardInstance();
-      for (const part of parts) {
-        obj.setTypeData(part.type, part.data);
-      }
-      return obj;
-    }
-    return parts;
-  }
-
-  public static async getHtml(messageId: string, partsInput: ModularCardInstance | ModularCardDataLegacy): Promise<string> {
+  public static async getHtml(messageId: string, parts: ModularCardInstance): Promise<string> {
     const htmlParts$: Array<{html: string} | Promise<{html: string}>> = [];
-    const parts = ModularCard.migrateParts(partsInput);
     for (const typeHandler of parts.getAllTypes()) {
       const partData = parts.getTypeData(typeHandler);
 
@@ -945,7 +960,7 @@ export class ModularCard {
     const htmlParts = (await Promise.all(htmlParts$)).filter(part => part.html != null);
 
     const enrichedHtmlParts: string[] = [];
-    enrichedHtmlParts.push(`<div class="${staticValues.moduleName}-item-card">`);
+    enrichedHtmlParts.push(`<div class="${staticValues.moduleName}-item-card" ${parts.getItemUuid() == null ? '' : `data-item-id="${parts.getItemUuid()}"`}>`);
     for (const enrichedPart of await Promise.all(htmlParts.map(part => TextEditor.enrichHTML(part.html, enrichOptions as any)))) {
       enrichedHtmlParts.push(enrichedPart);
     }
