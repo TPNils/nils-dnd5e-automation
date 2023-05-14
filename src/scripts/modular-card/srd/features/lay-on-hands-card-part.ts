@@ -9,7 +9,7 @@ import { Action } from "../../action";
 import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ResourceCardData, ResourceCardPart, TargetCardData, TargetCardPart } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
-import { BeforeCreateModuleCardEvent, ModularCard, ModularCardTriggerData } from "../../modular-card";
+import { BeforeCreateModuleCardEvent, ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart, PermissionResponse } from "../../modular-card-part";
 
 export interface SrdLayOnHandsCardData extends DamageCardData {
@@ -47,10 +47,11 @@ export interface SrdLayOnHandsCardData extends DamageCardData {
 export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit {
 
   //#region actions
-  private static readonly permissionCheck = createPermissionCheckAction<{part: {data: DamageCardData}}>(({part}) => {
+  private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
+    const part = cardParts.getTypeData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
-    if (part.data.calc$.actorUuid) {
-      documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
+    if (part?.calc$?.actorUuid) {
+      documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
     }
     return {documents: documents};
   });
@@ -59,7 +60,7 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
     .addSerializer(ItemCardHelpers.getRawSerializer('cure'))
     .addSerializer(ItemCardHelpers.getRawSerializer('heal'))
     .addEnricher(ItemCardHelpers.getChatEnricher())
-    .setPermissionCheck(SrdLayOnHandsComponent.permissionCheck)
+    .setPermissionCheck(SrdLayOnHandsComponent.actionPermissionCheck)
     .build(async ({messageId, cardParts, heal, cure}) => {
       const part = cardParts.getTypeData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance);
       if (heal != null) {
@@ -84,7 +85,7 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
       this.getData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance).switchMap((data) => {
         return ValueReader.mergeObject({
           ...data,
-          hasPermission: SrdLayOnHandsComponent.permissionCheck({messageId: this.messageId, part: {data: data.part}}, game.user)
+          hasPermission: SrdLayOnHandsComponent.actionPermissionCheck({messageId: this.messageId, cardParts: data.allParts}, game.user)
         })
       }).listen(async ({part, hasPermission}) => this.setData(part, hasPermission)),
     );

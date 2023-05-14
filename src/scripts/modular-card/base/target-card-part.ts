@@ -230,10 +230,11 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('uuid'))
     .addEnricher(ItemCardHelpers.getChatEnricher())
-    .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}}>(({part}) => {
+    .setPermissionCheck(createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
+      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
       const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (part.data.calc$.actorUuid) {
-        documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
+      if (part?.calc$?.actorUuid) {
+        documents.push({uuid: part.calc$.actorUuid, permission: 'update', security: true});
       }
       return {documents: documents};
     }))
@@ -247,10 +248,11 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('uuid'))
     .addEnricher(ItemCardHelpers.getChatEnricher())
-    .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}}>(({part}) => {
+    .setPermissionCheck(createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
+      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
       const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (part.data.calc$.actorUuid) {
-        documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
+      if (part?.calc$?.actorUuid) {
+        documents.push({uuid: part.calc$.actorUuid, permission: 'update', security: true});
       }
       return {documents: documents};
     }))
@@ -264,10 +266,11 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
   private static refreshTargets = new Action<ChatPartIdData>('TargetRefresh')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
     .addEnricher(ItemCardHelpers.getChatEnricher())
-    .setPermissionCheck(createPermissionCheckAction<{part: {data: TargetCardData}}>(({part}) => {
+    .setPermissionCheck(createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
+      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
       const documents: CreatePermissionCheckArgs['documents'] = [];
-      if (part.data.calc$.actorUuid) {
-        documents.push({uuid: part.data.calc$.actorUuid, permission: 'update', security: true});
+      if (part?.calc$?.actorUuid) {
+        documents.push({uuid: part.calc$.actorUuid, permission: 'update', security: true});
       }
       return {documents: documents};
     }))

@@ -14,7 +14,7 @@ import { Action } from "../../action";
 import { BaseCardComponent } from "../../base/base-card-component";
 import { DamageCardData, DamageCardPart, ManualDamageSource } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
-import { BeforeCreateModuleCardEvent, ModularCard, ModularCardTriggerData } from "../../modular-card";
+import { BeforeCreateModuleCardEvent, ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart, PermissionResponse } from "../../modular-card-part";
 
 export interface SrdSneakAttackCardData {
@@ -87,10 +87,11 @@ export interface SrdSneakAttackCardData {
 })
 export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit {
   //#region actions
-  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: SrdSneakAttackCardData}}>(({part}) => {
+  private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
+    const part = cardParts.getTypeData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
-    if (part.data.calc$.actorUuid) {
-      documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
+    if (part?.calc$?.actorUuid) {
+      documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
     }
     return {documents: documents};
   });
@@ -135,7 +136,7 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
             ...args,
             combat: uuid == null ? null : DocumentListener.listenUuid<Combat>(uuid),
             readDamagePermission: UtilsDocument.hasAllPermissions([{uuid: args.part.calc$.actorUuid, permission: `${staticValues.code}ReadDamage`, user: game.user}]),
-            actionResponse: SrdSneakAttackComponent.actionPermissionCheck({messageId: this.messageId, part: {data: args.part},}, game.user),
+            actionResponse: SrdSneakAttackComponent.actionPermissionCheck({messageId: this.messageId, cardParts: args.allParts,}, game.user),
           })
         })
         .listen(({part, combat, readDamagePermission, actionResponse}) => this.setData(part, combat, readDamagePermission, actionResponse))

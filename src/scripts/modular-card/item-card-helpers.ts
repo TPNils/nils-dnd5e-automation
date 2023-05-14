@@ -6,9 +6,8 @@ export interface ChatPartIdData {
   readonly messageId: string;
 }
 
-export interface ChatPartEnriched<T> {
+export interface ChatPartEnriched {
   readonly cardParts: ModularCardInstance;
-  readonly part: T;
 }
 
 export interface UserIdData {
@@ -118,33 +117,11 @@ export class ItemCardHelpers {
     }
   }
 
-  public static getChatEnricher(): (data: ChatPartIdData) => ChatPartEnriched<undefined> {
+  public static getChatEnricher(): (data: ChatPartIdData) => ChatPartEnriched {
     return data => {
       const message = game.messages.get(data.messageId);
-      const originalAllCardParts = ModularCard.getCardPartDatas(message);
       return {
-        cardParts: originalAllCardParts.deepClone(),
-        part: undefined,
-      }
-    }
-  }
-
-  public static getChatPartEnricher<T>(partType: ModularCardPart<T>): (data: ChatPartIdData) => ChatPartEnriched<T> {
-    return data => {
-      const message = game.messages.get(data.messageId);
-      const originalAllCardParts = ModularCard.getCardPartDatas(message);
-
-      if (!originalAllCardParts.hasType(partType)) {
-        throw {
-          success: false,
-          errorType: 'warn',
-          errorMessage: `Pressed an action button for message part ${data.messageId}.${partType.getType()} but no data was found`,
-        };
-      }
-      const cardParts = originalAllCardParts.deepClone();
-      return {
-        cardParts: cardParts,
-        part: cardParts.getTypeData<T>(partType),
+        cardParts: ModularCard.getCardPartDatas(message).deepClone()
       }
     }
   }

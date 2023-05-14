@@ -12,9 +12,10 @@ import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor, DamageType, MyItemData, MyItem } from "../../types/fixed-types";
 import { UtilsArray } from "../../utils/utils-array";
+import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ModularCard, ModularCardTriggerData } from "../modular-card";
+import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
@@ -226,10 +227,11 @@ async function itemSourceToManualSource(itemSource: ItemDamageSource | MyItem, a
 })
 class DamageCardComponent extends BaseCardComponent implements OnInit {
   //#region actions
-  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: DamageCardData}}>(({part}) => {
+  private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
+    const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
-    if (part.data.calc$.actorUuid) {
-      documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
+    if (part?.calc$?.actorUuid) {
+      documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
     }
     return {documents: documents};
   });

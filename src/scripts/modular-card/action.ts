@@ -1,6 +1,7 @@
 import { provider } from "../provider/provider";
 import { ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
+import { UtilsLog } from "../utils/utils-log";
 import { ChatPartIdData } from "./item-card-helpers";
 import { ActionPermissionCheck } from "./modular-card-part";
 
@@ -64,11 +65,11 @@ export class Action<ClientData, ServerData = {user: User}> {
     return this;
   }
 
-  public build<R = any>(serverExecutor: (data: ServerData) => R | Promise<R>): (data: ClientData) => Promise<ServerResponse<R>> {
+  public build<R = any>(serverExecutor: (data: ServerData) => R | Promise<R>): (data: ClientData) => Promise<R> {
     const callbackId = Action.getNextCallbackId(this.name);
     const server = async (serializedData: ServerData, userId: string | typeof runningLocalSymbol): Promise<ServerResponse<R>> => {
+      const user = userId === runningLocalSymbol ? game.user : game.users.get(userId);
       try {
-        const user = userId === runningLocalSymbol ? game.user : game.users.get(userId);
         if (user.isGM && userId !== runningLocalSymbol) {
           throw new Error('Security alert, someone is trying to impersonate a GM.');
         }
@@ -98,8 +99,11 @@ export class Action<ClientData, ServerData = {user: User}> {
           return {success: true, response: response};
         }
 
-        
+
       } catch (err) {
+        if (user.id === game.userId) {
+          throw err;
+        }
         if (err instanceof Error) {
           return {
             success: false,
@@ -125,7 +129,7 @@ export class Action<ClientData, ServerData = {user: User}> {
       });
     });
     
-    const client = async (data: ClientData): Promise<ServerResponse<R>> => {
+    const client = async (data: ClientData): Promise<R> => {
       let serializedData = {} as ServerData;
       if (this.serializerFuncs.length > 0) {
         serializedData = this.serializerFuncs[0](data);
@@ -134,7 +138,14 @@ export class Action<ClientData, ServerData = {user: User}> {
         }
       }
 
-      return server(serializedData, runningLocalSymbol);
+      const response = await server(serializedData, runningLocalSymbol);
+      if (response.success === true) {
+        return response.response;
+      }
+
+      const notificationType = response.errorType === 'error' ? ui.notifications.error : ui.notifications.warn;
+      notificationType.call(ui.notifications, response.errorMessage.join('\n'));
+      throw new Error(response.errorMessage.join('\n') + '\n\nStack:\n' + response.stackTrace);
     }
 
     return client;

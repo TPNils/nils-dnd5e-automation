@@ -6,6 +6,7 @@ import { Component, OnInit, OnInitParam } from "../../lib/render-engine/componen
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { SpellData, MyActor } from "../../types/fixed-types";
+import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ItemUtils } from "../item-utils";
@@ -39,10 +40,11 @@ export interface SpellLevelCardData {
 })
 export class SpellLevelCardComponent extends BaseCardComponent implements OnInit {
   //#region actions
-  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: SpellLevelCardData}}>(({part}) => {
+  private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
+    const part = cardParts.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
-    if (part.data.calc$.actorUuid) {
-      documents.push({uuid: part.data.calc$.actorUuid, permission: 'OWNER', security: true});
+    if (part?.calc$?.actorUuid) {
+      documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
     }
     return {documents: documents};
   });
@@ -69,7 +71,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
         return ValueReader.mergeObject({
           ...data,
           actor: data.part == null ? null : DocumentListener.listenUuid<MyActor & FoundryDocument>(data.part.calc$.actorUuid),
-          interactPermission: SpellLevelCardComponent.actionPermissionCheck({part: {data: data.part}, messageId: this.messageId}, game.user),
+          interactPermission: SpellLevelCardComponent.actionPermissionCheck({cardParts: data.allParts, messageId: this.messageId}, game.user),
           isObserver: UtilsDocument.hasAnyPermissions([
             {
               uuid: data.part.calc$.actorUuid,
@@ -296,7 +298,7 @@ class SpellLevelCardTrigger implements ITrigger<ModularCardTriggerData<SpellLeve
   
       const responses: Array<Promise<{data: any; type: ModularCardPart}>> = [];
       for (const typeHandler of parts.getAllTypes()) {
-        const response = typeHandler.refresh(part, {item, actor, token});
+        const response = typeHandler.refresh(parts.getTypeData(typeHandler), {item, actor, token});
         if (response instanceof Promise) {
           responses.push(response.then(r => ({
             type: typeHandler,

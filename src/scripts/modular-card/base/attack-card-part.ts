@@ -12,7 +12,7 @@ import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ModularCard, ModularCardTriggerData } from "../modular-card";
+import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
@@ -86,10 +86,11 @@ export interface AttackCardData {
 })
 class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   //#region actions
-  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: AttackCardData}}>(({part}) => {
+  private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
     const documents: CreatePermissionCheckArgs['documents'] = [];
-    if (part.data.actorUuid$) {
-      documents.push({uuid: part.data.actorUuid$, permission: 'OWNER', security: true});
+    const part = cardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+    if (part?.actorUuid$) {
+      documents.push({uuid: part.actorUuid$, permission: 'OWNER', security: true});
     }
     return {documents: documents};
   });

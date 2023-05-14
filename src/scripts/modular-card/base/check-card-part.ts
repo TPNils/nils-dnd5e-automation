@@ -12,7 +12,7 @@ import { staticValues } from "../../static-values";
 import { MyActor, MyActorData } from "../../types/fixed-types";
 import { Action } from "../action";
 import { ItemCardHelpers, ChatPartIdData, ChatPartEnriched } from "../item-card-helpers";
-import { ModularCard, ModularCardTriggerData } from "../modular-card";
+import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, createPermissionCheckAction } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
@@ -87,18 +87,17 @@ function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache 
 })
 export class CheckCardComponent extends BaseCardComponent implements OnInit {
   //#region actions
-  private static actionPermissionCheck = createPermissionCheckAction<{part: {data: CheckCardData}, targetId: string;}>(({part, targetId}) => {
-    const cache = getTargetCache(part.data, targetId);
-    if (!cache?.actorUuid$) {
+  private static actionPermissionCheck = createPermissionCheckAction<{targetCache: TargetCache;}>(({targetCache}) => {
+    if (!targetCache?.actorUuid$) {
       return {mustBeGm: true};
     }
     const documents: CreatePermissionCheckArgs['documents'] = [];
-    documents.push({uuid: cache.actorUuid$, permission: 'OWNER', security: true});
+    documents.push({uuid: targetCache.actorUuid$, permission: 'OWNER', security: true});
     return {documents: documents};
   });
 
   
-  private static getTargetCacheEnricher(this: null, data: ChatPartIdData & ChatPartEnriched<undefined> & {targetId: string;}): {targetCache: TargetCache} {
+  private static getTargetCacheEnricher(this: null, data: ChatPartIdData & ChatPartEnriched & {targetId: string;}): {targetCache: TargetCache} {
     const cache = getTargetCache(data.cardParts.getTypeData<CheckCardData>(CheckCardPart.instance), data.targetId);
     if (!cache) {
       throw {

@@ -246,14 +246,15 @@ function getMessageState(allParts: ModularCardInstance): MessageState {
 export class ResourceCardComponent extends BaseCardComponent implements OnInit {
 
   //#region actions
-  private static permissionCheck = createPermissionCheckAction<{part: {data: ResourceCardData}, resourceIndex: number | '*'}>(({part, resourceIndex}) => {
+  private static permissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance, resourceIndex: number | '*'}>(({cardParts, resourceIndex}) => {
+    const part = cardParts.getTypeData<ResourceCardData>(ResourceCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (resourceIndex === '*') {
-      for (const resource of part.data.consumeResources) {
+      for (const resource of part.consumeResources) {
         documents.push({uuid: resource.calc$.uuid, permission: 'OWNER', security: true});
       }
     } else {
-      documents.push({uuid: part.data.consumeResources[resourceIndex].calc$.uuid, permission: 'OWNER', security: true});
+      documents.push({uuid: part.consumeResources[resourceIndex].calc$.uuid, permission: 'OWNER', security: true});
     }
     return {documents: documents};
   })
