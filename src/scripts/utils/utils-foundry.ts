@@ -19,7 +19,7 @@ export class UtilsFoundry {
     }
   }
 
-  public static getUserRolls(): typeof foundry.CONST.USER_ROLES {
+  public static getUserRoles(): typeof foundry.CONST.USER_ROLES {
     if (foundry.CONST.USER_ROLES != null && typeof foundry.CONST.USER_ROLES === 'object') {
       return foundry.CONST.USER_ROLES as any;
     }
