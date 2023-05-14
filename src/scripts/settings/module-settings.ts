@@ -118,8 +118,9 @@ export class ModuleSettings {
       `,
     });
     for (const variant of ['gm', 'player']) {
+      const scope = variant === 'player' ? 'client' : 'world';
       game.settings.register<string, string, string>(staticValues.moduleName, `${variant}AutorollAttack`, {
-        scope: 'world',
+        scope: scope,
         config: false,
         type: String,
         choices: {
@@ -135,7 +136,7 @@ export class ModuleSettings {
       });
       
       game.settings.register<string, string, string>(staticValues.moduleName, `${variant}AutorollDamage`, {
-        scope: 'world',
+        scope: scope,
         config: false,
         type: String,
         choices: {
@@ -153,7 +154,7 @@ export class ModuleSettings {
       });
       
       game.settings.register<string, string, string>(staticValues.moduleName, `${variant}AutorollCheck`, {
-        scope: 'world',
+        scope: scope,
         config: false,
         type: String,
         choices: {
