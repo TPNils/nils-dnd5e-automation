@@ -3,17 +3,16 @@ import { DmlTrigger, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-tr
 import { TransformTrigger } from "../lib/db/transform-trigger";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
-import { Component, ComponentElement } from "../lib/render-engine/component";
 import { rerenderQueue } from "../lib/render-engine/virtual-dom/render-queue";
 import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem, SpellData } from "../types/fixed-types";
-import { UtilsHooks } from "../utils/utils-hooks";
 import { UtilsLog } from "../utils/utils-log";
 import { ActiveEffectCardPart, AttackCardData, AttackCardPart, CheckCardData, CheckCardPart, DamageCardData, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardData, ResourceCardPart, SpellLevelCardData, SpellLevelCardPart, TargetCardData, TargetCardPart, TemplateCardData, TemplateCardPart } from "./base/index";
 import { ItemUtils } from "./item-utils";
+import { ModularCardComponent } from "./modular-card-component";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 
 interface ModularCardPartDataLegacy<T = any> {
@@ -297,173 +296,12 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
         continue;
       }
       if (ModularCard.getCardPartDatas(newRow) != null) {
-        newRow.data.content = `The ${staticValues.moduleName} module is required to render this message.`;
+        newRow.data._source.content = `<div data-${staticValues.code}-tag-replacer="${ModularCardComponent.getSelector()}">
+          <span data-slot="not-installed-placeholder">The ${staticValues.moduleName} module is required to render this message.</span>
+        </div>`;
+        UtilsLog.debug(newRow.data._source.content)
       }
     }
-  }
-}
-
-async function getHTML(this: ChatMessage, wrapped: (...args: any) => any, ...args: any[]): Promise<JQuery> {
-  // Add client side rendering of the template, specific for the user.
-  // Pro:
-  // + This allows templates to be rendered specifically for the user (ex: based on permissions)
-  // + and should also reduce network traffic (not sure how impactfull it actually is)
-  // Con: 
-  // - Extra CPU power required by the client
-  // - Templates won't be shown properly once the module is uninstalled => would be an issue anyway, this might even be cleaner
-  const clientTemplateData = ModularCard.getCardPartDatas(this);
-  if (clientTemplateData) {
-    try {
-      this.data.update({content: await ModularCard.getHtml(this.id, clientTemplateData)});
-    } catch (e) {
-      UtilsLog.error(e);
-
-      let errorString: string;
-      if (e instanceof Error) {
-        errorString = `${e.name}: ${e.message}\n\n${e.stack}`;
-      } else {
-        errorString = String(e);
-      }
-      if (game.modules.get('bug-reporter')?.active) {
-        const message = document.createElement('div');
-        message.append(document.createTextNode("Internal error rendering the message."));
-        const report = document.createElement('button');
-        report.innerText = 'Please report the bug';
-        report.setAttribute('onclick', `game.modules.get("bug-reporter").api.bugWorkflow("${staticValues.moduleName}", "Error rendering a message", "${errorString.replace(/"/g, '\\"').replace(/\n/g, '\\n')}")`)
-        message.append(report);
-
-        const wrapper = document.createElement('div');
-        wrapper.append(message);
-        this.data.update({content: wrapper.innerHTML});
-      } else {
-        const bugsUrl = game.modules.get(staticValues.moduleName).data.bugs;
-        const message = document.createElement('div');
-        message.append(document.createTextNode("Internal error rendering the message. Please "));
-        const aUrl = document.createElement('a');
-        aUrl.innerText = 'report the bug';
-        aUrl.setAttribute('href', bugsUrl);
-        aUrl.setAttribute('target', '_blank');
-        aUrl.style.textDecoration = 'underline';
-        message.append(aUrl);
-        message.append(document.createTextNode(" with the follwoing message"));
-
-        const errorNode = document.createElement('code');
-        errorNode.style.maxHeight = '200px';
-        errorNode.style.display = 'block';
-        errorNode.style.overflowY = 'auto';
-        errorNode.style.userSelect = 'text';
-        errorNode.innerText = errorString;
-
-        const wrapper = document.createElement('div');
-        wrapper.append(message);
-        wrapper.append(document.createElement('br'));
-        wrapper.append(errorNode);
-        this.data.update({content: wrapper.innerHTML});
-      }
-    }
-  }
-
-  return wrapped(args);
-}
-
-async function updateMessage(this: ChatLog, wrapped: (...args: any) => any, ...args: any[]): Promise<void> {
-  const message: ChatMessage = args[0];
-  const clientTemplateData = ModularCard.getCardPartDatas(message);
-  if (!clientTemplateData) {
-    // Lets not mess with other messages. If there is am internal bug, don't affect them
-    return wrapped(args);
-  }
-
-  const notify: boolean = args[1];
-  let li = this.element.find(`.message[data-message-id="${message.id}"]`);
-  if (li.length) {
-    const updatedHtml = await message.getHTML();
-    const updatedContent = updatedHtml.children(`.message-content`)[0].querySelector(`:scope > .${staticValues.moduleName}-item-card`);
-    const currentContent = li.children(`.message-content`)[0].querySelector(`:scope > .${staticValues.moduleName}-item-card`);
-    const updatedContentChildren = Array.from(updatedContent.childNodes);
-    const currentContentChildren = Array.from(currentContent.childNodes);
-
-    let sameTopLevelLayout = updatedContentChildren.length === currentContentChildren.length;
-    if (sameTopLevelLayout) {
-      for (let i = 0; i < currentContentChildren.length; i++) {
-        // isEqualNode does a deep compare => make shallow copies
-        if (currentContentChildren[i].nodeName !== updatedContentChildren[i].nodeName) {
-          sameTopLevelLayout = false;
-          break;
-        }
-      }
-    }
-
-    if (sameTopLevelLayout) {
-      // replace message content
-      for (let i = 0; i < currentContentChildren.length; i++) {
-        if (Component.isComponentElement(currentContentChildren[i])) {
-          const currentElement = (currentContentChildren[i] as ComponentElement);
-          const updatedElement = (updatedContentChildren[i] as HTMLElement);
-          for (const attr of updatedElement.getAttributeNames()) {
-            if (currentElement.getAttribute(attr) !== updatedElement.getAttribute(attr)) {
-              currentElement.setAttribute(attr, updatedElement.getAttribute(attr));
-            }
-          }
-          for (const attr of currentElement.getAttributeNames()) {
-            if (attr === currentElement.getHostAttribute()) {
-              continue;
-            }
-            if (currentElement.getAttribute(attr) !== updatedElement.getAttribute(attr)) {
-              currentElement.removeAttribute(attr);
-            }
-          }
-        } else {
-          currentContentChildren[i].replaceWith(updatedContentChildren[i]);
-        }
-      }
-
-      // Replace non message content
-      let messageContentElement: HTMLElement;
-      const currentNonContentElements = Array.from(li[0].childNodes);
-      for (let i = 0; i < currentNonContentElements.length; i++) {
-        const element = currentNonContentElements[i];
-        if (element instanceof HTMLElement && element.classList.contains('message-content')) {
-          messageContentElement = element;
-          continue;
-        }
-        element.remove();
-      }
-      let isBeforeMessageContent = true;
-      const updatedNonContentElements = Array.from(updatedHtml[0].childNodes);
-      for (let i = 0; i < updatedNonContentElements.length; i++) {
-        const element = updatedNonContentElements[i];
-        if (element instanceof HTMLElement && element.classList.contains('message-content')) {
-          isBeforeMessageContent = false;
-          continue;
-        }
-
-        if (isBeforeMessageContent) {
-          li[0].insertBefore(element, messageContentElement);
-        } else {
-          li[0].append(element);
-        }
-      }
-    } else {
-      // sameTopLevelLayout should always be true, but just in case have a fallback
-      // Default behaviour isn foundry V9
-      li.replaceWith(updatedHtml);
-    }
-  } else {
-    await this.postOne(message, false);
-  }
-
-  // Post notification of update
-  if (notify) {
-    this.notify(message);
-  }
-
-  // Update popout tab
-  if (this._popout) {
-    await this._popout.updateMessage(message, false);
-  }
-  if (this.popOut) {
-    this.setPosition();
   }
 }
 
@@ -816,10 +654,6 @@ export class ModularCard {
   public static registerHooks(): void {
     // Override render behaviour
     DmlTrigger.registerTrigger(new ChatMessageTrigger());
-    UtilsHooks.setup().then(() => {
-      libWrapper.register(staticValues.moduleName, 'ChatMessage.prototype.getHTML', getHTML, 'WRAPPER');
-      libWrapper.register(staticValues.moduleName, 'ChatLog.prototype.updateMessage', updateMessage, 'MIXED');
-    });
     
     // - Keep scrollbar at the bottom
     // - Add child tags to item card as a replacement for :has
@@ -936,38 +770,6 @@ export class ModularCard {
       }
     }
     return cardsObj;
-  }
-
-  public static async getHtml(messageId: string, parts: ModularCardInstance): Promise<string> {
-    const htmlParts$: Array<{html: string} | Promise<{html: string}>> = [];
-    for (const typeHandler of parts.getAllTypes()) {
-      const partData = parts.getTypeData(typeHandler);
-
-      // TODO error handeling during render
-      if (typeHandler?.getHtml) {
-        const htmlPart = typeHandler.getHtml({messageId: messageId, data: partData, allMessageParts: parts});
-        if (htmlPart instanceof Promise) {
-          htmlParts$.push(htmlPart.then(html => {return {html: html}}));
-        } else if (typeof htmlPart === 'string') {
-          htmlParts$.push({html: htmlPart});
-        }
-      }
-    }
-
-    const enrichOptions: Partial<Parameters<typeof TextEditor['enrichHTML']>[1]> = {async: true} as any;
-    if (game.user.isGM) {
-      enrichOptions.secrets = true;
-    }
-    
-    const htmlParts = (await Promise.all(htmlParts$)).filter(part => part.html != null);
-
-    const enrichedHtmlParts: string[] = [];
-    enrichedHtmlParts.push(`<div class="${staticValues.moduleName}-item-card" ${parts.getItemUuid() == null ? '' : `data-item-id="${/Item\.([^\.]+)/i.exec(parts.getItemUuid())[1]}"`}>`);
-    for (const enrichedPart of await Promise.all(htmlParts.map(part => TextEditor.enrichHTML(part.html, enrichOptions as any)))) {
-      enrichedHtmlParts.push(enrichedPart);
-    }
-    enrichedHtmlParts.push(`</div>`);
-    return enrichedHtmlParts.join('');
   }
 
 }

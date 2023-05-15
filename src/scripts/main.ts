@@ -15,6 +15,7 @@ import { TokenImgElement } from "./elements/token-img-element";
 import { VirtualNodeParser } from "./lib/render-engine/virtual-dom/virtual-node-parser";
 import { RollDamageElement } from "./elements/roll-damage-element";
 import { UtilsHooks } from "./utils/utils-hooks";
+import { ComponentFoundryConnector } from "./lib/render-engine/component-foundry-connector";
 
 UtilsHooks.registerHooks();
 VirtualNodeParser.init();
@@ -32,6 +33,7 @@ ModularCard.registerHooks();
 ModuleSettings.registerHooks();
 registerModularCardBaseHooks();
 registerModularCardSrdHooks();
+ComponentFoundryConnector.registerHooks();
 
 Hooks.on('init', () => {
   const hbsFiles: string[] = [];

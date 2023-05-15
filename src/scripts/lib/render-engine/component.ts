@@ -1,5 +1,6 @@
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
+import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
@@ -367,6 +368,7 @@ export interface OnInit {
 }
 
 export interface OnInitParam {
+  html: ComponentElement,
   addStoppable(...stoppable: Stoppable[]): void;
 }
 
@@ -497,6 +499,7 @@ export class ComponentElement extends HTMLElement {
     }
     if (ComponentElement.isOnInit(this.#controller)) {
       this.#controller.onInit({
+        html: this,
         addStoppable: (...stoppable: Stoppable[]) => {
           this.unregisters.push(...stoppable);
         }
@@ -511,14 +514,14 @@ export class ComponentElement extends HTMLElement {
             case 'childList': {
               for (let i = 0; i < mutation.addedNodes.length; i++) {
                 const node = mutation.addedNodes.item(i);
-                if (node instanceof HTMLElement && node.hasAttribute('slot')) {
+                if (node instanceof HTMLElement && (node.hasAttribute('slot') || node.hasAttribute('data-slot'))) {
                   this.applySlots();
                   return;
                 }
               }
               for (let i = 0; i < mutation.removedNodes.length; i++) {
                 const node = mutation.removedNodes.item(i);
-                if (node instanceof HTMLElement && node.hasAttribute('slot')) {
+                if (node instanceof HTMLElement && (node.hasAttribute('slot') || node.hasAttribute('data-slot'))) {
                   this.applySlots();
                   return;
                 }
@@ -534,7 +537,7 @@ export class ComponentElement extends HTMLElement {
       });
 
       // Start observing the target node for configured mutations
-      observer.observe(this, { childList: true, subtree: true, attributeFilter: ['slot'] });
+      observer.observe(this, { childList: true, subtree: true, attributeFilter: ['data-slot', 'slot'] });
 
       // Later, you can stop observing
       this.unregisters.push({stop: () => observer.disconnect()})
@@ -712,14 +715,15 @@ export class ComponentElement extends HTMLElement {
 
     const replacementElementsBySlotName = new Map<string, Array<Element>>();
     for (const slotName of this.elementsBySlotName.keys()) {
-      replacementElementsBySlotName.set(slotName, Array.from(this.querySelectorAll(`:scope > [slot="${slotName}"]:not([${cssComponentIdAttrPrefix}-${componentId}])`)));
+      replacementElementsBySlotName.set(slotName, Array.from(this.querySelectorAll(`:scope > [slot="${slotName}"]:not([${cssComponentIdAttrPrefix}-${componentId}]), :scope > [data-slot="${slotName}"]:not([${cssComponentIdAttrPrefix}-${componentId}])`)));
     }
     
     // Check if the target slots still match
     for (const slotName of this.slotsToReplacements.keys()) {
       const filteredElements: Element[] = [];
       for (const elem of this.slotsToReplacements.get(slotName).elements) {
-        const slotAttr = elem.getAttribute('slot');
+        const slotAttr = elem.getAttribute('slot') ?? elem.getAttribute('data-slot');
+        UtilsLog.debug({slotAttr, elem, slot: this.elementsBySlotName.has(slotName)})
         if (slotAttr === slotName && this.elementsBySlotName.has(slotName)) {
           filteredElements.push(elem);
         } else {
