@@ -143,6 +143,14 @@ export class ComponentFoundryConnector {
                     element.append(child);
                   }
 
+                  for (let i = 0; i < node.attributes.length; i++) {
+                    const attr = node.attributes[i];
+                    if (attr.name === attrName && attr.namespaceURI == null) {
+                      continue;
+                    }
+                    element.setAttributeNS(attr.namespaceURI, attr.name, attr.value);
+                  }
+
                   node.parentNode.replaceChild(element, node);
                 }
               }
