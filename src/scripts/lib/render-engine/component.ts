@@ -723,7 +723,6 @@ export class ComponentElement extends HTMLElement {
       const filteredElements: Element[] = [];
       for (const elem of this.slotsToReplacements.get(slotName).elements) {
         const slotAttr = elem.getAttribute('slot') ?? elem.getAttribute('data-slot');
-        UtilsLog.debug({slotAttr, elem, slot: this.elementsBySlotName.has(slotName)})
         if (slotAttr === slotName && this.elementsBySlotName.has(slotName)) {
           filteredElements.push(elem);
         } else {
