@@ -110,6 +110,7 @@ export class ComponentFoundryConnector {
   @RunOnce()
   public static registerHooks(): void {
     // Foundry strips custom elements in the backend => find replace on client side
+    // Note: javascript does not support migrating event listeners. If this is an issue, may want to revisit this.
     UtilsHooks.init().then(() => {
       const attrName = `data-${staticValues.code}-tag-replacer`;
       const observer = new MutationObserver((mutationsList, observer) => {
