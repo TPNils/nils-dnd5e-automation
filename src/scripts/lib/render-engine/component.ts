@@ -180,22 +180,6 @@ export function Attribute(config?: AttributeConfig | string) {
   };
 }
 
-class DynamicValueReaderStoppable<T = any> implements Stoppable {
-
-  constructor (
-    public callback: (value?: T) => void,
-    public stoppables: Stoppable[],
-  ) {
-  }
-
-  public stop() {
-    for (const stoppable of this.stoppables) {
-      stoppable.stop();
-    }
-  };
-
-}
-
 export function AsyncAttribute(config?: AttributeConfig | string) {
   return function (target: any, propertyKey: string, descriptor?: PropertyDescriptor) {
     const valueProvider = new ValueProvider();
