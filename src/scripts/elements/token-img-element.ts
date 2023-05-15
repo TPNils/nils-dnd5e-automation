@@ -1,6 +1,6 @@
 import { DocumentListener } from "../lib/db/document-listener";
 import { RunOnce } from "../lib/decorator/run-once";
-import { Attribute, Component, OnInit, OnInitParam } from "../lib/render-engine/component";
+import { AsyncAttribute, Component, OnInit, OnInitParam } from "../lib/render-engine/component";
 import { ValueProvider, ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 
@@ -26,17 +26,11 @@ export class TokenImgElement implements OnInit {
     return `${staticValues.code}-token-img`;
   }
 
+  @AsyncAttribute('data-token-uuid')
   private tokenUuid$ = new ValueProvider<string>(null);
-  @Attribute('data-token-uuid')
-  public set tokenUuid(value: string) {
-    this.tokenUuid$.set(value)
-  };
 
+  @AsyncAttribute('data-token-img')
   private tokenImg$ = new ValueProvider<string>(null);
-  @Attribute('data-token-img')
-  public set tokenImg(value: string) {
-    this.tokenImg$.set(value)
-  };
 
   public tokenImgResult: string = CONST.DEFAULT_TOKEN;
   

@@ -1,11 +1,11 @@
 import { DocumentListener } from "../lib/db/document-listener";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
-import { Attribute, Component, OnInit, OnInitParam, Output } from "../lib/render-engine/component";
+import { AsyncAttribute, Attribute, Component, OnInit, OnInitParam, Output } from "../lib/render-engine/component";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { Stoppable } from "../lib/utils/stoppable";
 import { DamageCardData } from "../modular-card/base";
-import { ValueProvider } from "../provider/value-provider";
+import { ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 import { RollResultElement } from "./roll-result-element";
 
@@ -238,23 +238,11 @@ export class RollDamageElement implements OnInit {
   @Attribute({name: 'data-override-formula', dataType: 'string'})
   public overrideFormula: string;
 
-  private _interactionPermission = new ValueProvider<string[]>()
-  @Attribute({name: 'data-interaction-permission'})
-  public get interactionPermission(): string[] {
-    return this._interactionPermission.get();
-  }
-  public set interactionPermission(v: string | string[]) {
-    this._interactionPermission.set(Array.isArray(v) ? v : [v]);
-  }
+  @AsyncAttribute({name: 'data-interaction-permission'})
+  private interactionPermission: ValueReader<string | string[]>;
 
-  private _readPermission = new ValueProvider<string[]>()
-  @Attribute({name: 'data-read-permission'})
-  public get readPermission(): string[] {
-    return this._readPermission.get();
-  }
-  public set readPermission(v: string | string[]) {
-    this._readPermission.set(Array.isArray(v) ? v : [v]);
-  }
+  @AsyncAttribute({name: 'data-read-permission'})
+  private readPermission: ValueReader<string | string[]>;
   
   private readHiddenDisplayTypeListener: Stoppable;
   private _readHiddenDisplayType: RollResultElement['displayType'];
@@ -325,13 +313,15 @@ export class RollDamageElement implements OnInit {
     }
     
     args.addStoppable(
-      this._readPermission
+      this.readPermission
+        .map(value => Array.isArray(value) ? value : [value])
         .switchMap(readPermission => UtilsDocument.hasPermissionsFromString(readPermission))
         .listen(response => {
           this.hasReadPermission = response.some(check => check.result);
           this.calcRollModeLabel();
         }),
-      this._interactionPermission
+      this.interactionPermission
+        .map(value => Array.isArray(value) ? value : [value])
         .switchMap(interactionPermission => UtilsDocument.hasPermissionsFromString(interactionPermission))
         .listen(response => {
           this.hasInteractPermission = response.some(check => check.result);

@@ -1,3 +1,4 @@
+import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
@@ -176,6 +177,50 @@ export function Attribute(config?: AttributeConfig | string) {
       targetPrototype[attributeConfigSymbol].byProperty[internalConfig.propertyKey] = [];
     }
     targetPrototype[attributeConfigSymbol].byProperty[internalConfig.propertyKey].push(internalConfig);
+  };
+}
+
+class DynamicValueReaderStoppable<T = any> implements Stoppable {
+
+  constructor (
+    public callback: (value?: T) => void,
+    public stoppables: Stoppable[],
+  ) {
+  }
+
+  public stop() {
+    for (const stoppable of this.stoppables) {
+      stoppable.stop();
+    }
+  };
+
+}
+
+export function AsyncAttribute(config?: AttributeConfig | string) {
+  return function (target: any, propertyKey: string, descriptor?: PropertyDescriptor) {
+    const valueProvider = new ValueProvider();
+
+    const getFunction = function (this: {[htmlElementSymbol]: ComponentElement}) {
+      return valueProvider;
+    };
+    const setFunction = function(this: {[htmlElementSymbol]: ComponentElement}, arg: any) {
+      valueProvider.set(arg);
+    };
+
+    if (descriptor) {
+      if (descriptor.set || descriptor.get) {
+        throw new Error(`AsyncAttribute is not compatible with getter & setters. Ref: ${target?.constructor?.name}.${propertyKey}`)
+      }
+      descriptor.get = getFunction;
+      descriptor.set = setFunction;
+    } else {
+      Reflect.defineProperty(target, propertyKey, {
+        get: getFunction,
+        set: setFunction,
+      })
+    }
+    
+    return Attribute(config)(target, propertyKey, descriptor);
   };
 }
 
