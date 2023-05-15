@@ -424,18 +424,10 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
         if (!combat) {
           continue;
         }
-        const checks = await UtilsDocument.hasPermissions(Array.from(game.users.values())
-          .filter(user => user.active)
-          .map(user => {
-            return {
-              uuid: newRow.part.createdCombatRound.combatUuid,
-              permission: 'update',
-              user: user
-            }
-          })).listenFirst();
-        const executingUser = checks.sort((a, b) => a.requestedCheck.user.id.localeCompare(b.requestedCheck.user.id))
-          .find(check => check.result)
-          ?.requestedCheck.user
+        
+        const executingUser = Array.from(game.users.values())
+          .filter(user => user.active && user.isGM)
+          .sort((a, b) => a.id.localeCompare(b.id))[0];
         if (executingUser?.id !== game.userId) {
           continue;
         }
