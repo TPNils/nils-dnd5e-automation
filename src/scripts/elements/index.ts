@@ -1,3 +1,4 @@
+import { RechargeCardComponent } from "./recharge/recharge-component";
 import { RollD20Element } from "./roll-d20-element";
 import { RollDamageElement } from "./roll-damage-element";
 import { RollResultElement } from "./roll-result-element";
@@ -8,6 +9,7 @@ export function registerHooks() {
   RollResultElement.registerHooks();
   RollDamageElement.registerHooks();
   RollD20Element.registerHooks();
+  RechargeCardComponent.registerHooks();
   TokenImgElement.registerHooks();
 }
 

@@ -262,6 +262,10 @@ export type MyItemData = {
       ver: boolean; // versatile
     }
     quantity?: number;
+    recharge?: {
+      value?: number;
+      charged: boolean;
+    }
     range: {
       value?: number;
       long?: number;
