@@ -29,22 +29,12 @@
     "./README.md"
   ],
   "dependencies": [
-    {
-      "id": "compendium-folders",
-      "name": "compendium-folders",
-      "type": "module"
-    },
     {"id": "lib-wrapper", "name": "lib-wrapper", "type": "module"},
     {"id": "socketlib", "name": "socketlib", "type": "module"}
   ],
   "relationships": {
     "systems": [{"id": "dnd5e", "type": "system"}],
     "requires": [
-      {
-        "id": "compendium-folders",
-        "name": "compendium-folders",
-        "type": "module"
-      },
       {"id": "lib-wrapper", "name": "lib-wrapper", "type": "module"},
       {"id": "socketlib", "name": "socketlib", "type": "module"}
     ]
