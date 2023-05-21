@@ -634,6 +634,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   private getTargetState(context: StateContext): VisualState[] {
+    // TODO UI: add a square wich is full, half, or empty depending on the damage calculation.
+    //  Also allow manual overrides somehow 
     const part = context.allMessageParts.getTypeData<DamageCardData>(this);
     if (part == null) {
       return [];

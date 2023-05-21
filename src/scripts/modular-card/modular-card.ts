@@ -656,55 +656,14 @@ export class ModularCard {
     DmlTrigger.registerTrigger(new ChatMessageTrigger());
     
     // - Keep scrollbar at the bottom
-    // - Add child tags to item card as a replacement for :has
     Hooks.on('renderChatLog', () => {
       const log = document.querySelector("#chat-log");
-      const itemCardSelector = `.${staticValues.moduleName}-item-card`;
       let isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
       const scrollToBottom = () => (ui.chat as any).scrollBottom();
-
-      const calcChildTags = (itemCard: Element) => {
-        const cssClasses = new Set<string>();
-        cssClasses.add(`${staticValues.moduleName}-item-card`);
-        for (const child of Array.from(itemCard.children)) {
-          cssClasses.add(`has-${child.tagName.toLowerCase()}`);
-        }
-        itemCard.className = Array.from(cssClasses).sort().join(' ');
-      }
-      
-      for (const child of Array.from(log.querySelectorAll(itemCardSelector))) {
-        calcChildTags(child);
-      }
       
       const observer = new MutationObserver((mutationsList, observer) => {
         if (isAtBottom) {
           rerenderQueue.add(scrollToBottom);
-        }
-        
-        // Add child tags to item card as a replacement for :has
-        const recalcItemCards = new Set<Element>();
-        for (const item of mutationsList) {
-          const nodes: Node[] = [];
-          nodes.push(...Array.from(item.addedNodes));
-          nodes.push(...Array.from(item.removedNodes));
-          for (const node of nodes) {
-            if (node instanceof Element) {
-              if (node.matches(itemCardSelector)) {
-                recalcItemCards.add(node);
-              } else if (node.parentElement != null && node.parentElement.matches(itemCardSelector)) {
-                recalcItemCards.add(node.parentElement);
-              } else {
-                for (const child of Array.from(node.querySelectorAll(itemCardSelector))) {
-                  recalcItemCards.add(child);
-                }
-              }
-            }
-          }
-        }
-        recalcItemCards.delete(null);
-        recalcItemCards.delete(undefined);
-        for (const itemCard of recalcItemCards) {
-          calcChildTags(itemCard);
         }
       });
 
