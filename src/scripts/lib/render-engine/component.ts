@@ -497,14 +497,6 @@ export class ComponentElement extends HTMLElement {
     if (!this.hasAttribute(hostAttr)) {
       this.setAttribute(hostAttr, '');
     }
-    if (ComponentElement.isOnInit(this.#controller)) {
-      this.#controller.onInit({
-        html: this,
-        addStoppable: (...stoppable: Stoppable[]) => {
-          this.unregisters.push(...stoppable);
-        }
-      });
-    }
 
     if (this.getComponentConfig().hasHtmlSlots) {
       // Create an observer instance linked to the callback function
@@ -545,6 +537,14 @@ export class ComponentElement extends HTMLElement {
 
     this.generateHtmlQueue().then(() => {
       this.registerEventListeners();
+      if (ComponentElement.isOnInit(this.#controller)) {
+        this.#controller.onInit({
+          html: this,
+          addStoppable: (...stoppable: Stoppable[]) => {
+            this.unregisters.push(...stoppable);
+          }
+        });
+      }
     });
   }
 
