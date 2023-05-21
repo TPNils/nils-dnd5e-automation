@@ -29,7 +29,7 @@ import { CssSelectorParser } from 'css-selector-parser';
 const cssParser = new CssSelectorParser();
  
 cssParser.registerSelectorPseudos(
-  'host-context',
+  'host-context', 'deep',
   'dir', 'lang',
   'is', 'not', 'where', 'has'
 );
@@ -254,7 +254,7 @@ class CssScoperPlugin {
       }
 
       // Inject item attributes
-      for (const rule of rules) {
+      rules: for (const rule of rules) {
         let shouldAddItemAttr = true;
         for (const attr of rule.attrs) {
           if ((attr.name === this.hostAttr || attr.name === this.itemAttr) && attr.operator == null && attr.value == null) {
@@ -267,6 +267,16 @@ class CssScoperPlugin {
             if (pseudo.name === 'host-context') {
               shouldAddItemAttr = false;
               break;
+            }
+            if (pseudo.name === 'deep') {
+              // Once you encounter :deep, do not inject any more attributes
+              if (rule.pseudos.length > 1 || rule.attrs?.length > 0 || rule.classNames?.length > 0 || rule.tagName != null) {
+                throw new Error(`:deep can't be combined with other css rules. Found: ${cssParser.render({type: 'ruleSet', rule: rule})}`);
+              }
+
+              // :deep selector only exists virtually => remove it
+              rule.pseudos = rule.pseudos.filter(p => p !== pseudo);
+              break rules;
             }
           }
         }
