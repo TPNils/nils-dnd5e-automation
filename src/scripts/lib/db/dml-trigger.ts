@@ -7,6 +7,7 @@ import { UtilsCompare } from "../utils/utils-compare";
 import { TimeoutError, UtilsPromise } from "../utils/utils-promise";
 import { FoundryDocument, UtilsDocument } from "./utils-document";
 
+const thisSessionId = crypto.randomUUID()
 const unsupportedAfterDocuments = [
   FogExploration, // Old document is only available on the client
 ];
@@ -432,6 +433,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   //#region Before
   private onFoundryBeforeCreate(document: T & {constructor: new (...args: any[]) => T}, data: any, options: DmlOptions, userId: string): void | boolean {
+    this.setCurrentUser(options);
     const originalDocumentData = document.toObject(true);
     const context: IDmlContext<T> = {
       rows: [{
@@ -454,6 +456,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   }
   
   private onFoundryBeforeUpdate(document: T & {constructor: new (...args: any[]) => T}, change: any, options: DmlOptions, userId: string): void | boolean {
+    this.setCurrentUser(options);
     const modifiedData = mergeObject(document.toObject(true), change, {inplace: false});
     const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
     const context: IDmlContext<T> = {
@@ -490,6 +493,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
   }
 
   private onFoundryBeforeDelete(document: T & {constructor: new (...args: any[]) => T}, options: DmlOptions, userId: string): void | boolean {
+    this.setCurrentUser(options);
     const context: IDmlContext<T> = {
       rows: [{
         oldRow: document,
@@ -502,6 +506,15 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       if (response === false) {
         return false;
       }
+    }
+  }
+
+  private setCurrentUser(options: DmlOptions): void {
+    if (options[staticValues.moduleName] == null) {
+      options[staticValues.moduleName] = {};
+    }
+    if (options[staticValues.moduleName].sessionId == null) {
+      options[staticValues.moduleName].sessionId = thisSessionId;
     }
   }
   //#endregion
@@ -525,7 +538,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       }],
     );
 
-    if (game.userId === userId) {
+    if (this.isCurrentUser(options)) {
       let documentSnapshot = new document.constructor(document.toObject(true), {parent: document.parent, pack: document.pack});
       const execs = context.endOfContextExecutes;
       context = new AfterDmlContext<T>(
@@ -633,7 +646,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       );
 
       const recursiveUpdate = options?.[staticValues.moduleName]?.recursiveUpdate ?? 0;
-      if (game.userId === userId) {
+      if (this.isCurrentUser(options)) {
         documentSnapshot = new document.constructor(modifiedDocument.toObject(true), {parent: document.parent, pack: document.pack});
         const execs = context.endOfContextExecutes;
         context = new AfterDmlContext<T>(
@@ -705,7 +718,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         }
       }
       
-      if (recursiveUpdate === 0 || game.userId !== userId) {
+      if (recursiveUpdate === 0 || !this.isCurrentUser(options)) {
         for (const callback of this.afterCallbackGroups.get('update').getCallbacks()) {
           try {
             await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
@@ -783,6 +796,14 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     if (options[staticValues.moduleName].extendedId == null) {
       options[staticValues.moduleName].extendedId = this.nextExtendedId++;
     }
+  }
+
+  /**
+   * Don't check on user id since the user can have multiple tabs open.
+   * This is relevant for the "/stream" url
+   */
+  private isCurrentUser(options: DmlOptions): boolean {
+    return options?.[staticValues.moduleName]?.sessionId === thisSessionId;
   }
 
   private setExtendedOptions(options: DmlOptions, extended: any) {
