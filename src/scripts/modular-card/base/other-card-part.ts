@@ -10,7 +10,6 @@ import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { UtilsFoundry, Version } from "../../utils/utils-foundry";
-import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
@@ -292,7 +291,6 @@ class OtherCardTrigger implements ITrigger<ModularCardTriggerData<OtherCardData>
       // Detect new rolled dice
       if (newRow.part.roll$?.evaluated) {
         const roll = UtilsRoll.getNewRolledTerms(oldRow?.part?.roll$, newRow.part.roll$);
-        UtilsLog.debug('new rolls', roll)
         if (roll) {
           showRolls.push({
             uuid: newRow.allParts.getActorUuid(),
@@ -307,7 +305,6 @@ class OtherCardTrigger implements ITrigger<ModularCardTriggerData<OtherCardData>
     UtilsDocument.hasPermissions(showRolls).listenFirst().then(responses => {
       const rolls: Roll[] = [];
       for (const response of responses) {
-        UtilsLog.debug('check', response)
         if (response.result) {
           rolls.push(response.requestedCheck.meta);
         }
