@@ -234,10 +234,18 @@ class CssScoperPlugin {
       while (rules[rules.length - 1].rule) {
         rules.push(rules[rules.length - 1].rule);
       }
+      
       for (const rule of rules) {
         rule.attrs = rule.attrs == null ? [] : rule.attrs;
+      }
+      
+      // Inject :host if the first attr is :deep
+      if (rules[0].pseudos && rules[0].pseudos[0].name === 'deep') {
+        rules.unshift({type: 'rule', attrs: [{name: this.hostAttr}]});
+      }
 
-        // replace :host selector
+      // replace :host selector
+      for (const rule of rules) {
         if (rule.pseudos) {
           let deletePseudoIndexes = [];
           for (let i = 0; i < rule.pseudos.length; i++) {
