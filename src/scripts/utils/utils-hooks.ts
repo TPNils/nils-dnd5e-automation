@@ -84,9 +84,16 @@ export class UtilsHooks {
         // i18n is init during setup in V8, not during init
         setup.then(i18nInitResolve)
       }
+
+      if (game.view === 'game') {
+        Hooks.once('setup', setupResolve);
+        Hooks.once('ready', readyResolve);
+      } else {
+        // fallback for "/stream" url
+        chatRendered.then(setupResolve);
+        chatRendered.then(readyResolve);
+      }
     });
-    Hooks.once('setup', setupResolve);
-    Hooks.once('ready', readyResolve);
     Hooks.once('init', chatRenderedResolve);
   }
 
