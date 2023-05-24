@@ -6,28 +6,23 @@ import { staticValues } from "../static-values";
 @Component({
   tag: SettingsItemComponent.selector(),
   html: /*html*/`
-    <label *if="this.renderType" for="this.settingKey + ''">
-      <div class="label-text">
-        <div class="integration-dummy form-group" *if="this.forceClientSettings.render">
-          <label class="integration-dummy">
-            <span [title]="this.forceClientSettings.hint" class="fa {{this.forceClientSettings.icon}}" (click)="this.toggleForceClientSetting()">&nbsp;</span>
-          </label>
-          <div class="integration-dummy form-fields">
-            <input [name]="this.settingKey"/>
-          </div>
+    <div class="label-wrapper">
+      <span *if="this.forceClientSettings.render" [title]="this.forceClientSettings.hint" class="icon fa {{this.forceClientSettings.icon}}" (click)="this.toggleForceClientSetting()">&nbsp;</span>
+      <label *if="this.renderType">
+        <div class="label-text">
+          {{this.setting.name}}
         </div>
-        {{this.setting.name}}
-      </div>
-      <input *if="this.renderType === 'string'" type="string" [value]="this.currentValue" [disabled]="!this.canEdit" (blur)="this.setValue($event)"/>
+        <input *if="this.renderType === 'string'" type="string" [value]="this.currentValue" [disabled]="!this.canEdit" (blur)="this.setValue($event)"/>
 
-      <select *if="this.renderType === 'picklist'" [disabled]="!this.canEdit" (change)="this.setValue($event)">
-        <option *for="let key in this.setting.choices" [value]="key" [selected]="this.currentValue === key">{{this.setting.choices[key]}}</option>
-      </select>
+        <select *if="this.renderType === 'picklist'" [disabled]="!this.canEdit" (change)="this.setValue($event)">
+          <option *for="let key in this.setting.choices" [value]="key" [selected]="this.currentValue === key">{{this.setting.choices[key]}}</option>
+        </select>
 
-      <input *if="this.renderType === 'number'" type="number" [value]="this.currentValue" [disabled]="!this.canEdit" (blur)="this.setValue($event)"/>
+        <input *if="this.renderType === 'number'" type="number" [value]="this.currentValue" [disabled]="!this.canEdit" (blur)="this.setValue($event)"/>
 
-      <input *if="this.renderType === 'boolean'" type="checkbox" [checked]="!!this.currentValue" [disabled]="!this.canEdit" (change)="this.setValue($event)">
-    </label>
+        <input *if="this.renderType === 'boolean'" type="checkbox" [checked]="!!this.currentValue" [disabled]="!this.canEdit" (change)="this.setValue($event)">
+      </label>
+    </div>
     <p class="notes" *if="this.renderType && this.setting?.hint">{{{this.setting.hint}}}</p>
   `,
   style: /*css*/`
@@ -35,8 +30,24 @@ import { staticValues } from "../static-values";
       display: block;
     }
 
+    .label-wrapper {
+      display: flex;
+      align-items: baseline;
+    }
+
+    .icon {
+      min-width: 20px;
+      cursor: pointer;
+    }
+
+    input,
+    select {
+      cursor: pointer;
+    }
+
     label {
       display: flex;
+      flex-grow: 1;
       align-items: center;
     }
 
@@ -44,14 +55,6 @@ import { staticValues } from "../static-values";
       display: block;
       font-weight: bold;
       flex-grow: 1;
-    }
-
-    /* Used to help with 3th party integrations who count on a fixed html structure */
-    .integration-dummy {
-      display: contents !important;
-    }
-    .integration-dummy input {
-      display: none !important;
     }
   `
 })
