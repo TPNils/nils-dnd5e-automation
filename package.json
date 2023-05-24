@@ -38,8 +38,12 @@
     "json-stringify-pretty-compact": "^2.0.0",
     "open": "^8.4.0",
     "postcss": "^8.4.19",
+    "postcss-minify": "^1.1.0",
     "sass": "^1.26.10",
     "typescript": "^4.0.2"
   },
-  "dependencies": {"gulp-filter": "^7.0.0", "gulp-uglify": "^3.0.2"}
+  "dependencies": {
+    "gulp-filter": "^7.0.0",
+    "gulp-uglify": "^3.0.2"
+  }
 }

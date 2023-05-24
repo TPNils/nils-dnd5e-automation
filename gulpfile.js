@@ -21,6 +21,7 @@ import sourcemaps from 'gulp-sourcemaps';
 import gulpFilter from 'gulp-filter';
 import gulpUglify from 'gulp-uglify';
 import minifyCss from 'gulp-clean-css';
+import postCssMinify from 'postcss-minify';
 import open from 'open';
 
 import child_process from 'child_process';
@@ -452,7 +453,7 @@ class BuildActions {
       const hostAttr = `nd5a-hid-${prefix}`;
       const itemAttr = `nd5a-cid-${prefix}`;
 
-      const rootCss = postcss(new CssScoperPlugin(hostAttr, itemAttr)).process(css);
+      const rootCss = postcss(new CssScoperPlugin(hostAttr, itemAttr), postCssMinify()).process(css);
       
       return rootCss.toString()
     }
