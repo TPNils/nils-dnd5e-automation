@@ -133,8 +133,8 @@ export class ModularCardComponent implements OnInit {
           }
         }
         for (const node of Array.from(item.removedNodes)) {
-          if (node instanceof Element) {
-            node.parentElement.classList.remove(`has-${node.tagName.toLowerCase()}`);
+          if (node instanceof Element && item.target instanceof Element) {
+            item.target.classList.remove(`has-${node.tagName.toLowerCase()}`);
           }
         }
       }
