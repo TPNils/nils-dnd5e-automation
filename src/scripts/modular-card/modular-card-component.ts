@@ -40,18 +40,17 @@ import { ModularCard } from "./modular-card";
       --button-height: calc(2em - 2px);
     }
 
-    .item-card :deep button {
+    :deep button {
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: var(--font-size-14, 14px);
       background: rgb(190, 189, 178);
       border: 2px groove #eeede0;
       height: var(--button-height);
       line-height: calc(var(--button-height) - 4px);
     }
     
-    .item-card :deep .overlay {
+    :deep .overlay {
       display: flex;
       position: absolute;
       left: 0px;
@@ -62,31 +61,31 @@ import { ModularCard } from "./modular-card";
       padding: 3px;
     }
     
-    .item-card :deep .overlay > .left,
-    .item-card :deep .overlay > .right {
+    :deep .overlay > .left,
+    :deep .overlay > .right {
       pointer-events: initial;
       display: flex;
       width: fit-content;
     }
     
-    .item-card :deep .overlay > .middel {
+    :deep .overlay > .middel {
       flex-grow: 1;
     }
     
     /* default foundry css */
-    .item-card :deep .table {
+    :deep .table {
       padding-left: 2px;
     }
     
-    .item-card :deep .header-cell {
+    :deep .header-cell {
       background: rgba(0, 0, 0, 0.5);
       color: #f0f0e0;
       text-shadow: 1px 1px #000;
       border-bottom: 1px solid #000;
     }
         
-    .item-card :deep .body-cell,
-    .item-card :deep .header-cell {
+    :deep .body-cell,
+    :deep .header-cell {
       padding: 0.25em 1px;
       min-height: 1.8em;
       text-align: center;
