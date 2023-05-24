@@ -299,7 +299,6 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
         newRow.data._source.content = `<div data-${staticValues.code}-tag-replacer="${ModularCardComponent.getSelector()}">
           <span data-slot="not-installed-placeholder">The ${staticValues.moduleName} module is required to render this message.</span>
         </div>`;
-        UtilsLog.debug(newRow.data._source.content)
       }
     }
   }
