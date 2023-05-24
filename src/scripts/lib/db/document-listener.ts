@@ -1,4 +1,5 @@
 import { ValueProvider, ValueReader } from "../../provider/value-provider";
+import { UtilsHooks } from "../../utils/utils-hooks";
 import { UtilsLog } from "../../utils/utils-log";
 import { RunOnce } from "../decorator/run-once";
 import { Stoppable } from "../utils/stoppable";
@@ -12,9 +13,9 @@ const afterSettingHook = new ValueProvider<true>();
 if (game.settings) {
   afterSettingHook.set(true);
 } else {
-  Hooks.on('setup', () => {
+  UtilsHooks.setup().then(() => {
     afterSettingHook.set(true);
-  });
+  })
 }
 
 afterSettingHook.listenFirst().then(() => SettingListener.initClientSideSettingsHook());
