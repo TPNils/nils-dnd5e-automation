@@ -211,6 +211,21 @@ export class ModuleSettings {
           <b>Always</b>: Always auto roll the damage.<br/>
         `,
       });
+      game.settings.register<string, string, string>(staticValues.moduleName, `${variant}AutorollOther`, {
+        scope: scope,
+        config: false,
+        type: String,
+        choices: {
+          never: 'Never',
+          always: 'Always',
+        },
+        default: 'never',
+        name: `${variant.capitalize()}: Auto roll ${game.i18n.localize('DND5E.OtherFormula').toLowerCase()}`,
+        hint: `
+          <b>Never</b>: Never auto roll the ${game.i18n.localize('DND5E.OtherFormula').toLowerCase()}.<br/>
+          <b>Always</b>: Always auto roll the ${game.i18n.localize('DND5E.OtherFormula').toLowerCase()}.<br/>
+        `,
+      });
       
       game.settings.register<string, string, string>(staticValues.moduleName, `${variant}AutorollCheck`, {
         scope: scope,
@@ -271,6 +286,9 @@ export class ModuleSettings {
       {permissionName: `${staticValues.code}ReadItemDescription`, setting: 'itemDescriptionVisibility'},
       {permissionName: `${staticValues.code}ReadAttack`, setting: 'attackVisibility'},
       {permissionName: `${staticValues.code}ReadDamage`, setting: 'damageVisibility'},
+      // Since it's listed in the UI with damage, treat it with the same rule set
+      // May want to change depending on user feedback
+      {permissionName: `${staticValues.code}ReadOther`, setting: 'damageVisibility'},
       {permissionName: `${staticValues.code}ReadImmunity`, setting: 'immunityVisibility'},
       {permissionName: `${staticValues.code}ReadCheck`, setting: 'checkVisibility'},
       {permissionName: `${staticValues.code}ReadCheckDc`, setting: 'checkDcVisibility'},

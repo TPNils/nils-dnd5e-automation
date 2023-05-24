@@ -12,9 +12,10 @@ import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { CheckCardData, CheckCardPart } from "./check-card-part";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
+import { OtherCardData, OtherCardPart } from "./other-card-part";
 import { TemplateCardData, TemplateCardPart } from "./template-card-part";
 
-type AutoConsumeAfter = 'never' | 'init' | 'attack' | 'damage' | 'check' | 'template-placed';
+type AutoConsumeAfter = 'never' | 'init' | 'attack' | 'damage' | 'other-formula' | 'check' | 'template-placed';
 
 export interface ResourceCardData {
   consumeResources: {
@@ -185,6 +186,12 @@ function getMessageState(allParts: ModularCardInstance): MessageState {
     messageState.hasStates.add('template-placed');
     if (allParts.getTypeData<TemplateCardData>(TemplateCardPart.instance).calc$.createdTemplateUuid) {
       messageState.completedStates.add('template-placed');
+    }
+  }
+  if (allParts.hasType(OtherCardPart.instance)) {
+    messageState.hasStates.add('other-formula');
+    if (allParts.getTypeData<OtherCardData>(OtherCardPart.instance).roll$?.evaluated) {
+      messageState.completedStates.add('other-formula');
     }
   }
 

@@ -106,4 +106,8 @@ export class UtilsFoundry {
     return Version.fromString(version);
   }
 
+  public static getSystemVersion(): Version {
+    return Version.fromString(game.system.data.version);
+  }
+
 }

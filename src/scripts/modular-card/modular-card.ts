@@ -10,7 +10,7 @@ import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
 import { MyActor, MyItem, SpellData } from "../types/fixed-types";
 import { UtilsLog } from "../utils/utils-log";
-import { ActiveEffectCardPart, AttackCardData, AttackCardPart, CheckCardData, CheckCardPart, DamageCardData, DamageCardPart, DescriptionCardPart, PropertyCardPart, ResourceCardData, ResourceCardPart, SpellLevelCardData, SpellLevelCardPart, TargetCardData, TargetCardPart, TemplateCardData, TemplateCardPart } from "./base/index";
+import { ActiveEffectCardPart, AttackCardData, AttackCardPart, CheckCardData, CheckCardPart, DamageCardData, DamageCardPart, DescriptionCardPart, OtherCardPart, PropertyCardPart, ResourceCardData, ResourceCardPart, SpellLevelCardData, SpellLevelCardPart, TargetCardData, TargetCardPart, TemplateCardData, TemplateCardPart } from "./base/index";
 import { ItemUtils } from "./item-utils";
 import { ModularCardComponent } from "./modular-card-component";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
@@ -400,6 +400,7 @@ export class BeforeCreateModuleCardEvent {
       SpellLevelCardPart.instance,
       AttackCardPart.instance,
       DamageCardPart.instance,
+      OtherCardPart.instance,
       TemplateCardPart.instance,
       ResourceCardPart.instance,
       CheckCardPart.instance,

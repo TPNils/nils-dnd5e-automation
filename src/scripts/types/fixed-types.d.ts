@@ -230,6 +230,8 @@ export type MyItemData = {
     description: {
       value?: string | null;
     },
+    /** "Other" damage */
+    formula?: string;
     level?: number;
     materials: {
       consumed: boolean;
@@ -349,6 +351,7 @@ export interface MyItem extends BaseDocument<MyItemData> {
   getChatData: () => any;
   rollAttack(options?: D20RollOptions): Promise<Roll | null>;
   rollDamage(args?: {critical?: boolean, spellLevel?: MyItemData['data']['level'], versatile?: boolean, options?: {fastForward?: boolean, chatMessage?: boolean}}): Promise<Roll>;
+  rollFormula(options?: {spellLevel?: number; chatMessage?: boolean;}): Promise<Roll | null>;
   roll({}: {configureDialog?: boolean, rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
   displayCard({}: {rollMode?: ClientSettings.Values[`core.rollMode`], createMessage?: boolean} = {}): Promise<ChatMessage>;
   getCriticalThreshold(): number | null;
