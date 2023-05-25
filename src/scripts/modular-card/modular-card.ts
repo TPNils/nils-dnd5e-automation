@@ -295,10 +295,18 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
       if (newRow == null) {
         continue;
       }
-      if (ModularCard.getCardPartDatas(newRow) != null) {
-        newRow.data._source.content = `<div data-${staticValues.code}-tag-replacer="${ModularCardComponent.getSelector()}">
+      const parts = ModularCard.getCardPartDatas(newRow);
+      if (parts != null) {
+        const attr: [string, string][] = [];
+        if (parts.getItemUuid()) {
+          // Used to integrate with CUB concentrator
+          // Other modules might also use this?
+          attr.push([`data-item-id`, /Item\.([^\.]+)/i.exec(parts.getItemUuid())[1]]);
+        }
+        newRow.data._source.content = `<div ${attr.map(att => `${att[0]}=${att[1]}`).join(' ')}>
+        <div data-${staticValues.code}-tag-replacer="${ModularCardComponent.getSelector()}">
           <span data-slot="not-installed-placeholder">The ${staticValues.moduleName} module is required to render this message.</span>
-        </div>`;
+        </div></div>`;
       }
     }
   }
