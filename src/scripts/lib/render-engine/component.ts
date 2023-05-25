@@ -372,6 +372,8 @@ export interface OnInitParam {
   addStoppable(...stoppable: Stoppable[]): void;
 }
 
+const deepUpdateOptions = {deepUpdate: true};
+
 export class ComponentElement extends HTMLElement {
   #controller: object
   protected get controller(): object {
@@ -617,14 +619,14 @@ export class ComponentElement extends HTMLElement {
       } else {
         this.template = new Template(this.nodeName, parsedHtml, this.#controller);
         this.templateRenderResult = await this.template.render();
-        const rootNodes = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
+        const rootNodes = await VirtualNodeRenderer.renderDom(this.templateRenderResult, deepUpdateOptions);
         this.findSlots();
         this.applySlots();
         this.setInnerNode(rootNodes);
       }
     } else if (this.template !== null) {
       this.templateRenderResult = await this.template.render({force: true});
-      const rootNodes = await VirtualNodeRenderer.renderDom(this.templateRenderResult, true);
+      const rootNodes = await VirtualNodeRenderer.renderDom(this.templateRenderResult, deepUpdateOptions);
       this.findSlots();
       this.applySlots();
       this.setInnerNode(rootNodes);

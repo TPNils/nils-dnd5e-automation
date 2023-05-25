@@ -65,16 +65,17 @@ export class VirtualNodeRenderer {
   
   /**
    * @param virtualNode The virtual node that needs to be converted to a DOM element
-   * @param deepUpdate when false and the node already exists, only update the node itself, not it's children
+   * @param options.deepUpdate when false and the node already exists, only update the node itself, not it's children
    * @returns Created or updated DOM element
    */
-  public static async renderDom<T extends VirtualNode>(virtualNode: T, deepUpdate: boolean = false): Promise<Node[]> {
+  public static renderDom<T extends VirtualNode>(virtualNode: T, options: {deepUpdate?: boolean, async?: boolean} = {}): Promise<Node[]> | Node[] {
+    options = {deepUpdate: false, async: true, ...options};
     let pending: Array<{parent?: VirtualParentNode, node: VirtualNode, defaultNamespace: string | undefined;}> = [{
       node: virtualNode,
       defaultNamespace: document?.head?.namespaceURI,
     }];
     const allSyncDomActions: DomAction[] = [];
-    const allAsyncDomActions: DomAction[] = [];
+    let allAsyncDomActions: DomAction[] = [];
     
     while (pending.length > 0) {
       const processing = pending;
@@ -194,7 +195,7 @@ export class VirtualNodeRenderer {
           }
           
           // add/delete children
-          if (deepUpdate && process.node.isParentNode()) {
+          if (options.deepUpdate && process.node.isParentNode()) {
             const currentChildrenByNode = new Map<Node, VirtualNode>();
             for (const child of process.node.childNodes) {
               currentChildrenByNode.set(VirtualNodeRenderer.getOrNewState(child, namespace).domNode, child);
@@ -242,7 +243,7 @@ export class VirtualNodeRenderer {
           }
           
           // add children to the process queue
-          if (deepUpdate && process.node.isParentNode()) {
+          if (options.deepUpdate && process.node.isParentNode()) {
             for (const child of process.node.childNodes) {
               pending.push({parent: process.node, node: child, defaultNamespace: namespace});
             }
@@ -251,6 +252,10 @@ export class VirtualNodeRenderer {
           allAsyncDomActions.push(...domActions);
         }
       }
+    }
+    if (!options.async) {
+      allSyncDomActions.push(...allAsyncDomActions);
+      allAsyncDomActions = [];
     }
     if (allSyncDomActions.length > 0) {
       VirtualNodeRenderer.processDomActions(allSyncDomActions);
@@ -261,7 +266,11 @@ export class VirtualNodeRenderer {
         return VirtualNodeRenderer.getNodes(virtualNode);
       });
     }
-    return Promise.resolve(VirtualNodeRenderer.getNodes(virtualNode));
+    if (options.async) {
+      return Promise.resolve(VirtualNodeRenderer.getNodes(virtualNode));
+    } else {
+      return VirtualNodeRenderer.getNodes(virtualNode);
+    }
   }
 
   private static queuedDomActions: DomAction[] = [];
