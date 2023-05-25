@@ -366,7 +366,6 @@ export class VirtualNodeRenderer {
               case 'nodeValue': {
                 // domParser.parseFromString removes the start whitespaces
                 const whitespacePrefix = /^ */.exec(item.value);
-                const escaped = item.value.replace(/&/, '&amp').replace(/</, '&lt;').replace(/>/, '&gt;');
                 const unescapedHtml = item.value.replace(/&(#[0-9]+|[a-z]+);/ig, (fullMatch, group1: string) => {
                   if (group1.startsWith('#')) {
                     return String.fromCharCode(Number.parseInt(group1.substring(1)));
@@ -378,9 +377,6 @@ export class VirtualNodeRenderer {
                   return domEscapeCharactersByCode.get(group1);
                 });
                 item.node.nodeValue = whitespacePrefix + unescapedHtml;
-                if (item.value.includes('&lt;')) {
-                  UtilsLog.debug({value: item.value, escaped, unescapedHtml})
-                }
                 break;
               }
               case 'removeNode': {
