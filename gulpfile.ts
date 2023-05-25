@@ -442,7 +442,7 @@ class BuildActions {
      * @param {string} prefix 
      * @param {string} css 
      */
-    function doCssTransform(prefix, css) {
+    function doCssTransform(prefix: string, css: string) {
       const hostAttr = `nd5a-hid-${prefix}`;
       const itemAttr = `nd5a-cid-${prefix}`;
 
@@ -475,10 +475,7 @@ class BuildActions {
     }
 
     let cssId = 0;
-    /**
-     * @param {typescript.TransformationContext} context
-     */
-    return function cssTransformer(context) {
+    return function cssTransformer(context: typescript.TransformationContext) {
       
       /** @type {typescript.Visitor} */
       const visit = (node) => {
@@ -496,7 +493,7 @@ class BuildActions {
                 if (changed !== false) {
                   properties.push(context.factory.createPropertyAssignment(
                     property.name,
-                    context.factory.createNoSubstitutionTemplateLiteral(changed, changed),
+                    context.factory.createNoSubstitutionTemplateLiteral(changed),
                   ));
                   break;
                 } else {
