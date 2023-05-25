@@ -421,34 +421,36 @@ class BuildActions {
    * @returns {typescript.TransformerFactory<typescript.SourceFile>}
    */
   private static cssTransformer() {
-    /**
-     * @param {string} prefix 
-     * @param {typescript.ObjectLiteralElementLike} property
-     * @returns {string | false}
-     */
-    function transformCssProperty(prefix, property) {
-      const init = property.initializer;
+    function transformCssProperty(prefix: string, property: typescript.PropertyAssignment): string | false {
+      let init = property.initializer;
+      let transformer = doCssTransform;
+      if (typescript.isTaggedTemplateExpression(init)) {
+        if (init.tag.getText() === 'scss') {
+          transformer = doScssTransform;
+          init = init.template;
+        }
+      }
       if (typescript.isStringLiteral(init)) {
-        return doCssTransform(prefix, init.text);
+        return transformer(prefix, init.text);
       } else if (typescript.isNoSubstitutionTemplateLiteral(init)) {
-        return doCssTransform(prefix, init.text);
+        return transformer(prefix, init.text);
       } else if (typescript.isTemplateExpression(init)) {
         throw Error(`Javascript string templates with variables are not supported in @Component styles`)
       }
       return false;
     }
     
-    /**
-     * @param {string} prefix 
-     * @param {string} css 
-     */
-    function doCssTransform(prefix: string, css: string) {
+    function doCssTransform(prefix: string, css: string): string {
       const hostAttr = `nd5a-hid-${prefix}`;
       const itemAttr = `nd5a-cid-${prefix}`;
 
       const rootCss = postcss(new CssScoperPlugin(hostAttr, itemAttr), postCssMinify()).process(css);
       
       return rootCss.toString()
+    }
+    
+    function doScssTransform(prefix: string, scss: string): string {
+      return doCssTransform(prefix, sassCompiler.compileString(scss).css)
     }
 
     /**
