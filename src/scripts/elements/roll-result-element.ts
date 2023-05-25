@@ -173,7 +173,7 @@ const defaultDisplayType: DisplayType = 'result';
   .terms .term-result.exploded:before {
     font-size: var(--font-size-8, 8px);
     font-family: "Font Awesome 5 Free";
-    content: "\f666";
+    content: "\\f666";
     position: absolute;
     top: -8px;
     right: 0;
