@@ -1,4 +1,4 @@
-import { MyActor } from "./fixed-types"
+export {};
 
 /** 
  * Add virtual "global keywords" that will be picked up by the compiler and and removed.
