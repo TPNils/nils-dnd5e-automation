@@ -22,7 +22,7 @@ async function displayCard(this: MyItem, wrapped: (...args: any) => any, ...args
     const speaker = ChatMessage.getSpeaker();
     if (speaker.actor === (this.actor as MyActor)?.id) {
       if (speaker.scene && speaker.token) {
-        token = game.scenes.get(speaker.scene).getEmbeddedDocument(TokenDocument.documentName, speaker.token) as TokenDocument;
+        token = game.scenes.get(speaker.scene).getEmbeddedDocument((TokenDocument as any).documentName, speaker.token) as TokenDocument;
       }
     }
   }

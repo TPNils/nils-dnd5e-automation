@@ -1,32 +1,28 @@
-/**
- * Based on https://gitlab.com/tposney/midi-qol/-/blob/master/gulpfile.js
- */
+import * as glob from 'glob';
+import * as gulp from 'gulp';
+import * as fs from 'fs-extra';
+import * as path from 'path';
+import * as chalk from 'chalk';
+import * as archiver from 'archiver';
+import * as stringify from 'json-stringify-pretty-compact';
+import * as typescript from 'typescript';
+import * as postcss from 'postcss';
 
-import glob from 'glob';
-import gulp from 'gulp';
-import fs from 'fs-extra';
-import path, { join } from 'path';
-import chalk from 'chalk';
-import archiver from 'archiver';
-import stringify from 'json-stringify-pretty-compact';
-import typescript from 'typescript';
-import postcss from 'postcss';
+import * as ts from 'gulp-typescript';
+import * as less from 'gulp-less';
+import * as sassCompiler from 'sass';
+import * as gulpSass from 'gulp-sass';
+import * as git from 'gulp-git';
+import * as sourcemaps from 'gulp-sourcemaps';
+import * as gulpFilter from 'gulp-filter';
+import * as gulpUglify from 'gulp-uglify';
+import * as minifyCss from 'gulp-clean-css';
+import * as postCssMinify from 'postcss-minify';
+import * as open from 'open';
 
-import ts from 'gulp-typescript';
-import less from 'gulp-less';
-import sassCompiler from 'sass';
-import gulpSass from 'gulp-sass';
-import git from 'gulp-git';
-import sourcemaps from 'gulp-sourcemaps';
-import gulpFilter from 'gulp-filter';
-import gulpUglify from 'gulp-uglify';
-import minifyCss from 'gulp-clean-css';
-import postCssMinify from 'postcss-minify';
-import open from 'open';
-
-import child_process from 'child_process';
-import yargs from 'yargs';
-import { CssSelectorParser } from 'css-selector-parser';
+import * as child_process from 'child_process';
+import * as yargs from 'yargs';
+import { CssSelectorParser, Rule } from 'css-selector-parser';
 const cssParser = new CssSelectorParser();
  
 cssParser.registerSelectorPseudos(
@@ -109,16 +105,16 @@ class Meta {
     }
   }
   
-  /**
-   * @param {'src' | 'dist'} type
-   * @returns {{
-   *   file: any,
-   *   name: string,
-   *   root: string
-   * }}
-   */
-  static getManifest(type = 'src') {
-    const json = {};
+  public static getManifest(type: 'src' | 'dist' = 'src'): {
+    file: any,
+    name: string,
+    root: string
+  } {
+    const json: {
+      file?: any,
+      name?: string,
+      root?: string
+    } = {};
     json.root = type;
   
     const modulePath = path.join(json.root, 'module.json');
@@ -131,25 +127,20 @@ class Meta {
       json.file = fs.readJSONSync(systemPath);
       json.name = 'system.json';
     } else {
-      return;
+      throw new Error(`No file found: ${modulePath} OR ${systemPath}`)
     }
   
-    return json;
+    return json as any;
   }
 
-  /**
-   * @param {string} dest
-   * @returns {Promise<void>}
-   */
-  static createBuildManifest(dest) {
+  static createBuildManifest(dest: string): () => Promise<void> {
     dest = path.normalize(dest);
     return async function buildManifest() {
       const manifest = Meta.getManifest();
   
-      /** @type {Promise<string[]>[]} */
-      const filePromises = [];
-      filePromises.push(new Promise((resolve, reject) => {
-        glob(path.join(dest, '**/*.css'), (err, matches) => {
+      const filePromises: Promise<string[]>[] = [];
+      filePromises.push(new Promise<string[]>((resolve, reject) => {
+        glob(path.join(dest, '**/*.css'), (err, matches: string[]) => {
           if (err) {
             reject(err);
             return;
@@ -157,8 +148,8 @@ class Meta {
           resolve(matches);
         })
       }));
-      filePromises.push(new Promise((resolve, reject) => {
-        glob(path.join(dest, '**/*.hbs'), (err, matches) => {
+      filePromises.push(new Promise<string[]>((resolve, reject) => {
+        glob(path.join(dest, '**/*.hbs'), (err, matches: string[]) => {
           if (err) {
             reject(err);
             return;
@@ -168,10 +159,8 @@ class Meta {
       }));
     
       const fileNameCollection = await Promise.all(filePromises)
-      /** @type {Set<string>} */
-      const cssFiles = new Set();
-      /** @type {Set<string>} */
-      const hbsFiles = new Set();
+      const cssFiles = new Set<string>();
+      const hbsFiles = new Set<string>();
       for (const fileNames of fileNameCollection) {
         for (let fileName of fileNames) {
           fileName = path.normalize(fileName);
@@ -192,13 +181,17 @@ class Meta {
         manifest.file.flags = {};
       }
       if (Array.isArray(manifest.file.styles)) {
-        cssFiles.add(...manifest.file.styles)
+        for (const value of manifest.file.styles) {
+          cssFiles.add(value)
+        }
       }
       cssFiles.delete(null);
       cssFiles.delete(undefined);
   
       if (Array.isArray(manifest.file.flags.hbsFiles)) {
-        hbsFiles.add(...manifest.file.flags.hbsFiles)
+        for (const value of manifest.file.hbsFiles) {
+          hbsFiles.add(value)
+        }
       }
       hbsFiles.delete(null);
       hbsFiles.delete(undefined);
@@ -213,27 +206,22 @@ class Meta {
 }
 
 class CssScoperPlugin {
-  static #isProcessed = Symbol('isProcessed');
-  postcssPlugin = 'prefix-scope';
+  private static isProcessed = Symbol('isProcessed');
+  public postcssPlugin = 'prefix-scope';
 
-  hostAttr;
-  itemAttr;
-
-  constructor(hostAttr, itemAttr) {
-    this.hostAttr = hostAttr;
-    this.itemAttr = itemAttr;
+  constructor(private hostAttr: string, private itemAttr: string) {
   }
 
   RuleExit = (rule, helpers) => {
-    if (rule[CssScoperPlugin.#isProcessed] === true) {
+    if (rule[CssScoperPlugin.isProcessed] === true) {
       return;
     }
     const rootParsedRules = cssParser.parse(rule.selector);
     let pendingRules = rootParsedRules.type === 'selectors' ? rootParsedRules.selectors : [rootParsedRules];
     for (const rootRule of pendingRules) {
-      let rules = [rootRule.rule];
+      let rules: Array<Partial<Rule>> = [rootRule.rule];
       while (rules[rules.length - 1].rule) {
-        rules.push(rules[rules.length - 1].rule);
+        rules.push(rules[rules.length - 1].rule!);
       }
       
       for (const rule of rules) {
@@ -253,7 +241,7 @@ class CssScoperPlugin {
             const pseudo = rule.pseudos[i];
             if (pseudo.name === 'host') {
               deletePseudoIndexes.push(i);
-              rule.attrs.unshift({name: this.hostAttr});
+              rule.attrs!.unshift({name: this.hostAttr});
             }
           }
           for (let i = deletePseudoIndexes.length - 1; i >= 0; i--) {
@@ -265,8 +253,8 @@ class CssScoperPlugin {
       // Inject item attributes
       rules: for (const rule of rules) {
         let shouldAddItemAttr = true;
-        for (const attr of rule.attrs) {
-          if ((attr.name === this.hostAttr || attr.name === this.itemAttr) && attr.operator == null && attr.value == null) {
+        for (const attr of rule.attrs!) {
+          if ((attr.name === this.hostAttr || attr.name === this.itemAttr) && (attr as any).operator == null && (attr as any).value == null) {
             shouldAddItemAttr = false;
             break;
           }
@@ -280,7 +268,7 @@ class CssScoperPlugin {
             if (pseudo.name === 'deep') {
               // Once you encounter :deep, do not inject any more attributes
               if (rule.pseudos.length > 1 || rule.attrs?.length > 0 || rule.classNames?.length > 0 || rule.tagName != null) {
-                throw new Error(`:deep can't be combined with other css rules. Found: ${cssParser.render({type: 'ruleSet', rule: rule})}`);
+                throw new Error(`:deep can't be combined with other css rules. Found: ${cssParser.render({type: 'ruleSet', rule: rule as Rule})}`);
               }
 
               // :deep selector only exists virtually => remove it
@@ -310,11 +298,11 @@ class CssScoperPlugin {
           }
           
           if (rule.pseudos.length > 1 || rule.attrs?.length > 0 || rule.classNames?.length > 0 || rule.tagName != null || typeof hostContextPseudo.value === 'string') {
-            throw new Error(`:host-context() can't be combined with other css rules. Found: ${cssParser.render({type: 'ruleSet', rule: rule})}`);
+            throw new Error(`:host-context() can't be combined with other css rules. Found: ${cssParser.render({type: 'ruleSet', rule: rule as Rule})}`);
           }
 
           if (hostContextPseudo.value.type !== 'ruleSet') {
-            throw new Error(`:host-context() currently only supports ruleSet: ${cssParser.render({type: 'ruleSet', rule: rule})}`);
+            throw new Error(`:host-context() currently only supports ruleSet: ${cssParser.render({type: 'ruleSet', rule: rule as Rule})}`);
           }
           
           const replaceRules = [{
@@ -334,13 +322,13 @@ class CssScoperPlugin {
       
       // Write the order of the rules the way cssParser expects
       for (let i = 0; i < rules.length - 1; i++) {
-        rules[i].rule = rules[i+1];
+        rules[i].rule = rules[i+1] as Rule;
         rules[i+1].rule = null;
       }
-      rootRule.rule = rules[0];
+      rootRule.rule = rules[0] as Rule;
     }
     const newSelectors = cssParser.render(rootParsedRules);
-    rule[CssScoperPlugin.#isProcessed] = true;
+    rule[CssScoperPlugin.isProcessed] = true;
     if (rule.selector !== newSelectors) {
       rule.selector = newSelectors;
     }
@@ -380,31 +368,36 @@ class BuildActions {
      * Transforms import/export declarations to append `.js` extension
      * @param {typescript.TransformationContext} context
      */
-    function importTransformer(context) {
+    function importTransformer(context: typescript.TransformationContext) {
       return (node) => {
-        /**
-         * @param {typescript.Node} node
-         */
-        function visitor(node) {
+        function visitor(node: typescript.Node) {
           if (shouldMutateModuleSpecifier(node)) {
             if (typescript.isImportDeclaration(node)) {
-              const newModuleSpecifier = typescript.createLiteral(`${node.moduleSpecifier.text}.js`);
-              return typescript.updateImportDeclaration(
-                node,
-                node.decorators,
-                node.modifiers,
-                node.importClause,
-                newModuleSpecifier
-              );
+              const nodeText: string = (node.moduleSpecifier as any).text;
+              if (!nodeText.endsWith('.js')) {
+                const newModuleSpecifier = typescript.factory.createStringLiteral(`${nodeText}.js`);
+                return typescript.factory.updateImportDeclaration(
+                  node,
+                  node.decorators,
+                  node.modifiers,
+                  node.importClause,
+                  newModuleSpecifier,
+                  node.assertClause,
+                );
+              }
             } else if (typescript.isExportDeclaration(node)) {
-              const newModuleSpecifier = typescript.createLiteral(`${node.moduleSpecifier.text}.js`);
-              return typescript.updateExportDeclaration(
-                node,
-                node.decorators,
-                node.modifiers,
-                node.exportClause,
-                newModuleSpecifier
-              );
+              const nodeText: string = (node.moduleSpecifier as any).text;
+              if (!nodeText.endsWith('.js')) {
+                const newModuleSpecifier = typescript.factory.createStringLiteral(`${nodeText}.js`);
+                return typescript.updateExportDeclaration(
+                  node,
+                  node.decorators,
+                  node.modifiers,
+                  node.exportClause,
+                  newModuleSpecifier,
+                  node.isTypeOnly,
+                );
+              }
             }
           }
           return typescript.visitEachChild(node, visitor, context);
@@ -427,7 +420,7 @@ class BuildActions {
    * Transform @Component style css at compile time since we can't make use of an external library at runtime
    * @returns {typescript.TransformerFactory<typescript.SourceFile>}
    */
-  static #cssTransformer() {
+  private static cssTransformer() {
     /**
      * @param {string} prefix 
      * @param {typescript.ObjectLiteralElementLike} property
@@ -531,21 +524,17 @@ class BuildActions {
     }
   }
 
-  /** @type {ts.Project} */
-  static #tsConfig;
-  /**
-   * @returns {ts.Project}
-   */
-  static #getTsConfig() {
-    if (BuildActions.#tsConfig == null) {
-      BuildActions.#tsConfig = ts.createProject('tsconfig.json', {
+  private static tsConfig: ts.Project;
+  private static getTsConfig(): ts.Project {
+    if (BuildActions.tsConfig == null) {
+      BuildActions.tsConfig = ts.createProject('tsconfig.json', {
         getCustomTransformers: (_program) => ({
-          before: [BuildActions.#cssTransformer()],
+          before: [BuildActions.cssTransformer()],
           after: [BuildActions.importTransformer()],
         }),
       });
     }
-    return BuildActions.#tsConfig;
+    return BuildActions.tsConfig;
   }
 
   /**
@@ -571,7 +560,7 @@ class BuildActions {
         const manifest = Meta.getManifest();
         return gulp.src('src/**/*.ts')
           .pipe(sourcemaps.init())
-          .pipe(BuildActions.#getTsConfig()())
+          .pipe(BuildActions.getTsConfig()())
           /*.pipe(minifyJs({
             ext: { min: '.js' },
             mangle: false,
@@ -609,7 +598,7 @@ class BuildActions {
       };
       return gulp.src('src/**/*.ts')
         .pipe(sourcemaps.init())
-        .pipe(BuildActions.#getTsConfig()())
+        .pipe(BuildActions.getTsConfig()())
         .pipe(sourcemaps.mapSources(function(sourcePath, file) {
           const filePathParts = file.relative.split(path.sep);
           return '/' + [urlPrefix, ...filePathParts].join('/').replace(/\.js$/, '.ts');
@@ -686,7 +675,7 @@ class BuildActions {
     }
   }
 
-  static #startFoundry() {
+  private static startFoundry() {
     if (!fs.existsSync('foundryconfig.json')) {
       console.warn('Could not start foundry: foundryconfig.json not found in project root');
       return;
@@ -752,16 +741,16 @@ class BuildActions {
         // finish, close, end
         await BuildActions.createClean(destPath)();
         await Promise.all([
-          new Promise((resolve) => BuildActions.createBuildTS(destPath)().once('end', () => resolve())),
-          new Promise((resolve) => BuildActions.createBuildLess(destPath)().once('end', () => resolve())),
-          new Promise((resolve) => BuildActions.createBuildSASS(destPath)().once('end', () => resolve())),
+          new Promise<void>((resolve) => BuildActions.createBuildTS(destPath)().once('end', () => resolve())),
+          new Promise<void>((resolve) => BuildActions.createBuildLess(destPath)().once('end', () => resolve())),
+          new Promise<void>((resolve) => BuildActions.createBuildSASS(destPath)().once('end', () => resolve())),
           copyFilesFunc(),
         ]);
         // Only build manifest once all hbs & css files are generated
         await Meta.createBuildManifest(destPath)();
   
         // Only start foundry when the manifest is build
-        BuildActions.#startFoundry();
+        BuildActions.startFoundry();
       },
       function watch() {
         // Do not watch to build the manifest since it only gets loaded on server start
@@ -795,7 +784,7 @@ class BuildActions {
    * Package the module into a zip
    * @param {string} inputDir the directory which should be zipped
    */
-  static createBuildPackage(inputDir) {
+  static createBuildPackage(inputDir: string) {
     return async function buildPackage() {
       const manifest = Meta.getManifest();
       inputDir = path.normalize(inputDir);
@@ -803,7 +792,7 @@ class BuildActions {
         inputDir += path.sep;
       }
     
-      return new Promise((resolve, reject) => {
+      return new Promise<void>((resolve, reject) => {
         try {
           // Ensure there is a directory to hold all the packaged versions
           fs.ensureDirSync('package');
@@ -874,7 +863,7 @@ class BuildActions {
 
 class Args {
   /** @type {{u?: string; update?: string;}} */
-  static #args = yargs.argv;
+  private static args = yargs.argv;
  
   /**
    * @param {string} currentVersion
@@ -884,7 +873,7 @@ class Args {
     if (currentVersion == null || currentVersion == '') {
       currentVersion = '0.0.0';
     }
-    const version = Args.#args.update || Args.#args.u;
+    const version = Args.args.update || Args.args.u;
     if (!version) {
       if (allowNoVersion) {
         return null;

@@ -846,6 +846,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const simulatedOldRow: User = new User(user.toObject(true), {parent: user.parent, pack: user.pack});
       
       // Prevent the hook from going off again
+      const originalAdd = documentSnapshot.targets.add;
+      const originalDelete = documentSnapshot.targets.delete;
       documentSnapshot.targets.add = Set.prototype.add;
       documentSnapshot.targets.delete = Set.prototype.delete;
       simulatedOldRow.targets.add = Set.prototype.add;
@@ -870,8 +872,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       }
       
       // Re-enable hook events, not for oldRow since it should be immutable anyway
-      documentSnapshot.targets.add = UserTargets.prototype.add;
-      documentSnapshot.targets.delete = UserTargets.prototype.delete;
+      documentSnapshot.targets.add = originalAdd;
+      documentSnapshot.targets.delete = originalDelete;
 
       rows.push({
         newRow: documentSnapshot as any,
