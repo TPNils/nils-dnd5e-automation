@@ -30,6 +30,7 @@ export interface SpellLevelCardData {
   }
 }
 
+// TODO can't apply pact usage for bless
 @Component({
   tag: SpellLevelCardComponent.getSelector(),
   html: /*html*/`
@@ -294,6 +295,13 @@ class SpellLevelCardTrigger implements ITrigger<ModularCardTriggerData<SpellLeve
   
       if (item.data.data.level !== level || (part.selectedLevel === 'pact' && item.data.data?.preparation?.mode !== 'pact')) {
         item = ItemUtils.createUpcastItem(item, level);
+      }
+      if (part.selectedLevel === 'pact') {
+        // Detect that it should consume pact slots
+        item.data.data.preparation.mode = 'pact';
+      } else if (item.data.data.preparation.mode === 'pact') {
+        // Detect that it should consume spell slots
+        item.data.data.preparation.mode = 'always';
       }
   
       const responses: Array<Promise<{data: any; type: ModularCardPart}>> = [];
