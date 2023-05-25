@@ -6,6 +6,7 @@ import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
 import { UtilsFoundry } from "../utils/utils-foundry";
 import { UtilsHooks } from "../utils/utils-hooks";
+import { UtilsLog } from "../utils/utils-log";
 import { Nd5aSettingsFormApplication, SettingsComponent } from "./settings-component";
 import { SettingsItemComponent } from "./settings-item-component";
 
@@ -303,16 +304,40 @@ export class ModuleSettings {
             return UtilsDocument.getPermissionHandler('Observer').sync(args);
           }
           case 'player': {
+            let actorUuid: string;
+            let loopingDocument = args.document;
+            while (loopingDocument) {
+              if (loopingDocument instanceof Actor) {
+                actorUuid = loopingDocument.uuid;
+                break;
+              }
+              loopingDocument = loopingDocument.parent;
+            }
+            if (!actorUuid) {
+              return false;
+            }
             for (const user of game.users.values()) {
-              if ((user.character as MyActor)?.uuid === args.document.uuid) {
+              if ((user.character as MyActor)?.uuid === actorUuid) {
                 return true;
               }
             }
             return false;
           }
           default: /* playerOrPermission */ {
+            let actorUuid: string;
+            let loopingDocument = args.document;
+            while (loopingDocument) {
+              if (loopingDocument instanceof Actor) {
+                actorUuid = loopingDocument.uuid;
+                break;
+              }
+              loopingDocument = loopingDocument.parent;
+            }
+            if (!actorUuid) {
+              return false;
+            }
             for (const user of game.users.values()) {
-              if ((user.character as MyActor)?.uuid === args.document.uuid) {
+              if ((user.character as MyActor)?.uuid === actorUuid) {
                 return true;
               }
             }
@@ -330,16 +355,40 @@ export class ModuleSettings {
               return UtilsDocument.getPermissionHandler('Observer').async(args);
             }
             case 'player': {
+              let actorUuid: string;
+              let loopingDocument = args.document;
+              while (loopingDocument) {
+                if (loopingDocument instanceof Actor) {
+                  actorUuid = loopingDocument.uuid;
+                  break;
+                }
+                loopingDocument = loopingDocument.parent;
+              }
+              if (!actorUuid) {
+                return new ValueProvider(false);
+              }
               for (const user of game.users.values()) {
-                if ((user.character as MyActor)?.uuid === args.document.uuid) {
+                if ((user.character as MyActor)?.uuid === actorUuid) {
                   return new ValueProvider(true);
                 }
               }
               return new ValueProvider(false);
             }
             default: /* playerOrPermission */ {
+              let actorUuid: string;
+              let loopingDocument = args.document;
+              while (loopingDocument) {
+                if (loopingDocument instanceof Actor) {
+                  actorUuid = loopingDocument.uuid;
+                  break;
+                }
+                loopingDocument = loopingDocument.parent;
+              }
+              if (!actorUuid) {
+                return new ValueProvider(false);
+              }
               for (const user of game.users.values()) {
-                if ((user.character as MyActor)?.uuid === args.document.uuid) {
+                if ((user.character as MyActor)?.uuid === actorUuid) {
                   return new ValueProvider(true);
                 }
               }
