@@ -17,3 +17,8 @@ class BuildMeta {
 }
 
 export const buildMeta = new BuildMeta();
+for (let prop in buildMeta) {
+  if (typeof buildMeta[prop] === 'function') {
+    buildMeta[prop] = buildMeta[prop].bind(buildMeta);
+  }
+}

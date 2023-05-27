@@ -3,7 +3,6 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as chalk from 'chalk';
 import * as archiver from 'archiver';
-import * as stringify from 'json-stringify-pretty-compact';
 import * as typescript from 'typescript';
 import * as postcss from 'postcss';
 
@@ -11,7 +10,6 @@ import * as ts from 'gulp-typescript';
 import * as less from 'gulp-less';
 import * as sassCompiler from 'sass';
 import * as gulpSass from 'gulp-sass';
-import * as git from 'gulp-git';
 import * as sourcemaps from 'gulp-sourcemaps';
 import * as gulpFilter from 'gulp-filter';
 import * as gulpUglify from 'gulp-uglify';
@@ -19,13 +17,13 @@ import * as minifyCss from 'gulp-clean-css';
 import * as postCssMinify from 'postcss-minify';
 import * as open from 'open';
 
-import * as child_process from 'child_process';
-import * as yargs from 'yargs';
+import { exec } from 'child_process';
 import { CssSelectorParser, Rule } from 'css-selector-parser';
 import { FoundryManifestJson, foundryManifest } from './foundry-manifest';
 import { FoundryConfigJson, foundryConfig } from './foundry-config';
-import { configJson } from './config';
 import { buildMeta } from './build-meta';
+import { args } from './args';
+import { git } from './git';
 const cssParser = new CssSelectorParser();
  
 cssParser.registerSelectorPseudos(
@@ -39,20 +37,6 @@ cssParser.registerAttrEqualityMods('^', '$', '*', '~');
 cssParser.enableSubstitutes();
 
 const sass = gulpSass(sassCompiler);
-const exec = child_process.exec;
-const execPromise = (command) => {
-  return new Promise((resolve, reject) => {
-    child_process.exec(command, (err, stdout, stderr) => {
-      if (err) {
-        return reject(err);
-      }
-      if (stderr) {
-        return reject(stderr);
-      }
-      return resolve(stdout);
-    })
-  });
-}
 
 class CssScoperPlugin {
   private static isProcessed = Symbol('isProcessed');
@@ -567,7 +551,6 @@ class BuildActions {
           throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
         }
         destPath = path.join(config.dataPath, 'Data', 'modules', manifest!.file.id);
-        console.log(destPath)
         if (!fs.existsSync(destPath)) {
           fs.mkdirSync(destPath, {recursive: true});
         }
@@ -582,23 +565,18 @@ class BuildActions {
         // Initial build
         //console.log(buildTS().eventNames())
         // finish, close, end
-        console.log('1');
         await BuildActions.createClean()();
-        console.log('2');
         await Promise.all([
           new Promise<void>((resolve) => BuildActions.createBuildTS({inlineMapping: true})().once('end', () => resolve())),
           new Promise<void>((resolve) => BuildActions.createBuildLess()().once('end', () => resolve())),
           new Promise<void>((resolve) => BuildActions.createBuildSASS()().once('end', () => resolve())),
           copyFilesFunc(),
         ]);
-        console.log('3');
         // Only build manifest once all hbs & css files are generated
         await foundryManifest.createBuildManifest()();
-        console.log('4');
   
         // Only start foundry when the manifest is build
         BuildActions.startFoundry();
-        console.log('5');
       },
       function watch() {
         // Do not watch to build the manifest since it only gets loaded on server start
@@ -708,242 +686,6 @@ class BuildActions {
 
 }
 
-class Args {
-  /** @type {{u?: string; update?: string;}} */
-  private static args = yargs.argv;
- 
-  /**
-   * @param {string} currentVersion
-   * @returns {string} version name
-   */
-  static getVersion(currentVersion, allowNoVersion = false): string | null {
-    if (currentVersion == null || currentVersion == '') {
-      currentVersion = '0.0.0';
-    }
-    const version = Args.args.update || Args.args.u;
-    if (!version) {
-      if (allowNoVersion) {
-        return null;
-      }
-      throw new Error('Missing version number. Use -u <version> (or --update) to specify a version.');
-    }
-  
-    const versionMatch = /^v?(\d{1,}).(\d{1,}).(\d{1,})(-.+)?$/;
-    let targetVersion = null;
-  
-    if (versionMatch.test(version)) {
-      targetVersion = version;
-    } else {
-      targetVersion = currentVersion.replace(
-        versionMatch,
-        (substring, major, minor, patch, addon) => {
-          let target: string | null = null;
-          if (version.toLowerCase() === 'major') {
-            target = `${Number(major) + 1}.0.0`;
-          } else if (version.toLowerCase() === 'minor') {
-            target = `${major}.${Number(minor) + 1}.0`;
-          } else if (version.toLowerCase() === 'patch') {
-            target = `${major}.${minor}.${Number(patch) + 1}`;
-          }
-  
-          if (addon) {
-            target += addon;
-          }
-  
-          return target;
-        }
-      );
-    }
-  
-    if (targetVersion == null) {
-      throw new Error(chalk.red('Error: Incorrect version arguments. Accepts the following:\n- major\n- minor\n- patch\n- the following patterns: 1.0.0 | 1.0.0-beta'));
-    }
-    return targetVersion;
-  }
-
-  /**
-   * @param {string} version
-   * @returns {{major: number, minor: number, patch: number, addon?: string}}
-   */
-  static parseVersion(version) {
-    if (version == null) {
-      return null;
-    }
-    const versionMatch = /^v?(\d{1,}).(\d{1,}).(\d{1,})(-.+)?$/;
-    const exec = versionMatch.exec(version);
-    if (exec) {
-      return {
-        major: Number(exec[1]),
-        minor: Number(exec[2]),
-        patch: Number(exec[3]),
-        addon: exec[4],
-      }
-    }
-
-    return null;
-  }
-
-  static createVersionValdiation() {
-    return function versionValdiation(cb) {
-      const currentVersionString = foundryManifest.getManifest().file.version;
-      const currentVersion = Args.parseVersion(currentVersionString);
-      if (!currentVersion) {
-        cb();
-        return;
-      }
-      const newVersionString = Args.getVersion(currentVersionString, false);
-      const newVersion = Args.parseVersion(newVersionString)!;
-
-      if (currentVersion.major < newVersion.major) {
-        cb();
-        return;
-      } else if (currentVersion.major > newVersion.major) {
-        cb(new Error(`New version is not higher. old: ${currentVersionString} | new: ${newVersionString}`));
-        return;
-      }
-      if (currentVersion.minor < newVersion.minor) {
-        cb();
-        return;
-      } else if (currentVersion.minor > newVersion.minor) {
-        cb(new Error(`New version is not higher. old: ${currentVersionString} | new: ${newVersionString}`));
-        return;
-      }
-      if (currentVersion.patch < newVersion.patch) {
-        cb();
-        return;
-      } else if (currentVersion.patch > newVersion.patch) {
-        cb(new Error(`New version is not higher. old: ${currentVersionString} | new: ${newVersionString}`));
-        return;
-      }
-      
-      cb(new Error(`New version is not higher. old: ${currentVersionString} | new: ${newVersionString}`));
-    }
-  }
-}
-
-class Git {
-
-  static createUpdateManifestForGithub({source, externalManifest}: {source: boolean, externalManifest: boolean}) {
-    return async function updateManifestForGithub() {
-      const packageJson = fs.readJSONSync('package.json');
-      const config = configJson.getConfig();
-      const manifest = foundryManifest.getManifest();
-
-      if (!config) {
-        throw new Error(chalk.red('foundryconfig.json not found in the ./ (root) folder'));
-      }
-      if (!manifest) {
-        throw new Error(chalk.red('Manifest JSON not found in the ./src folder'));
-      }
-      if (!config.githubRepository) {
-        throw new Error(chalk.red('Missing "githubRepository" property in ./config.json. Expected format: <githubUsername>/<githubRepo>'));
-      }
-
-      const currentVersion = manifest.file.version;
-      let targetVersion = Args.getVersion(currentVersion, true);
-      if (targetVersion == null) {
-        targetVersion = currentVersion;
-      }
-
-      if (targetVersion.startsWith('v')) {
-        targetVersion = targetVersion.substring(1);
-      }
-
-      console.log(`Updating version number to '${targetVersion}'`);
-
-      packageJson.version = targetVersion;
-
-      manifest.file.version = targetVersion;
-      manifest.file.url = `https://github.com/${config.githubRepository}`;
-      // When foundry checks if there is an update, it will fetch the manifest present in the zip, for us it points to the latest one.
-      // The external one should point to itself so you can download a specific version
-      // The zipped one should point to the latest manifest so when the "check for update" is executed it will fetch the latest
-      if (externalManifest) {
-        // Seperate file uploaded for github
-        manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.json`;
-      } else {
-        // The manifest which is within the module zip
-        manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/latest/module.json`;
-      }
-      manifest.file.download = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.zip`;
-
-      fs.writeFileSync(
-        'package.json',
-        stringify(packageJson, {indent: '  '}),
-        'utf8'
-      );
-      await foundryManifest.saveManifest({overrideManifest: manifest.file, source: source});
-    }
-  }
-
-  static validateCleanRepo(cb) {
-    return git.status({args: '--porcelain'}, (err, stdout) => {
-      if (typeof stdout === 'string' && stdout.length > 0) {
-        err = new Error("You must first commit your pending changes");
-      }
-      if (err) {
-        cb(Error(err));
-        throw Error(err);
-      }
-      cb();
-    });
-  }
-
-  static gitCommit() {
-    let newVersion = 'v' + foundryManifest.getManifest().file.version;
-    return gulp.src('.').pipe(git.commit(`Updated to ${newVersion}`));
-  }
-
-  static async gitDeleteTag() {
-    let version = 'v' + foundryManifest.getManifest().file.version;
-    // Ignore errors
-    try {
-      await execPromise(`git tag -d ${version}`);
-    } catch {}
-    try {
-      await execPromise(`git push --delete origin ${version}`);
-    } catch {}
-  }
-
-  static async gitTag() {
-    let version = 'v' + foundryManifest.getManifest().file.version;
-    await execPromise(`git tag -a ${version} -m "Updated to ${version}"`);
-  }
-
-  static gitPush(cb) {
-    git.push('origin', (err) => {
-      if (err) {
-        cb(err);
-        throw err;
-      }
-      cb();
-    });
-  }
-
-  static async gitPushTag() {
-    let version = 'v' + foundryManifest.getManifest().file.version;
-    try {
-      await execPromise(`git push origin ${version}`);
-    } catch (e) {
-      console.log('git push tag error', e)
-    }
-  }
-
-  static async gitMoveTag() {
-    let currentVersion = 'v' + foundryManifest.getManifest().file.version;
-    try {
-      await execPromise(`git tag -d ${currentVersion}`);
-    } catch {}
-    try {
-      await execPromise(`git push --delete origin ${currentVersion}`);
-    } catch {}
-    await Git.gitTag();
-    await Git.gitPushTag();
-  }
-
-}
-
-
 export const build = gulp.series(
   BuildActions.createFolder(buildMeta.getDestPath()),
   BuildActions.createClean(),
@@ -967,21 +709,27 @@ export const buildZip = gulp.series(
   build,
   BuildActions.createBuildPackage(buildMeta.getDestPath())
 );
-export const test = Args.createVersionValdiation();
-export const rePublish = Git.gitMoveTag;
-export const updateZipManifestForGithub = Git.createUpdateManifestForGithub({source: false, externalManifest: false});
-export const updateExternalManifestForGithub = Git.createUpdateManifestForGithub({source: false, externalManifest: true});
+export function test() {
+  return args.validateVersion();
+}
+export function rePublish() {
+  return git.gitMoveTag();
+}
+export function updateZipManifestForGithub() {
+  return git.updateManifestForGithub({source: false, externalManifest: false})
+}
+export function updateExternalManifestForGithub() {
+  return git.updateManifestForGithub({source: false, externalManifest: false})
+}
 export const publish = gulp.series(
-  Args.createVersionValdiation(),
-  Git.validateCleanRepo,
-  Git.createUpdateManifestForGithub({source: true, externalManifest: false}),
-  Git.gitCommit, 
-  Git.gitTag,
-  Git.gitPush,
-  Git.gitPushTag
+  function validateVersion() {args.validateVersion()},
+  function validateCleanRepo() {git.validateCleanRepo()},
+  function updateManifestForGithub() {git.updateManifestForGithub({source: true, externalManifest: false})},
+  function gitCommit() {git.commitNewVersion()},
+  function gitDeleteCurrentVersionTag() {git.deleteVersionTag()},
+  function gitTag() {git.tagCurrentVersion()},
 );
 export const reupload = gulp.series(
-  Git.gitDeleteTag,
-  Git.gitTag,
-  Git.gitPushTag
+  function gitDeleteTag() {git.deleteVersionTag()},
+  function gitTag() {git.tagCurrentVersion()},
 );

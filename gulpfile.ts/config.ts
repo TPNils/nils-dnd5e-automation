@@ -24,3 +24,8 @@ class Config {
 }
 
 export const configJson = new Config();
+for (let prop in configJson) {
+  if (typeof configJson[prop] === 'function') {
+    configJson[prop] = configJson[prop].bind(configJson);
+  }
+}

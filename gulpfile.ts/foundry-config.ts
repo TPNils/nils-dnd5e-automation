@@ -43,3 +43,8 @@ class FoundryConfig {
 }
 
 export const foundryConfig = new FoundryConfig();
+for (let prop in foundryConfig) {
+  if (typeof foundryConfig[prop] === 'function') {
+    foundryConfig[prop] = foundryConfig[prop].bind(foundryConfig);
+  }
+}

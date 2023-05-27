@@ -380,3 +380,8 @@ class FoundryManifest {
 }
 
 export const foundryManifest = new FoundryManifest();
+for (let prop in foundryManifest) {
+  if (typeof foundryManifest[prop] === 'function') {
+    foundryManifest[prop] = foundryManifest[prop].bind(foundryManifest);
+  }
+}
