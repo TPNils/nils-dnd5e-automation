@@ -26,30 +26,26 @@ export const importTransformer: typescript.TransformerFactory<typescript.SourceF
       if (shouldMutateModuleSpecifier(node)) {
         if (typescript.isImportDeclaration(node)) {
           const nodeText: string = (node.moduleSpecifier as any).text;
-          if (!nodeText.endsWith('.js')) {
-            const newModuleSpecifier = typescript.factory.createStringLiteral(`${nodeText}.js`);
-            return typescript.factory.updateImportDeclaration(
-              node,
-              node.decorators,
-              node.modifiers,
-              node.importClause,
-              newModuleSpecifier,
-              node.assertClause,
-            );
-          }
+          const newModuleSpecifier = typescript.factory.createStringLiteral(`${nodeText}.js`);
+          return typescript.factory.updateImportDeclaration(
+            node,
+            node.decorators,
+            node.modifiers,
+            node.importClause,
+            newModuleSpecifier,
+            node.assertClause,
+          );
         } else if (typescript.isExportDeclaration(node)) {
           const nodeText: string = (node.moduleSpecifier as any).text;
-          if (!nodeText.endsWith('.js')) {
-            const newModuleSpecifier = typescript.factory.createStringLiteral(`${nodeText}.js`);
-            return typescript.updateExportDeclaration(
-              node,
-              node.decorators,
-              node.modifiers,
-              node.exportClause,
-              newModuleSpecifier,
-              node.isTypeOnly,
-            );
-          }
+          const newModuleSpecifier = typescript.factory.createStringLiteral(`${nodeText}.js`);
+          return typescript.updateExportDeclaration(
+            node,
+            node.decorators,
+            node.modifiers,
+            node.exportClause,
+            newModuleSpecifier,
+            node.isTypeOnly,
+          );
         }
       }
       return typescript.visitEachChild(node, visitor, context);
