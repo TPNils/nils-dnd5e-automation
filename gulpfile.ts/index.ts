@@ -1,4 +1,3 @@
-import * as glob from 'glob';
 import * as gulp from 'gulp';
 import * as fs from 'fs-extra';
 import * as path from 'path';
@@ -23,6 +22,10 @@ import * as open from 'open';
 import * as child_process from 'child_process';
 import * as yargs from 'yargs';
 import { CssSelectorParser, Rule } from 'css-selector-parser';
+import { FoundryManifestJson, foundryManifest } from './foundry-manifest';
+import { FoundryConfigJson, foundryConfig } from './foundry-config';
+import { configJson } from './config';
+import { buildMeta } from './build-meta';
 const cssParser = new CssSelectorParser();
  
 cssParser.registerSelectorPseudos(
@@ -49,160 +52,6 @@ const execPromise = (command) => {
       return resolve(stdout);
     })
   });
-}
-
-class Meta {
-
-  /**
-  * @returns {{
-  *   dataPath: string,
-  *   foundryPath: string,
-  * }}
-  */
-  static getFoundryConfig() {
-    const configPath = path.resolve(process.cwd(), 'foundryconfig.json');
-    let config;
-  
-    if (fs.existsSync(configPath)) {
-      config = fs.readJSONSync(configPath);
-      if (config.dataPath) {
-        { // Validate correct path
-          const files = fs.readdirSync(config.dataPath).filter(fileName => fileName !== 'Data' && fileName !== 'Config' && fileName !== 'Logs');
-          // 0 files => only the foundry folders exist (or some of them if the server has not yet started for a first time)
-          if (files.length !== 0) {
-            throw new Error('dataPath in foundryconfig.json is not recognised as a foundry folder. The folder should include 3 other folders: Data, Config & Logs');
-          }
-        }
-      }
-      return config;
-    } else {
-      return;
-    }
-  }
-
-  /**
-  * @returns {{
-  *   githubRepository: string,
-  * }}
-  */
-  static getConfig() {
-    const configPath = path.resolve(process.cwd(), 'config.json');
-    let config;
-  
-    if (fs.existsSync(configPath)) {
-      config = fs.readJSONSync(configPath);
-      if (config.dataPath) {
-        { // Validate correct path
-          const files = fs.readdirSync(config.dataPath);
-          if (!files.includes('Data') || !files.includes('Config') || !files.includes('Logs')) {
-            throw new Error('dataPath in foundryconfig.json is not recognised as a foundry folder. The folder should include 3 other folders: Data, Config & Logs');
-          }
-        }
-      }
-      return config;
-    } else {
-      return;
-    }
-  }
-  
-  public static getManifest(type: 'src' | 'dist' = 'src'): {
-    file: any,
-    name: string,
-    root: string
-  } {
-    const json: {
-      file?: any,
-      name?: string,
-      root?: string
-    } = {};
-    json.root = type;
-  
-    const modulePath = path.join(json.root, 'module.json');
-    const systemPath = path.join(json.root, 'system.json');
-  
-    if (fs.existsSync(modulePath)) {
-      json.file = fs.readJSONSync(modulePath);
-      json.name = 'module.json';
-    } else if (fs.existsSync(systemPath)) {
-      json.file = fs.readJSONSync(systemPath);
-      json.name = 'system.json';
-    } else {
-      throw new Error(`No file found: ${modulePath} OR ${systemPath}`)
-    }
-  
-    return json as any;
-  }
-
-  static createBuildManifest(dest: string): () => Promise<void> {
-    dest = path.normalize(dest);
-    return async function buildManifest() {
-      const manifest = Meta.getManifest();
-  
-      const filePromises: Promise<string[]>[] = [];
-      filePromises.push(new Promise<string[]>((resolve, reject) => {
-        glob(path.join(dest, '**/*.css'), (err, matches: string[]) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          resolve(matches);
-        })
-      }));
-      filePromises.push(new Promise<string[]>((resolve, reject) => {
-        glob(path.join(dest, '**/*.hbs'), (err, matches: string[]) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          resolve(matches);
-        })
-      }));
-    
-      const fileNameCollection = await Promise.all(filePromises)
-      const cssFiles = new Set<string>();
-      const hbsFiles = new Set<string>();
-      for (const fileNames of fileNameCollection) {
-        for (let fileName of fileNames) {
-          fileName = path.normalize(fileName);
-          if (fileName.startsWith('src' + path.delimiter)) {
-            fileName = fileName.substring(('src' + path.delimiter).length)
-          } else if (fileName.startsWith(dest)) {
-            fileName = fileName.substring(dest.length)
-          }
-          if (fileName.toLowerCase().endsWith('.css')) {
-            cssFiles.add(fileName);
-          } else if (fileName.toLowerCase().endsWith('.hbs')) {
-            hbsFiles.add(fileName);
-          }
-        }
-      }
-  
-      if (manifest.file.flags == null) {
-        manifest.file.flags = {};
-      }
-      if (Array.isArray(manifest.file.styles)) {
-        for (const value of manifest.file.styles) {
-          cssFiles.add(value)
-        }
-      }
-      cssFiles.delete(null);
-      cssFiles.delete(undefined);
-  
-      if (Array.isArray(manifest.file.flags.hbsFiles)) {
-        for (const value of manifest.file.hbsFiles) {
-          hbsFiles.add(value)
-        }
-      }
-      hbsFiles.delete(null);
-      hbsFiles.delete(undefined);
-  
-      manifest.file.styles = Array.from(cssFiles).sort();
-      manifest.file.flags.hbsFiles = Array.from(hbsFiles).sort();
-  
-      fs.writeFileSync(path.join(dest, manifest.name), JSON.stringify(manifest.file, null, 2));
-    }
-  }
-
 }
 
 class CssScoperPlugin {
@@ -278,13 +127,13 @@ class CssScoperPlugin {
           }
         }
         if (shouldAddItemAttr) {
-          rule.attrs.unshift({name: this.itemAttr});
+          rule.attrs!.unshift({name: this.itemAttr});
         }
       }
       
       // replace :host-context() selector
       {
-        let adjustedRules = [];
+        let adjustedRules: Partial<Rule>[] = [];
         for (let i = 0; i < rules.length; i++) {
           const rule = rules[i];
           if (!rule.pseudos || rule.pseudos.length === 0) {
@@ -323,7 +172,7 @@ class CssScoperPlugin {
       // Write the order of the rules the way cssParser expects
       for (let i = 0; i < rules.length - 1; i++) {
         rules[i].rule = rules[i+1] as Rule;
-        rules[i+1].rule = null;
+        delete rules[i+1].rule;
       }
       rootRule.rule = rules[0] as Rule;
     }
@@ -536,10 +385,7 @@ class BuildActions {
     return BuildActions.tsConfig;
   }
 
-  /**
-   * @param {string} target Ensure the folder exists
-   */
-  static createFolder(target) {
+  static createFolder(target: string) {
     return function createFolder(cb) {
       if (!fs.existsSync(target)) {
         fs.mkdirSync(target);
@@ -551,13 +397,15 @@ class BuildActions {
   /**
    * @param {string} target the destination directory
    */
-  static createBuildTS(target) {
-    if (target !== 'dist') {
+  static createBuildTS(options: {inlineMapping?: boolean} = {}) {
+    options.inlineMapping = options.inlineMapping ?? false;
+
+    if (options.inlineMapping) {
       // When building locally, inject the mapping into the js file
       // Can't figure out how to get the mapping working well otherwise
       return function buildTS() {
-        const manifest = Meta.getManifest();
-        return gulp.src('src/**/*.ts')
+        const manifest = foundryManifest.getManifest();
+        return gulp.src(`${buildMeta.getSrcPath()}/**/*.ts`)
           .pipe(sourcemaps.init())
           .pipe(BuildActions.getTsConfig()())
           /*.pipe(minifyJs({
@@ -577,25 +425,25 @@ class BuildActions {
             //includeContent: false,
             sourceMappingURL: (file) => {
               const filePathParts = file.relative.split(path.sep);
-              return '/' + [(manifest.file.type === 'system' ? 'systems' : 'modules'), manifest.file.name, ...filePathParts].join('/') + '.map';
+              return '/' + [(manifest.type === 'system' ? 'systems' : 'modules'), manifest.file.id, ...filePathParts].join('/') + '.map';
             }
           }))
-          .pipe(gulp.dest(target));
+          .pipe(gulp.dest(buildMeta.getDestPath()));
       }
     }
     return function buildTS() {
-      const manifest = Meta.getManifest();
-      const urlPrefix = '/' + [(manifest.file.type === 'system' ? 'systems' : 'modules'), manifest.file.name].join('/');
+      const manifest = foundryManifest.getManifest();
+      const urlPrefix = '/' + [(manifest.type === 'system' ? 'systems' : 'modules'), manifest.file.id].join('/');
       const jsFilter = gulpFilter((file) => file.basename.endsWith('.js'), {restore: true})
       const sourceMapConfig = {
         addComment: true,
         includeContent: false,
         sourceMappingURL: (file) => {
           const filePathParts = file.relative.split(path.sep);
-          return '/' + [(manifest.file.type === 'system' ? 'systems' : 'modules'), manifest.file.name, ...filePathParts].join('/') + '.map';
+          return '/' + [(manifest.type === 'system' ? 'systems' : 'modules'), manifest.file.id, ...filePathParts].join('/') + '.map';
         },
       };
-      return gulp.src('src/**/*.ts')
+      return gulp.src(`${buildMeta.getSrcPath()}/**/*.ts`)
         .pipe(sourcemaps.init())
         .pipe(BuildActions.getTsConfig()())
         .pipe(sourcemaps.mapSources(function(sourcePath, file) {
@@ -610,32 +458,26 @@ class BuildActions {
         }))
         .pipe(jsFilter.restore)
         .pipe(sourcemaps.write('./', sourceMapConfig))
-        .pipe(gulp.dest(target));
+        .pipe(gulp.dest(buildMeta.getDestPath()));
     }
   }
 
-  /**
-   * @param {string} target the destination directory
-   */
-  static createBuildLess(target) {
+  static createBuildLess() {
     return function buildLess() {
-      return gulp.src('src/**/*.less')
+      return gulp.src(`${buildMeta.getSrcPath()}/**/*.less`)
         .pipe(less())
         .pipe(minifyCss())
-        .pipe(gulp.dest(target));
+        .pipe(gulp.dest(buildMeta.getDestPath()));
     }
   }
   
-  /**
-   * @param {string} target the destination directory
-   */
-  static createBuildSASS(target) {
+  static createBuildSASS() {
     return function buildSASS() {
       return gulp
-        .src('src/**/*.scss')
+        .src(`${buildMeta.getSrcPath()}/**/*.scss`)
         .pipe(sass().on('error', sass.logError))
         .pipe(minifyCss())
-        .pipe(gulp.dest(target));
+        .pipe(gulp.dest(buildMeta.getDestPath()));
     }
   }
 
@@ -644,14 +486,12 @@ class BuildActions {
    */
   static getStaticCopyFiles() {
     return [
-      {from: ['src','scripts'], to: ['scripts']}, // include ts files for source mappings
-      {from: ['src','lang'], to: ['lang']},
-      {from: ['src','fonts'], to: ['fonts']},
-      {from: ['src','assets'], to: ['assets']},
-      {from: ['src','templates'], to: ['templates']},
-      {from: ['src','module.json'], to: ['module.json']},
-      {from: ['src','system.json'], to: ['system.json']},
-      {from: ['src','template.json'], to: ['template.json']},
+      {from: [buildMeta.getSrcPath(),'scripts'], to: ['scripts']}, // include ts files for source mappings
+      {from: [buildMeta.getSrcPath(),'lang'], to: ['lang']},
+      {from: [buildMeta.getSrcPath(),'fonts'], to: ['fonts']},
+      {from: [buildMeta.getSrcPath(),'assets'], to: ['assets']},
+      {from: [buildMeta.getSrcPath(),'templates'], to: ['templates']},
+      {from: [buildMeta.getSrcPath(),'template.json'], to: ['template.json']},
     ]
   }
   
@@ -660,7 +500,7 @@ class BuildActions {
    */
   static createCopyFiles(copyFilesArg) {
     return async function copyFiles() {
-      const promises = [];
+      const promises: any[] = [];
       for (const file of copyFilesArg) {
         if (fs.existsSync(path.join(...file.from))) {
           if (file.options) {
@@ -679,12 +519,14 @@ class BuildActions {
       console.warn('Could not start foundry: foundryconfig.json not found in project root');
       return;
     }
-    const config = Meta.getFoundryConfig();
+    const config = foundryConfig.getFoundryConfig('v8');
     if (!config.dataPath) {
       console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
+      return;
     }
     if (!config.foundryPath) {
       console.warn('Could not start foundry: foundryconfig.json is missing the property "foundryPath"');
+      return;
     }
   
     const cmd = `node "${path.join(config.foundryPath, 'resources', 'app', 'main.js')}" --dataPath="${config.dataPath}"`;
@@ -692,7 +534,7 @@ class BuildActions {
     const childProcess = exec(cmd);
 
     let serverStarted = false;
-    childProcess.stdout.on('data', function (data) {
+    childProcess.stdout!.on('data', function (data) {
       process.stdout.write(data);
       if (!serverStarted) {
         const result = /Server started and listening on port ([0-9]+)/i.exec(data.toString());
@@ -702,7 +544,7 @@ class BuildActions {
       }
     });
     
-    childProcess.stderr.on('data', function (data) {
+    childProcess.stderr!.on('data', function (data) {
       process.stderr.write(data);
     });
   }
@@ -711,24 +553,26 @@ class BuildActions {
    * Watch for changes for each build step
    */
   static createWatch() {
-    let config;
-    let manifest;
-    let destPath;
+    let config: FoundryConfigJson;
+    let manifest: FoundryManifestJson;
+    let destPath: string;
     let copyFiles;
     let copyFilesFunc;
     
     return gulp.series(
       async function init() {
-        config = Meta.getFoundryConfig();
-        manifest = Meta.getManifest();
+        config = foundryConfig.getFoundryConfig('v8');
+        manifest = foundryManifest.getManifest();
         if (config?.dataPath == null) {
           throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
         }
-        destPath = path.join(config.dataPath, 'Data', 'modules', manifest.file.name);
+        destPath = path.join(config.dataPath, 'Data', 'modules', manifest!.file.id);
+        console.log(destPath)
         if (!fs.existsSync(destPath)) {
           fs.mkdirSync(destPath, {recursive: true});
         }
-        copyFiles = [...BuildActions.getStaticCopyFiles(), {from: ['src','packs'], to: ['packs'], options: {override: false}}];
+        buildMeta.setDestPath(destPath);
+        copyFiles = [...BuildActions.getStaticCopyFiles(), {from: [buildMeta.getSrcPath(),'packs'], to: ['packs'], options: {override: false}}];
         for (let i = 0; i < copyFiles.length; i++) {
           copyFiles[i].to = [destPath, ...copyFiles[i].to];
         }
@@ -738,24 +582,29 @@ class BuildActions {
         // Initial build
         //console.log(buildTS().eventNames())
         // finish, close, end
-        await BuildActions.createClean(destPath)();
+        console.log('1');
+        await BuildActions.createClean()();
+        console.log('2');
         await Promise.all([
-          new Promise<void>((resolve) => BuildActions.createBuildTS(destPath)().once('end', () => resolve())),
-          new Promise<void>((resolve) => BuildActions.createBuildLess(destPath)().once('end', () => resolve())),
-          new Promise<void>((resolve) => BuildActions.createBuildSASS(destPath)().once('end', () => resolve())),
+          new Promise<void>((resolve) => BuildActions.createBuildTS({inlineMapping: true})().once('end', () => resolve())),
+          new Promise<void>((resolve) => BuildActions.createBuildLess()().once('end', () => resolve())),
+          new Promise<void>((resolve) => BuildActions.createBuildSASS()().once('end', () => resolve())),
           copyFilesFunc(),
         ]);
+        console.log('3');
         // Only build manifest once all hbs & css files are generated
-        await Meta.createBuildManifest(destPath)();
+        await foundryManifest.createBuildManifest()();
+        console.log('4');
   
         // Only start foundry when the manifest is build
         BuildActions.startFoundry();
+        console.log('5');
       },
       function watch() {
         // Do not watch to build the manifest since it only gets loaded on server start
-        gulp.watch('src/**/*.ts', { ignoreInitial: true }, BuildActions.createBuildTS(destPath));
-        gulp.watch('src/**/*.less', { ignoreInitial: true }, BuildActions.createBuildLess(destPath));
-        gulp.watch('src/**/*.scss', { ignoreInitial: true }, BuildActions.createBuildSASS(destPath));
+        gulp.watch('src/**/*.ts', { ignoreInitial: true }, BuildActions.createBuildTS({inlineMapping: true}));
+        gulp.watch('src/**/*.less', { ignoreInitial: true }, BuildActions.createBuildLess());
+        gulp.watch('src/**/*.scss', { ignoreInitial: true }, BuildActions.createBuildSASS());
         gulp.watch(
           [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
           { ignoreInitial: true },
@@ -767,13 +616,12 @@ class BuildActions {
 
   /**
    * Delete every file and folder within the target
-   * @param {string} target the directory which should be made empty
    */
-  static createClean(target) {
+  static createClean() {
     return async function clean() {
-      const promises = [];
-      for (const file of await fs.readdir(target)) {
-        promises.push(fs.rm(path.join(target, file), {recursive: true}));
+      const promises: any[] = [];
+      for (const file of await fs.readdir(buildMeta.getDestPath())) {
+        promises.push(fs.rm(path.join(buildMeta.getDestPath(), file), {recursive: true}));
       }
       return Promise.all(promises).then();
     }
@@ -785,7 +633,7 @@ class BuildActions {
    */
   static createBuildPackage(inputDir: string) {
     return async function buildPackage() {
-      const manifest = Meta.getManifest();
+      const manifest = foundryManifest.getManifest();
       inputDir = path.normalize(inputDir);
       if (!inputDir.endsWith(path.sep)) {
         inputDir += path.sep;
@@ -816,7 +664,7 @@ class BuildActions {
           zip.pipe(zipFile);
     
           // Add the directory with the final code
-          zip.directory(inputDir, manifest.file.name);
+          zip.directory(inputDir, manifest.file.id);
     
           zip.finalize();
         } catch (err) {
@@ -831,16 +679,16 @@ class BuildActions {
    */
   static createUpdateSrcPacks() {
     return async function updateSrcPacks() {
-      const config = Meta.getFoundryConfig();
+      const config = foundryConfig.getFoundryConfig('v8');
       if (!config.dataPath) {
         console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
       }
-      const manifest = Meta.getManifest();
-      const srcPath = ['src','packs'];
-      await BuildActions.createCopyFiles([{from: [config.dataPath, 'Data', 'modules', manifest.file.name, 'packs'], to: srcPath}])();
+      const manifest = foundryManifest.getManifest();
+      const srcPath = [buildMeta.getSrcPath(),'packs'];
+      await BuildActions.createCopyFiles([{from: [config.dataPath, 'Data', 'modules', manifest.file.id, 'packs'], to: srcPath}])();
       for (const fileName of fs.readdirSync(path.join(...srcPath))) {
         const lines = fs.readFileSync(path.join(...srcPath, fileName), {encoding: 'UTF-8'}).split('\n');
-        const filteredLines = [];
+        const filteredLines: any[] = [];
         const foundIds = new Set();
         for (let i = lines.length - 1; i >= 0; i--) {
           if (!lines[i]) {
@@ -868,7 +716,7 @@ class Args {
    * @param {string} currentVersion
    * @returns {string} version name
    */
-  static getVersion(currentVersion, allowNoVersion = false) {
+  static getVersion(currentVersion, allowNoVersion = false): string | null {
     if (currentVersion == null || currentVersion == '') {
       currentVersion = '0.0.0';
     }
@@ -889,7 +737,7 @@ class Args {
       targetVersion = currentVersion.replace(
         versionMatch,
         (substring, major, minor, patch, addon) => {
-          let target = null;
+          let target: string | null = null;
           if (version.toLowerCase() === 'major') {
             target = `${Number(major) + 1}.0.0`;
           } else if (version.toLowerCase() === 'minor') {
@@ -937,14 +785,14 @@ class Args {
 
   static createVersionValdiation() {
     return function versionValdiation(cb) {
-      const currentVersionString = Meta.getManifest().file.version;
-      const currentVersion = Args.parseVersion(Meta.getManifest().file.version);
+      const currentVersionString = foundryManifest.getManifest().file.version;
+      const currentVersion = Args.parseVersion(currentVersionString);
       if (!currentVersion) {
         cb();
         return;
       }
-      const newVersionString  = Args.getVersion(currentVersionString, false);
-      const newVersion = Args.parseVersion(newVersionString);
+      const newVersionString = Args.getVersion(currentVersionString, false);
+      const newVersion = Args.parseVersion(newVersionString)!;
 
       if (currentVersion.major < newVersion.major) {
         cb();
@@ -975,73 +823,56 @@ class Args {
 
 class Git {
 
-  /**
-   * Update version and URLs in the manifest JSON
-   * @param {'src' | 'dist'} manifestType
-   */
-  static createUpdateManifestForGithub(manifestType, externalManifest = false) {
-    /**
-     * @param {Function} cb
-     */
-    return function updateManifestForGithub(cb) {
+  static createUpdateManifestForGithub({source, externalManifest}: {source: boolean, externalManifest: boolean}) {
+    return async function updateManifestForGithub() {
       const packageJson = fs.readJSONSync('package.json');
-      const config = Meta.getConfig();
-      const manifest = Meta.getManifest(manifestType);
+      const config = configJson.getConfig();
+      const manifest = foundryManifest.getManifest();
 
       if (!config) {
-        return cb(Error(chalk.red('foundryconfig.json not found in the ./ (root) folder')));
+        throw new Error(chalk.red('foundryconfig.json not found in the ./ (root) folder'));
       }
       if (!manifest) {
-        return cb(Error(chalk.red('Manifest JSON not found in the ./src folder')));
+        throw new Error(chalk.red('Manifest JSON not found in the ./src folder'));
       }
       if (!config.githubRepository) {
-        return cb(Error(chalk.red('Missing "githubRepository" property in ./config.json. Expected format: <githubUsername>/<githubRepo>')));
+        throw new Error(chalk.red('Missing "githubRepository" property in ./config.json. Expected format: <githubUsername>/<githubRepo>'));
       }
 
-      try {
-        const currentVersion = manifest.file.version;
-        let targetVersion = Args.getVersion(currentVersion, true);
-        if (targetVersion == null) {
-          targetVersion = currentVersion;
-        }
-
-        if (targetVersion.startsWith('v')) {
-          targetVersion = targetVersion.substring(1);
-        }
-
-        console.log(`Updating version number to '${targetVersion}'`);
-
-        packageJson.version = targetVersion;
-
-        manifest.file.version = targetVersion;
-        manifest.file.url = `https://github.com/${config.githubRepository}`;
-        // When foundry checks if there is an update, it will fetch the manifest present in the zip, for us it points to the latest one.
-        // The external one should point to itself so you can download a specific version
-        // The zipped one should point to the latest manifest so when the "check for update" is executed it will fetch the latest
-        if (externalManifest) {
-          // Seperate file uploaded for github
-          manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.json`;
-        } else {
-          // The manifest which is within the module zip
-          manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/latest/module.json`;
-        }
-        manifest.file.download = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.zip`;
-
-        fs.writeFileSync(
-          'package.json',
-          stringify(packageJson, {indent: '  '}),
-          'utf8'
-        );
-        fs.writeFileSync(
-          path.join(manifest.root, manifest.name),
-          stringify(manifest.file, {indent: '  '}),
-          'utf8'
-        );
-
-        return cb();
-      } catch (err) {
-        return cb(err);
+      const currentVersion = manifest.file.version;
+      let targetVersion = Args.getVersion(currentVersion, true);
+      if (targetVersion == null) {
+        targetVersion = currentVersion;
       }
+
+      if (targetVersion.startsWith('v')) {
+        targetVersion = targetVersion.substring(1);
+      }
+
+      console.log(`Updating version number to '${targetVersion}'`);
+
+      packageJson.version = targetVersion;
+
+      manifest.file.version = targetVersion;
+      manifest.file.url = `https://github.com/${config.githubRepository}`;
+      // When foundry checks if there is an update, it will fetch the manifest present in the zip, for us it points to the latest one.
+      // The external one should point to itself so you can download a specific version
+      // The zipped one should point to the latest manifest so when the "check for update" is executed it will fetch the latest
+      if (externalManifest) {
+        // Seperate file uploaded for github
+        manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.json`;
+      } else {
+        // The manifest which is within the module zip
+        manifest.file.manifest = `https://github.com/${config.githubRepository}/releases/download/latest/module.json`;
+      }
+      manifest.file.download = `https://github.com/${config.githubRepository}/releases/download/v${targetVersion}/module.zip`;
+
+      fs.writeFileSync(
+        'package.json',
+        stringify(packageJson, {indent: '  '}),
+        'utf8'
+      );
+      await foundryManifest.saveManifest({overrideManifest: manifest.file, source: source});
     }
   }
 
@@ -1059,12 +890,12 @@ class Git {
   }
 
   static gitCommit() {
-    let newVersion = 'v' + Meta.getManifest().file.version;
+    let newVersion = 'v' + foundryManifest.getManifest().file.version;
     return gulp.src('.').pipe(git.commit(`Updated to ${newVersion}`));
   }
 
   static async gitDeleteTag() {
-    let version = 'v' + Meta.getManifest().file.version;
+    let version = 'v' + foundryManifest.getManifest().file.version;
     // Ignore errors
     try {
       await execPromise(`git tag -d ${version}`);
@@ -1075,7 +906,7 @@ class Git {
   }
 
   static async gitTag() {
-    let version = 'v' + Meta.getManifest().file.version;
+    let version = 'v' + foundryManifest.getManifest().file.version;
     await execPromise(`git tag -a ${version} -m "Updated to ${version}"`);
   }
 
@@ -1090,7 +921,7 @@ class Git {
   }
 
   static async gitPushTag() {
-    let version = 'v' + Meta.getManifest().file.version;
+    let version = 'v' + foundryManifest.getManifest().file.version;
     try {
       await execPromise(`git push origin ${version}`);
     } catch (e) {
@@ -1099,7 +930,7 @@ class Git {
   }
 
   static async gitMoveTag() {
-    let currentVersion = 'v' + Meta.getManifest().file.version;
+    let currentVersion = 'v' + foundryManifest.getManifest().file.version;
     try {
       await execPromise(`git tag -d ${currentVersion}`);
     } catch {}
@@ -1114,35 +945,36 @@ class Git {
 
 
 export const build = gulp.series(
-  BuildActions.createFolder('dist'),
-  BuildActions.createClean('dist'),
+  BuildActions.createFolder(buildMeta.getDestPath()),
+  BuildActions.createClean(),
   gulp.parallel(
-    BuildActions.createBuildTS('dist'),
-    BuildActions.createBuildLess('dist'),
-    BuildActions.createBuildSASS('dist'),
+    BuildActions.createBuildTS({inlineMapping: false}),
+    BuildActions.createBuildLess(),
+    BuildActions.createBuildSASS(),
     BuildActions.createCopyFiles([
-     {from: ['src','packs'], to: ['dist','packs']},
+     {from: [buildMeta.getSrcPath(),'packs'], to: [buildMeta.getDestPath(),'packs']},
       ...BuildActions.getStaticCopyFiles().map(copy => {
-        copy.to = ['dist', ...copy.to];
+        copy.to = [buildMeta.getDestPath(), ...copy.to];
         return copy;
       }),
-    ])),
-  Meta.createBuildManifest('dist'),
+    ])
+  ),
+  foundryManifest.createBuildManifest(),
 );
 export const updateSrcPacks = gulp.series(BuildActions.createUpdateSrcPacks());
 export const watch = BuildActions.createWatch();
 export const buildZip = gulp.series(
   build,
-  BuildActions.createBuildPackage('dist')
+  BuildActions.createBuildPackage(buildMeta.getDestPath())
 );
 export const test = Args.createVersionValdiation();
 export const rePublish = Git.gitMoveTag;
-export const updateZipManifestForGithub = Git.createUpdateManifestForGithub('dist', false);
-export const updateExternalManifestForGithub = Git.createUpdateManifestForGithub('dist', true);
+export const updateZipManifestForGithub = Git.createUpdateManifestForGithub({source: false, externalManifest: false});
+export const updateExternalManifestForGithub = Git.createUpdateManifestForGithub({source: false, externalManifest: true});
 export const publish = gulp.series(
   Args.createVersionValdiation(),
   Git.validateCleanRepo,
-  Git.createUpdateManifestForGithub('src'),
+  Git.createUpdateManifestForGithub({source: true, externalManifest: false}),
   Git.gitCommit, 
   Git.gitTag,
   Git.gitPush,
