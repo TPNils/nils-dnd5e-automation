@@ -28,7 +28,6 @@
     "glob": "^7.1.7",
     "gulp": "^4.0.2",
     "gulp-clean-css": "^4.3.0",
-    "gulp-git": "^2.10.1",
     "gulp-less": "^4.0.1",
     "gulp-minify": "^3.1.0",
     "gulp-sass": "^5.0.0",
@@ -42,5 +41,8 @@
     "ts-node": "^10.9.1",
     "typescript": "^4.9.5"
   },
-  "dependencies": {"gulp-filter": "^7.0.0", "gulp-uglify": "^3.0.2"}
+  "dependencies": {
+    "gulp-filter": "^7.0.0",
+    "gulp-uglify": "^3.0.2"
+  }
 }
