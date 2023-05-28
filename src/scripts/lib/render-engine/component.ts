@@ -1,6 +1,6 @@
+import { AnyNodeData } from "../../../../types/html-data";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
@@ -26,7 +26,7 @@ const componentInstanceProxyHandler: ProxyHandler<{[htmlElementSymbol]: Componen
 }
 export interface ComponentConfig {
   tag: string;
-  html?: string;
+  html?: string | AnyNodeData[];
   style?: string;
 }
 interface ComponentConfigInternal extends ComponentConfig {
