@@ -63,13 +63,14 @@ const tokens = {
   endBinding: createToken({name: 'EndBinding', pattern: endBindingPattern, pop_mode: true}),
 
   jsNoQuotes: createToken({name: 'JsNoQuotes', pattern: jsNoQuotesPattern, line_breaks: true}),
-  jsSingleQuote: createToken({name: 'JsSingleQuote', pattern: /(?<!\\)(?:\\\\)*(?:''|'(.*?[^\\](?:\\\\)*))'/s, line_breaks: true, start_chars_hint: [`'`]}),
-  jsDoubleQuote: createToken({name: 'JsDoubleQuote', pattern: /(?<!\\)(?:\\\\)*(?:""|"(.*?[^\\](?:\\\\)*))"/s, line_breaks: true, start_chars_hint: [`"`]}),
+  jsSingleQuote: createToken({name: 'JsSingleQuote', pattern: /(?<!\\)(?:\\\\)*(?:''|'(.*?[^\\](?:\\\\)*)')/s, line_breaks: true, start_chars_hint: [`'`]}),
+  jsDoubleQuote: createToken({name: 'JsDoubleQuote', pattern: /(?<!\\)(?:\\\\)*(?:""|"(.*?[^\\](?:\\\\)*)")/s, line_breaks: true, start_chars_hint: [`"`]}),
 
   jsStartBacktickQuote: createToken({name: 'JsStartBacktickQuote', pattern: /(?<!\\)(?:\\\\)*`/, push_mode: 'backtick'}),
+  jsBacktickValue: createToken({name: 'JsBacktickValue', pattern: /[^`].*?(?=((?<!\\)(?:\\\\)*(?:`))|((?<!\\)(?:\\\\)*(?:\$)((?<!\\)(?:\\\\)*{)))/s, line_breaks: true}),
   jsEndBacktickQuote: createToken({name: 'JsEndBacktickQuote', pattern: /(?<!\\)(?:\\\\)*`/, pop_mode: true}),
   jsStartInterpolation: createToken({name: 'JsStartInterpolation', pattern: /(?<!\\)(?:\\\\)*\$(?<!\\)(?:\\\\)*{/, push_mode: 'interpolation'}),
-  jsEndInterpolation: createToken({name: 'JsStartInterpolation', pattern: /(?<!\\)(?:\\\\)*{/, pop_mode: true}),
+  jsEndInterpolation: createToken({name: 'JsEndInterpolation', pattern: /(?<!\\)(?:\\\\)*}/, pop_mode: true}),
 }
 
 const lexerDef: IMultiModeLexerDefinition = {
@@ -89,13 +90,15 @@ const lexerDef: IMultiModeLexerDefinition = {
       tokens.jsStartBacktickQuote,
     ],
     interpolation: [
+      tokens.jsEndInterpolation,
       tokens.jsSingleQuote,
       tokens.jsDoubleQuote,
       tokens.jsNoQuotes,
-      tokens.jsEndInterpolation,
     ],
     backtick: [
+      tokens.jsStartInterpolation,
       tokens.jsEndBacktickQuote,
+      tokens.jsBacktickValue,
     ],
   }
 };
@@ -111,6 +114,7 @@ export function parseBoundString(text: string): BindableString[] {
     throw new Error("Lexing errors detected\n" + lexingResult.errors.map(e => JSON.stringify(e)).join('\n'))
   }
   
+  console.log('parsed tokens', lexingResult.tokens.map(t => ({image: t.image, payload: t.payload, token: t.tokenType.name})));
   const response: BindableString[] = []
   let bindMethod : BindExpressionValue['bindMethod'] = 'escaped';
   for (const token of lexingResult.tokens) {
