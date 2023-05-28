@@ -73,7 +73,7 @@ function regexGroup(regex: RegExp, groupNr: number) {
     }
     
     const response = [regexResult[0]] as CustomPatternMatcherReturn;
-    response.payload = regexResult[1];
+    response.payload = regexResult[groupNr];
     return response;
   }
 }
