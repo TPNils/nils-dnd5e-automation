@@ -209,7 +209,7 @@ function isComponentObjectParam(node: typescript.Node): node is typescript.Objec
  * Decent documentation: https://github.com/madou/typescript-transformer-handbook
  * Transform @Component style css at compile time since we can't make use of an external library at runtime
  */
-export const componentCssTransformer: typescript.TransformerFactory<typescript.SourceFile> = context => {
+export const componentTransformer: typescript.TransformerFactory<typescript.SourceFile> = context => {
   const visit: typescript.Visitor = (node) => {
     if (isComponentObjectParam(node)) {
       const id = cssId++;

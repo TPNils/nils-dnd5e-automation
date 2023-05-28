@@ -20,7 +20,7 @@ import { FoundryConfigJson, foundryConfig } from './foundry-config';
 import { buildMeta } from './build-meta';
 import { args } from './args';
 import { git } from './git';
-import { componentCssTransformer } from './ts-transformers/component-css-transformer';
+import { componentTransformer } from './ts-transformers/component-transformer';
 import { importTransformer } from './ts-transformers/import-transformer';
 
 const sass = gulpSass(sassCompiler);
@@ -32,7 +32,7 @@ class BuildActions {
     if (BuildActions.tsConfig == null) {
       BuildActions.tsConfig = ts.createProject('tsconfig.json', {
         getCustomTransformers: (_program) => ({
-          before: [componentCssTransformer],
+          before: [componentTransformer],
           after: [importTransformer],
         }),
       });
