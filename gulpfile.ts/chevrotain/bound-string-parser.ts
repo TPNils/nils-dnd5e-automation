@@ -51,7 +51,7 @@ function jsNoQuotesPattern(text: string, offset: number, previousTokens: IToken[
   if (!expected) {
     return null;
   }
-  const regex = new RegExp(/[^'"]+?(?=(}}}?|"|'))/.source.replace('}}}', expected), 'sy');
+  const regex = new RegExp(/[^'"]+?(?=(}}}?|"|'|`))/.source.replace('}}}', expected), 'sy');
   regex.lastIndex = offset;
   return regex.exec(text);
 }
@@ -62,10 +62,14 @@ const tokens = {
   startBinding: createToken({name: 'StartBinding', pattern: /{{{?/, push_mode: 'bound'}),
   endBinding: createToken({name: 'EndBinding', pattern: endBindingPattern, pop_mode: true}),
 
-  // TODO this quote: `
   jsNoQuotes: createToken({name: 'JsNoQuotes', pattern: jsNoQuotesPattern, line_breaks: true}),
-  jsSingleQuote: createToken({name: 'JsSingleQuote', pattern: /''|'(.*?[^\\](?:\\\\)*)'/s, line_breaks: true, start_chars_hint: [`'`]}),
-  jsDoubleQuote: createToken({name: 'JsDoubleQuote', pattern: /""|"(.*?[^\\](?:\\\\)*)"/s, line_breaks: true, start_chars_hint: [`"`]}),
+  jsSingleQuote: createToken({name: 'JsSingleQuote', pattern: /(?<!\\)(?:\\\\)*(?:''|'(.*?[^\\](?:\\\\)*))'/s, line_breaks: true, start_chars_hint: [`'`]}),
+  jsDoubleQuote: createToken({name: 'JsDoubleQuote', pattern: /(?<!\\)(?:\\\\)*(?:""|"(.*?[^\\](?:\\\\)*))"/s, line_breaks: true, start_chars_hint: [`"`]}),
+
+  jsStartBacktickQuote: createToken({name: 'JsStartBacktickQuote', pattern: /(?<!\\)(?:\\\\)*`/, push_mode: 'backtick'}),
+  jsEndBacktickQuote: createToken({name: 'JsEndBacktickQuote', pattern: /(?<!\\)(?:\\\\)*`/, pop_mode: true}),
+  jsStartInterpolation: createToken({name: 'JsStartInterpolation', pattern: /(?<!\\)(?:\\\\)*\$(?<!\\)(?:\\\\){*/, push_mode: 'interpolation'}),
+  jsEndInterpolation: createToken({name: 'JsStartInterpolation', pattern: /(?<!\\)(?:\\\\){*/, pop_mode: true}),
 }
 
 const lexerDef: IMultiModeLexerDefinition = {
@@ -82,6 +86,16 @@ const lexerDef: IMultiModeLexerDefinition = {
       tokens.jsSingleQuote,
       tokens.jsDoubleQuote,
       tokens.jsNoQuotes,
+      tokens.jsStartBacktickQuote,
+    ],
+    interpolation: [
+      tokens.jsSingleQuote,
+      tokens.jsDoubleQuote,
+      tokens.jsNoQuotes,
+      tokens.jsEndInterpolation,
+    ],
+    backtick: [
+      tokens.jsEndBacktickQuote,
     ],
   }
 };
@@ -114,7 +128,7 @@ export function parseBoundString(text: string): BindableString[] {
       response[response.length - 1].text += token.image;
       continue;
     }
-    if (lexerDef.modes.bound.includes(token.tokenType)) {
+    if (lexerDef.modes.bound.includes(token.tokenType) || lexerDef.modes.backtick.includes(token.tokenType) || lexerDef.modes.interpolation.includes(token.tokenType)) {
       if (response[response.length - 1]?.type !== 'bind') {
         response.push({type: 'bind', text: '', bindMethod});
       }
