@@ -1,13 +1,12 @@
 import { CstElement, CstNode, CstParser, ParserMethod } from "chevrotain"
-import { htmlLex, htmlTokenVocabulary } from "./html-lexer"
-import type { AnyNodeData, AttributeData, ElementData } from "../../types/html-data";
-import { assert } from "console";
+import { AttributePayload, htmlLex, htmlTokenVocabulary } from "./html-lexer"
+import type { AnyNodeData, ElementData } from "../../types/html-data";
+import { parseBoundString } from "./bound-string-parser";
+import { UtilsChevrotain } from "./utils-chevrotain";
 
 class HtmlParser extends CstParser {
   constructor() {
     super(htmlTokenVocabulary, {nodeLocationTracking: 'onlyOffset'})
-
-    // for conciseness
 
     this.RULE("content", () => {
       this.MANY(() => {
@@ -106,22 +105,6 @@ export function htmlToCst(inputText: string): CstNode {
   return cstNode;
 }
 
-function isNode(node: CstElement): node is CstNode {
-  return !!(node as any).name
-}
-
-function getChildrenInCorrectOrder(node: CstNode): CstElement[] {
-  const children: CstElement[] = [];
-
-  for (const type in node.children) {
-    for (const child of node.children[type]) {
-      children.push(child);
-    }
-  }
-
-  return children.sort((a, b) => (isNode(a) ? a.location.startOffset : a.startOffset) - (isNode(b) ? b.location.startOffset : b.startOffset));
-}
-
 const parsedSymbol = Symbol('htmlParsed');
 const cstParentSymbol = Symbol('htmlParsed');
 export function parseHtml(input: string | CstNode): AnyNodeData[] {
@@ -151,7 +134,7 @@ export function parseHtml(input: string | CstNode): AnyNodeData[] {
       }
       const parentElementData: ElementData = parentElement[parsedSymbol] ?? dummyRootElement;
 
-      if (isNode(process)) {
+      if (UtilsChevrotain.isNode(process)) {
         switch (process.name) {
           case 'element': {
             const elementData: ElementData = {
@@ -169,7 +152,7 @@ export function parseHtml(input: string | CstNode): AnyNodeData[] {
           case 'comment':
           case 'attribute':
           case 'text': {
-            for (const child of getChildrenInCorrectOrder(process)) {
+            for (const child of UtilsChevrotain.getChildrenInCorrectOrder(process)) {
               child[cstParentSymbol] = process;
               pending.push(child);
             }
@@ -191,7 +174,7 @@ export function parseHtml(input: string | CstNode): AnyNodeData[] {
             // htmlTokenVocabulary.comment uses custom payload
             process[parsedSymbol] = {
               type: 'comment',
-              text: process.payload,
+              text: parseBoundString((process.payload as string)),
             };
             parentElementData.children.push(process[parsedSymbol]);
             break;
@@ -199,7 +182,7 @@ export function parseHtml(input: string | CstNode): AnyNodeData[] {
           case htmlTokenVocabulary.outsideText: {
             process[parsedSymbol] = {
               type: 'text',
-              text: process.image,
+              text: parseBoundString(process.image),
             };
             parentElementData.children.push(process[parsedSymbol]);
             break;
@@ -208,11 +191,18 @@ export function parseHtml(input: string | CstNode): AnyNodeData[] {
             if (!parentElement) {
               throw new Error('Internal compiler error: could not find the element to which we need to assign the attribute')
             }
-            const attrData: AttributeData = process.payload;
+            const attrData: AttributePayload = process.payload;
             if (parentElementData.attributes[attrData.name.toLowerCase()]) {
               throw new Error(`Duplicate attribute detected on element ${parentElementData.tag}. Attribute: ${attrData.name} (attributes are case insensitive)`);
             }
-            parentElementData.attributes[attrData.name.toLowerCase()] = attrData;
+            parentElementData.attributes[attrData.name.toLowerCase()] = {
+              name: attrData.name,
+              quoteType: attrData.quoteType,
+              value: [],
+            };
+            if (attrData.value) {
+              parentElementData.attributes[attrData.name.toLowerCase()].value = parseBoundString(attrData.value);
+            }
             
             process[parsedSymbol] = parentElementData;
             break;

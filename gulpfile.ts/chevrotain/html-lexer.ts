@@ -31,6 +31,12 @@ function pushAfterToken(push_mode: string, ...previousTokens: TokenType[]): Toke
   });
 }
 
+export interface AttributePayload {
+  name: string;
+  quoteType: `` | `'` | `"`
+  value?: string;
+};
+
 function attributePattern(text: string, offset: number, tokens: IToken[], groups: {[groupName: string]: IToken[]}): CustomPatternMatcherReturn {
   attrRegex.lastIndex = offset;
 
@@ -51,7 +57,7 @@ function attributePattern(text: string, offset: number, tokens: IToken[], groups
   }
   
   const response = [regexResult[0]] as CustomPatternMatcherReturn;
-  const payload: AttributeData = {
+  const payload: AttributePayload = {
     name: regexResult[1],
     quoteType: attrQuote,
     value: value,

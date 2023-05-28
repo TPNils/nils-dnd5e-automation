@@ -1,4 +1,4 @@
-import { AttributeData, ElementData } from "../../../../../types/html-data";
+import { AttributeData, BindableString, ElementData } from "../../../../../types/html-data";
 import { AnyNodeData } from "../../../../../types/html-data";
 import { UtilsLog } from "../../../utils/utils-log";
 import { VirtualCommmentNode } from "./virtual-comment-node";
@@ -67,7 +67,7 @@ export class VirtualNodeParser {
       // Text is the last part that needs to be parsed => no special characters found
       const value = this.html.substring(this.currentIndex);
       if (value.trim().length > 0) {
-        this.currentNode.children.push({type: 'text', text: value});
+        this.currentNode.children.push({type: 'text', text: [{type: 'string', text: value}]});
       }
       this.currentIndex = this.html.length;
       return;
@@ -75,13 +75,13 @@ export class VirtualNodeParser {
 
     // A special character is found => something else needs to be parsed
     if (this.regexResult[1].trim().length > 0) {
-      this.currentNode.children.push({type: 'text', text: this.regexResult[1]});
+      this.currentNode.children.push({type: 'text', text: [{type: 'string', text: this.regexResult[1]}]});
     }
   }
 
   private readCommentNode(): void {
     if (this.exec(commentNodeRegex)) {
-      this.currentNode.children.push({type: 'comment', text: this.regexResult[1]});
+      this.currentNode.children.push({type: 'comment', text: [{type: 'string', text: this.regexResult[1]}]});
     }
   }
 
@@ -140,7 +140,7 @@ export class VirtualNodeParser {
 
       this.currentNode.attributes[this.regexResult[1].toLowerCase()] = {
         name: this.regexResult[1],
-        value: value,
+        value: [{type: 'string', text: value}],
         quoteType: attrQuote,
       }
       if (indexSnapshot === this.currentIndex) {
@@ -201,12 +201,14 @@ export class VirtualNodeParser {
         switch (item.nodeData.type) {
           case "element": {
             const virtual = new VirtualHtmlNode(item.nodeData.tag);
-            for (const attr in item.nodeData.attributes) {
-              const value = item.nodeData.attributes[attr].value;
-              if (value) {
-                virtual.setAttribute(attr, value);
+            for (const attrName in item.nodeData.attributes) {
+              const attr = item.nodeData.attributes[attrName];
+              if (attr.value.length) {
+                // TODO allow bindable text
+                UtilsLog.debug(attr.name, VirtualNodeParser.toRawString(attr.value))
+                virtual.setAttribute(attr.name, VirtualNodeParser.toRawString(attr.value));
               } else {
-                virtual.setAttribute(attr);
+                virtual.setAttribute(attr.name);
               }
             }
             for (const child of item.nodeData.children) {
@@ -216,13 +218,17 @@ export class VirtualNodeParser {
             break;
           }
           case "comment": {
-            const virtual = new VirtualCommmentNode(item.nodeData.text);
+            // TODO allow bindable text
+            const virtual = new VirtualCommmentNode(VirtualNodeParser.toRawString(item.nodeData.text));
             item.parentVirtualNode.appendChild(virtual);
             break;
           }
           case "text": {
-            const virtual = new VirtualTextNode(item.nodeData.text);
-            item.parentVirtualNode.appendChild(virtual);
+            // TODO allow bindable text
+            const virtual = new VirtualTextNode(VirtualNodeParser.toRawString(item.nodeData.text));
+            if (virtual.getText().trim().length > 0) {
+              item.parentVirtualNode.appendChild(virtual);
+            }
             break;
           }
         }
@@ -234,6 +240,33 @@ export class VirtualNodeParser {
 
   public static init() {
     
+  }
+
+  private static toRawString(strings: BindableString[]): string {
+    const parts: string[] = [];
+
+    for (const str of strings) {
+      if (str.type === 'string') {
+        parts.push(str.text);
+      } else {
+        if (str.bindMethod === 'raw') {
+          parts.push('{{{');
+        } else {
+          parts.push('{{');
+        }
+        parts.push(str.text);
+        if (str.bindMethod === 'raw') {
+          parts.push('}}}');
+        } else {
+          parts.push('}}');
+        }
+      }
+    }
+
+    if (!parts.length) {
+      return null;
+    }
+    return parts.join('');
   }
 
 }

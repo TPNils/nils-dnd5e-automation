@@ -386,10 +386,14 @@ export class VirtualNodeRenderer {
                 break;
               }
               case 'addNodeBefore': {
-                if (item.addBefore instanceof Element) {
-                  item.addBefore.parentNode.insertBefore(item.node, item.addBefore);
-                } else {
-                  item.parent.insertBefore(item.node, item.addBefore);
+                try {
+                  if (item.addBefore instanceof Element) {
+                    item.addBefore.parentNode.insertBefore(item.node, item.addBefore);
+                  } else {
+                    item.parent.insertBefore(item.node, item.addBefore);
+                  }
+                } catch (e) {
+                  UtilsLog.error(item, e);
                 }
                 break;
               }

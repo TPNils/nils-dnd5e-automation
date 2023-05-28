@@ -1,6 +1,7 @@
 import { AnyNodeData } from "../../../../types/html-data";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
+import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
@@ -55,6 +56,7 @@ export function Component(config: ComponentConfig | string) {
 
     if (internalConfig.html) {
       internalConfig.parsedHtml = VirtualNodeParser.parse(internalConfig.html);
+      UtilsLog.debug(internalConfig.tag, internalConfig)
       // Mark all child nodes to be a part of this template
       let pending: Array<VirtualNode> = [internalConfig.parsedHtml];
       while (pending.length > 0) {

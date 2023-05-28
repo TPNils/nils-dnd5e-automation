@@ -8,17 +8,34 @@ export interface ElementData {
 export interface AttributeData {
   name: string;
   quoteType: `` | `'` | `"`
-  value?: string;
+  value: BindableString[];
+};
+
+export type BindableString = StringValue | BindExpressionValue;
+
+export interface StringValue {
+  type: 'string';
+  text: string;
+};
+
+export interface BindExpressionValue {
+  type: 'bind';
+  /**
+   * escaped: {{noHtmlElementsWillGenerate}}
+   * raw: {{canGenerateHtmlElements}}
+   */
+  bindMethod: 'escaped' | 'raw';
+  text: string;
 };
 
 export interface CommentData {
   type: 'comment';
-  text: string;
+  text: BindableString[];
 };
 
 export interface TextData {
   type: 'text';
-  text: string;
+  text: BindableString[];
 };
 
 export type AnyNodeData = ElementData | CommentData | TextData;
