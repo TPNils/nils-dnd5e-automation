@@ -4,6 +4,8 @@ import * as postcss from 'postcss';
 import * as sassCompiler from 'sass';
 import * as postCssMinify from 'postcss-minify';
 import { CssSelectorParser, Rule } from 'css-selector-parser';
+import { parseHtml } from '../chevrotain/html-parser';
+import { UtilsTransformer } from './utils-transformer';
 
 
 const cssParser = new CssSelectorParser();
@@ -157,14 +159,14 @@ function transformCssProperty(prefix: string, property: typescript.PropertyAssig
       init = init.template;
     }
   }
-  if (typescript.isStringLiteral(init)) {
-    return transformer(prefix, init.text);
-  } else if (typescript.isNoSubstitutionTemplateLiteral(init)) {
-    return transformer(prefix, init.text);
-  } else if (typescript.isTemplateExpression(init)) {
-    throw Error(`Javascript string templates with variables are not supported in @Component styles`)
+  const text = UtilsTransformer.valueFromExpression(init);
+  if (text == null) {
+    return false;
   }
-  return false;
+  if (typeof text !== 'string') {
+    throw new Error(`expected a string for css. found ${typeof text} ${text}`)
+  }
+  return transformer(prefix, text);
 }
 
 function doCssTransform(prefix: string, css: string): string {
@@ -223,6 +225,19 @@ export const componentTransformer: typescript.TransformerFactory<typescript.Sour
           continue;
         }
         switch (property.name.getText()) {
+          case 'html': {
+            let html = UtilsTransformer.valueFromExpression(property.initializer);
+            if (html == null) {
+              properties.push(property);
+              break;
+            }
+            if (typeof html !== 'string') {
+              throw new Error('Expected html to be a string: ' + html)
+            }
+            const parsedHtml = parseHtml(html);
+            properties.push(typescript.factory.createPropertyAssignment(property.name, UtilsTransformer.valueToExpression(parsedHtml)));
+            break;
+          }
           case 'style':
             const changed = transformCssProperty(String(id), property);
             if (changed !== false) {

@@ -23,6 +23,7 @@ import { git } from './git';
 import { componentTransformer } from './ts-transformers/component-transformer';
 import { importTransformer } from './ts-transformers/import-transformer';
 import { parseHtml } from './chevrotain/html-parser';
+import { UtilsTransformer } from './ts-transformers/utils-transformer';
 
 const sass = gulpSass(sassCompiler);
 
@@ -33,7 +34,7 @@ class BuildActions {
     if (BuildActions.tsConfig == null) {
       BuildActions.tsConfig = ts.createProject('tsconfig.json', {
         getCustomTransformers: (_program) => ({
-          before: [componentTransformer],
+          before: [UtilsTransformer.beforeCompilerHook, componentTransformer],
           after: [importTransformer],
         }),
       });
@@ -390,7 +391,10 @@ export async function test() {
     <input name="cure-amount" type="number" min="0" [max]="this.maxCure" [value]="this.currentCure" [disabled]="this.missingPermission" (keyup)="this.cure($event)" (blur)="this.cure($event)">
   </div>
   `;
-  console.log(JSON.stringify(parseHtml(html), null, 2))
+  const fromPath = `C:/Users/Nils/Documents/foundry/dev-modules/nils-automated-compendium/src/scripts/elements/roll.ts`;
+  const toPath = `../static-values`;
+  console.log(path.resolve(fromPath, toPath))
+  // console.log(JSON.stringify(parseHtml(html), null, 2))
 }
 export function rePublish() {
   return git.gitMoveTag();
