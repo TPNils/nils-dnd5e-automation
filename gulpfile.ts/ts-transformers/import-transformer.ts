@@ -29,7 +29,6 @@ export const importTransformer: typescript.TransformerFactory<typescript.SourceF
           const newModuleSpecifier = typescript.factory.createStringLiteral(`${nodeText}.js`);
           return typescript.factory.updateImportDeclaration(
             node,
-            node.decorators,
             node.modifiers,
             node.importClause,
             newModuleSpecifier,
@@ -38,13 +37,13 @@ export const importTransformer: typescript.TransformerFactory<typescript.SourceF
         } else if (typescript.isExportDeclaration(node)) {
           const nodeText: string = (node.moduleSpecifier as any).text;
           const newModuleSpecifier = typescript.factory.createStringLiteral(`${nodeText}.js`);
-          return typescript.updateExportDeclaration(
+          return typescript.factory.updateExportDeclaration(
             node,
-            node.decorators,
             node.modifiers,
+            node.isTypeOnly,
             node.exportClause,
             newModuleSpecifier,
-            node.isTypeOnly,
+            node.assertClause,
           );
         }
       }
