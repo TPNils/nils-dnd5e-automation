@@ -63,7 +63,7 @@ export class VirtualHtmlNode extends VNode({attribute: true, child: true, event:
       for (const child of this.childNodes) {
         parts.push(String(child));
       }
-      parts.push(`<${this.#nodeName.toLowerCase()}/>`);
+      parts.push(`</${this.#nodeName.toLowerCase()}>`);
     } else {
       parts.push('/>');
     }
