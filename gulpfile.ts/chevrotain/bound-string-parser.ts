@@ -51,7 +51,7 @@ function jsNoQuotesPattern(text: string, offset: number, previousTokens: IToken[
   if (!expected) {
     return null;
   }
-  const regex = new RegExp(/[^'"]+?(?=(}}}?|"|'|`))/.source.replace('}}}', expected), 'sy');
+  const regex = new RegExp(/[^'"`]+?(?=(}}}?|"|'|`))/.source.replace('}}}', expected), 'sy');
   regex.lastIndex = offset;
   return regex.exec(text);
 }
@@ -68,8 +68,8 @@ const tokens = {
 
   jsStartBacktickQuote: createToken({name: 'JsStartBacktickQuote', pattern: /(?<!\\)(?:\\\\)*`/, push_mode: 'backtick'}),
   jsEndBacktickQuote: createToken({name: 'JsEndBacktickQuote', pattern: /(?<!\\)(?:\\\\)*`/, pop_mode: true}),
-  jsStartInterpolation: createToken({name: 'JsStartInterpolation', pattern: /(?<!\\)(?:\\\\)*\$(?<!\\)(?:\\\\){*/, push_mode: 'interpolation'}),
-  jsEndInterpolation: createToken({name: 'JsStartInterpolation', pattern: /(?<!\\)(?:\\\\){*/, pop_mode: true}),
+  jsStartInterpolation: createToken({name: 'JsStartInterpolation', pattern: /(?<!\\)(?:\\\\)*\$(?<!\\)(?:\\\\)*{/, push_mode: 'interpolation'}),
+  jsEndInterpolation: createToken({name: 'JsStartInterpolation', pattern: /(?<!\\)(?:\\\\)*{/, pop_mode: true}),
 }
 
 const lexerDef: IMultiModeLexerDefinition = {
