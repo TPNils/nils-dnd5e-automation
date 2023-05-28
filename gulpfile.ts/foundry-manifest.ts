@@ -321,8 +321,9 @@ class FoundryManifest {
     for (const fileNames of fileNameCollection) {
       for (let fileName of fileNames) {
         fileName = path.normalize(fileName);
-        // Remove the 'dist/' prefix
-        fileName = fileName.substring(4 + path.delimiter.length);
+        // Remove the destination path prefix
+        fileName = fileName.substring(buildMeta.getDestPath().length + path.sep.length);
+        fileName = fileName.replace(path.sep, '/');
         if (fileName.toLowerCase().endsWith('.css')) {
           cssFiles.add(fileName);
         } else if (fileName.toLowerCase().endsWith('.hbs')) {
