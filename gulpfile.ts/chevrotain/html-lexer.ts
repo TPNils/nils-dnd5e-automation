@@ -8,8 +8,10 @@ const attrNameRegex = /([^\s"'>/=]+)/y;
 const attrRegex = new RegExp(`\\s*${attrNameRegex.source}(?:\\s*=(?:${attrValueNoQuoteRegex.source}|\\s*${attrValueDoubleQuoteRegex.source}|\\s*${attrValueSingleQuoteRegex.source}))?`, `ys`)
 const attrQuotesSorted = ['', `"`, `'`] as const;
 
+const voidElementsTags = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'];
+
 /** Can't push and pop at the same time, this is a workaround */
-function pushAfterToken(push_mode: string, previousToken: TokenType): TokenType {
+function pushAfterToken(push_mode: string, ...previousTokens: TokenType[]): TokenType {
   return createToken({
     name: `PushPopFix` + push_mode,
     push_mode: push_mode,
@@ -19,7 +21,7 @@ function pushAfterToken(push_mode: string, previousToken: TokenType): TokenType 
       if (!tokens.length) {
         return null;
       }
-      if (tokens[tokens.length-1].tokenType === previousToken) {
+      if (previousTokens.includes(tokens[tokens.length-1].tokenType)) {
         const response = [''] as CustomPatternMatcherReturn;
         response.payload = '';
         return response;
@@ -83,6 +85,7 @@ export const htmlTokenVocabulary = {
   elementOpen: createToken({name: 'ElementOpen', pattern: /</, push_mode: 'elementName'}),
   elementSlashOpen: createToken({name: 'ElementSlashOpen', pattern: /<\//, push_mode: 'elementName'}),
   elementName: createToken({name: 'ElementName', pattern: /[a-zA-Z_][a-zA-Z0-9_\-\.]*/, pop_mode: true}),
+  elementVoidName: createToken({name: 'ElementVoidName', pattern: new RegExp(voidElementsTags.join('|'), 'i'), start_chars_hint: Array.from(new Set<string>(voidElementsTags.map(t => t[0]))), pop_mode: true}),
   elementClose: createToken({name: 'ElementClose', pattern: />/, pop_mode: true}),
   elementSlashClose: createToken({name: 'ElementSlashClose', pattern: /\/>/, pop_mode: true}),
 
@@ -98,7 +101,7 @@ const HtmlLexer = new Lexer({
   modes: {
     // Order matters, the first in the array will get matched first
     outside: [
-      pushAfterToken('inside', htmlTokenVocabulary.elementName),
+      pushAfterToken('inside', htmlTokenVocabulary.elementName, htmlTokenVocabulary.elementVoidName),
       htmlTokenVocabulary.comment,
       htmlTokenVocabulary.elementSlashOpen,
       htmlTokenVocabulary.elementOpen,
@@ -111,6 +114,7 @@ const HtmlLexer = new Lexer({
       htmlTokenVocabulary.insideSkip,
     ],
     elementName: [
+      htmlTokenVocabulary.elementVoidName,
       htmlTokenVocabulary.elementName,
     ],
   }

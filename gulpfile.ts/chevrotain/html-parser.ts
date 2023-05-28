@@ -25,26 +25,45 @@ class HtmlParser extends CstParser {
 
     this.RULE("element", () => {
       this.CONSUME(htmlTokenVocabulary.elementOpen)
-      this.CONSUME(htmlTokenVocabulary.elementName)
-      this.MANY(() => {
-        this.SUBRULE(this.attribute)
-      })
-
       this.OR([
         {
           ALT: () => {
-            this.CONSUME(htmlTokenVocabulary.elementClose, { LABEL: "START_CLOSE" })
-            this.SUBRULE(this.content)
-            this.CONSUME(htmlTokenVocabulary.elementSlashOpen)
-            this.CONSUME2(htmlTokenVocabulary.elementName, { LABEL: "END_NAME" })
-            this.CONSUME2(htmlTokenVocabulary.elementClose, { LABEL: "END" })
-          }
+            this.CONSUME(htmlTokenVocabulary.elementName)
+            this.MANY(() => {
+              this.SUBRULE(this.attribute)
+            })
+      
+            this.OR2([
+              {
+                ALT: () => {
+                  this.CONSUME(htmlTokenVocabulary.elementClose, { LABEL: "START_CLOSE" })
+                  this.SUBRULE(this.content)
+                  this.CONSUME(htmlTokenVocabulary.elementSlashOpen)
+                  this.CONSUME2(htmlTokenVocabulary.elementName, { LABEL: "END_NAME" })
+                  this.CONSUME2(htmlTokenVocabulary.elementClose, { LABEL: "END" })
+                }
+              },
+              {
+                ALT: () => {
+                  this.CONSUME(htmlTokenVocabulary.elementSlashClose);
+                }
+              }
+            ])
+          },
         },
         {
           ALT: () => {
-            this.CONSUME(htmlTokenVocabulary.elementSlashClose);
-          }
-        }
+            this.CONSUME(htmlTokenVocabulary.elementVoidName)
+            this.MANY2(() => {
+              this.SUBRULE2(this.attribute)
+            })
+      
+            this.OR3([
+              { ALT: () => this.CONSUME3(htmlTokenVocabulary.elementClose) },
+              { ALT: () => this.CONSUME2(htmlTokenVocabulary.elementSlashClose) },
+            ])
+          },
+        },
       ])
     })
 
@@ -135,19 +154,9 @@ export function parseHtml(input: string | CstNode): AnyNodeData[] {
       if (isNode(process)) {
         switch (process.name) {
           case 'element': {
-            const elementNames = process.children[htmlTokenVocabulary.elementName.name];
-            if (!elementNames) {
-              throw new Error('Internal compiler error: no element name found.')
-            }
-            if (elementNames.length !== 1) {
-              throw new Error('Internal compiler error: multiple element names found.')
-            }
-            if (isNode(elementNames[0])) {
-              throw new Error('Internal compiler error: expected element name to be an IToken.')
-            }
             const elementData: ElementData = {
               type: 'element',
-              tag: (elementNames[0]).image,
+              tag: '',
               attributes: {},
               children: [],
             }
@@ -208,9 +217,16 @@ export function parseHtml(input: string | CstNode): AnyNodeData[] {
             process[parsedSymbol] = parentElementData;
             break;
           }
+          case htmlTokenVocabulary.elementName:
+          case htmlTokenVocabulary.elementVoidName: {
+            if (!parentElement) {
+              throw new Error('Internal compiler error: could not find the element to which we need to assign the attribute')
+            }
+            parentElementData.tag = process.image;
+            break;
+          }
           case htmlTokenVocabulary.elementOpen:
           case htmlTokenVocabulary.elementSlashOpen:
-          case htmlTokenVocabulary.elementName:
           case htmlTokenVocabulary.elementClose:
           case htmlTokenVocabulary.elementSlashClose: {
             // do nothing
