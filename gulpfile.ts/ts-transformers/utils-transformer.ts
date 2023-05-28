@@ -2,6 +2,9 @@ import { resolve, sep } from 'path';
 import * as typescript from 'typescript';
 
 const validProperty = /$[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*/u
+/**
+ * https://ts-ast-viewer.com/
+ */
 export class UtilsTransformer {
 
   private static parsedSourceFiles = new Map<string, typescript.SourceFile>();
@@ -102,6 +105,17 @@ export class UtilsTransformer {
       
       const instance = UtilsTransformer.valueFromExpression(value.expression);
       return instance?.[propName];
+    }
+    if (typescript.isExpressionStatement(value)) {
+      return UtilsTransformer.valueFromExpression(value.expression);
+    }
+    if (typescript.isBinaryExpression(value)) {
+      const right = UtilsTransformer.valueFromExpression(value.right);
+      if (value.operatorToken.kind === typescript.SyntaxKind.EqualsToken) {
+        return right;
+      }
+      const left = UtilsTransformer.valueFromExpression(value.left);
+      return Function('left', 'right', `return left ${value.operatorToken.getText()} right;`)(left, right);
     }
     if (typescript.isIdentifier(value) || typescript.isPrivateIdentifier(value)) {
       const instanceName = value.getText();
