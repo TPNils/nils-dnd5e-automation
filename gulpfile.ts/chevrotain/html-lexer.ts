@@ -1,11 +1,12 @@
 import { CustomPatternMatcherReturn, ILexingResult, IToken, Lexer, TokenType, createToken } from 'chevrotain';
+import { AttributeData } from '../../types/html-data';
 
 const attrValueNoQuoteRegex = /([^"'=<>`\s]+)/;
 const attrValueDoubleQuoteRegex = /""|"(.*?[^\\](?:\\\\)*)"/s;
 const attrValueSingleQuoteRegex = /''|'(.*?[^\\](?:\\\\)*)'/s;
 const attrNameRegex = /([^\s"'>/=]+)/y;
 const attrRegex = new RegExp(`\\s*${attrNameRegex.source}(?:\\s*=(?:${attrValueNoQuoteRegex.source}|\\s*${attrValueDoubleQuoteRegex.source}|\\s*${attrValueSingleQuoteRegex.source}))?`, `ys`)
-const attrQuotesSorted = ['', `"`, `'`];
+const attrQuotesSorted = ['', `"`, `'`] as const;
 
 /** Can't push and pop at the same time, this is a workaround */
 function pushAfterToken(push_mode: string, previousToken: TokenType): TokenType {
@@ -13,6 +14,7 @@ function pushAfterToken(push_mode: string, previousToken: TokenType): TokenType 
     name: `PushPopFix` + push_mode,
     push_mode: push_mode,
     group: Lexer.SKIPPED,
+    line_breaks: false,
     pattern: (text: string, offset: number, tokens: IToken[], groups: {[groupName: string]: IToken[]}) => {
       if (!tokens.length) {
         return null;
@@ -36,7 +38,7 @@ function attributePattern(text: string, offset: number, tokens: IToken[], groups
     return null;
   }
   
-  let attrQuote = '';
+  let attrQuote: AttributeData['quoteType'] = '';
   let value = '';
   for (let i = 2; i <= 4; i++) {
     if (regexResult[i]) {
@@ -47,21 +49,40 @@ function attributePattern(text: string, offset: number, tokens: IToken[], groups
   }
   
   const response = [regexResult[0]] as CustomPatternMatcherReturn;
-  response.payload = {
+  const payload: AttributeData = {
     name: regexResult[1],
     quoteType: attrQuote,
     value: value,
   }
+  response.payload = payload;
   return response;
 }
 
+function regexGroup(regex: RegExp, groupNr: number) {
+  if (!regex.sticky) {
+    regex = new RegExp(regex.source, (regex.flags ?? '') + 'y')
+  }
+  return function regexGroupMatcher(text: string, offset: number, tokens: IToken[], groups: {[groupName: string]: IToken[]}): CustomPatternMatcherReturn {
+    regex.lastIndex = offset;
+
+    const regexResult = regex.exec(text);
+    if (!regexResult) {
+      return null;
+    }
+    
+    const response = [regexResult[0]] as CustomPatternMatcherReturn;
+    response.payload = regexResult[1];
+    return response;
+  }
+}
+
 export const htmlTokenVocabulary = {
-  comment: createToken({name: 'Comment', pattern: /<!--(.*?)-->/, line_breaks: true}),
+  comment: createToken({name: 'Comment', pattern: regexGroup(/<!--(.*?)-->/, 1), line_breaks: true}),
 
   // https://www.ibm.com/docs/en/app-connect-pro/7.5.3?topic=schemas-valid-node-names
   elementOpen: createToken({name: 'ElementOpen', pattern: /</, push_mode: 'elementName'}),
   elementSlashOpen: createToken({name: 'ElementSlashOpen', pattern: /<\//, push_mode: 'elementName'}),
-  elementName: createToken({name: 'ElementName', pattern: /([a-zA-Z_][a-zA-Z0-9_\-\.]*)/, pop_mode: true}),
+  elementName: createToken({name: 'ElementName', pattern: /[a-zA-Z_][a-zA-Z0-9_\-\.]*/, pop_mode: true}),
   elementClose: createToken({name: 'ElementClose', pattern: />/, pop_mode: true}),
   elementSlashClose: createToken({name: 'ElementSlashClose', pattern: /\/>/, pop_mode: true}),
 
@@ -69,8 +90,6 @@ export const htmlTokenVocabulary = {
   attribute: createToken({name: 'AttrValue', pattern: attributePattern, line_breaks: true}),
 
   insideSkip: createToken({name: 'InsideSkip', pattern: /\s+/, group: Lexer.SKIPPED, line_breaks: true}),
-  slash: createToken({name: 'Slash', pattern: /\//}),
-  equals: createToken({name: 'Equals', pattern: /=/}),
   outsideText: createToken({ name: "OutsideText", pattern: /[^<]+/s, line_breaks: true }),
 }
 
@@ -97,13 +116,14 @@ const HtmlLexer = new Lexer({
   }
 })
 
-export function htmlLex(inputText: string): ILexingResult {
+export function htmlLex(inputText: string): IToken[] {
   const lexingResult = HtmlLexer.tokenize(inputText)
 
   if (lexingResult.errors.length > 0) {
-    console.error(lexingResult.tokens.map(t => ({image: t.image, payload: t.payload, token: t.tokenType.name})))
-    throw Error("Sad Sad Panda, lexing errors detected\n" + lexingResult.errors.map(e => JSON.stringify(e)).join('\n'))
+    console.error('parsed tokens', lexingResult.tokens.map(t => ({image: t.image, payload: t.payload, token: t.tokenType.name})));
+    console.error('html', inputText);
+    throw new Error("Lexing errors detected\n" + lexingResult.errors.map(e => JSON.stringify(e)).join('\n'))
   }
 
-  return lexingResult
+  return lexingResult.tokens;
 }

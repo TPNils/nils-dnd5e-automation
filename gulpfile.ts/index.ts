@@ -22,6 +22,7 @@ import { args } from './args';
 import { git } from './git';
 import { componentTransformer } from './ts-transformers/component-transformer';
 import { importTransformer } from './ts-transformers/import-transformer';
+import { parseHtml } from './chevrotain/html-parser';
 
 const sass = gulpSass(sassCompiler);
 
@@ -380,8 +381,16 @@ export const buildZip = gulp.series(
   build,
   BuildActions.createBuildPackage(buildMeta.getDestPath())
 );
-export function test() {
-  return args.validateVersion();
+export async function test() {
+  const html = /*html*/`
+  <div class="loh-grid">
+    <label>{{this.localeHealing}}:</label>
+    <input name="heal-amount" type="number" min="0" [max]="this.maxHeal" [value]="this.currentHeal" [disabled]="this.missingPermission" (keyup)="this.heal($event)" (blur)="this.heal($event)">
+    <label>{{this.localeCure}}:</label>
+    <input name="cure-amount" type="number" min="0" [max]="this.maxCure" [value]="this.currentCure" [disabled]="this.missingPermission" (keyup)="this.cure($event)" (blur)="this.cure($event)">
+  </div>
+  `;
+  console.log(JSON.stringify(parseHtml(html), null, 2))
 }
 export function rePublish() {
   return git.gitMoveTag();

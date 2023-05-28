@@ -12,6 +12,8 @@
 !/.gitmodules
 !/.eslintrc.json
 
+!/types
+
 !/src
 /src/*
 # Gulp copies these files
