@@ -56,7 +56,6 @@ export function Component(config: ComponentConfig | string) {
 
     if (internalConfig.html) {
       internalConfig.parsedHtml = VirtualNodeParser.parse(internalConfig.html);
-      UtilsLog.debug(internalConfig.tag, internalConfig)
       // Mark all child nodes to be a part of this template
       let pending: Array<VirtualNode> = [internalConfig.parsedHtml];
       while (pending.length > 0) {

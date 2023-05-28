@@ -205,7 +205,6 @@ export class VirtualNodeParser {
               const attr = item.nodeData.attributes[attrName];
               if (attr.value.length) {
                 // TODO allow bindable text
-                UtilsLog.debug(attr.name, VirtualNodeParser.toRawString(attr.value))
                 virtual.setAttribute(attr.name, VirtualNodeParser.toRawString(attr.value));
               } else {
                 virtual.setAttribute(attr.name);
