@@ -114,7 +114,7 @@ export function parseBoundString(text: string): BindableString[] {
     throw new Error("Lexing errors detected\n" + lexingResult.errors.map(e => JSON.stringify(e)).join('\n'))
   }
   
-  console.log('parsed tokens', lexingResult.tokens.map(t => ({image: t.image, payload: t.payload, token: t.tokenType.name})));
+  // console.log('parsed tokens', lexingResult.tokens.map(t => ({image: t.image, payload: t.payload, token: t.tokenType.name})));
   const response: BindableString[] = []
   let bindMethod : BindExpressionValue['bindMethod'] = 'escaped';
   for (const token of lexingResult.tokens) {
