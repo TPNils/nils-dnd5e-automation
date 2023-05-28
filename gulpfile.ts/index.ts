@@ -24,6 +24,7 @@ import { componentTransformer } from './ts-transformers/component-transformer';
 import { importTransformer } from './ts-transformers/import-transformer';
 import { parseHtml } from './chevrotain/html-parser';
 import { UtilsTransformer } from './ts-transformers/utils-transformer';
+import { parseBoundString } from './chevrotain/bound-string-parser';
 
 const sass = gulpSass(sassCompiler);
 
@@ -391,10 +392,8 @@ export async function test() {
     <input name="cure-amount" type="number" min="0" [max]="this.maxCure" [value]="this.currentCure" [disabled]="this.missingPermission" (keyup)="this.cure($event)" (blur)="this.cure($event)">
   </div>
   `;
-  const fromPath = `C:/Users/Nils/Documents/foundry/dev-modules/nils-automated-compendium/src/scripts/elements/roll.ts`;
-  const toPath = `../static-values`;
-  console.log(path.resolve(fromPath, toPath))
-  // console.log(JSON.stringify(parseHtml(html), null, 2))
+  console.log(JSON.stringify(parseHtml(html), null, 2))
+  console.log(JSON.stringify(parseBoundString("{{`this[${'test}}'}]`}}"), null, 2))
 }
 export function rePublish() {
   return git.gitMoveTag();
