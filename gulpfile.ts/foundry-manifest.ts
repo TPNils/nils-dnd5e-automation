@@ -375,7 +375,64 @@ class FoundryManifest {
         fileJson = FoundryManifest.injectV9(fileJson);
       }
     }
+    fileJson = this.sortProperties(fileJson);
     fs.writeFileSync(path.join(source ? buildMeta.getSrcPath() : buildMeta.getDestPath(), `${manifest.type}.json`), JSON.stringify(fileJson, null, 2));
+  }
+
+  private sortProperties<T extends Record<string, any>>(obj: T): T {
+    const propertyOrder: Array<keyof FoundryManifestJsonFile | keyof T> = [
+      'id',
+      'name',
+      'title',
+      'version',
+      'compatibility',
+      'minimumCoreVersion',
+      'compatibleCoreVersion',
+      'description',
+      'author',
+      'authors',
+      'url',
+      'manifest',
+      'download',
+      'media',
+      'license',
+      'readme',
+      'bugs',
+      'changelog',
+      'flags',
+      'scripts',
+      'esmodules',
+      'styles',
+      'languages',
+      'packs',
+      'relationships',
+      'system',
+      'dependencies',
+      'socket',
+      'protected',
+      'exclusive',
+    ];
+
+    const shalowClone: Partial<T> = {};
+    {
+      const extraProperties: typeof propertyOrder = [];
+      for (let key in obj) {
+        shalowClone[key] = obj[key];
+        delete obj[key];
+        if (!propertyOrder.includes(key) && !extraProperties.includes(key)) {
+          extraProperties.push(key);
+        }
+      }
+      propertyOrder.push(...extraProperties.sort());
+    }
+
+    for (const key of propertyOrder) {
+      if (key in shalowClone) {
+        obj[key] = shalowClone[key];
+      }
+    }
+
+    return obj;
   }
 
 }
