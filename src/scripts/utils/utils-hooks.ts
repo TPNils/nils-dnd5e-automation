@@ -77,10 +77,10 @@ export class UtilsHooks {
     Hooks.once('init', initResolve);
     UtilsHooks.init().then(() => {
       // Game version is available after init
-      if (UtilsFoundry.getGameVersion() >= new Version(9)) {
+      if (UtilsFoundry.getGameVersion() >= new Version(9, 240)) {
         Hooks.once('i18nInit', i18nInitResolve);
       } else {
-        // Hook does not exist in V8 or lower
+        // Hook does not exist in before 9.240
         // i18n is init during setup in V8, not during init
         setup.then(i18nInitResolve)
       }

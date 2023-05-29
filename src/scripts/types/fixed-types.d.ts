@@ -7,7 +7,7 @@ interface BaseDocument<DATA> {
   data: {_source: DATA} & DATA;
   folder?: string;
   getFlag(moduleName: string, key: string): any;
-  testUserPermission(user: User, permission: keyof CONST.ENTITY_PERMISSIONS, exact?: boolean);
+  testUserPermission(user: User, permission: keyof CONST.DOCUMENT_PERMISSION_LEVELS, exact?: boolean);
   clone(merge: DeepPartial<this>, options?: {keepId: boolean});
   update(data: DeepPartial<DATA> | {[key: string]: any});
   delete();
