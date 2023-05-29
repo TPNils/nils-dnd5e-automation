@@ -173,11 +173,11 @@ class BuildActions {
   }
 
   private static startFoundry() {
-    if (!fs.existsSync('foundryconfig.json')) {
+    if (!foundryConfig.exists()) {
       console.warn('Could not start foundry: foundryconfig.json not found in project root');
       return;
     }
-    const config = foundryConfig.getFoundryConfig('v8');
+    const config = foundryConfig.getFoundryConfig();
     if (!config.dataPath) {
       console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
       return;
@@ -219,7 +219,7 @@ class BuildActions {
     
     return gulp.series(
       async function init() {
-        config = foundryConfig.getFoundryConfig('v8');
+        config = foundryConfig.getFoundryConfig();
         manifest = foundryManifest.getManifest();
         if (config?.dataPath == null) {
           throw new Error(`Missing "dataPath" in the file foundryconfig.json. This should point to the foundry data folder.`);
@@ -331,7 +331,7 @@ class BuildActions {
    */
   static createUpdateSrcPacks() {
     return async function updateSrcPacks() {
-      const config = foundryConfig.getFoundryConfig('v8');
+      const config = foundryConfig.getFoundryConfig();
       if (!config.dataPath) {
         console.warn('Could not start foundry: foundryconfig.json is missing the property "dataPath"');
       }

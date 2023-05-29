@@ -1,5 +1,6 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import { args } from './args';
 
 interface FoundryConfigFileJson {
   [key: string]: {
@@ -15,13 +16,31 @@ export interface FoundryConfigJson {
 
 class FoundryConfig {
 
-  public getFoundryConfig(runInstanceKey: string): FoundryConfigJson {
+  public exists(): Boolean {
+    return fs.existsSync(path.resolve(process.cwd(), 'foundryconfig.json'));
+  }
+
+  public getFoundryConfig(runInstanceKey?: string): FoundryConfigJson {
+    if (!runInstanceKey) {
+      runInstanceKey = args.getFoundryInstanceName();
+    }
     const configPath = path.resolve(process.cwd(), 'foundryconfig.json');
     const response: FoundryConfigJson = {};
   
     if (fs.existsSync(configPath)) {
       const file: FoundryConfigFileJson = fs.readJSONSync(configPath);
-      const instance = file[runInstanceKey];
+      let instance: FoundryConfigJson;
+      if (runInstanceKey in file) {
+        instance = file[runInstanceKey];
+      }
+      if (!instance) {
+        for (const key in file) {
+          if (typeof file[key] === 'object') {
+            instance = file[key];
+            break;
+          }
+        }
+      }
       if (instance) {
         response.dataPath = instance.dataPath;
         response.foundryPath = instance.foundryPath;
@@ -34,7 +53,6 @@ class FoundryConfig {
           throw new Error(`dataPath "${response.dataPath}" in foundryconfig.json is not recognised as a foundry folder. The folder should include 3 other folders: Data, Config & Logs`);
         }
       }
-      return file;
     }
 
     return response;

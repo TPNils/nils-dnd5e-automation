@@ -12,7 +12,10 @@ export interface Version {
 
 class Args {
   /** @type {{u?: string; update?: string;}} */
-  private args: {u?: string; update?: string;} = yargs.argv;
+  private args: {
+    u?: string; update?: string;
+    fi?: string; foundryinstance?: string;
+  } = yargs.argv;
  
   public getVersion(currentVersion: string, allowNoVersion: true): string
   public getVersion(currentVersion: string, allowNoVersion?: false): string | null
@@ -59,6 +62,10 @@ class Args {
       throw new Error(chalk.red('Error: Incorrect version arguments. Accepts the following:\n- major\n- minor\n- patch\n- the following patterns: 1.0.0 | 1.0.0-beta'));
     }
     return targetVersion;
+  }
+  
+  public getFoundryInstanceName(): string | undefined {
+    return this.args.foundryinstance ?? this.args.fi;
   }
 
   /**
