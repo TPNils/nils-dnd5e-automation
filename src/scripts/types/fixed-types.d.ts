@@ -4,13 +4,11 @@ import { ActorData } from "@league-of-foundry-developers/foundry-vtt-types/src/f
 interface BaseDocument<DATA> {
   id?: string;
   uuid: string;
-  data: {_source: DATA} & DATA;
+  data: foundry.abstract.DocumentData<any, DATA> & DATA;
   folder?: string;
   getFlag(moduleName: string, key: string): any;
   testUserPermission(user: User, permission: keyof CONST.DOCUMENT_PERMISSION_LEVELS, exact?: boolean);
-  clone(merge: DeepPartial<this>, options?: {keepId: boolean});
-  update(data: DeepPartial<DATA> | {[key: string]: any});
-  delete();
+  clone(merge: DeepPartial<DATA>, options?: {keepId: boolean});
   createEmbeddedDocuments(embeddedName: string, data: any[]): Promise<Array<Document<any, this>>>;
   updateEmbeddedDocuments(embeddedName: string, updates?: Array<Record<string, unknown>>, context?: DocumentModificationContext): Promise<Array<Document<any, this>>>;
   deleteEmbeddedDocuments(embeddedName: string, ids: string[], context?: DocumentModificationContext): Promise<Array<Document<any, this>>>;
@@ -128,7 +126,10 @@ export type MyActorData = {
       }
     }
     mod: number;
-    prof: number;
+    prof?: {
+      hasProficiency: boolean;
+      term: string;
+    };
     resources: {
       [key: 'primary' | 'secondary' | 'tertiary']: {​​​​​
         label: string;
@@ -338,7 +339,7 @@ export interface D20RollOptions {
   flavor?: string;
 }
 
-export interface MyItem extends BaseDocument<MyItemData> {
+export interface MyItem extends BaseDocument<MyActorData> {
   name: string;
   img: string;
   type: 'weapon' | 'equipment' | 'consumable' | 'tool' | 'loot' | 'class' | 'spell' | 'feat' | 'backpack';
