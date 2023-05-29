@@ -10,6 +10,7 @@ interface FoundryConfigFileJson {
 }
 
 export interface FoundryConfigJson {
+  runInstanceKey: string;
   dataPath?: string;
   foundryPath?: string;
 }
@@ -20,42 +21,44 @@ class FoundryConfig {
     return fs.existsSync(path.resolve(process.cwd(), 'foundryconfig.json'));
   }
 
-  public getFoundryConfig(runInstanceKey?: string): FoundryConfigJson {
+  public getFoundryConfig(runInstanceKey?: string): FoundryConfigJson[] {
     if (!runInstanceKey) {
       runInstanceKey = args.getFoundryInstanceName();
     }
     const configPath = path.resolve(process.cwd(), 'foundryconfig.json');
-    const response: FoundryConfigJson = {};
+    const responses: FoundryConfigJson[] = [];
   
     if (fs.existsSync(configPath)) {
       const file: FoundryConfigFileJson = fs.readJSONSync(configPath);
-      let instance: FoundryConfigJson;
-      if (runInstanceKey in file) {
-        instance = file[runInstanceKey];
-      }
-      if (!instance) {
+      if (runInstanceKey && runInstanceKey in file) {
+        responses.push({
+          runInstanceKey: runInstanceKey,
+          ...file[runInstanceKey]
+        });
+      } else {
         for (const key in file) {
           if (typeof file[key] === 'object') {
-            instance = file[key];
-            break;
+            responses.push({
+              runInstanceKey: key,
+              ...file[key]
+            });
           }
         }
       }
-      if (instance) {
-        response.dataPath = instance.dataPath;
-        response.foundryPath = instance.foundryPath;
-      }
+    }
+
+    for (const response of responses) {
       if (response.dataPath) {
         // Validate correct path
         const files = fs.readdirSync(response.dataPath).filter(fileName => fileName !== 'Data' && fileName !== 'Config' && fileName !== 'Logs');
         // 0 files => only the foundry folders exist (or some of them if the server has not yet started for a first time)
         if (files.length !== 0) {
-          throw new Error(`dataPath "${response.dataPath}" in foundryconfig.json is not recognised as a foundry folder. The folder should include 3 other folders: Data, Config & Logs`);
+          throw new Error(`dataPath "${response.dataPath}" in foundryconfig.json ${response.runInstanceKey} is not recognised as a foundry folder. The folder should include 3 other folders: Data, Config & Logs`);
         }
       }
     }
 
-    return response;
+    return responses;
   }
 
 }

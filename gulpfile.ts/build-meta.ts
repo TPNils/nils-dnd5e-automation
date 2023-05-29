@@ -1,12 +1,12 @@
 class BuildMeta {
 
-  private destPath = 'dist';
+  private destPath = ['dist'];
 
-  public setDestPath(path: string): void {
+  public setDestPath(path: string[]): void {
     this.destPath = path;
   }
 
-  public getDestPath(): string {
+  public getDestPath(): string[] {
     return this.destPath;
   }
 

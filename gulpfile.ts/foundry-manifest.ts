@@ -292,12 +292,12 @@ class FoundryManifest {
     return injected;
   }
 
-  private static async injectFromOutput(input: FoundryManifestJsonV10): Promise<FoundryManifestJsonV10> {
+  private static async injectFromOutput(input: FoundryManifestJsonV10, destPath: string): Promise<FoundryManifestJsonV10> {
     const injected: FoundryManifestJsonV10 = JSON.parse(JSON.stringify(input));
 
     const filePromises: Promise<string[]>[] = [];
     filePromises.push(new Promise<string[]>((resolve, reject) => {
-      glob(path.join(buildMeta.getDestPath(), '**/*.css'), (err: any, matches: string[]) => {
+      glob(path.join(destPath, '**/*.css'), (err: any, matches: string[]) => {
         if (err) {
           reject(err);
           return;
@@ -306,7 +306,7 @@ class FoundryManifest {
       })
     }));
     filePromises.push(new Promise<string[]>((resolve, reject) => {
-      glob(path.join(buildMeta.getDestPath(), '**/*.hbs'), (err: any, matches: string[]) => {
+      glob(path.join(destPath, '**/*.hbs'), (err: any, matches: string[]) => {
         if (err) {
           reject(err);
           return;
@@ -322,7 +322,7 @@ class FoundryManifest {
       for (let fileName of fileNames) {
         fileName = path.normalize(fileName);
         // Remove the destination path prefix
-        fileName = fileName.substring(buildMeta.getDestPath().length + path.sep.length);
+        fileName = fileName.substring(destPath.length + path.sep.length);
         fileName = fileName.replace(path.sep, '/');
         if (fileName.toLowerCase().endsWith('.css')) {
           cssFiles.add(fileName);
@@ -367,16 +367,23 @@ class FoundryManifest {
   public async saveManifest({overrideManifest, source}: {overrideManifest?: FoundryManifestJsonV10, source?: boolean} = {}): Promise<void> {
     const manifest = foundryManifest.getManifest();
     let fileJson: any = overrideManifest ?? manifest.file;
-    if (!source) {
-      fileJson = await FoundryManifest.injectFromOutput(fileJson);
-  
-      const minimumCompatibility = (fileJson as FoundryManifestJsonV10).compatibility?.minimum;
-      if (minimumCompatibility && Number(minimumCompatibility.split('.')[0]) <= 9) {
-        fileJson = FoundryManifest.injectV9(fileJson);
+    
+    if (source) {
+      fileJson = this.sortProperties(fileJson);
+      fs.writeFileSync(path.join(buildMeta.getSrcPath(), `${manifest.type}.json`), JSON.stringify(fileJson, null, 2));
+    } else {
+      for (const dest of buildMeta.getDestPath()) {
+        fileJson = await FoundryManifest.injectFromOutput(fileJson, dest);
+    
+        const minimumCompatibility = (fileJson as FoundryManifestJsonV10).compatibility?.minimum;
+        if (minimumCompatibility && Number(minimumCompatibility.split('.')[0]) <= 9) {
+          fileJson = FoundryManifest.injectV9(fileJson);
+        }
+        
+        fileJson = this.sortProperties(fileJson);
+        fs.writeFileSync(path.join(dest, `${manifest.type}.json`), JSON.stringify(fileJson, null, 2));
       }
     }
-    fileJson = this.sortProperties(fileJson);
-    fs.writeFileSync(path.join(source ? buildMeta.getSrcPath() : buildMeta.getDestPath(), `${manifest.type}.json`), JSON.stringify(fileJson, null, 2));
   }
 
   private sortProperties<T extends Record<string, any>>(obj: T): T {
