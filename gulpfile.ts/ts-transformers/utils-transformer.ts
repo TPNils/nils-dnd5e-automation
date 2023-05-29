@@ -118,6 +118,8 @@ export class UtilsTransformer {
       return Function('left', 'right', `return left ${value.operatorToken.getText()} right;`)(left, right);
     }
     if (typescript.isIdentifier(value) || typescript.isPrivateIdentifier(value)) {
+      // TODO it's not really correct at this moment as it does not account for modifing the variable
+      //  inject assert statements to verify at runtime? I mean... it's not great but it might catch an issue
       const instanceName = value.getText();
       let ancestor: typescript.Node = value;
 
