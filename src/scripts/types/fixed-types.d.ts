@@ -9,7 +9,7 @@ export type DataHolderV10<SYSTEM extends object, DATA extends object = object> =
 
 export type DataHolder<SYSTEM extends object, DATA extends object = object> = Partial<DataHolderV8<DATA> | DataHolderV10<SYSTEM, DATA>>
 
-interface BaseDocument<DATA> {
+interface BaseDocument<SYSTEM extends object, DATA extends object = object> {
   id?: string;
   uuid: string;
   data: foundry.abstract.DocumentData<any, DATA> & DATA;
@@ -23,7 +23,7 @@ interface BaseDocument<DATA> {
   
   /** @private only used to find the implicit type */
   ___GENERIC_DATA_TYPE___?: DATA;
-  ___GENERIC_SYSTEM_TYPE___?: DATA;
+  ___GENERIC_SYSTEM_TYPE___?: SYSTEM;
 }
 
 export interface ActorAbility {
