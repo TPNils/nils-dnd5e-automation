@@ -1,7 +1,7 @@
 import { ModularCard, ModularCardInstance } from "../modular-card/modular-card";
 import { CheckCardData, CheckCardPart } from "../modular-card/base/check-card-part";
 import { staticValues } from "../static-values";
-import type { D20RollOptions, MyActor } from "../types/fixed-types";
+import type { D20RollOptions, MyActor, MyActorData } from "../types/fixed-types";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { UtilsRoll } from "../lib/roll/utils-roll";
 import { UtilsHooks } from "../utils/utils-hooks";
@@ -44,7 +44,7 @@ function getTokenUuid(options: D20RollOptions) {
   return null;
 }
 
-async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActor['data']['data']['skills'], D20RollOptions]): Promise<Roll> {
+async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['data']['skills'], D20RollOptions]): Promise<Roll> {
   const [skillId, options] = args;
   if (options.chatMessage === false) {
     return wrapped(...args);
@@ -97,7 +97,7 @@ async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args:
   return UtilsRoll.fromRollData(target.roll$);
 }
 
-async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActor['data']['data']['abilities'], D20RollOptions]): Promise<Roll> {
+async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['data']['abilities'], D20RollOptions]): Promise<Roll> {
   const [abilityId, options] = args;
   if (options.chatMessage === false) {
     return wrapped(...args);
@@ -150,7 +150,7 @@ async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ..
   return UtilsRoll.fromRollData(target.roll$);
 }
 
-async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActor['data']['data']['abilities'], D20RollOptions]): Promise<Roll> {
+async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['data']['abilities'], D20RollOptions]): Promise<Roll> {
   const [abilityId, options] = args;
   if (options.chatMessage === false) {
     return wrapped(...args);

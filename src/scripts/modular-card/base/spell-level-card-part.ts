@@ -5,8 +5,7 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { SpellData, MyActor } from "../../types/fixed-types";
-import { UtilsLog } from "../../utils/utils-log";
+import { SpellData, MyActor, MyActorData } from "../../types/fixed-types";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ItemUtils } from "../item-utils";
@@ -106,7 +105,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
             continue;
           }
           if (spellKey === 'pact') {
-            const spellLevel = (spellData as MyActor['data']['data']['spells']['pact']).level;
+            const spellLevel = (spellData as MyActorData['data']['spells']['pact']).level;
             const availableSlots = spellData.value;
             this.spellSlotOptions.push({
               label: game.i18n.format("DND5E.SpellLevelPact", {level: spellLevel, n: availableSlots}),
@@ -179,7 +178,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       } else if (spellKey === 'pact') {
         spellSlots.push({
           type: 'pact',
-          level: (spellData as MyActor['data']['data']['spells']['pact']).level,
+          level: (spellData as MyActorData['data']['spells']['pact']).level,
           maxSlots: spellData.max,
           availableSlots: spellData.value
         });

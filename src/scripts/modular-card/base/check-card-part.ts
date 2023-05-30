@@ -32,7 +32,7 @@ export interface TargetCache {
 
 export interface CheckCardData {
   actorUuid$?: string;
-  ability: keyof MyActor['data']['data']['abilities'];
+  ability: keyof MyActorData['data']['abilities'];
   dc: number;
   skill?: keyof MyActorData['data']['skills'];
   /**@deprecated use isSave*/

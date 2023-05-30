@@ -73,7 +73,7 @@ export interface DamageCardData {
   userBonus?: string;
   calc$: {
     actorUuid?: string;
-    properties: MyItem['data']['data']['properties'];
+    properties: MyItemData['data']['properties'];
     damageSource: ItemDamageSource | ManualDamageSource;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     roll?: RollData;

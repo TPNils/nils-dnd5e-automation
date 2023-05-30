@@ -12,7 +12,7 @@ export type DataHolder<SYSTEM extends object, DATA extends object = object> = Pa
 interface BaseDocument<SYSTEM extends object, DATA extends object = object> {
   id?: string;
   uuid: string;
-  data: foundry.abstract.DocumentData<any, DATA> & DATA;
+  data: foundry.abstract.DocumentData<any, SYSTEM> & SYSTEM;
   folder?: string;
   getFlag(moduleName: string, key: string): any;
   testUserPermission(user: User, permission: keyof CONST.DOCUMENT_PERMISSION_LEVELS, exact?: boolean);
@@ -381,9 +381,9 @@ export type MyActor = Actor & BaseDocument<MyActorData> & {
   pack: any;
   isOwner: boolean;
   update(data: any, context?: any);
-  rollSkill(skillId: keyof MyActor['data']['data']['skills'], options?: D20RollOptions): Promise<Roll>;
-  rollAbilityTest(abilityId: keyof MyActor['data']['data']['abilities'], options?: D20RollOptions): Promise<Roll>;
-  rollAbilitySave(abilityId: keyof MyActor['data']['data']['abilities'], options?: D20RollOptions): Promise<Roll>;
+  rollSkill(skillId: keyof MyActorData['data']['skills'], options?: D20RollOptions): Promise<Roll>;
+  rollAbilityTest(abilityId: keyof MyActorData['data']['abilities'], options?: D20RollOptions): Promise<Roll>;
+  rollAbilitySave(abilityId: keyof MyActorData['data']['abilities'], options?: D20RollOptions): Promise<Roll>;
 }
 
 export type MyCompendiumCollection = CompendiumCollection & BaseDocument<CompendiumCollection.Metadata>;
