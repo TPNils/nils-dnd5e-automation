@@ -29,7 +29,6 @@ export interface SpellLevelCardData {
   }
 }
 
-// TODO can't apply pact usage for bless
 @Component({
   tag: SpellLevelCardComponent.getSelector(),
   html: /*html*/`

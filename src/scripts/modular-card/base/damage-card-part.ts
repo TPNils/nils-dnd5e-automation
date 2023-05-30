@@ -432,7 +432,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       return null;
     }
 
-    // TODO make an other element with for the "other" formula
     const rollData: {[key: string]: any} = item.getRollData();
     if (item.data.data.prof?.hasProficiency) {
       rollData.prof = item.data.data.prof.term;
