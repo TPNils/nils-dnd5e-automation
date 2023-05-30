@@ -1,3 +1,6 @@
+import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
+import { StaticInitFunc } from "../lib/decorator/static-init-func";
+import { BaseDocument, DataHolderV10, DataHolderV8 } from "../types/fixed-types";
 import { UtilsHooks } from "./utils-hooks";
 
 export class Version {
@@ -47,6 +50,8 @@ export class Version {
   }
 
 }
+
+const version10 = new Version(10);
 
 export class UtilsFoundry {
 
@@ -104,6 +109,27 @@ export class UtilsFoundry {
 
 
     return Version.fromString(version);
+  }
+
+  @StaticInitFunc(() => (document: any) => UtilsFoundry.getGameVersion() >= version10)
+  public static usesDataModel: <T extends BaseDocument<any>>(document?: T) => document is T & DataHolderV10<T['___GENERIC_TYPE___']>;
+
+  
+  @StaticInitFunc(() => (document: any) => UtilsFoundry.getGameVersion() < version10)
+  public static usesDocumentData: <T extends BaseDocument<any>>(document?: T) => document is T & DataHolderV8<T['___GENERIC_TYPE___']>;
+
+  public static getData<T extends ActiveEffect>(document: T): foundry.abstract.DataModel<ActiveEffectData>;
+  public static getData<T extends {data: any}>(document: T): foundry.abstract.DataModel<T extends {data: infer DATA} ? DATA : any>;
+  public static getData<T extends BaseDocument<any>>(document: T): foundry.abstract.DataModel<T['___GENERIC_TYPE___']>
+  @StaticInitFunc(() => {
+    if (UtilsFoundry.usesDataModel()) {
+      return (document: DataHolderV10<any>) => document;
+    } else {
+      return (document: DataHolderV8<any>) => document?.data;
+    }
+  })
+  public static getData<T extends BaseDocument<any> | {data: any}>(document: T): foundry.abstract.DataModel<any> {
+    throw new Error('Should never get called')
   }
 
   public static getSystemVersion(): Version {

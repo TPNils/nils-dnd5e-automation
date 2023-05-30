@@ -1,6 +1,14 @@
 import EmbeddedCollection from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/embedded-collection.mjs";
 import { ActorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 
+export type DataHolderV8<DATA extends object> = {
+  data: foundry.abstract.DocumentData<any, DATA> & DATA;
+}
+
+export type DataHolderV10<DATA extends object> = foundry.abstract.DataModel<DATA>
+
+export type DataHolder<DATA extends object = object> = Partial<DataHolderV8<DATA> | DataHolderV10<DATA>>
+
 interface BaseDocument<DATA> {
   id?: string;
   uuid: string;
