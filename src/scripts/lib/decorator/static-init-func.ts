@@ -1,3 +1,5 @@
+import { UtilsLog } from "../../utils/utils-log";
+
 function runOnceInternal<T>(originalFunction: (args: Array<Array<T>>) => any): (...args: T[]) => any {
   let hasRan = false;
   let response: any;
@@ -27,6 +29,7 @@ export function StaticInitFunc(init: () => any) {
 
     const getFunc = () => {
       const value = init();
+      UtilsLog.debug(propertyKey, value)
       Reflect.deleteProperty(target, propertyKey);
       target[propertyKey] = value;
       return value;
@@ -35,19 +38,12 @@ export function StaticInitFunc(init: () => any) {
     if (descriptor) {
       descriptor.get = getFunc;
       delete descriptor.value;
+      delete descriptor.writable;
     } else {
       Reflect.defineProperty(target, propertyKey, {
+        configurable: true,
         get: getFunc
       })
-    }
-    
-    const bufferMethod = runOnceInternal(
-      descriptor.get ? descriptor.get() : descriptor.value
-    )
-    if (descriptor.get) {
-      descriptor.set(bufferMethod);
-    } else {
-      descriptor.value = bufferMethod;
     }
   };
 }

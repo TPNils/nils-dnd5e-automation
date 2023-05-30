@@ -10,6 +10,8 @@ export type DataHolderV10<DATA extends object> = foundry.abstract.DataModel<DATA
 export type DataHolder<DATA extends object = object> = Partial<DataHolderV8<DATA> | DataHolderV10<DATA>>
 
 interface BaseDocument<DATA> {
+  /** @private only used to find the implicit type */
+  ___GENERIC_TYPE___?: DATA;
   id?: string;
   uuid: string;
   data: foundry.abstract.DocumentData<any, DATA> & DATA;
