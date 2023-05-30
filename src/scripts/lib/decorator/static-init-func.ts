@@ -1,18 +1,3 @@
-import { UtilsLog } from "../../utils/utils-log";
-
-function runOnceInternal<T>(originalFunction: (args: Array<Array<T>>) => any): (...args: T[]) => any {
-  let hasRan = false;
-  let response: any;
-  // use 'function' to retain the original context from the caller (use another this context)
-  return function (...args: T[]): any {
-    if (hasRan) {
-      return response;
-    }
-    hasRan = true;
-    response = originalFunction.call(this, ...args);
-  }
-}
-
 export function StaticInitFunc(init: () => any) {
   return function (target: any, propertyKey: string, descriptor?: PropertyDescriptor) {
     if (descriptor) {
@@ -29,7 +14,6 @@ export function StaticInitFunc(init: () => any) {
 
     const getFunc = () => {
       const value = init();
-      UtilsLog.debug(propertyKey, value)
       Reflect.deleteProperty(target, propertyKey);
       target[propertyKey] = value;
       return value;
