@@ -131,6 +131,18 @@ export class UtilsFoundry {
   public static getSystemData<T extends BaseDocument<any> | {data: any}>(document: T): any {
     throw new Error('Should never get called')
   }
+  
+  public static getModelData<T extends BaseDocument<any>>(document: T): DataHolderV10<T['___GENERIC_SYSTEM_TYPE___'], T['___GENERIC_DATA_TYPE___']>;
+  @StaticInitFunc(() => {
+    if (UtilsFoundry.usesDataModel()) {
+      return (document: DataHolderV10<any>) => document;
+    } else {
+      return (document: DataHolderV8<any>) => document?.data;
+    }
+  })
+  public static getModelData<T extends BaseDocument<any> | {data: any}>(document: T): any {
+    throw new Error('Should never get called')
+  }
 
   public static getSystemVersion(): Version {
     return Version.fromString(game.system.data.version);
