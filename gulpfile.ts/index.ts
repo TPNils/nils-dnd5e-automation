@@ -87,7 +87,7 @@ class BuildActions {
             }
           }));
         for (const dest of buildMeta.getDestPath()) {
-          pipeline.pipe(gulp.dest(dest));
+          pipeline = pipeline.pipe(gulp.dest(dest));
         }
         return pipeline;
       }
@@ -121,7 +121,7 @@ class BuildActions {
         .pipe(sourcemaps.write('./', sourceMapConfig));
         
       for (const dest of buildMeta.getDestPath()) {
-        pipeline.pipe(gulp.dest(dest));
+        pipeline = pipeline.pipe(gulp.dest(dest));
       }
       return pipeline;
     }
@@ -134,7 +134,7 @@ class BuildActions {
         .pipe(minifyCss());
         
       for (const dest of buildMeta.getDestPath()) {
-        pipeline.pipe(gulp.dest(dest));
+        pipeline = pipeline.pipe(gulp.dest(dest));
       }
       return pipeline;
     }
@@ -148,7 +148,7 @@ class BuildActions {
         .pipe(minifyCss());
         
       for (const dest of buildMeta.getDestPath()) {
-        pipeline.pipe(gulp.dest(dest));
+        pipeline = pipeline.pipe(gulp.dest(dest));
       }
       return pipeline;
     }
