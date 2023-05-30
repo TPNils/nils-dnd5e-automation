@@ -112,23 +112,23 @@ export class UtilsFoundry {
   }
 
   @StaticInitFunc(() => (document: any) => UtilsFoundry.getGameVersion() >= version10)
-  public static usesDataModel: <T extends BaseDocument<any>>(document?: T) => document is T & DataHolderV10<T['___GENERIC_TYPE___']>;
+  public static usesDataModel: <T extends BaseDocument<any>>(document?: T) => document is T & DataHolderV10<T['___GENERIC_SYSTEM_TYPE___'], T['___GENERIC_DATA_TYPE___']>;
 
   
   @StaticInitFunc(() => (document: any) => UtilsFoundry.getGameVersion() < version10)
-  public static usesDocumentData: <T extends BaseDocument<any>>(document?: T) => document is T & DataHolderV8<T['___GENERIC_TYPE___']>;
+  public static usesDocumentData: <T extends BaseDocument<any>>(document?: T) => document is T & DataHolderV8<T['___GENERIC_SYSTEM_TYPE___']>;
 
-  public static getData<T extends ActiveEffect>(document: T): foundry.abstract.DataModel<ActiveEffectData>;
-  public static getData<T extends {data: any}>(document: T): foundry.abstract.DataModel<T extends {data: infer DATA} ? DATA : any>;
-  public static getData<T extends BaseDocument<any>>(document: T): foundry.abstract.DataModel<T['___GENERIC_TYPE___']>
+  public static getSystemData<T extends ActiveEffect>(document: T): ActiveEffectData;
+  public static getSystemData<T extends {data: any}>(document: T): T extends {data: infer DATA} ? DATA : any;
+  public static getSystemData<T extends BaseDocument<any>>(document: T): T['___GENERIC_SYSTEM_TYPE___']
   @StaticInitFunc(() => {
     if (UtilsFoundry.usesDataModel()) {
-      return (document: DataHolderV10<any>) => document;
+      return (document: DataHolderV10<any>) => document?.system;
     } else {
-      return (document: DataHolderV8<any>) => document?.data;
+      return (document: DataHolderV8<any>) => document?.data?.data;
     }
   })
-  public static getData<T extends BaseDocument<any> | {data: any}>(document: T): foundry.abstract.DataModel<any> {
+  public static getSystemData<T extends BaseDocument<any> | {data: any}>(document: T): any {
     throw new Error('Should never get called')
   }
 

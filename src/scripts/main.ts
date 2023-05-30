@@ -13,6 +13,7 @@ import { ItemSheetHooks } from "./modular-card/item-sheet-hooks";
 import { VirtualNodeParser } from "./lib/render-engine/virtual-dom/virtual-node-parser";
 import { UtilsHooks } from "./utils/utils-hooks";
 import { ComponentFoundryConnector } from "./lib/render-engine/component-foundry-connector";
+import { UtilsFoundry } from "./utils/utils-foundry";
 
 UtilsHooks.registerHooks();
 VirtualNodeParser.init();
@@ -28,6 +29,7 @@ ModuleSettings.registerHooks();
 registerModularCardBaseHooks();
 registerModularCardSrdHooks();
 ComponentFoundryConnector.registerHooks();
+globalThis.UtilsFoundry = UtilsFoundry;
 
 Hooks.on('init', () => {
   const hbsFiles: string[] = [];

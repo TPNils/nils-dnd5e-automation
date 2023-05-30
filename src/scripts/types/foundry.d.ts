@@ -22,7 +22,7 @@ declare global {
 }
 
 
-class DataModelCls<DATA extends object, PARENT extends foundry.abstract.Document<any, any> = foundry.abstract.Document<any, any>> {
+class DataModelCls<DATA, PARENT extends foundry.abstract.Document<any, any> = foundry.abstract.Document<any, any>> {
   constructor(data?: DATA, options?: {parent?: any, strict?: boolean, [key: string]: any});
 
   readonly _source: DATA;
@@ -34,7 +34,9 @@ class DataModelCls<DATA extends object, PARENT extends foundry.abstract.Document
 declare global {
   namespace foundry {
     namespace abstract {
-      type DataModel<DATA extends object> = DataModelCls<DATA> & DATA;
+      type DataModel<SYSTEM extends object, DATA extends object = object> = DataModelCls<SYSTEM> & DATA & {
+        system: SYSTEM;
+      };
     }
   }
 }

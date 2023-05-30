@@ -1,17 +1,15 @@
 import EmbeddedCollection from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/embedded-collection.mjs";
 import { ActorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 
-export type DataHolderV8<DATA extends object> = {
-  data: foundry.abstract.DocumentData<any, DATA> & DATA;
+export type DataHolderV8<SYSTEM extends object> = {
+  data: foundry.abstract.DocumentData<any, SYSTEM> & SYSTEM;
 }
 
-export type DataHolderV10<DATA extends object> = foundry.abstract.DataModel<DATA>
+export type DataHolderV10<SYSTEM extends object, DATA extends object = object> = foundry.abstract.DataModel<SYSTEM, DATA>
 
-export type DataHolder<DATA extends object = object> = Partial<DataHolderV8<DATA> | DataHolderV10<DATA>>
+export type DataHolder<SYSTEM extends object, DATA extends object = object> = Partial<DataHolderV8<DATA> | DataHolderV10<SYSTEM, DATA>>
 
 interface BaseDocument<DATA> {
-  /** @private only used to find the implicit type */
-  ___GENERIC_TYPE___?: DATA;
   id?: string;
   uuid: string;
   data: foundry.abstract.DocumentData<any, DATA> & DATA;
@@ -22,6 +20,10 @@ interface BaseDocument<DATA> {
   createEmbeddedDocuments(embeddedName: string, data: any[]): Promise<Array<Document<any, this>>>;
   updateEmbeddedDocuments(embeddedName: string, updates?: Array<Record<string, unknown>>, context?: DocumentModificationContext): Promise<Array<Document<any, this>>>;
   deleteEmbeddedDocuments(embeddedName: string, ids: string[], context?: DocumentModificationContext): Promise<Array<Document<any, this>>>;
+  
+  /** @private only used to find the implicit type */
+  ___GENERIC_DATA_TYPE___?: DATA;
+  ___GENERIC_SYSTEM_TYPE___?: DATA;
 }
 
 export interface ActorAbility {
