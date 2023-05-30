@@ -703,19 +703,6 @@ export class UtilsDocument {
     return Promise.all(promises).then();
   }
 
-  public static async updateTokenActors(actorDataByTokenUuid: Map<string, DeepPartial<MyActorData>>): Promise<void> {
-    const tokensByUuid = await UtilsDocument.tokenFromUuid(actorDataByTokenUuid.keys());
-    
-    const documents: Parameters<typeof UtilsDocument['bulkUpdate']>[0] = [];
-    for (const [tokenUuid, actorData] of actorDataByTokenUuid.entries()) {
-      documents.push({
-        document: tokensByUuid.get(tokenUuid).getActor(),
-        data: actorData
-      });
-    }
-    return UtilsDocument.bulkUpdate(documents);
-  }
-
   public static async setTargets(params: {tokenUuids: string[], user?: User}): Promise<void> {
     const user = params.user ?? game.user;
     // Game seems buggy when unetting targets, this however does work
