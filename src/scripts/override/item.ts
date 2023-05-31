@@ -74,7 +74,7 @@ async function displayCard(this: MyItem, wrapped: (...args: any) => any, ...args
   
   Hooks.callAll("dnd5e.preDisplayCard", this, chatData, options);
 
-  const returnValue = options.createMessage ? await ChatMessage.create(chatData) : chatData;
+  const returnValue = (options.createMessage !== false) ? await ChatMessage.create(chatData) : chatData;
   
   Hooks.callAll("dnd5e.displayCard", this, returnValue);
 
