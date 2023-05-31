@@ -163,7 +163,6 @@ class ChatMessageAccessPropertyV10 implements ProxyHandler<any> {
         
       }
     }
-    UtilsLog.debug({wrapped, result: dummyRoot.wrapped})
     return dummyRoot.wrapped;
   }
 
@@ -375,8 +374,6 @@ export class ModularCardInstance {
   }
 
   public deepClone(): ModularCardInstance {
-    UtilsLog.debug('deepClone')
-    // TODO test
     if (UtilsFoundry.usesDataModel(this.message)) {
       this.data = ChatMessageAccessPropertyV10.revoke(this.data);
       this.meta = ChatMessageAccessPropertyV10.revoke(this.meta);
@@ -871,7 +868,6 @@ export class ModularCard {
 
   private static createFlagObject(data: ModularCardInstance | ModularCardDataLegacy): ModularCardData {
     const cardsObj: ModularCardData = {};
-    UtilsLog.debug('createFlagObject', data)
     if (Array.isArray(data)) {
       for (const part of data) {
         if (part.data != null) {
