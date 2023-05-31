@@ -18,7 +18,7 @@ export interface RollEventData<T> {
       <nd5a-roll-result *if="this.roll?.total != null && (this.readHiddenDisplayType !== 'hidden' || this.hasInteractPermission)"
         [data-roll]="this.roll"
         [data-override-formula]="this.overrideFormula"
-        [data-highlight-total-on-firstTerm]="this.highlightTotalOnFirstTerm"
+        [data-highlight-total-on-first-term]="this.highlightTotalOnFirstTerm"
         [data-display-type]="this.hasReadPermission ? '' : this.readHiddenDisplayType"
         [data-override-max-roll]="this.overrideMaxRoll">
         <div slot="top">

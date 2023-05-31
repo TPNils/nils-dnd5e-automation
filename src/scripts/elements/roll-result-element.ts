@@ -233,7 +233,7 @@ export class RollResultElement {
   }
   
   private _highlightTotalOnFirstTerm = false;
-  @Attribute({name: 'data-highlight-total-on-firstTerm', dataType: 'boolean'})
+  @Attribute({name: 'data-highlight-total-on-first-term', dataType: 'boolean'})
   public get highlightTotalOnFirstTerm(): boolean {
     return this._highlightTotalOnFirstTerm;
   }
