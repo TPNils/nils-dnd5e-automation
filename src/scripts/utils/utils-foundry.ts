@@ -111,12 +111,20 @@ export class UtilsFoundry {
     return Version.fromString(version);
   }
 
+  public static usesDataModel<T extends foundry.abstract.Document<any, any>>(document?: T): document is T & BaseDocumentV10<object>
+  public static usesDataModel<T extends BaseDocument<object, object>>(document?: T): document is T & BaseDocumentV10<T['___GENERIC_SYSTEM_TYPE___'], T['___GENERIC_DATA_TYPE___']>
   @StaticInitFunc(() => (document: any) => UtilsFoundry.getGameVersion() >= version10)
-  public static usesDataModel: <T extends BaseDocument<object, object>>(document?: T) => document is T & BaseDocumentV10<T['___GENERIC_SYSTEM_TYPE___'], T['___GENERIC_DATA_TYPE___']>;
+  public static usesDataModel<T extends BaseDocument<object, object>>(document?: T): document is T & BaseDocumentV10<T['___GENERIC_SYSTEM_TYPE___'], T['___GENERIC_DATA_TYPE___']> {
+    throw new Error('Should never get called')
+  }
 
   
+  public static usesDocumentData<T extends foundry.abstract.Document<any, any>>(document?: T): document is T & BaseDocumentV8<object>
+  public static usesDocumentData<T extends BaseDocument<any>>(document?: T): document is T & BaseDocumentV8<T['___GENERIC_SYSTEM_TYPE___'], T['___GENERIC_DATA_TYPE___']>
   @StaticInitFunc(() => (document: any) => UtilsFoundry.getGameVersion() < version10)
-  public static usesDocumentData: <T extends BaseDocument<any>>(document?: T) => document is T & BaseDocumentV8<T['___GENERIC_SYSTEM_TYPE___'], T['___GENERIC_DATA_TYPE___']>;
+  public static usesDocumentData<T extends BaseDocument<any>>(document?: T): document is T & BaseDocumentV8<T['___GENERIC_SYSTEM_TYPE___'], T['___GENERIC_DATA_TYPE___']> {
+    throw new Error('Should never get called')
+  }
 
   public static getSystemData<T extends ActiveEffect>(document: T): never;
   public static getSystemData<T extends {data: any}>(document: T): T extends {data: infer DATA} ? DATA : any;
