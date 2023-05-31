@@ -43,32 +43,57 @@ export class UtilsHooks {
   /**
    * A hook event that fires as Foundry is initializing, right before any initialization tasks have begun.
    */
-  public static init(): Promise<void> {
+  public static init(): Promise<void>
+  public static init<T>(then: () => T): Promise<T>
+  public static init(then?: () => any): Promise<void> {
+    if (then) {
+      return init.then(then);
+    }
     return init;
   }
   /**
    * A hook event that fires once Localization translations have been loaded and are ready for use.
    */
-  public static i18nInit(): Promise<void> {
+  public static i18nInit(): Promise<void>
+  public static i18nInit<T>(then: () => T): Promise<T>
+  public static i18nInit(then?: () => any): Promise<void> {
+    if (then) {
+      return i18nInit.then(then);
+    }
     return i18nInit;
   }
   /**
    * A hook event that fires when Foundry has finished initializing but before the game state has been set up.
    * Fires before any Documents, UI applications, or the Canvas have been initialized.
    */
-  public static setup(): Promise<void> {
+  public static setup(): Promise<void>
+  public static setup<T>(then: () => T): Promise<T>
+  public static setup(then?: () => any): Promise<void> {
+    if (then) {
+      return setup.then(then);
+    }
     return setup;
   }
   /**
    * A hook event that fires when the game is fully ready.
    */
-  public static ready(): Promise<void> {
+  public static ready(): Promise<void>
+  public static ready<T>(then: () => T): Promise<T>
+  public static ready(then?: () => any): Promise<void> {
+    if (then) {
+      return ready.then(then);
+    }
     return ready;
   }
   /**
    * A hook event that fires when the chat dom has been initialized
    */
-  public static chatRendered(): Promise<void> {
+  public static chatRendered(): Promise<void>
+  public static chatRendered<T>(then: () => T): Promise<T>
+  public static chatRendered(then?: () => any): Promise<void> {
+    if (then) {
+      return chatRendered.then(then);
+    }
     return chatRendered;
   }
 
