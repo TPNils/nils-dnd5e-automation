@@ -8,7 +8,7 @@ import { Stoppable } from "../lib/utils/stoppable";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 import { UtilsObject } from "../lib/utils/utils-object";
 import { staticValues } from "../static-values";
-import { MyActor, MyItem, SpellData } from "../types/fixed-types";
+import { BaseDocumentV10, MyActor, MyItem, SpellData } from "../types/fixed-types";
 import { UtilsLog } from "../utils/utils-log";
 import { ActiveEffectCardPart, AttackCardData, AttackCardPart, CheckCardData, CheckCardPart, DamageCardData, DamageCardPart, DescriptionCardPart, OtherCardPart, PropertyCardPart, ResourceCardData, ResourceCardPart, SpellLevelCardData, SpellLevelCardPart, TargetCardData, TargetCardPart, TemplateCardData, TemplateCardPart } from "./base/index";
 import { ItemUtils } from "./item-utils";
@@ -47,19 +47,159 @@ function getExtendedTypes(inputHandler: ModularCardPart | string): string[] {
   return types;
 }
 
+class ChatMessageAccessPropertyV10 implements ProxyHandler<any> {
+  private static getTargetSymbol = Symbol('getWrappedTarget');
+  private static revokeSymbol = Symbol('revoke');
+
+  private readonly pathPrefix: string;
+
+  private constructor(
+    private readonly message: ChatMessage & BaseDocumentV10<any>,
+    readonly path: string,
+  ) {
+    if (path.length > 0) {
+      this.pathPrefix = path + '.';
+    } else {
+      this.pathPrefix = path;
+    }
+  }
+
+  public get(target: any, prop: string | symbol, receiver: any) {
+    let value = target[prop];
+    if (value == null || typeof prop === 'symbol') {
+      return value
+    }
+    if (typeof value !== 'object') {
+      return value;
+    }
+    if (!value[ChatMessageAccessPropertyV10.getTargetSymbol]) {
+      value = ChatMessageAccessPropertyV10.wrap(value, this.message, `${this.pathPrefix}${prop}`);
+      target[prop] = value;
+    }
+    return value;
+  }
+  
+  public set(target: any, prop: string | symbol, newValue: any, receiver: any) {
+    target[prop] = newValue;
+    if (typeof prop === 'symbol') {
+      return true;
+    }
+    
+    // Foundry does not like to partially update arrays as they become converted into objects
+    const selectedSourcePath = `${this.pathPrefix}${prop}`;
+    let traversingSourcePath = selectedSourcePath;
+    let highestArrayPath: string;
+    while (traversingSourcePath.length) {
+      const value = getProperty(this.message, traversingSourcePath);
+      if (Array.isArray(value)) {
+        highestArrayPath = traversingSourcePath;
+      }
+      traversingSourcePath = traversingSourcePath.substring(0, traversingSourcePath.lastIndexOf('.'))
+    }
+    let updatePath: string;
+    let updateValue: any;
+    if (highestArrayPath && highestArrayPath !== selectedSourcePath) {
+      updatePath = highestArrayPath;
+      updateValue = deepClone(getProperty(this.message, highestArrayPath));
+      const targetSubpath = selectedSourcePath.substring(highestArrayPath.length + 1);
+      setProperty(updateValue, targetSubpath, target[prop])
+    } else {
+      updatePath = selectedSourcePath;
+      updateValue = target[prop];
+    }
+    this.message.updateSource({[updatePath]: updateValue});
+    
+    // If you pass an object as a new value
+    //  wrap all properties so any changes made it the external provided value also get captured
+    let pendingDeepProxyWraps: Array<{pathPrefix: string, newValue: object}> = [];
+    if (newValue != null && typeof newValue === 'object') {
+      pendingDeepProxyWraps.push({pathPrefix: this.pathPrefix, newValue});
+    }
+    while (pendingDeepProxyWraps.length) {
+      const proxyWraps = pendingDeepProxyWraps;
+      pendingDeepProxyWraps = [];
+      for (const proxyWrap of proxyWraps) {
+        for (const key in proxyWrap.newValue) {
+          if (proxyWrap.newValue[key] != null && typeof proxyWrap.newValue[key] === 'object') {
+            pendingDeepProxyWraps.push({pathPrefix: `${proxyWrap.pathPrefix}${key}.`, newValue: proxyWrap.newValue[key]});
+            if (!proxyWrap.newValue[key][ChatMessageAccessPropertyV10.getTargetSymbol]) {
+              proxyWrap.newValue[key] = ChatMessageAccessPropertyV10.wrap(proxyWrap.newValue[key], this.message, `${this.pathPrefix}${prop}`);
+            }
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  public deleteProperty(target: any, prop: string | symbol): boolean {
+    delete target[prop];
+    if (typeof prop !== 'symbol') {
+      this.message.updateSource({[`-=${this.pathPrefix}${prop}`]: null});
+    }
+    return true;
+  }
+
+  public static revoke<T>(wrapped: T): T {
+    const dummyRoot = {wrapped};
+    let pendingUnwrapping = [{proxy: wrapped as any, key: 'wrapped', parent: dummyRoot as object}];
+    while (pendingUnwrapping.length) {
+      const unwrapping = pendingUnwrapping;
+      pendingUnwrapping = [];
+      for (const unwrap of unwrapping) {
+        if (unwrap.proxy == null) {
+          continue;
+        } else if (unwrap.proxy[ChatMessageAccessPropertyV10.revokeSymbol]) {
+          const target = unwrap.proxy[ChatMessageAccessPropertyV10.getTargetSymbol];
+          unwrap.parent[unwrap.key] = target;
+          unwrap.proxy[ChatMessageAccessPropertyV10.revokeSymbol]();
+          delete target[ChatMessageAccessPropertyV10.getTargetSymbol];
+          delete target[ChatMessageAccessPropertyV10.revokeSymbol];
+          for (const key in target) {
+            pendingUnwrapping.push({proxy: target[key], key: key, parent: target})
+          }
+          
+        }
+        
+      }
+    }
+    UtilsLog.debug({wrapped, result: dummyRoot.wrapped})
+    return dummyRoot.wrapped;
+  }
+
+  public static wrap<T>(wrapped: T, message: ChatMessage & BaseDocumentV10<any>, path: string = ''): T {
+    const proxy = Proxy.revocable(wrapped, new ChatMessageAccessPropertyV10(message, path));
+    wrapped[ChatMessageAccessPropertyV10.getTargetSymbol] = wrapped;
+    wrapped[ChatMessageAccessPropertyV10.revokeSymbol] = proxy.revoke;
+    return proxy.proxy;
+  }
+
+}
+
 export class ModularCardInstance {
   private data: ModularCardData = {};
   private meta: ModularCardMeta = {};
 
-  constructor(message?: ChatMessage) {
-    if (!message) {
-      return;
-    }
+  constructor(private message: ChatMessage) {
     
+    this.data = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
+    if (this.data == null) {
+      this.data = {};
+    }
+    this.meta = message.getFlag(staticValues.moduleName, 'modularCardDataMeta') as any;
+    if (this.meta == null) {
+      this.meta = {};
+    }
+
     // It's important that we use the same data & meta instance
     // So changes made within this instance are also reflected on the chat message
-    this.data = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
-    this.meta = message.getFlag(staticValues.moduleName, 'modularCardDataMeta') as any;
+    if (UtilsFoundry.usesDataModel(message)) {
+      this.data = ChatMessageAccessPropertyV10.wrap(deepClone(this.data), message, `flags.${staticValues.moduleName}.modularCardData`);
+      this.meta = ChatMessageAccessPropertyV10.wrap(deepClone(this.meta), message, `flags.${staticValues.moduleName}.modularCardDataMeta`);
+    } else if (UtilsFoundry.usesDocumentData(message)) {
+      setProperty(message.data, `flags.${staticValues.moduleName}.modularCardData`, this.data);
+      setProperty(message.data, `flags.${staticValues.moduleName}.modularCardDataMeta`, this.meta);
+    }
 
     for (const key of Object.keys(this.data)) {
       if (!Number.isNaN(Number.parseInt(key))) {
@@ -235,10 +375,20 @@ export class ModularCardInstance {
   }
 
   public deepClone(): ModularCardInstance {
-    const clone = new ModularCardInstance();
-    clone.data = deepClone(this.data);
-    clone.meta = deepClone(this.meta);
-    return clone;
+    UtilsLog.debug('deepClone')
+    // TODO test
+    if (UtilsFoundry.usesDataModel(this.message)) {
+      this.data = ChatMessageAccessPropertyV10.revoke(this.data);
+      this.meta = ChatMessageAccessPropertyV10.revoke(this.meta);
+
+      const clone = new ModularCardInstance(new ChatMessage(this.message.toObject()));
+
+      this.data = ChatMessageAccessPropertyV10.wrap(this.data, this.message, `flags.${staticValues.moduleName}.modularCardData`);
+      this.meta = ChatMessageAccessPropertyV10.wrap(this.meta, this.message, `flags.${staticValues.moduleName}.modularCardDataMeta`);
+
+      return clone;
+    }
+    return new ModularCardInstance(new ChatMessage(this.message.toObject()));
   }
 }
 
@@ -592,7 +742,7 @@ export class ModularCard {
       }
     }
 
-    const response = new ModularCardInstance();
+    const response = new ModularCardInstance(new ChatMessage());
     response.setMeta({
       created: {
         actorUuid: data.actor?.uuid,
@@ -721,6 +871,7 @@ export class ModularCard {
 
   private static createFlagObject(data: ModularCardInstance | ModularCardDataLegacy): ModularCardData {
     const cardsObj: ModularCardData = {};
+    UtilsLog.debug('createFlagObject', data)
     if (Array.isArray(data)) {
       for (const part of data) {
         if (part.data != null) {

@@ -436,7 +436,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   @StaticInitFunc(() => {
     if (UtilsFoundry.usesDataModel()) {
-      return (document: FoundryDocument) => document.toObject();
+      return (document: FoundryDocument) => document.toObject(true);
     } else {
       return (document: FoundryDocument) => document.data;
     }

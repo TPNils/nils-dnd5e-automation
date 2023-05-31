@@ -1048,7 +1048,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
             .map(terms => UtilsRoll.fromRollTermData(terms));
 
           // TODO ammo
-          // TODO event hooks
+          // TODO V10 event hooks
           const dmgRoll = UtilsRoll.createDamageRoll(UtilsRoll.mergeRolls(...rollRolls).terms, {critical: newRow.part.mode === 'critical'});
 
           return dmgRoll.roll({async: true});
