@@ -9,7 +9,9 @@ import { Stoppable } from "../../lib/utils/stoppable";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
+import { MyItem } from "../../types/fixed-types";
 import { UtilsFoundry, Version } from "../../utils/utils-foundry";
+import { UtilsHooks } from "../../utils/utils-hooks";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
@@ -129,6 +131,7 @@ class OtherCardPartComponent extends BaseCardComponent implements OnInit {
 
 }
 
+const preventFormulaMessage = Symbol('preventFormulaMessage');
 export class OtherCardPart implements ModularCardPart<OtherCardData> {
 
   public static readonly instance = new OtherCardPart();
@@ -164,6 +167,17 @@ export class OtherCardPart implements ModularCardPart<OtherCardData> {
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new OtherCardTrigger());
+
+    UtilsHooks.init(() => {
+      if (UtilsFoundry.getSystemVersion() >= new Version(2)) {
+        Hooks.on("dnd5e.preRollFormula", (item: MyItem, config: any, options: any) => {
+          if (item[preventFormulaMessage]) {
+            config.chatMessage = false;
+            delete item[preventFormulaMessage];
+          }
+        })
+      }
+    })
   }
 
   public getType(): string {
@@ -179,7 +193,7 @@ export class OtherCardPart implements ModularCardPart<OtherCardData> {
 
 }
 
-class PreventOtherChatMessage implements IDmlTrigger<ChatMessage> {
+class PreventOtherChatMessageV9 implements IDmlTrigger<ChatMessage> {
   
   get type() {
     return ChatMessage;
@@ -262,9 +276,13 @@ class OtherCardTrigger implements ITrigger<ModularCardTriggerData<OtherCardData>
             const rollPromises: Promise<Roll>[] = [];
             if (UtilsFoundry.getSystemVersion() < new Version(2)) {
               // dnd5e 1.x always creates a message;
-              const trigger = new PreventOtherChatMessage();
+              const trigger = new PreventOtherChatMessageV9();
               const stoppable = DmlTrigger.registerTrigger(trigger);
               trigger.stopSelf = stoppable;
+            } else {
+              // dnd5e 2.2.3 also always creates a message but we can disable it via a hook.
+              //  2.2.3 (latest version at the time of writing) ignores any options that are passed, sadly
+              item[preventFormulaMessage] = true;
             }
             rollPromises.push(item.rollFormula({spellLevel: newData.spellLevel, chatMessage: false}));
 
