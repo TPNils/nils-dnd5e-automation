@@ -5,7 +5,6 @@
   "authors": [{"name": "TPNils"}],
   "version": "2.2.1-beta",
   "compatibility": {"minimum": "0.8.9", "verified": "9.268"},
-  "manifestPlusVersion": "1.0.0",
   "socket": true,
   "url": "https://github.com/TPNils/nils-dnd5e-automation",
   "manifest": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/latest/module.json",
@@ -14,8 +13,8 @@
   "esmodules": ["scripts/main.js"],
   "flags": {"allowBugReporter": true},
   "relationships": {
-    "systems": [{"id": "dnd5e", "type": "system"}],
     "requires": [
+      {"id": "dnd5e", "type": "system"},
       {"id": "lib-wrapper", "type": "module"},
       {"id": "socketlib", "type": "module"}
     ]
