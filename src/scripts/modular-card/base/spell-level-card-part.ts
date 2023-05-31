@@ -16,6 +16,7 @@ import { BaseCardComponent } from "./base-card-component";
 
 export interface SpellLevelCardData {
   selectedLevel: number | 'pact';
+  selectedLevelNr: number;
   calc$: {
     tokenUuid?: string;
     actorUuid: string;
@@ -216,6 +217,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
 
     return {
       selectedLevel: selectedLevel,
+      selectedLevelNr: itemData.level,
       calc$: {
         actorUuid: actor.uuid,
         itemUuid: item.uuid,

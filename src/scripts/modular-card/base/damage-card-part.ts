@@ -13,6 +13,7 @@ import { staticValues } from "../../static-values";
 import { MyActor, DamageType, MyItemData, MyItem } from "../../types/fixed-types";
 import { UtilsArray } from "../../utils/utils-array";
 import { UtilsFoundry } from "../../utils/utils-foundry";
+import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
@@ -20,6 +21,7 @@ import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, Html
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { CheckCardData, CheckCardPart, TargetCache as CheckTargetCache } from "./check-card-part";
+import { SpellLevelCardData, SpellLevelCardPart } from "./spell-level-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type KeyOfType<T, V> = keyof {
@@ -49,7 +51,6 @@ interface TargetCache {
 export interface ItemDamageSource {
   type: 'Item';
   itemUuid: string;
-  spellLevel?: MyItemData['level'];
   hasVersatile: boolean;
 }
 
@@ -1014,7 +1015,16 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
       }
 
       if (shouldModifyRoll) {
-        const damageSources: DamageSource[] = [newData.calc$.damageSource];
+        const damageSources: DamageSource[] = [];
+        let itemToRoll: MyItem;
+        // If the item still exists and the damage is based on the item, use the item.rollDamage
+        if (newData.calc$.damageSource.type === 'Item') {
+          itemToRoll = await UtilsDocument.itemFromUuid(newData.calc$.damageSource.itemUuid);
+        }
+        // Otherwise fallback to the default
+        if (itemToRoll == null) {
+          damageSources.push(newData.calc$.damageSource);
+        }
         if (newData.userBonus) {
           damageSources.push({type: 'Formula', formula: newData.userBonus});
         }
@@ -1047,11 +1057,21 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
             .filter(terms => terms?.length > 0)
             .map(terms => UtilsRoll.fromRollTermData(terms));
 
-          // TODO ammo
-          // TODO V10 event hooks
-          const dmgRoll = UtilsRoll.createDamageRoll(UtilsRoll.mergeRolls(...rollRolls).terms, {critical: newRow.part.mode === 'critical'});
-
-          return dmgRoll.roll({async: true});
+          if (itemToRoll) {
+            return await itemToRoll.rollDamage({
+              critical: newRow.part.mode === 'critical',
+              versatile: newRow.part.source === 'versatile',
+              spellLevel: newRow.allParts.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance)?.selectedLevelNr,
+              options: {
+                parts: rollRolls.map(r => r.formula),
+                critical: newRow.part.mode === 'critical',
+                fastForward: true,
+                chatMessage: false,
+              }
+            })
+          } else {
+            return UtilsRoll.createDamageRoll(UtilsRoll.mergeRolls(...rollRolls).terms, {critical: newRow.part.mode === 'critical'}).roll({async: true});
+          }
         }
 
         const oldRoll = oldData?.calc$?.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
