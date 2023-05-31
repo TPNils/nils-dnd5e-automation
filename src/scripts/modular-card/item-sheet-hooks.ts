@@ -1,7 +1,8 @@
-import { FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
+import { DmlUpdateRequest, FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { staticValues } from "../static-values";
 import { MyItem, MyItemData } from "../types/fixed-types";
+import { UtilsFoundry } from "../utils/utils-foundry";
 import { UtilsHooks } from "../utils/utils-hooks";
 
 /**
@@ -22,19 +23,21 @@ export class ItemSheetHooks {
     const targetFormula = this.getFlag(staticValues.moduleName, 'targetFormula');
     if (targetFormula) {
       const onActorDataIsSet = () => {
+        // TODO V10: check compatibility
+        const itemData = UtilsFoundry.getSystemData(this);
         const formula = Roll.replaceFormulaData(targetFormula, this.getRollData());
-        if (this.data.data.target == null) {
-          this.data.data.target = {
+        if (itemData?.target == null) {
+          itemData.target = {
             type: '',
             units: '',
           };
         };
         try {
-          this.data.data.target.value = Roll.safeEval(formula);
+          itemData.target.value = Roll.safeEval(formula);
         } catch {/* ignore, probably an error for a formula refering to actor data, while not having an actor */}
       }
 
-      if (this.actor == null || this.actor.data != null) {
+      if (this.actor == null || UtilsFoundry.getSystemData(this.actor) != null) {
         onActorDataIsSet();
       } else {
         setTimeout(() => {
@@ -46,34 +49,39 @@ export class ItemSheetHooks {
     return result;
   }
 
-  private static renderItemSheet(sheet: ItemSheet, html: JQuery, arg3: {data: MyItemData['data'], document: MyItem & FoundryDocument}): void {
-    const targetInput = <HTMLInputElement> html.find(`input[name="data.target.value"]`).get()[0];
+  private static renderItemSheet(sheet: ItemSheet, html: JQuery, arg3: {data: MyItemData, document: MyItem & FoundryDocument}): void {
+    const targetInput = <HTMLInputElement> html.find(`input[name="data.target.value"],input[name="system.target.value"]`).get()[0];
     if (!targetInput) {
       return;
     }
+
+    targetInput.removeAttribute('name');
+    targetInput.setAttribute('type', 'text');
+    
     const targetFormula = (arg3.document as MyItem).getFlag(staticValues.moduleName, 'targetFormula');
     if (targetFormula) {
       targetInput.value = targetFormula;
     }
-
-    targetInput.removeAttribute('name');
     targetInput.addEventListener('change', event => {
       event.stopPropagation();
       const value = targetInput.value;
       if (value == null || value == '') {
-        const updateData: DeepPartial<MyItemData> = {
-          data: {
+        const updateData: DmlUpdateRequest<MyItem> = {
+          document: arg3.document,
+          systemData: {
             target: {
               value: null
             }
           },
-          flags: {
-            [staticValues.moduleName]: {
-              targetFormula: null,
+          rootData: {
+            flags: {
+              [staticValues.moduleName]: {
+                targetFormula: null,
+              }
             }
           }
         };
-        UtilsDocument.bulkUpdate([{document: arg3.document, data: updateData}])
+        UtilsDocument.bulkUpdate([updateData])
         return;
       }
 
@@ -87,34 +95,40 @@ export class ItemSheetHooks {
 
         const roll = new Roll(value, arg3.document.getRollData());
         roll.roll({async: true}).then(rollResult => {
-          const updateData: DeepPartial<MyItemData> = {
-            data: {
+          const updateData: DmlUpdateRequest<MyItem> = {
+            document: arg3.document,
+            systemData: {
               target: {
                 value: rollResult.total,// Try not to break other systems/modules
               }
             },
-            flags: {
-              [staticValues.moduleName]: {
-                targetFormula: value,
+            rootData: {
+              flags: {
+                [staticValues.moduleName]: {
+                  targetFormula: value,
+                }
               }
             }
           };
-          UtilsDocument.bulkUpdate([{document: arg3.document, data: updateData}])
+          UtilsDocument.bulkUpdate([updateData])
         })
       } else {
-        const updateData: DeepPartial<MyItemData> = {
-          data: {
+        const updateData: DmlUpdateRequest<MyItem> = {
+          document: arg3.document,
+          systemData: {
             target: {
               value: valueNr,
             }
           },
-          flags: {
-            [staticValues.moduleName]: {
-              targetFormula: null,
+          rootData: {
+            flags: {
+              [staticValues.moduleName]: {
+                targetFormula: null,
+              }
             }
           }
         };
-        UtilsDocument.bulkUpdate([{document: arg3.document, data: updateData}])
+        UtilsDocument.bulkUpdate([updateData])
       }
     })
 

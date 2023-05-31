@@ -16,6 +16,7 @@ import { DamageCardData, DamageCardPart, ManualDamageSource } from "../../base/i
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
 import { BeforeCreateModuleCardEvent, ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart, PermissionResponse } from "../../modular-card-part";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
 
 export interface SrdSneakAttackCardData {
   itemUuid: string;
@@ -205,10 +206,11 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
 
   public async create(args: ModularCardCreateArgs): Promise<SrdSneakAttackCardData> {
     // Only add sneak attack to weapon attacks
-    if (!args.item.hasAttack || !['mwak', 'rwak'].includes(args.item.data.data.actionType)) {
+    const itemData = UtilsFoundry.getSystemData(args.item);
+    if (!args.item.hasAttack || !['mwak', 'rwak'].includes(itemData.actionType)) {
       return null;
     }
-    if (!args.item.hasDamage || !args.item.data.data.damage?.parts?.length) {
+    if (!args.item.hasDamage || !itemData.damage?.parts?.length) {
       return null;
     }
 
@@ -218,8 +220,9 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
     }
 
     const rollData = sneakItem.getRollData()
-    const normalRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(sneakItem.data.data.damage.parts, rollData));
-    const versatileRoll = UtilsRoll.toRollData(UtilsRoll.versatilePartsToRoll(sneakItem.data.data.damage.parts, sneakItem.data.data.damage.versatile, rollData));
+    const sneakItemData = UtilsFoundry.getSystemData(sneakItem);
+    const normalRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(sneakItemData.damage.parts, rollData));
+    const versatileRoll = UtilsRoll.toRollData(UtilsRoll.versatilePartsToRoll(sneakItemData.damage.parts, sneakItemData.damage.versatile, rollData));
 
     const data: SrdSneakAttackCardData = {
       itemUuid: sneakItem.uuid,
@@ -396,8 +399,8 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
           }
         }
         if (source.type === 'Item') {
-          const item = await UtilsDocument.itemFromUuid(source.itemUuid);
-          for (const [formula, damage] of item.data.data.damage.parts) {
+          const itemData = UtilsFoundry.getSystemData(await UtilsDocument.itemFromUuid(source.itemUuid));
+          for (const [formula, damage] of itemData.damage.parts) {
             damageTypes.add(damage);
           }
         }

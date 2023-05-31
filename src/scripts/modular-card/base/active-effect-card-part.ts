@@ -3,13 +3,14 @@ import { IAfterDmlContext, IDmlContext, ITrigger } from "../../lib/db/dml-trigge
 import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { staticValues } from "../../static-values";
-import { MyActor } from "../../types/fixed-types";
+import { BaseDocument, MyActor } from "../../types/fixed-types";
 import { AttackCardData, AttackCardPart } from "./attack-card-part";
 import { CheckCardData, CheckCardPart } from "./check-card-part";
 import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
 import { ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 import { StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
-import { UtilsLog } from "../../utils/utils-log";
+import { UtilsFoundry } from "../../utils/utils-foundry";
+import { DataModel } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/module.mjs";
 
 interface TargetCache {
   actorUuid$: string;
@@ -60,12 +61,11 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
 
   public async create({item}: ModularCardCreateArgs): Promise<ActiveEffectCardData> {
     const activeEffects: ActiveEffectData[] = Array.from(item.effects.values())
-      .filter((effectData: ActiveEffect) => !effectData.data.transfer)
-      .map((effect: ActiveEffect) => {
-        const data = deepClone(effect.data);
-        delete data._id;
-        return data;
-      });
+      .map(effect => {
+        effect = (effect as any).clone({}, {keepId: false});
+        return UtilsFoundry.getModelData(effect);
+      })
+      .filter(effectData => !effectData.transfer);
 
     if (activeEffects.length === 0) {
       return null;
@@ -232,7 +232,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       await UtilsDocument.bulkDelete(deleteActiveEffectUuids)
     }
     for (const effectDocument of await UtilsDocument.bulkCreate(createActiveEffects)) {
-      const origin = (effectDocument.data.flags[staticValues.moduleName] as any).origin;
+      const origin = (UtilsFoundry.getModelData(effectDocument).flags[staticValues.moduleName] as any).origin;
       createdUuidsByOriginKey.set(`${origin.messageId}/${effectDocument.parent.uuid}/${origin.activeEffectIndex}`, effectDocument.uuid);
     }
     

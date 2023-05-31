@@ -47,7 +47,7 @@ export class ItemCardHelpers {
     return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
   }
   
-  public static get spellUpcastModes(): Array<MyItemData['data']['preparation']['mode']> {
+  public static get spellUpcastModes(): Array<MyItemData['preparation']['mode']> {
     return (CONFIG as any).DND5E.spellUpcastModes;
   }
 

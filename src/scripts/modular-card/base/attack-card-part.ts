@@ -10,6 +10,7 @@ import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor } from "../../types/fixed-types";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
@@ -306,24 +307,27 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       critTreshold$: 20
     };
 
-    let critTreshold = item.data.data.critical?.threshold ?? attack.critTreshold$;
-    const actorDnd5eFlags = actor?.data?.flags?.dnd5e;
+    const itemData = UtilsFoundry.getSystemData(item);
+    const actorSystemData = UtilsFoundry.getSystemData(actor);
+    const actorModelData = UtilsFoundry.getModelData(actor);
+    let critTreshold = itemData.critical?.threshold ?? attack.critTreshold$;
+    const actorDnd5eFlags = actorModelData.flags?.dnd5e;
     if (item.type === 'weapon' && actorDnd5eFlags?.weaponCriticalThreshold != null) {
-      critTreshold = Math.min(critTreshold, actor.data.flags.dnd5e.weaponCriticalThreshold);
+      critTreshold = Math.min(critTreshold, actorDnd5eFlags.weaponCriticalThreshold);
     }
     if (item.type === 'spell' && actorDnd5eFlags?.spellCriticalThreshold != null) {
-      critTreshold = Math.min(critTreshold, actor.data.flags.dnd5e.spellCriticalThreshold);
+      critTreshold = Math.min(critTreshold, actorDnd5eFlags.spellCriticalThreshold);
     }
     attack.critTreshold$ = critTreshold;
 
     {
-      let suffixes = ['all', item.data.data.actionType, item.abilityMod];
+      let suffixes = ['all', itemData.actionType, item.abilityMod];
       if (actor) {
         if (actor.type === 'character') {
           suffixes.push('humanoid');
-        } else if (actor.type === 'npc' && actor.data.data.details?.type) {
-          suffixes.push(actor.data.data.details.type.custom);
-          suffixes.push(actor.data.data.details.type.value);
+        } else if (actor.type === 'npc' && actorSystemData.details?.type) {
+          suffixes.push(actorSystemData.details.type.custom);
+          suffixes.push(actorSystemData.details.type.value);
         }
       }
       suffixes = suffixes.filter(suffix => !!suffix);
@@ -333,10 +337,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         let advantage = false;
         let disadvantage = false;
         for (const suffix of suffixes) {
-          if (getProperty(actor.data._source, `flags.${staticValues.moduleName}.attack.advantage.${suffix}`) > 0) {
+          if (getProperty(actorModelData._source, `flags.${staticValues.moduleName}.attack.advantage.${suffix}`) > 0) {
             advantage = true;
           }
-          if (getProperty(actor.data._source, `flags.${staticValues.moduleName}.attack.disadvantage.${suffix}`) > 0) {
+          if (getProperty(actorModelData._source, `flags.${staticValues.moduleName}.attack.disadvantage.${suffix}`) > 0) {
             disadvantage = true;
           }
         }
@@ -345,24 +349,25 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           attack.advantageSources$.push({
             $uuid: actor.uuid,
             $image: actor.img,
-            $name: actor.data.name,
+            $name: actorModelData.name,
           });
         }
         if (disadvantage) {
           attack.disadvantageSources$.push({
             $uuid: actor.uuid,
             $image: actor.img,
-            $name: actor.data.name,
+            $name: actorModelData.name,
           });
         }
       }
 
-      for (const effect of actor.getEmbeddedCollection(ActiveEffect.name) as any as Array<ActiveEffect>) {
+      for (const effect of actor.getEmbeddedCollection(ActiveEffect.name) as any as Array<ActiveEffect & {uuid: string, name: string}>) {
+        const effectData = UtilsFoundry.getModelData(effect);
         let advantage = false;
         let disadvantage = false;
   
         for (const suffix of suffixes) {
-          for (const change of effect.data.changes) {
+          for (const change of effectData.changes) {
             if (change.key === `data.flags.${staticValues.moduleName}.attack.advantage.${suffix}`) {
               advantage = true;
             }
@@ -375,14 +380,14 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         if (advantage) {
           attack.advantageSources$.push({
             $uuid: effect.uuid,
-            $image: effect.data.icon,
+            $image: effectData.icon,
             $name: effect.sourceName ?? effect.name,
           });
         }
         if (disadvantage) {
           attack.disadvantageSources$.push({
             $uuid: effect.uuid,
-            $image: effect.data.icon,
+            $image: effectData.icon,
             $name: effect.sourceName ?? effect.name,
           });
         }
@@ -541,11 +546,12 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
 
       for (const expectedUuid of allTargetUuids) {
         if (!cachedTargetUuids.has(expectedUuid)) {
-          const actor = (tokens.get(expectedUuid).getActor() as MyActor);
+          const actor = tokens.get(expectedUuid).getActor() as MyActor;
+          const actorData = UtilsFoundry.getSystemData(actor);
           attackPart.targetCaches$.push({
             targetUuid$: expectedUuid,
             actorUuid$: actor.uuid,
-            ac$: actor.data.data.attributes.ac.value,
+            ac$: actorData.attributes.ac.value,
           });
           cachedTargetUuids.add(expectedUuid);
         }

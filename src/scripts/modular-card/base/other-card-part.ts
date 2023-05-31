@@ -135,14 +135,15 @@ export class OtherCardPart implements ModularCardPart<OtherCardData> {
   private constructor() {}
 
   public create({item}: ModularCardCreateArgs): OtherCardData {
-    if (!item.data.data.formula) {
+    const itemData = UtilsFoundry.getSystemData(item);
+    if (!itemData?.formula) {
       return null;
     }
 
     return {
       phase: 'mode-select',
       userBonus: "",
-      spellLevel: item.data.data.level,
+      spellLevel: itemData.level,
     };
   }
 

@@ -1,7 +1,7 @@
-import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
+import { ChatMessageData, ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import { DmlTrigger, IDmlContext, IDmlTrigger, ITrigger } from "../lib/db/dml-trigger";
 import { TransformTrigger } from "../lib/db/transform-trigger";
-import { UtilsDocument } from "../lib/db/utils-document";
+import { DmlUpdateRequest, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { rerenderQueue } from "../lib/render-engine/virtual-dom/render-queue";
 import { Stoppable } from "../lib/utils/stoppable";
@@ -14,6 +14,7 @@ import { ActiveEffectCardPart, AttackCardData, AttackCardPart, CheckCardData, Ch
 import { ItemUtils } from "./item-utils";
 import { ModularCardComponent } from "./modular-card-component";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { UtilsFoundry } from "../utils/utils-foundry";
 
 interface ModularCardPartDataLegacy<T = any> {
   readonly id: string;
@@ -303,7 +304,7 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
           // Other modules might also use this?
           attr.push([`data-item-id`, /Item\.([^\.]+)/i.exec(parts.getItemUuid())[1]]);
         }
-        newRow.data._source.content = `<div ${attr.map(att => `${att[0]}=${att[1]}`).join(' ')}>
+        UtilsFoundry.getModelData(newRow)._source.content = `<div ${attr.map(att => `${att[0]}=${att[1]}`).join(' ')}>
         <div data-${staticValues.code}-tag-replacer="${ModularCardComponent.getSelector()}">
           <span data-slot="not-installed-placeholder">The ${staticValues.moduleName} module is required to render this message.</span>
         </div></div>`;
@@ -541,20 +542,22 @@ export class ModularCard {
 
   public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardInstance> {
     const parts: Promise<{data: any, cardPart: ModularCardPart}>[] = [];
+    const itemData = UtilsFoundry.getSystemData(data.item);
+    const actorData = UtilsFoundry.getSystemData(data.actor);
     
     // Find the first available spellslot, auto upcast if missing spell slots
-    if (data.actor && data.item.data.data.level > 0) {
-      const itemLevel = data.item.data.data.level;
-      const spellIsPact = data.item.data.data?.preparation?.mode === 'pact';
-      let selectedLevel: number | 'pact' = spellIsPact ? data.actor.data.data.spells.pact.level : data.item.data.data.level;
-      let selectedSpell: SpellData = spellIsPact ? data.actor.data.data.spells.pact : data.actor.data.data.spells[`spell${selectedLevel}`];
+    if (actorData && itemData.level > 0) {
+      const itemLevel = itemData.level;
+      const spellIsPact = itemData?.preparation?.mode === 'pact';
+      let selectedLevel: number | 'pact' = spellIsPact ? actorData.spells.pact.level : itemData.level;
+      let selectedSpell: SpellData = spellIsPact ? actorData.spells.pact : actorData.spells[`spell${selectedLevel}`];
       
       if (selectedLevel < itemLevel || selectedSpell.value < 1) {
         let newItemLevel = itemLevel;
-        if (data.actor.data.data.spells.pact.level >= itemLevel && data.actor.data.data.spells.pact.value > 0) {
-          newItemLevel = data.actor.data.data.spells.pact.level;
+        if (actorData.spells.pact.level >= itemLevel && actorData.spells.pact.value > 0) {
+          newItemLevel = actorData.spells.pact.level;
         } else {
-          const spellLevels = Object.keys(data.actor.data.data.spells)
+          const spellLevels = Object.keys(actorData.spells)
             .map(prop => /^spell([0-9]+)$/i.exec(prop))
             .filter(rgx => !!rgx)
             .map(rgx => Number(rgx[1]))
@@ -563,7 +566,7 @@ export class ModularCard {
             if (spellLevel <= itemLevel) {
               continue;
             }
-            let actorSpellData: SpellData = data.actor.data.data.spells[`spell${spellLevel}`];
+            let actorSpellData: SpellData = actorData.spells[`spell${spellLevel}`];
             if (actorSpellData.value > 0) {
               newItemLevel = spellLevel;
               break;
@@ -605,7 +608,7 @@ export class ModularCard {
     return response;
   }
   
-  public static async createCard(parts: ModularCardInstance, insert: boolean = true): Promise<ChatMessage> {
+  public static createCardData(parts: ModularCardInstance): ChatMessageDataConstructorData {
     const modularCardDataMeta: ModularCardMeta = {
       created: {
         actorUuid: parts.getActorUuid(),
@@ -651,11 +654,7 @@ export class ModularCard {
 
     chatMessageData.speaker = ChatMessage.getSpeaker();
 
-    if (insert) {
-      return await ChatMessage.createDocuments([chatMessageData]).then(documents => documents[0]);
-    } else {
-      return new ChatMessage(chatMessageData);
-    }
+    return chatMessageData;
   }
   
   @RunOnce()
@@ -699,7 +698,7 @@ export class ModularCard {
   }
   
   public static async setBulkCardPartDatas(updates: Array<{message: ChatMessage, data: ModularCardInstance | ModularCardDataLegacy}>): Promise<void> {
-    const bulkUpdateRequest: Parameters<typeof UtilsDocument.bulkUpdate>[0] = [];
+    const bulkUpdateRequest: DmlUpdateRequest<any>[] = [];
     for (const update of updates) {
       if (update.message == null) {
         continue;
@@ -711,7 +710,7 @@ export class ModularCard {
         continue;
       }
       UtilsObject.injectDeleteForDml(originalCards, cardsObj);
-      bulkUpdateRequest.push({document: update.message, data: {[`flags.${staticValues.moduleName}.modularCardData`]: cardsObj}});
+      bulkUpdateRequest.push({document: update.message, rootData: {flags: {[staticValues.moduleName]: {modularCardData: cardsObj}}}});
     }
     return UtilsDocument.bulkUpdate(bulkUpdateRequest);
   }

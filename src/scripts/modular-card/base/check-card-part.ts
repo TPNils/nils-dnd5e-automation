@@ -10,9 +10,10 @@ import { UtilsCompare } from "../../lib/utils/utils-compare";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor, MyActorData } from "../../types/fixed-types";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 import { Action } from "../action";
 import { ItemCardHelpers, ChatPartIdData, ChatPartEnriched } from "../item-card-helpers";
-import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
+import { ModularCard, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, createPermissionCheckAction } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
@@ -32,9 +33,9 @@ export interface TargetCache {
 
 export interface CheckCardData {
   actorUuid$?: string;
-  ability: keyof MyActorData['data']['abilities'];
+  ability: keyof MyActorData['abilities'];
   dc: number;
-  skill?: keyof MyActorData['data']['skills'];
+  skill?: keyof MyActorData['skills'];
   /**@deprecated use isSave*/
   iSave?: boolean;
   isSave?: boolean;
@@ -205,14 +206,15 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
   private constructor(){}
   
   public create({item, actor}: ModularCardCreateArgs): CheckCardData {
-    if (item.data.data.save?.dc == null || !item.data.data.save?.ability) {
+    const itemData = UtilsFoundry.getSystemData(item);
+    if (itemData.save?.dc == null || !itemData.save?.ability) {
       return null;
     }
 
     return {
       actorUuid$: actor?.uuid,
-      ability: item.data.data.save?.ability,
-      dc: item.data.data.save.dc,
+      ability: itemData.save?.ability,
+      dc: itemData.save.dc,
       isSave: true,
       targetCaches$: []
     };

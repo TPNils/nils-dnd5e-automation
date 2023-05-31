@@ -44,7 +44,7 @@ function getTokenUuid(options: D20RollOptions) {
   return null;
 }
 
-async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['data']['skills'], D20RollOptions]): Promise<Roll> {
+async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['skills'], D20RollOptions]): Promise<Roll> {
   const [skillId, options] = args;
   if (options.chatMessage === false) {
     return wrapped(...args);
@@ -97,7 +97,7 @@ async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args:
   return UtilsRoll.fromRollData(target.roll$);
 }
 
-async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['data']['abilities'], D20RollOptions]): Promise<Roll> {
+async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['abilities'], D20RollOptions]): Promise<Roll> {
   const [abilityId, options] = args;
   if (options.chatMessage === false) {
     return wrapped(...args);
@@ -150,7 +150,7 @@ async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ..
   return UtilsRoll.fromRollData(target.roll$);
 }
 
-async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['data']['abilities'], D20RollOptions]): Promise<Roll> {
+async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['abilities'], D20RollOptions]): Promise<Roll> {
   const [abilityId, options] = args;
   if (options.chatMessage === false) {
     return wrapped(...args);

@@ -7,6 +7,7 @@ import MyAbilityTemplate from "../../pixi/ability-template";
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyItemData } from "../../types/fixed-types";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 import { UtilsTemplate } from "../../utils/utils-template";
 import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
@@ -18,8 +19,8 @@ export interface TemplateCardData {
     actorUuid: string;
     tokenUuid?: string;
     createdTemplateUuid?: string;
-    target: MyItemData['data']['target'];
-    rangeUnit?: MyItemData['data']['range']['units'];
+    target: MyItemData['target'];
+    rangeUnit?: MyItemData['range']['units'];
   }
 }
 
@@ -92,8 +93,8 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   private constructor(){}
   
   public create({item, actor, token}: ModularCardCreateArgs): TemplateCardData {
-    // @ts-expect-error
-    const hasAoe = CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target?.type);
+    const itemData = UtilsFoundry.getSystemData(item);
+    const hasAoe = (CONFIG as any).DND5E.areaTargetTypes.hasOwnProperty(itemData.target?.type);
     if (!hasAoe) {
       return null;
     }
@@ -101,8 +102,8 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
       calc$: {
         actorUuid: actor?.uuid,
         tokenUuid: token?.uuid,
-        target: item.data.data.target,
-        rangeUnit: item.data.data.range?.units
+        target: itemData.target,
+        rangeUnit: itemData.range?.units
       }
     };
   }

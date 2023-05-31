@@ -3,6 +3,8 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { AsyncAttribute, Component, OnInit, OnInitParam } from "../lib/render-engine/component";
 import { ValueProvider, ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
+import { UtilsFoundry } from "../utils/utils-foundry";
+import { UtilsLog } from "../utils/utils-log";
 
 @Component({
   tag: TokenImgElement.selector(),
@@ -42,13 +44,19 @@ export class TokenImgElement implements OnInit {
         tokenImg: this.tokenImg$,
       }).listen(({token, tokenImg}) => {
         this.token = token;
-
-        if (token?.data?.img) {
-          this.tokenImgResult = token.data.img;
-        } else if (tokenImg) {
-          this.tokenImgResult = tokenImg;
+        
+        if (UtilsFoundry.usesDataModel()) {
+          this.tokenImgResult = (token as any)?.texture?.src
         } else {
-          this.tokenImgResult = CONST.DEFAULT_TOKEN;
+          this.tokenImgResult = token?.data?.img;
+        }
+
+        if (!this.tokenImgResult) {
+          if (tokenImg) {
+            this.tokenImgResult = tokenImg;
+          } else {
+            this.tokenImgResult = CONST.DEFAULT_TOKEN;
+          }
         }
       })
     );

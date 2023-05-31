@@ -68,7 +68,7 @@ export class UtilsRoll {
   }
 
   private static damagePartsEndWithComment = /(.*)\[([^\]]*)\]$/;
-  public static damagePartsToRoll(parts: MyItemData['data']['damage']['parts'], rollData?: any): Roll {
+  public static damagePartsToRoll(parts: MyItemData['damage']['parts'], rollData?: any): Roll {
     return new Roll(parts.map(([formula, damageType]) => {
       if (damageType) {
         const match = UtilsRoll.damagePartsEndWithComment.exec(formula);
@@ -83,7 +83,7 @@ export class UtilsRoll {
     }).join(' + '), rollData);
   }
   
-  public static versatilePartsToRoll(parts: MyItemData['data']['damage']['parts'], versatile: string, rollData?: any): Roll | null {
+  public static versatilePartsToRoll(parts: MyItemData['damage']['parts'], versatile: string, rollData?: any): Roll | null {
     if (versatile == null) {
       return null;
     }

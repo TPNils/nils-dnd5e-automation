@@ -4,6 +4,7 @@ import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/compo
 import { UtilsRoll } from "../../../lib/roll/utils-roll";
 import { ValueReader } from "../../../provider/value-provider";
 import { staticValues } from "../../../static-values";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
 import { UtilsItem } from "../../../utils/utils-item";
 import { Action } from "../../action";
 import { BaseCardComponent } from "../../base/base-card-component";
@@ -187,13 +188,19 @@ export class SrdLayOnHandsCardPart extends DamageCardPart implements ModularCard
   public static readonly instance = new SrdLayOnHandsCardPart();
 
   private injectCreateHealing(args: ModularCardCreateArgs): ModularCardCreateArgs {
-    const merge = args.item.data.data.damage == null ? {} : deepClone(args.item.data.data.damage);
+    const itemData = UtilsFoundry.getSystemData(args.item);
+    const merge = itemData.damage == null ? {} : deepClone(itemData.damage);
     if (!merge.parts) {
       merge.parts = [];
     }
     // insert at index 0
     merge.parts.splice(0, 0, ['0', 'healing']);
-    const modifiedItem = args.item.clone({data: {damage: merge}}, {keepId: true});
+    let modifiedItem = args.item;
+    if (UtilsFoundry.usesDataModel(args.item)) {
+      modifiedItem = args.item.clone({system: {damage: merge}}, {keepId: true});
+    } else if (UtilsFoundry.usesDocumentData(args.item)) {
+      modifiedItem = args.item.clone({data: {damage: merge}}, {keepId: true});
+    }
     return {...args, item: modifiedItem};
   }
 

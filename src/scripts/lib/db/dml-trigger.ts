@@ -1,4 +1,6 @@
+import { DataModel } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/module.mjs";
 import { staticValues } from "../../static-values";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 import { UtilsLog } from "../../utils/utils-log";
 import { buffer } from "../decorator/buffer";
 import { RunOnce } from "../decorator/run-once";
@@ -451,7 +453,11 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
     const totalDiff = UtilsCompare.findDiff(originalDocumentData, document.toObject(true));
     if (totalDiff.changed) {
-      document.data.update(totalDiff.diff);
+      if (UtilsFoundry.usesDataModel()) {
+        (document as any as DataModel<any>).updateSource(totalDiff.diff);
+      } else {
+        document.data.update(totalDiff.diff);
+      }
     }
   }
   
@@ -475,7 +481,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }
 
     // Apply the changes made to the document
-    const totalDiff = UtilsCompare.findDiff(document.data, modifiedDocument.data);
+    const totalDiff = UtilsCompare.findDiff(
+      UtilsFoundry.getModelData(document),
+      UtilsFoundry.getModelData(modifiedDocument),
+    );
     const id = change._id
     for (const key in change) {
       if (Object.prototype.hasOwnProperty.call(change, key)) {
@@ -563,7 +572,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         }
       }
 
-      const diff = UtilsCompare.findDiff(document.data, documentSnapshot.data);
+      const diff = UtilsCompare.findDiff(
+        UtilsFoundry.getModelData(document),
+        UtilsFoundry.getModelData(documentSnapshot),
+      );
       if (diff.changed) {
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
           UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, newRow: documentSnapshot});
@@ -635,7 +647,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         // See injector (initOldValueInjector) for more info
         return;
       }
-      const originalDiff = UtilsCompare.findDiff(modifiedDocument.data, oldDocument.data);
+      const originalDiff = UtilsCompare.findDiff(
+        UtilsFoundry.getModelData(modifiedDocument),
+        UtilsFoundry.getModelData(oldDocument),
+      );
       let context = new AfterDmlContext<T>(
         [{
           newRow: documentSnapshot,
@@ -672,7 +687,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           }
         }
 
-        const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
+        const diff = UtilsCompare.findDiff(
+          UtilsFoundry.getModelData(modifiedDocument),
+          UtilsFoundry.getModelData(documentSnapshot),
+        );
         if (!UtilsCompare.deepEquals(originalDiff, diff)) {
           if (outputDiff) {
             UtilsLog.debug('trigger diff', {
@@ -681,8 +699,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
               diff: diff,
               originalDiff: originalDiff,
               diffDiff: UtilsCompare.findDiff(originalDiff, diff),
-              oldRow: deepClone(oldDocument.data),
-              newRow: deepClone(modifiedDocument.data)
+              oldRow: deepClone(UtilsFoundry.getModelData(oldDocument)),
+              newRow: deepClone(UtilsFoundry.getModelData(modifiedDocument))
             });
           }
           if (recursiveUpdate > 5) {

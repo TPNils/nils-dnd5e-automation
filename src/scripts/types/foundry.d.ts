@@ -28,6 +28,11 @@ class DataModelCls<DATA, PARENT extends foundry.abstract.Document<any, any> = fo
   readonly _source: DATA;
   readonly parent: PARENT;
   readonly flags: Record<string, Record<string, any>>;
+
+  /** Update with a DML */
+  public update(diff: DeepPartial<DATA>, options?: any);
+  /** Update the source data locally without a DML */
+  public updateSource(diff: DeepPartial<DATA>, options?: any);
 }
 
 /** Sinds foundry V10 */

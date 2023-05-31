@@ -19,7 +19,7 @@ export default class MyAbilityTemplate extends MeasuredTemplate {
 
   private actorSheet?: ActorSheet;
 
-  public static fromItem({target, flags, actorSheet}: {target: MyItemData['data']['target'], flags?: any, actorSheet?: ActorSheet}): MeasuredTemplate {
+  public static fromItem({target, flags, actorSheet}: {target: MyItemData['target'], flags?: any, actorSheet?: ActorSheet}): MeasuredTemplate {
     // @ts-expect-error
     let templateShape = CONFIG.DND5E.areaTargetTypes[target?.type];
     let distance = target?.value;

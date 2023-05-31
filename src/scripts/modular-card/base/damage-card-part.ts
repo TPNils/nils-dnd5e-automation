@@ -2,7 +2,7 @@
 import { RollDamageEventData, RollDamageMode } from "../../elements/roll-damage-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
 import { DocumentListener } from "../../lib/db/document-listener";
-import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
+import { UtilsDocument, PermissionCheck, DmlUpdateRequest } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
@@ -12,7 +12,7 @@ import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyActor, DamageType, MyItemData, MyItem } from "../../types/fixed-types";
 import { UtilsArray } from "../../utils/utils-array";
-import { UtilsLog } from "../../utils/utils-log";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
@@ -49,7 +49,7 @@ interface TargetCache {
 export interface ItemDamageSource {
   type: 'Item';
   itemUuid: string;
-  spellLevel?: MyItemData['data']['level'];
+  spellLevel?: MyItemData['level'];
   hasVersatile: boolean;
 }
 
@@ -73,7 +73,7 @@ export interface DamageCardData {
   userBonus?: string;
   calc$: {
     actorUuid?: string;
-    properties: MyItemData['data']['properties'];
+    properties: MyItemData['properties'];
     damageSource: ItemDamageSource | ManualDamageSource;
     modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     roll?: RollData;
@@ -135,36 +135,38 @@ async function itemSourceToManualSource(itemSource: ItemDamageSource | MyItem, a
     normalBaseRoll: [],
   };
 
-  if (item.data.data.damage?.parts?.length > 0) {
-    manualSource.normalBaseRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(item.data.data.damage.parts, rollData)).terms;
-    if (item.data.data.damage.versatile) {
-      manualSource.versatileBaseRoll = UtilsRoll.toRollData(UtilsRoll.versatilePartsToRoll(item.data.data.damage.parts, item.data.data.damage.versatile, rollData)).terms;
+  const itemData = UtilsFoundry.getSystemData(item);
+  const actorData = UtilsFoundry.getSystemData(item.actor);
+  if (itemData.damage?.parts?.length > 0) {
+    manualSource.normalBaseRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(itemData.damage.parts, rollData)).terms;
+    if (itemData.damage.versatile) {
+      manualSource.versatileBaseRoll = UtilsRoll.toRollData(UtilsRoll.versatilePartsToRoll(itemData.damage.parts, itemData.damage.versatile, rollData)).terms;
     }
   }
 
   const rollKeys: Array<KeyOfType<ManualDamageSource, TermData[]>> = ['normalBaseRoll'];
-  if (item.data.data.damage.versatile) {
+  if (itemData.damage.versatile) {
     rollKeys.push('versatileBaseRoll');
   }
   
   // Upcasting
   for (const key of rollKeys) {
-    const scaling = item.data.data.scaling;
+    const scaling = itemData.scaling;
 
     let upcastLevels = 0;
     if (scaling?.mode === 'level' && scaling.formula) {
-      const originalItem = await UtilsDocument.itemFromUuid(item.uuid);
-      if (originalItem && item.data.data.level > originalItem.data.data.level) {
-        upcastLevels = item.data.data.level - originalItem.data.data.level;
+      const originalItemData = UtilsFoundry.getSystemData(await UtilsDocument.itemFromUuid(item.uuid));
+      if (originalItemData && itemData.level > originalItemData.level) {
+        upcastLevels = itemData.level - originalItemData.level;
       }
     } else if (scaling?.mode === 'cantrip' && item.actor) {
       let actorLevel = 0;
       if (item.actor.type === "character") {
-        actorLevel = item.actor.data.data.details.level;
-      } else if (item.data.data.preparation.mode === "innate") {
-        actorLevel = Math.ceil(item.actor.data.data.details.cr);
+        actorLevel = actorData.details.level;
+      } else if (itemData.preparation.mode === "innate") {
+        actorLevel = Math.ceil(actorData.details.cr);
       } else {
-        actorLevel = item.actor.data.data.details.spellLevel;
+        actorLevel = actorData.details.spellLevel;
       }
       upcastLevels = Math.floor((actorLevel + 1) / 6);
     }
@@ -185,7 +187,7 @@ async function itemSourceToManualSource(itemSource: ItemDamageSource | MyItem, a
 
   // Actor bonus
   if (addActorBonus && item.actor) {
-    const actorBonus = item.actor.data.data.bonuses?.[item.data.data.actionType];
+    const actorBonus = actorData.bonuses?.[itemData.actionType];
     if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
       for (const key of rollKeys) {
         const modifiedRoll = UtilsRoll.mergeRolls(UtilsRoll.fromRollTermData(manualSource[key]), new Roll(actorBonus.damage, rollData));
@@ -433,8 +435,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     }
 
     const rollData: {[key: string]: any} = item.getRollData();
-    if (item.data.data.prof?.hasProficiency) {
-      rollData.prof = item.data.data.prof.term;
+    const itemData = UtilsFoundry.getSystemData(item);
+    if (itemData.prof?.hasProficiency) {
+      rollData.prof = itemData.prof.term;
     }
 
     const inputDamages: DamageCardData = {
@@ -442,17 +445,17 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       phase: 'mode-select',
       source: 'normal',
       calc$: {
-        properties: deepClone(item.data.data.properties),
+        properties: deepClone(itemData.properties),
         damageSource: await itemSourceToManualSource(item, true),
         targetCaches: [],
       },
       extraDamageSources: {},
     };
 
-    if (item.data.data.level === 0) {
+    if (itemData.level === 0) {
       // Non homebrew cantrips take no damage on save
       inputDamages.calc$.modfierRule = 'save-no-dmg';
-    } else if (item.data.data.level > 0) {
+    } else if (itemData.level > 0) {
       // Not confirmed, but I believe most leveled spells that do damage use half damage on save
       inputDamages.calc$.modfierRule = 'save-halve-dmg';
     }
@@ -508,12 +511,12 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.selected.tokenUuid));
     let tokenHpSnapshot = new Map<string, {hp: number; failedDeathSaves: number; maxHp: number; tempHp: number}>();
     for (const token of tokenDocuments.values()) {
-      const actor: MyActor = token.getActor();
+      const actorData = UtilsFoundry.getSystemData(token.getActor() as MyActor);
       tokenHpSnapshot.set(token.uuid, {
-        hp: actor.data.data.attributes.hp.value,
-        failedDeathSaves: actor.data.data.attributes.death?.failure,
-        maxHp: actor.data.data.attributes.hp.max,
-        tempHp: actor.data.data.attributes.hp.temp ?? 0,
+        hp: actorData.attributes.hp.value,
+        failedDeathSaves: actorData.attributes.death?.failure,
+        maxHp: actorData.attributes.hp.max,
+        tempHp: actorData.attributes.hp.temp ?? 0,
       });
     }
     for (const targetEvent of targetEvents) {
@@ -611,19 +614,28 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     }
 
     // Apply healing/damage/death saves to the token
-    const updateActors: Parameters<(typeof UtilsDocument)['bulkUpdate']>[0] = [];
+    const updateActors: DmlUpdateRequest<MyActor>[] = [];
     for (const [uuid, tokenHp] of tokenHpSnapshot.entries()) {
       const token = tokenDocuments.get(uuid);
-      const actor: MyActor = token.getActor();
-      const hpDiff = tokenHp.hp - actor.data.data.attributes.hp.value;
-      const tempHpDiff = tokenHp.tempHp - actor.data.data.attributes.hp.temp;
-      const failedDeathSavesDiff = tokenHp.failedDeathSaves - (actor.data.data.attributes.death?.failure ?? 0);
+      const actor = token.getActor() as MyActor;
+      const actorData = UtilsFoundry.getSystemData(actor);
+      const hpDiff = tokenHp.hp - actorData.attributes.hp.value;
+      const tempHpDiff = tokenHp.tempHp - actorData.attributes.hp.temp;
+      const failedDeathSavesDiff = tokenHp.failedDeathSaves - (actorData.attributes.death?.failure ?? 0);
       if (hpDiff || tempHpDiff || failedDeathSavesDiff) {
-        updateActors.push({document: actor as any, data: {
-          'data.attributes.hp.value': tokenHp.hp,
-          'data.attributes.hp.temp': tokenHp.tempHp,
-          'data.attributes.death.failure': tokenHp.failedDeathSaves
-        }});
+        updateActors.push({document: actor as any, 
+          systemData: {
+            attributes: {
+              hp: {
+                value: tokenHp.hp,
+                temp: tokenHp.tempHp,
+              },
+              death: {
+                failure: tokenHp.failedDeathSaves
+              }
+            }
+          }
+        });
       }
     }
 
@@ -792,9 +804,10 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       }
 
       if (actor) {
-        cache.immunities = [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))];
-        cache.resistances = [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))];
-        cache.vulnerabilities = [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))];
+        const actorData = UtilsFoundry.getSystemData(actor);
+        cache.immunities = [...actorData.traits.di.value, ...(actorData.traits.di.custom === '' ? [] : actorData.traits.di.custom.split(';'))];
+        cache.resistances = [...actorData.traits.dr.value, ...(actorData.traits.dr.custom === '' ? [] : actorData.traits.dr.custom.split(';'))];
+        cache.vulnerabilities = [...actorData.traits.dv.value, ...(actorData.traits.dv.custom === '' ? [] : actorData.traits.dv.custom.split(';'))];
       } else {
         cache.immunities = [];
         cache.resistances = [];

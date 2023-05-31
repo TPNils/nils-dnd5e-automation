@@ -7,6 +7,7 @@ import { UtilsCompare } from "../../lib/utils/utils-compare";
 import MyAbilityTemplate from "../../pixi/ability-template";
 import { staticValues } from "../../static-values";
 import { MyActor, MyItemData } from "../../types/fixed-types";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 import { UtilsLog } from "../../utils/utils-log";
 import { UtilsTemplate } from "../../utils/utils-template";
 import { Action } from "../action";
@@ -26,8 +27,8 @@ export interface TargetCardData {
     autoChangeTarget: boolean;
     actorUuid?: string;
     tokenUuid?: string;
-    targetDefinition?: MyItemData['data']['target'];
-    rangeDefinition?: MyItemData['data']['range'];
+    targetDefinition?: MyItemData['target'];
+    rangeDefinition?: MyItemData['range'];
     expectedTargets?: number;
     tokenData: Array<{
       tokenUuid: string;
@@ -615,22 +616,23 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
   private constructor(){}
   
   public create({item, token, actor}: ModularCardCreateArgs): TargetCardData {
+    const itemData = UtilsFoundry.getSystemData(item);
     const target: TargetCardData = {
       selected: [],
       calc$: {
         autoChangeTarget: true,
         actorUuid: actor?.uuid,
         tokenUuid: token?.uuid,
-        targetDefinition: deepClone(item.data.data.target),
-        rangeDefinition: deepClone(item.data.data.range),
+        targetDefinition: deepClone(itemData.target),
+        rangeDefinition: deepClone(itemData.range),
         tokenData: [],
       },
     };
 
     const selectedTargets: TokenDocument[] = [];
-    if (item.data.data.target?.type === 'none') {
+    if (itemData.target?.type === 'none') {
       // no selection
-    } else if (item.data.data.target?.type === 'self' && token) {
+    } else if (itemData.target?.type === 'self' && token) {
       selectedTargets.push(token);
     } else {
       for (const token of game.user.targets) {
@@ -640,10 +642,10 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     
     target.selected = uuidsToSelected(selectedTargets.map(t => t.uuid));
 
-    if (item.data.data.target?.value > 0 && ['ally', 'creature', 'enemy', 'object'].includes(item.data.data.target?.type)) {
+    if (itemData.target?.value > 0 && ['ally', 'creature', 'enemy', 'object'].includes(itemData.target?.type)) {
       // Should not be any units, if units is specified, assume its in a radius
-      if ([''].includes(item.data.data.target?.units)) {
-        target.calc$.expectedTargets = item.data.data.target?.value;
+      if ([''].includes(itemData.target?.units)) {
+        target.calc$.expectedTargets = itemData.target?.value;
       }
     }
 
@@ -791,9 +793,12 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       if (token == null) {
         continue;
       }
-      template.document.data.update({
-        x: token.data.x + ((token.data.width * template.document.parent.data.grid) / 2),
-        y: token.data.y + ((token.data.height * template.document.parent.data.grid) / 2),
+      const tokenData = UtilsFoundry.getModelData(token);
+      const templateData = UtilsFoundry.getModelData(template.document);
+      const parentData = UtilsFoundry.getModelData(template.document.parent);
+      templateData.update({
+        x: tokenData.x + ((tokenData.width * parentData.grid) / 2),
+        y: tokenData.y + ((tokenData.height * parentData.grid) / 2),
       });
       const templateDetails = UtilsTemplate.getTemplateDetails(template.document);
 
@@ -830,7 +835,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     const excludeMessageIds = new Set<string>();
     for (const {newRow} of context.rows) {
       excludeMessageIds.add(newRow.messageId);
-      timestamps.push(game.messages.get(newRow.messageId).data.timestamp);
+      timestamps.push(UtilsFoundry.getModelData(game.messages.get(newRow.messageId)).timestamp);
     }
     const newestMessageCreatedDate = timestamps.sort()[timestamps.length - 1];
     
@@ -845,7 +850,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         continue;
       }
 
-      if (chatMessage.data.timestamp >= newestMessageCreatedDate) {
+      if (UtilsFoundry.getModelData(chatMessage).timestamp >= newestMessageCreatedDate) {
         return;
       }
       const parts = ModularCard.getCardPartDatas(chatMessage);
@@ -901,9 +906,9 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
           cache.set(token.uuid, {
             tokenUuid: token.uuid,
             actorUuid: (token.getActor() as MyActor)?.uuid,
-            name: token.data.name,
-            nameVisibleAnyone: [CONST.TOKEN_DISPLAY_MODES.HOVER, CONST.TOKEN_DISPLAY_MODES.ALWAYS as number].includes(token.data.displayName),
-            img: token.data.img,
+            name: UtilsFoundry.getModelData(token).name,
+            nameVisibleAnyone: [CONST.TOKEN_DISPLAY_MODES.HOVER, CONST.TOKEN_DISPLAY_MODES.ALWAYS as number].includes(UtilsFoundry.getModelData(token).displayName),
+            img: UtilsFoundry.getModelData(token).img,
           })
         }
       }
@@ -962,7 +967,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
     }
     
     const targetData = partsWithTarget.getTypeData<TargetCardData>(TargetCardPart.instance);
-    if (!targetData.calc$.autoChangeTarget || chatMessage.data.user !== game.userId) {
+    if (!targetData.calc$.autoChangeTarget || UtilsFoundry.getModelData(chatMessage).user !== game.userId) {
       return;
     }
     

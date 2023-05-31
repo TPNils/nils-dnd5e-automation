@@ -4,6 +4,7 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 import { ModularCard } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
@@ -120,11 +121,12 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   private constructor(){}
   
   public create({item}: ModularCardCreateArgs): DescriptionCardData {
+    const itemData = UtilsFoundry.getSystemData(item);
     return {
       name$: item.name,
       img$: item.img,
-      description$: item.data?.data?.description?.value,
-      materials$: item.data?.data?.materials?.value,
+      description$: itemData?.description?.value,
+      materials$: itemData?.materials?.value,
     };
   }
 

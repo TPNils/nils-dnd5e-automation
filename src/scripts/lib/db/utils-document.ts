@@ -1,6 +1,6 @@
 import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { MyActor, MyActorData, MyItem } from "../../types/fixed-types";
+import { BaseDocument, MyActor, MyActorData, MyItem } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
 import { UtilsLog } from "../../utils/utils-log";
 import { DocumentListener } from "./document-listener";
@@ -130,9 +130,10 @@ defaultPermissionChecks['GM'] = {
 }
 defaultPermissionChecks['DM'] = defaultPermissionChecks['GM'];
 
-interface DmlUpdateRequest {
+export interface DmlUpdateRequest<T extends BaseDocument<any> = BaseDocument<any>> {
   document: FoundryDocument;
-  data: any;
+  rootData?: DeepPartial<T['___GENERIC_DATA_TYPE___']>;
+  systemData?: DeepPartial<T['___GENERIC_SYSTEM_TYPE___']>;
 };
 
 /**
@@ -198,7 +199,10 @@ class UpdateQueue {
           const dmlUpdateRequests: DmlUpdateRequest[] = [];
           for (const queueId of selectedQueueIds) {
             const request = this.queue.get(queueId);
-            request.data._id = request.data._id ?? request.document.id;
+            if (request.rootData == null) {
+              request.rootData = {};
+            }
+            request.rootData._id = request.rootData._id ?? request.document.id;
             documentsByUuid.set(request.document.uuid, request);
             dmlUpdateRequests.push(request);
           }
@@ -208,12 +212,20 @@ class UpdateQueue {
           const promises: Promise<any>[] = [];
           for (const documentName of updatesPerDocumentName.keys()) {
             const updatesByUuid = updatesPerDocumentName.get(documentName);
-            const documentClass: {updateDocuments: (rows: FoundryDocument[], options?: any) => Promise<any>} = CONFIG[documentName].documentClass;
-            const rootRows: FoundryDocument[] = [];
+            const documentClass: {updateDocuments: (rows: any[], options?: any) => Promise<any>} = CONFIG[documentName].documentClass;
+            const rootRows: any[] = [];
   
             for (const bulkEntry of updatesByUuid.values()) {
-              if (bulkEntry.data != null) {
-                rootRows.push(bulkEntry.data);
+              if (bulkEntry.rootData) {
+                const rowData = {...bulkEntry.rootData};
+                if (bulkEntry.systemData) {
+                  if (UtilsFoundry.usesDataModel()) {
+                    rowData.system = bulkEntry.systemData;
+                  } else {
+                    rowData.data = bulkEntry.systemData;
+                  }
+                }
+                rootRows.push(rowData)
               }
   
               const embededByDocumentName = new Map<string, any[]>();
@@ -221,7 +233,15 @@ class UpdateQueue {
                 if (!embededByDocumentName.has(embeded.document.documentName)) {
                   embededByDocumentName.set(embeded.document.documentName, []);
                 }
-                embededByDocumentName.get(embeded.document.documentName).push(embeded.data);
+                const embededData = {...embeded.rootData};
+                if (embeded.systemData) {
+                  if (UtilsFoundry.usesDataModel()) {
+                    embededData.system = embeded.systemData;
+                  } else {
+                    embededData.data = embeded.systemData;
+                  }
+                }
+                embededByDocumentName.get(embeded.document.documentName).push(embededData);
               }
               for (const embededDocumentName of embededByDocumentName.keys()) {
                 let parentDocument: foundry.abstract.Document<any, any> | Promise<foundry.abstract.Document<any, any>> = documentsByUuid.get(bulkEntry.uuid)?.document;
@@ -229,7 +249,6 @@ class UpdateQueue {
                   parentDocument = fromUuid(bulkEntry.uuid);
                 }
                 promises.push(Promise.resolve(parentDocument).then(async doc => {
-                  const options: any = {[staticValues.moduleName]: {dmlUuid: crypto.randomUUID()}};
                   const returnValue = doc.updateEmbeddedDocuments(embededDocumentName, embededByDocumentName.get(embededDocumentName));
                   return returnValue;
                 }));
@@ -280,7 +299,7 @@ class UpdateQueue {
   }
 
   private groupDocumentsForDml(inputDocuments: Array<DmlUpdateRequest>): Map<string, Map<string, BulkEntry>> {
-    const documentsByUuid = new Map<string, {document: FoundryDocument, data?: any}>();
+    const documentsByUuid = new Map<string, DmlUpdateRequest>();
     for (const document of inputDocuments) {
       documentsByUuid.set(document.document.uuid, document);
     }
@@ -290,11 +309,11 @@ class UpdateQueue {
       // Special use case for actors since they are not an embeded entity
       if (documentWrapper.document.documentName === 'Actor' && (documentWrapper.document as FoundryDocument & MyActor).isToken) {
         documentWrapper.document = documentWrapper.document.parent;
-        if (documentWrapper.data) {
-          documentWrapper.data = {
+        if (documentWrapper.rootData) {
+          documentWrapper.rootData = {
             _id: documentWrapper.document.id,
-            actorData: documentWrapper.data
-          };
+            actorData: documentWrapper.rootData
+          } as Record<string, any>;
         }
       }
 
@@ -310,7 +329,8 @@ class UpdateQueue {
             embededDocuments: [],
           });
         }
-        dmlsByUuid.get(documentWrapper.document.uuid).data = documentWrapper.data;
+        dmlsByUuid.get(documentWrapper.document.uuid).rootData = documentWrapper.rootData;
+        dmlsByUuid.get(documentWrapper.document.uuid).systemData = documentWrapper.systemData;
       } else {
         if (!dmlsPerDocumentName.has(documentWrapper.document.parent.documentName)) {
           dmlsPerDocumentName.set(documentWrapper.document.parent.documentName, new Map<string, BulkEntry>());
@@ -638,7 +658,7 @@ export class UtilsDocument {
       };
       const promise = documentContext.documentClass.createDocuments.call(
         documentContext.documentClass,
-        documentContext.documents.map(doc => doc.data),
+        documentContext.documents.map(doc => UtilsFoundry.getModelData(doc)),
         options,
       );
       promises.push(promise);
@@ -935,6 +955,11 @@ globalThis.UtilsDocument = UtilsDocument;
 
 interface BulkEntry {
   uuid: string;
-  data?: any; // when provided, update this record itself
-  embededDocuments: {document: FoundryDocument, data?: any}[];
+
+  // when provided, update the embeded documents
+  embededDocuments: {document: FoundryDocument, rootData?: any; systemData?: any;}[];
+
+  // when provided, update this record itself
+  rootData?: any;
+  systemData?: any;
 }

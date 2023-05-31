@@ -6,6 +6,7 @@ import { Component, OnInit, OnInitParam } from "../../lib/render-engine/componen
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { SpellData, MyActor, MyActorData } from "../../types/fixed-types";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ItemUtils } from "../item-utils";
@@ -98,13 +99,14 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
         });
       }
       if (actor) {
-        for (const spellKey of Object.keys(actor.data.data.spells)) {
-          const spellData: SpellData = actor.data.data.spells[spellKey];
+        const actorData = UtilsFoundry.getSystemData(actor);
+        for (const spellKey of Object.keys(actorData.spells)) {
+          const spellData: SpellData = actorData.spells[spellKey];
           if (spellData.max === 0) {
             continue;
           }
           if (spellKey === 'pact') {
-            const spellLevel = (spellData as MyActorData['data']['spells']['pact']).level;
+            const spellLevel = (spellData as MyActorData['spells']['pact']).level;
             const availableSlots = spellData.value;
             this.spellSlotOptions.push({
               label: game.i18n.format("DND5E.SpellLevelPact", {level: spellLevel, n: availableSlots}),
@@ -157,13 +159,15 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
   private constructor(){}
   
   public async create({item, actor, token}: ModularCardCreateArgs): Promise<SpellLevelCardData> {
-    if (item.type !== 'spell' || item?.data?.data?.level == null || item.data.data.level <= 0 || !actor || !ItemCardHelpers.spellUpcastModes.includes(item.data.data?.preparation?.mode)) {
+    const itemData = UtilsFoundry.getSystemData(item);
+    if (item.type !== 'spell' || itemData?.level == null || itemData.level <= 0 || !actor || !ItemCardHelpers.spellUpcastModes.includes(itemData?.preparation?.mode)) {
       return null;
     }
 
     let spellSlots: SpellLevelCardData['calc$']['spellSlots'] = [];
-    for (const spellKey in actor.data.data.spells) {
-      const spellData: SpellData = actor.data.data.spells[spellKey];
+    const actorData = UtilsFoundry.getSystemData(actor);
+    for (const spellKey in actorData.spells) {
+      const spellData: SpellData = actorData.spells[spellKey];
       if (spellData.max <= 0) {
         continue;
       }
@@ -177,7 +181,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
       } else if (spellKey === 'pact') {
         spellSlots.push({
           type: 'pact',
-          level: (spellData as MyActorData['data']['spells']['pact']).level,
+          level: (spellData as MyActorData['spells']['pact']).level,
           maxSlots: spellData.max,
           availableSlots: spellData.value
         });
@@ -198,14 +202,14 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
 
     // Find the first available spellslot
     // TODO innate casting (always?) also counts as known spells => allow to use either the (un)limited uses or (upcast) spell slots
-    const spellIsPact = item.data.data?.preparation?.mode === 'pact';
-    let selectedLevel: SpellLevelCardData['selectedLevel'] = spellIsPact ? 'pact' : item.data.data.level;
+    const spellIsPact = itemData?.preparation?.mode === 'pact';
+    let selectedLevel: SpellLevelCardData['selectedLevel'] = spellIsPact ? 'pact' : itemData.level;
     if (selectedLevel === 'pact') {
-      if (actor.data.data.spells.pact.value < 1 && actor.data.data.spells[`spell${actor.data.data.spells.pact.level}`].value > 0) {
-        selectedLevel = actor.data.data.spells.pact.level;
+      if (actorData.spells.pact.value < 1 && actorData.spells[`spell${actorData.spells.pact.level}`].value > 0) {
+        selectedLevel = actorData.spells.pact.level;
       }
     } else {
-      if (actor.data.data.spells.pact.value > 0 && actor.data.data.spells.pact.level === selectedLevel) {
+      if (actorData.spells.pact.value > 0 && actorData.spells.pact.level === selectedLevel) {
         selectedLevel = 'pact';
       }
     }
@@ -280,7 +284,7 @@ class SpellLevelCardTrigger implements ITrigger<ModularCardTriggerData<SpellLeve
       let level: number;
       if (part.selectedLevel === 'pact') {
         const actor = await UtilsDocument.actorFromUuid(part.calc$.actorUuid);
-        level = actor.data.data.spells.pact.level;
+        level =  UtilsFoundry.getSystemData(actor).spells.pact.level;
       } else {
         level = part.selectedLevel;
       }
@@ -290,16 +294,17 @@ class SpellLevelCardTrigger implements ITrigger<ModularCardTriggerData<SpellLeve
         UtilsDocument.actorFromUuid(part.calc$.actorUuid),
         part.calc$.tokenUuid == null ? Promise.resolve(null) : UtilsDocument.tokenFromUuid(part.calc$.tokenUuid)
       ]);
-  
-      if (item.data.data.level !== level || (part.selectedLevel === 'pact' && item.data.data?.preparation?.mode !== 'pact')) {
+
+      const itemData = UtilsFoundry.getSystemData(item);
+      if (itemData.level !== level || (part.selectedLevel === 'pact' && itemData?.preparation?.mode !== 'pact')) {
         item = ItemUtils.createUpcastItem(item, level);
       }
       if (part.selectedLevel === 'pact') {
         // Detect that it should consume pact slots
-        item.data.data.preparation.mode = 'pact';
-      } else if (item.data.data.preparation.mode === 'pact') {
+        itemData.preparation.mode = 'pact';
+      } else if (itemData.preparation.mode === 'pact') {
         // Detect that it should consume spell slots
-        item.data.data.preparation.mode = 'always';
+        itemData.preparation.mode = 'always';
       }
   
       const responses: Array<Promise<{data: any; type: ModularCardPart}>> = [];
