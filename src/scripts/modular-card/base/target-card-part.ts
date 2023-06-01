@@ -651,6 +651,12 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
       if ([''].includes(itemData.target?.units)) {
         target.calc$.expectedTargets = itemData.target?.value;
       }
+    } else if (['', null].includes(itemData.target?.type)) {
+      // Target None => probably not configured
+      // This is also home some dnd5e compendium weapons are configured
+      if (item.hasAttack || item.hasDamage) {
+        target.calc$.expectedTargets = 1;
+      }
     }
 
     return target;
@@ -969,7 +975,9 @@ class DmlTriggerUser implements IDmlTrigger<User> {
     }
     
     const targetData = partsWithTarget.getTypeData<TargetCardData>(TargetCardPart.instance);
-    if (!targetData.calc$.autoChangeTarget || UtilsFoundry.getModelData(chatMessage).user !== game.userId) {
+    const chatMessageUser = UtilsFoundry.getModelData(chatMessage).user as User | string;
+    // V9 this is the user id, V10 this is the user model
+    if (!targetData.calc$.autoChangeTarget || ((chatMessageUser instanceof User) ? (chatMessageUser.id !== game.userId) : (chatMessageUser !== game.userId))) {
       return;
     }
     
