@@ -65,6 +65,9 @@ class ChatMessageAccessPropertyV10 implements ProxyHandler<any> {
   }
 
   public get(target: any, prop: string | symbol, receiver: any) {
+    if (prop === ChatMessageAccessPropertyV10.getTargetSymbol || prop === ChatMessageAccessPropertyV10.revokeSymbol) {
+      return this[prop];
+    }
     let value = target[prop];
     if (value == null || typeof prop === 'symbol') {
       return value
@@ -74,12 +77,15 @@ class ChatMessageAccessPropertyV10 implements ProxyHandler<any> {
     }
     if (!value[ChatMessageAccessPropertyV10.getTargetSymbol]) {
       value = ChatMessageAccessPropertyV10.wrap(value, this.message, `${this.pathPrefix}${prop}`);
-      target[prop] = value;
     }
     return value;
   }
   
   public set(target: any, prop: string | symbol, newValue: any, receiver: any) {
+    if (prop === ChatMessageAccessPropertyV10.getTargetSymbol || prop === ChatMessageAccessPropertyV10.revokeSymbol) {
+      this[prop] = newValue;
+      return true;
+    }
     target[prop] = newValue;
     if (typeof prop === 'symbol') {
       return true;
@@ -168,8 +174,8 @@ class ChatMessageAccessPropertyV10 implements ProxyHandler<any> {
 
   public static wrap<T>(wrapped: T, message: ChatMessage & BaseDocumentV10<any>, path: string = ''): T {
     const proxy = Proxy.revocable(wrapped, new ChatMessageAccessPropertyV10(message, path));
-    wrapped[ChatMessageAccessPropertyV10.getTargetSymbol] = wrapped;
-    wrapped[ChatMessageAccessPropertyV10.revokeSymbol] = proxy.revoke;
+    proxy.proxy[ChatMessageAccessPropertyV10.getTargetSymbol] = wrapped;
+    proxy.proxy[ChatMessageAccessPropertyV10.revokeSymbol] = proxy.revoke;
     return proxy.proxy;
   }
 
