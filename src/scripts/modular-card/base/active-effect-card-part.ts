@@ -292,8 +292,8 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
           appliedStates.add(applied);
           visualState.columns.push({
             key: ActiveEffectCardPart.instance.getType() + '-' + i,
-            label: `<img style="min-width: 16px;width: 16px;min-height: 16px;height: 16px;" src="${activeEffect.icon}">`,
-            rowValue: applied ? `<span style="color: green">✓</span>` : `<span style="color: red">✗</span>`
+            label: `<img style="min-width: 16px;width: 16px;min-height: 16px;height: 16px;" title="${activeEffect.label}" src="${activeEffect.icon}">`,
+            rowValue: applied ? `<span style="color: green" title="Applied">✓</span>` : `<span style="color: red">✗</span>`
           });
         }
         if (appliedStates.size > 1) {
@@ -326,7 +326,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
         const activeEffect = activeEffectPart.activeEffects[i];
         visualState.columns.push({
           key: ActiveEffectCardPart.instance.getType() + '-' + i,
-          label: `<img style="min-width: 16px;width: 16px;min-height: 16px;height: 16px;" src="${activeEffect.icon}">`,
+          label: `<img style="min-width: 16px;width: 16px;min-height: 16px;height: 16px;" title="${activeEffect.label}" src="${activeEffect.icon}">`,
           rowValue: `<span style="color: red">✗</span>`,
         });
       }

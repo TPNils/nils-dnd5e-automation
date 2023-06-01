@@ -118,18 +118,18 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
   html: /*html*/`
     <div *if="this.tableBody.length" class="table target-table" style="grid-template-columns: max-content 25px {{this.tableHeader.row.length ? 'repeat(' + this.tableHeader.row.length + ', max-content)' : ''}} auto max-content;">
       <div class="header-cell">
-        <button *if="!this.autoChangeTarget" [disabled]="!this.isOwner" (click)="this.onRefreshClick()" class="icon-button reset"><i class="fas fa-bullseye"></i></button>
+        <button *if="!this.autoChangeTarget" title="Auto updating targets disabled. Click to manually update." [disabled]="!this.isOwner" (click)="this.onRefreshClick()" class="icon-button reset"><i class="fas fa-bullseye"></i></button>
       </div>
-      <div class="header-cell target-amount-summary">
+      <div class="header-cell target-amount-summary" title="Current targets{{this.tableHeader.expectedTargets ? ' / Expected targets' : ''}}">
         {{this.tableHeader.currentTargets}}{{this.tableHeader.expectedTargets ? '/' + this.tableHeader.expectedTargets : ''}}
       </div>
       <div *for="let row of this.tableHeader.row" class="header-cell">{{{row}}}</div>
       <div class="header-cell"></div>
       <div class="header-cell one-line">
         <virtual *if="this.tableHeader.canOneActorWrite && this.tableBody.length > 1">
-          <button (click)="this.onTargetActionClick('smart-apply', '*')" [data-state]="this.tableHeader.smartState" class="icon-button apply"><i class="fas fa-brain"></i></button>
-          <button (click)="this.onTargetActionClick('force-apply', '*')" [data-state]="this.tableHeader.state" class="icon-button apply"><i class="fas fa-check"></i></button>
-          <button (click)="this.onTargetActionClick('undo', '*')" [data-state]="this.tableHeader.state" class="icon-button undo"><i class="fas fa-undo"></i></button>
+          <button (click)="this.onTargetActionClick('smart-apply', '*')" title="Smart apply all: ${staticValues.code} will calculate which target should be affected and which not." [data-state]="this.tableHeader.smartState" class="icon-button apply"><i class="fas fa-brain"></i></button>
+          <button (click)="this.onTargetActionClick('force-apply', '*')" title="Apply all: You decide that all targets should be affected." [data-state]="this.tableHeader.state" class="icon-button apply"><i class="fas fa-check"></i></button>
+          <button (click)="this.onTargetActionClick('undo', '*')" title="Undo all: You decide that no targets should be affected." [data-state]="this.tableHeader.state" class="icon-button undo"><i class="fas fa-undo"></i></button>
         </virtual>
       </div>
       
@@ -147,17 +147,17 @@ const callbacks = new Map<number, TargetIntegrationCallback>();
         </virtual>
         <virtual *if="!target.isPlaceholder">
           <div class="body-cell">
-            <button [disabled]="!this.isOwner || ((target.state === 'partial-applied' || target.state === 'applied'))" (click)="this.onDeleteClick(target.selectionId)" class="icon-button delete"><i class="fas fa-trash"></i></button>
-            <button [disabled]="!this.isOwner" (click)="this.onCopyClick(target.tokenUuid)" class="icon-button copy"><i class="far fa-copy"></i></button>
+            <button [disabled]="!this.isOwner || ((target.state === 'partial-applied' || target.state === 'applied'))" title="{{(target.state === 'partial-applied' || target.state === 'applied') ? 'Disabled. Enable by pressing undo.' : 'Remove target.'}}" (click)="this.onDeleteClick(target.selectionId)" class="icon-button delete"><i class="fas fa-trash"></i></button>
+            <button [disabled]="!this.isOwner" title="Select this target again." (click)="this.onCopyClick(target.tokenUuid)" class="icon-button copy"><i class="far fa-copy"></i></button>
           </div>
           <div class="body-cell" [title]="target.name"><nd5e-token-img [data-token-uuid]="target.tokenUuid" [data-token-img]="target.img"></nd5e-token-img></div>
           <div *for="let row of target.row" class="body-cell">{{{row}}}</div>
           <div class="body-cell"><!-- filler --></div>
           <div class="body-cell one-line">
             <virtual *if="target.canActorWrite">
-              <button (click)="this.onTargetActionClick('smart-apply', target.selectionId)" [data-state]="target.smartState" class="icon-button apply"><i class="fas fa-brain"></i></button>
-              <button (click)="this.onTargetActionClick('force-apply', target.selectionId)" [data-state]="target.state" class="icon-button apply"><i class="fas fa-check"></i></button>
-              <button (click)="this.onTargetActionClick('undo', target.selectionId)" [data-state]="target.state" class="icon-button undo"><i class="fas fa-undo"></i></button>
+              <button (click)="this.onTargetActionClick('smart-apply', target.selectionId)" title="Smart apply: ${staticValues.code} will calculate if this target should be affected or not." [data-state]="target.smartState" class="icon-button apply"><i class="fas fa-brain"></i></button>
+              <button (click)="this.onTargetActionClick('force-apply', target.selectionId)" title="Apply: You decide that the target should be affected." [data-state]="target.state" class="icon-button apply"><i class="fas fa-check"></i></button>
+              <button (click)="this.onTargetActionClick('undo', target.selectionId)" title="Undo: You decide that the target should not be affected." [data-state]="target.state" class="icon-button undo"><i class="fas fa-undo"></i></button>
             </virtual>
           </div>
         </virtual>
