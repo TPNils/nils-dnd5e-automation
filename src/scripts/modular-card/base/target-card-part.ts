@@ -967,6 +967,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
 
       if (parts.hasType(TargetCardPart.instance)) {
         partsWithTarget = parts.deepClone();
+        break;
       }
     }
 
