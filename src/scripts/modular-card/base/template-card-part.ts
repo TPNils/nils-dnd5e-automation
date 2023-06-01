@@ -8,6 +8,7 @@ import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyItemData } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
+import { UtilsLog } from "../../utils/utils-log";
 import { UtilsTemplate } from "../../utils/utils-template";
 import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
@@ -55,14 +56,16 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
             hasPermission: UtilsDocument.hasAllPermissions([{uuid: data.part.calc$.actorUuid, permission: 'Owner', user: game.user}]),
           })
         })
-        .listen(data => this.setData(data.part, data.hasPermission))
+        .listen(data => this.setData(data.allParts, data.part, data.hasPermission))
     );
   }
 
   public hasPermission = false;
+  private itemUuid: string;
   private target: TemplateCardData['calc$']['target'];
-  private async setData(part: TemplateCardData, hasPermission: boolean) {
+  private async setData(allParts: ModularCardInstance, part: TemplateCardData, hasPermission: boolean) {
     if (part) {
+      this.itemUuid = allParts.getItemUuid();
       this.hasPermission = hasPermission;
       this.target = part.calc$.target;
     } else {
@@ -70,18 +73,11 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
     }
   }
 
-  public startPlace() {
-    const template = MyAbilityTemplate.fromItem({
-      target: this.target,
-      flags: {
-        [staticValues.moduleName]: {
-          dmlCallbackMessageId: this.messageId,
-        }
-      }
-    });
+  public async startPlace() {
+    const template = MyAbilityTemplate.fromItem(await UtilsDocument.itemFromUuid(this.itemUuid), this.messageId);
     // TODO area of Minor Illlusion (Caspian) is too big with XGE area (did not test default)
-    if ((template as MyAbilityTemplate)?.drawPreview) {
-      (template as MyAbilityTemplate).drawPreview();
+    if (template?.drawPreview) {
+      template.drawPreview();
     }
   }
 
@@ -159,29 +155,33 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData<TemplateCar
         continue;
       }
       // Initiate measured template creation
-      const template = MyAbilityTemplate.fromItem({
-        target: newRow.part.calc$.target,
-        flags: {
-          [staticValues.moduleName]: {
-            dmlCallbackMessageId: newRow.messageId,
-          }
-        }
-      });
+      const template = MyAbilityTemplate.fromItem(await UtilsDocument.itemFromUuid(newRow.allParts.getItemUuid()), newRow.messageId);
       // Auto place circle templates with range self
       if (newRow.part.calc$.tokenUuid && newRow.part.calc$.rangeUnit === 'self' && template.document.data.t === 'circle') {
         const token = await UtilsDocument.tokenFromUuid(newRow.part.calc$.tokenUuid);
         if (token) {
-          template.document.data.update({
-            x: token.data.x + (token.data.width * token.parent.data.grid / 2),
-            y: token.data.y + (token.data.height * token.parent.data.grid / 2),
-          })
+          const tokenData = UtilsFoundry.getModelData(token);
+          let grid = UtilsFoundry.getModelData(token.parent).grid;
+          // Foundry V9 has grid as a number, V10 as an object
+          if (typeof grid === 'object') {
+            grid = grid.size;
+          }
+          const updateData = {
+            x: tokenData.x + (tokenData.width * grid / 2),
+            y: tokenData.y + (tokenData.height * grid / 2),
+          };
+          if (UtilsFoundry.usesDataModel<MeasuredTemplateDocument>(template.document)) {
+            template.document.updateSource(updateData);
+          } else if (UtilsFoundry.usesDocumentData<MeasuredTemplateDocument>(template.document)) {
+            template.document.data.update(updateData);
+          }
           UtilsDocument.bulkCreate([template.document]);
           return;
         }
       }
       // Manually place template
-      if (template && (template as MyAbilityTemplate).drawPreview) {
-        (template as MyAbilityTemplate).drawPreview();
+      if (template && template.drawPreview) {
+        template.drawPreview();
         return;
       }
     }
@@ -273,7 +273,9 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         updateChatMessageMap.set(chatMessage.id, parts);
       }
 
-      if (newTemplate.data.x !== oldTemplate?.data?.x || newTemplate.data.y !== oldTemplate?.data?.y) {
+      const newTemplateData = UtilsFoundry.getModelData(newTemplate);
+      const oldTemplateData = UtilsFoundry.getModelData(oldTemplate);
+      if (newTemplateData.x !== oldTemplateData?.x || newTemplateData.y !== oldTemplateData?.y) {
         const templateDetails = UtilsTemplate.getTemplateDetails(newTemplate);
         const scene = newTemplate.parent;
         const newTargets = new Set<string>();

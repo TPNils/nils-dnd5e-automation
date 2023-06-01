@@ -1,5 +1,6 @@
 import { staticValues } from "../static-values";
 import { RangeUnits } from "../types/fixed-types";
+import { UtilsFoundry } from "./utils-foundry";
 
 export interface TemplateDetails {
   x: number;
@@ -17,12 +18,23 @@ interface Rectangle {
 export class UtilsTemplate {
 
   public static isTokenInside(templateDetails: TemplateDetails, token: TokenDocument | Rectangle, wallsBlockTargeting: boolean): boolean {
-    const rectangle = token instanceof TokenDocument ? {
-      x: token.data.x,
-      y: token.data.y,
-      width: token.data.width * canvas.scene.data.grid,
-      height: token.data.height * canvas.scene.data.grid,
-    } : token;
+    let rectangle: Rectangle;
+    if (token instanceof TokenDocument) {
+      let gridSize = UtilsFoundry.getModelData(canvas.scene).grid;
+      // Foundry V9 has grid as a number, V10 as an object
+      if (typeof gridSize === 'object') {
+        gridSize = gridSize.size;
+      }
+      const tokenData = UtilsFoundry.getModelData(token);
+      rectangle = {
+        x: tokenData.x,
+        y: tokenData.y,
+        width: tokenData.width * gridSize,
+        height: tokenData.height * gridSize,
+      };
+    } else {
+      rectangle = token;
+    }
 
     if (game.settings.get(staticValues.moduleName, 'aoeTargetRule') === 'xge') {
       return UtilsTemplate.isTokenInsideXge(templateDetails, rectangle, wallsBlockTargeting);
@@ -35,7 +47,11 @@ export class UtilsTemplate {
    * If a *tile* is at least 50% in the area (Foundry default)
    */
   private static isTokenInsideDmg(templateDetails: TemplateDetails, rectangle: Rectangle, wallsBlockTargeting: boolean): boolean {
-    const grid = canvas.scene.data.grid;
+    let grid = UtilsFoundry.getModelData(canvas.scene).grid;
+    // Foundry V9 has grid as a number, V10 as an object
+    if (typeof grid === 'object') {
+      grid = grid.size;
+    }
     const steps = grid;
   
     // Check for center of each square the token uses.
@@ -56,7 +72,12 @@ export class UtilsTemplate {
    * XGE. p.86 If a *token* is within the area, it is affected
    */
    private static isTokenInsideXge(templateDetails: TemplateDetails, rectangle: Rectangle, wallsBlockTargeting: boolean): boolean {
-    const steps = Math.min(canvas.scene.data.grid / 2, rectangle.width / 2, rectangle.height / 2);
+    let grid = UtilsFoundry.getModelData(canvas.scene).grid;
+    // Foundry V9 has grid as a number, V10 as an object
+    if (typeof grid === 'object') {
+      grid = grid.size;
+    }
+    const steps = Math.min(grid / 2, rectangle.width / 2, rectangle.height / 2);
 
     // This isnt't perfect, but it should work well enough with the limitations of PIXI
     for (let x = 0; x <= rectangle.width; x += steps) {
@@ -89,14 +110,14 @@ export class UtilsTemplate {
   }
 
   public static getTemplateDetails(document: MeasuredTemplateDocument): TemplateDetails {
-    let {direction, distance, angle = 90, width} = document.data;
+    let {direction, distance, angle = 90, width, t, x, y} = UtilsFoundry.getModelData(document);
     distance = UtilsTemplate.feetToPx(distance);
     width = UtilsTemplate.feetToPx(width);
     direction = Math.toRadians(direction);
 
     let shape: MeasuredTemplate['shape'];
     // Get the Template shape
-    switch ( document.data.t ) {
+    switch ( t ) {
       case "circle":
         shape = new PIXI.Circle(0, 0, distance);
         break;
@@ -114,8 +135,8 @@ export class UtilsTemplate {
         break;
     }
     return {
-      x: document.data.x,
-      y: document.data.y,
+      x: x,
+      y: y,
       shape: shape
     }
   }
@@ -159,12 +180,17 @@ export class UtilsTemplate {
   }
 
   public static getCenter(template: MeasuredTemplateDocument, token: TokenDocument): {x: number; y: number;} {
-    const gridSize = template.parent.data.grid;
-    switch ( template.data.t ) {
+    switch ( UtilsFoundry.getModelData(template.parent).t ) {
       case "circle":
+        let grid = UtilsFoundry.getModelData(canvas.scene).grid;
+        // Foundry V9 has grid as a number, V10 as an object
+        if (typeof grid === 'object') {
+          grid = grid.size;
+        }
+        const tokenData = UtilsFoundry.getModelData(token);
         return {
-          x: token.data.x + ((token.data.width * gridSize) / 2),
-          y: token.data.y + ((token.data.height * gridSize) / 2),
+          x: tokenData.x + ((tokenData.width * grid) / 2),
+          y: tokenData.y + ((tokenData.height * grid) / 2),
         }
       case "cone":
         // @ts-expect-error

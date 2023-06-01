@@ -489,7 +489,12 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
         const bToken = tokenCacheByUuid.get(b[1].uuid);
         
         // Since tokens are displayed with their image, group them together
-        let compare = aToken.img.localeCompare(bToken.img);
+        let compare: number;
+        if (UtilsFoundry.usesDataModel()) {
+          compare = aToken.img.localeCompare(bToken.img)
+        } else {
+          compare = aToken.img.localeCompare(bToken.img)
+        }
         if (compare !== 0) {
           return compare;
         }
@@ -777,14 +782,8 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         return;
       }
 
-      const template = MyAbilityTemplate.fromItem({
-        target: newRow.part.calc$.targetDefinition,
-        flags: {
-          [staticValues.moduleName]: {
-            dmlCallbackMessageId: newRow.messageId,
-          }
-        }
-      });
+      // TODO V10
+      const template = MyAbilityTemplate.fromItem(await UtilsDocument.itemFromUuid(newRow.allParts.getItemUuid()), newRow.messageId);
       if (!template) {
         continue;
       }
@@ -795,10 +794,14 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       }
       const tokenData = UtilsFoundry.getModelData(token);
       const templateData = UtilsFoundry.getModelData(template.document);
-      const parentData = UtilsFoundry.getModelData(template.document.parent);
+      let grid = UtilsFoundry.getModelData(template.document.parent).grid;
+      // Foundry V9 has grid as a number, V10 as an object
+      if (typeof grid === 'object') {
+        grid = grid.size;
+      }
       templateData.update({
-        x: tokenData.x + ((tokenData.width * parentData.grid) / 2),
-        y: tokenData.y + ((tokenData.height * parentData.grid) / 2),
+        x: tokenData.x + ((tokenData.width * grid) / 2),
+        y: tokenData.y + ((tokenData.height * grid) / 2),
       });
       const templateDetails = UtilsTemplate.getTemplateDetails(template.document);
 
@@ -908,7 +911,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
             actorUuid: (token.getActor() as MyActor)?.uuid,
             name: UtilsFoundry.getModelData(token).name,
             nameVisibleAnyone: [CONST.TOKEN_DISPLAY_MODES.HOVER, CONST.TOKEN_DISPLAY_MODES.ALWAYS as number].includes(UtilsFoundry.getModelData(token).displayName),
-            img: UtilsFoundry.getModelData(token).img,
+            img: UtilsFoundry.usesDataModel(token) ? (token as any).texture.src : token.data.img,
           })
         }
       }
