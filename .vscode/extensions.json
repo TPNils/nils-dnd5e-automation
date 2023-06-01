@@ -1,5 +1,6 @@
 {
     "recommendations": [
-        "Tobermory.es6-string-html"
+        "Tobermory.es6-string-html",
+        "enhancedjs.sass-in-template-string"
     ]
 }
