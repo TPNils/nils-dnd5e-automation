@@ -26,7 +26,7 @@ DocumentListener.listenSettingValue<boolean>('dnd5e', 'autoCollapseItemCards').l
   html: /*html*/`
   <div class="header" (click)="this.toggleCollapsed()">
     <img [src]="this.image" [title]="this.name" width="36" height="36"/>
-    <h3 class="name">{{this.name}}</h3>
+    <div class="name">{{this.name}}</div>
   </div>
 
   <div class="section description {{this.collapsed ? '' : 'open'}}">
