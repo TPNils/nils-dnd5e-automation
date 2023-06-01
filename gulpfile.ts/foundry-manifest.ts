@@ -240,7 +240,6 @@ class FoundryManifest {
       }
     }
     if (input.relationships?.requires) {
-      console.log('required', input.relationships?.requires);
       for (const required of input.relationships.requires) {
         relationshipRequiredById.set(required.id, required);
       }
@@ -255,7 +254,6 @@ class FoundryManifest {
       systems: Array.from(relationshipSystemsById.values()),
       conflicts: input.relationships?.conflicts,
     };
-    console.log(v10, input)
     v10.scripts = input.scripts;
     v10.socket = input.socket;
     v10.styles = input.styles;
