@@ -19,7 +19,7 @@ function getTemplateClass() {
       baseClass = (game as any).dnd5e.canvas.AbilityTemplate;
     }
 
-    Nd5aAbilityTemplate = class a extends baseClass {
+    Nd5aAbilityTemplate = class Nd5aAbilityTemplate extends baseClass {
 
       private simulateId = false;
       /**
