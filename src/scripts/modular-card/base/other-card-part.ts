@@ -31,7 +31,7 @@ export interface OtherCardData {
     <div class="flavor">
       {{ this.flavor }}
     </div>
-    <nd5a-roll *if="this.part"
+    <nd5e-roll *if="this.part"
       [data-roll]="this.part.roll$"
       [data-bonus-formula]="this.part.userBonus"
       [data-show-bonus]="this.part.phase !== 'mode-select'"
@@ -43,7 +43,7 @@ export interface OtherCardData {
       (doRoll)="this.onRollClick($event)"
       (rollMode)="this.onRollMode($event)"
       >
-    </nd5a-roll>
+    </nd5e-roll>
   `,
   style: /*css*/`
     .flavor {

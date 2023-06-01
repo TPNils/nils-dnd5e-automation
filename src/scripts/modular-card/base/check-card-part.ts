@@ -56,7 +56,7 @@ function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache 
 @Component({
   tag: CheckCardComponent.getSelector(),
   html: /*html*/`
-    <nd5a-roll-d20
+    <nd5e-roll-d20
       *if="this.cache"
       class="snug"
       data-label-type="icon"
@@ -71,16 +71,16 @@ function getTargetCache(cache: CheckCardData, selectionId: string): TargetCache 
       (doRoll)="this.onRollClick($event)"
       (rollMode)="this.onRollMode($event)"
       >
-    </nd5a-roll-d20>
+    </nd5e-roll-d20>
   `,
   style: /*css*/`
-    :host-context(nd5a-target-part) :host {
+    :host-context(nd5e-target-part) :host {
       display: block;
       font-size: 12px;
       min-width: 6em;
     }
     
-    nd5a-roll-d20 {
+    nd5e-roll-d20 {
       font-size: 1em;
     }
   `

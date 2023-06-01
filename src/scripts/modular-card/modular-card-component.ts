@@ -28,8 +28,8 @@ import { ModularCard } from "./modular-card";
     }
 
     /*Firefox does not support :has => solved in an other way */
-    .item-card.has-nd5a-attack-part.has-nd5a-damage-part :deep > nd5a-attack-part,
-    .item-card.has-nd5a-attack-part.has-nd5a-damage-part :deep > nd5a-damage-part {
+    .item-card.has-nd5e-attack-part.has-nd5e-damage-part :deep > nd5e-attack-part,
+    .item-card.has-nd5e-attack-part.has-nd5e-damage-part :deep > nd5e-damage-part {
       grid-column: span 5;
     }
 
