@@ -58,13 +58,6 @@ export default class MyAbilityTemplate {
 
   @RunOnce()
   public static registerHooks() {
-    UtilsHooks.init().then(() => {
-      // 
-      if (UtilsFoundry.getSystemVersion() < new Version(2)) {
-        // No longer needed since DND 2.0.0 & foundry V10.270 now do this out of the box
-        // CONFIG.MeasuredTemplate.objectClass = MyAbilityTemplate;
-      }
-    })
   }
 
   public static fromItem(item: MyItem, dmlCallbackMessageId: string): AbilityTemplate {
