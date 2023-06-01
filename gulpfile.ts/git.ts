@@ -22,7 +22,7 @@ export class Git {
       throw new Error(chalk.red('Missing "githubRepository" property in ./config.json. Expected format: <githubUsername>/<githubRepo>'));
     }
 
-    const currentVersion = manifest.file.version;
+    const currentVersion = await this.getLatestVersion();
     let targetVersion = args.getVersion(currentVersion, true);
     if (targetVersion == null) {
       targetVersion = currentVersion;
@@ -80,6 +80,10 @@ export class Git {
     // Ignore errors
     await cli.execPromise(`git tag -d ${version}`);
     await cli.execPromise(`git push --delete origin ${version}`);
+  }
+
+  public async getLatestVersion(): Promise<string> {
+    return cli.throwOnAnyError(cli.execPromise('git describe --tags `git rev-list --tags --max-count=1`'));
   }
 
   public async tagCurrentVersion(): Promise<void> {

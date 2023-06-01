@@ -2,6 +2,7 @@
 import * as chalk from 'chalk';
 import * as yargs from 'yargs';
 import { foundryManifest } from './foundry-manifest';
+import { git } from './git';
 
 export interface Version {
   major: number;
@@ -91,7 +92,7 @@ class Args {
   }
 
   public async validateVersion(): Promise<void> {
-      const currentVersionString = foundryManifest.getManifest().file.version;
+      const currentVersionString = await git.getLatestVersion();
       const currentVersion = this.parseVersion(currentVersionString);
       if (!currentVersion) {
         return;
