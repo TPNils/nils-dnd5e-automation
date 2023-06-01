@@ -243,22 +243,6 @@ export class RollDamageElement implements OnInit {
 
   @AsyncAttribute({name: 'data-read-permission'})
   private readPermission: ValueReader<string | string[]>;
-  
-  private readHiddenDisplayTypeListener: Stoppable;
-  private _readHiddenDisplayType: RollResultElement['displayType'];
-  @Attribute({name: 'data-read-hidden-display-type', dataType: 'string'})
-  public get readHiddenDisplayType(): RollResultElement['displayType'] {
-    return this._readHiddenDisplayType;
-  }
-  public set readHiddenDisplayType(v: RollResultElement['displayType']) {
-    this._readHiddenDisplayType = v;
-    // When the value is provided, stop listener for the default value.
-    if (this.readHiddenDisplayTypeListener) {
-      this.readHiddenDisplayTypeListener.stop();
-      this.readHiddenDisplayTypeListener = null;
-    }
-    this.calcRollModeLabel();
-  }
 
   private _rollMode : RollDamageMode = 'normal';
   @Attribute({name: 'data-roll-mode', dataType: 'string'})
@@ -303,16 +287,13 @@ export class RollDamageElement implements OnInit {
   
   public hasReadPermission = true;
   public hasInteractPermission = true;
+  public readHiddenDisplayType: RollResultElement['displayType'];
   public onInit(args: OnInitParam): void {
-    if (this._readHiddenDisplayType == null) {
-      // If no type is provided, set a default.
-      args.addStoppable(this.readHiddenDisplayTypeListener = DocumentListener.listenSettingValue(`${staticValues.moduleName}.damageHiddenRoll`).listen(value => {
-        this._readHiddenDisplayType = value;
-        this.calcRollModeLabel();
-      }));
-    }
-    
     args.addStoppable(
+      DocumentListener.listenSettingValue(`${staticValues.moduleName}.damageHiddenRoll`).listen(value => {
+        this.readHiddenDisplayType = value;
+        this.calcRollModeLabel();
+      }),
       this.readPermission
         .map(value => Array.isArray(value) ? value : [value])
         .switchMap(readPermission => UtilsDocument.hasPermissionsFromString(readPermission))
