@@ -3,7 +3,7 @@
   "title": "Nils' dnd5e automation",
   "description": "",
   "authors": [{"name": "TPNils"}],
-  "version": "2.2.1-beta",
+  "version": "2.2.2-beta",
   "compatibility": {"minimum": "0.8.9", "verified": "9.268"},
   "socket": true,
   "url": "https://github.com/TPNils/nils-dnd5e-automation",
