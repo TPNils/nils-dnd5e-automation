@@ -4,7 +4,7 @@
   "description": "",
   "authors": [{"name": "TPNils"}],
   "version": "2.2.2-beta",
-  "compatibility": {"minimum": "0.8.9", "verified": "9.268"},
+  "compatibility": {"minimum": "0.8.9", "verified": "10.291"},
   "socket": true,
   "url": "https://github.com/TPNils/nils-dnd5e-automation",
   "manifest": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/latest/module.json",
