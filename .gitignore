@@ -8,6 +8,7 @@
 !/tsconfig.json
 !/LICENSE.MIT
 !/README.md
+!/TODO.md
 !/lib-find-the-path
 !/.gitmodules
 !/.eslintrc.json
