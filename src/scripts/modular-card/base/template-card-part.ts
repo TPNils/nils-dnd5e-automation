@@ -3,7 +3,6 @@ import { UtilsDocument } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
-import MyAbilityTemplate from "../../pixi/ability-template";
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyItemData } from "../../types/fixed-types";
@@ -74,7 +73,7 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
   }
 
   public async startPlace() {
-    const template = MyAbilityTemplate.fromItem(await UtilsDocument.itemFromUuid(this.itemUuid), this.messageId);
+    const template = UtilsTemplate.fromItem(await UtilsDocument.itemFromUuid(this.itemUuid), this.messageId);
     // TODO area of Minor Illlusion (Caspian) is too big with XGE area (did not test default)
     if (template?.drawPreview) {
       template.drawPreview();
@@ -155,7 +154,7 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData<TemplateCar
         continue;
       }
       // Initiate measured template creation
-      const template = MyAbilityTemplate.fromItem(await UtilsDocument.itemFromUuid(newRow.allParts.getItemUuid()), newRow.messageId);
+      const template = UtilsTemplate.fromItem(await UtilsDocument.itemFromUuid(newRow.allParts.getItemUuid()), newRow.messageId);
       // Auto place circle templates with range self
       if (newRow.part.calc$.tokenUuid && newRow.part.calc$.rangeUnit === 'self' && template.document.data.t === 'circle') {
         const token = await UtilsDocument.tokenFromUuid(newRow.part.calc$.tokenUuid);

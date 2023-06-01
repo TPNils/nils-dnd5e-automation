@@ -4,7 +4,6 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { Stoppable } from "../../lib/utils/stoppable";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
-import MyAbilityTemplate from "../../pixi/ability-template";
 import { staticValues } from "../../static-values";
 import { MyActor, MyItemData } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
@@ -783,7 +782,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       }
 
       // TODO V10
-      const template = MyAbilityTemplate.fromItem(await UtilsDocument.itemFromUuid(newRow.allParts.getItemUuid()), newRow.messageId);
+      const template = UtilsTemplate.fromItem(await UtilsDocument.itemFromUuid(newRow.allParts.getItemUuid()), newRow.messageId);
       if (!template) {
         continue;
       }

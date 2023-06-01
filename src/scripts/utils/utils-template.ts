@@ -1,5 +1,5 @@
 import { staticValues } from "../static-values";
-import { RangeUnits } from "../types/fixed-types";
+import { MyItem, RangeUnits } from "../types/fixed-types";
 import { UtilsFoundry } from "./utils-foundry";
 
 export interface TemplateDetails {
@@ -14,8 +14,70 @@ interface Rectangle {
   width: number;
   height: number;
 }
+export interface AbilityTemplate extends MeasuredTemplate {
+  drawPreview?: () => void
+}
+
+let Nd5aAbilityTemplate: typeof MeasuredTemplate & {fromItem: (item: MyItem) => AbilityTemplate};
+function getTemplateClass() {
+  if (Nd5aAbilityTemplate == null) {
+    let baseClass: typeof Nd5aAbilityTemplate;
+    if ('dnd5e' in globalThis) {
+      baseClass = (globalThis.dnd5e as any).canvas.AbilityTemplate;
+    } else {
+      baseClass = (game as any).dnd5e.canvas.AbilityTemplate;
+    }
+
+    Nd5aAbilityTemplate = class Nd5aAbilityTemplate extends baseClass {
+
+      private simulateId = false;
+      /**
+       * Required to make highlightGrid work
+       */
+      public get id(): string {
+        if (!super.id && this.simulateId) {
+          return 'null';
+        }
+        return super.id;
+      }
+      
+      public refresh(): this {
+        const value = super.refresh()
+        if (this.template) {
+          this.highlightGrid();
+        }
+        return value;
+      }
+      
+      public highlightGrid(): void {
+        this.simulateId = true;
+        super.highlightGrid()
+        this.simulateId = false;
+      }
+    }
+  }
+
+  return Nd5aAbilityTemplate;
+}
 
 export class UtilsTemplate {
+
+  public static fromItem(item: MyItem, dmlCallbackMessageId: string): AbilityTemplate {
+    const template = getTemplateClass().fromItem(item);
+    const dataUpdate = {
+      flags: {
+        [staticValues.moduleName]: {
+          dmlCallbackMessageId: dmlCallbackMessageId,
+        }
+      }
+    };
+    if (UtilsFoundry.usesDataModel<MeasuredTemplateDocument>(template.document)) {
+      template.document.updateSource(dataUpdate)
+    } else if (UtilsFoundry.usesDocumentData<MeasuredTemplateDocument>(template.document)) {
+      template.document.data.update(dataUpdate);
+    }
+    return template;
+  }
 
   public static isTokenInside(templateDetails: TemplateDetails, token: TokenDocument | Rectangle, wallsBlockTargeting: boolean): boolean {
     let rectangle: Rectangle;
