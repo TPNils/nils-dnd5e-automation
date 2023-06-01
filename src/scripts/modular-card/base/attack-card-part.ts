@@ -463,6 +463,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   private getTargetState(context: StateContext): VisualState[] {
     const visualStates: VisualState[] = [];
 
+    if (!context.allMessageParts.hasType(AttackCardPart.instance)) {
+      return visualStates;
+    }
+
     for (const selected of context.selected) {
       visualStates.push({
         selectionId: selected.selectionId,
