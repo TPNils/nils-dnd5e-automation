@@ -62,7 +62,7 @@ function partialRollModeSetting(): ClientSettings.PartialSettingConfig<string> {
   }
 
   return {
-    hint: hintLines.join('<br>'),
+    hint: hintLines.join('<br/>'),
     scope: 'world',
     config: false,
     type: String,
