@@ -79,7 +79,7 @@ const allTabConfigs: TabLayoutConfig[] = [
     <div class="wrapper" selected-tab="{{this.selectedTab}}">
       <div *for="let tab of this.allTabs" class="tab {{tab.key}}">
         <virtual *for="let group of tab.groups">
-          <nd5a-settings-item-page *for="let setting of group" [data-setting]="setting.key" [data-auto-save]="setting.autoSave"></nd5a-settings-item-page>
+          <nd5e-settings-item-page *for="let setting of group" [data-setting]="setting.key" [data-auto-save]="setting.autoSave"></nd5e-settings-item-page>
           <div class="seperator"></div>
         </virtual>
       </div>

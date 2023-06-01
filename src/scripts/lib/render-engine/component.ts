@@ -182,15 +182,26 @@ export function Attribute(config?: AttributeConfig | string) {
   };
 }
 
+const asyncAttributeSymbol = Symbol('valueProvider');
 export function AsyncAttribute(config?: AttributeConfig | string) {
   return function (target: any, propertyKey: string, descriptor?: PropertyDescriptor) {
-    const valueProvider = new ValueProvider();
-
     const getFunction = function (this: {[htmlElementSymbol]: ComponentElement}) {
-      return valueProvider;
+      if (!this[asyncAttributeSymbol]) {
+        this[asyncAttributeSymbol] = {};
+      }
+      if (!this[asyncAttributeSymbol][propertyKey]) {
+        this[asyncAttributeSymbol][propertyKey] = new ValueProvider();
+      }
+      return this[asyncAttributeSymbol][propertyKey];
     };
     const setFunction = function(this: {[htmlElementSymbol]: ComponentElement}, arg: any) {
-      valueProvider.set(arg);
+      if (!this[asyncAttributeSymbol]) {
+        this[asyncAttributeSymbol] = {};
+      }
+      if (!this[asyncAttributeSymbol][propertyKey]) {
+        this[asyncAttributeSymbol][propertyKey] = new ValueProvider();
+      }
+      this[asyncAttributeSymbol][propertyKey].set(arg);
     };
 
     if (descriptor) {

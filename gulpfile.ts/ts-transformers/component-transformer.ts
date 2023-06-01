@@ -170,8 +170,8 @@ function transformCssProperty(prefix: string, property: typescript.PropertyAssig
 }
 
 function doCssTransform(prefix: string, css: string): string {
-  const hostAttr = `nd5a-hid-${prefix}`;
-  const itemAttr = `nd5a-cid-${prefix}`;
+  const hostAttr = `nd5e-hid-${prefix}`;
+  const itemAttr = `nd5e-cid-${prefix}`;
 
   const rootCss = postcss(new CssScoperPlugin(hostAttr, itemAttr), postCssMinify()).process(css);
   

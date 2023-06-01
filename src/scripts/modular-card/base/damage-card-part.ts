@@ -206,7 +206,7 @@ async function itemSourceToManualSource(itemSource: ItemDamageSource | MyItem, a
   <div class="flavor">
     {{ this.flavor }}
   </div>
-  <nd5a-roll-damage
+  <nd5e-roll-damage
     [data-roll]="this.roll"
     [data-bonus-formula]="this.userBonus"
     [data-roll-mode]="this.rollMode"
@@ -219,7 +219,7 @@ async function itemSourceToManualSource(itemSource: ItemDamageSource | MyItem, a
     (rollMode)="this.onRollMode($event)"
     (rollSource)="this.onRollSource($event)"
     (doRoll)="this.onRollClick($event)"
-  ></nd5a-roll-damage>
+  ></nd5e-roll-damage>
   `,
   style: /*css*/`
     .flavor {

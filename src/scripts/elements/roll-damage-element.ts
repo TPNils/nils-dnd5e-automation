@@ -25,7 +25,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
   tag: RollDamageElement.selector(),
   html: /*html*/`
     <div class="roll-wrapper">
-      <nd5a-roll-result *if="this.roll?.total != null && (this.readHiddenDisplayType !== 'hidden' || this.hasInteractPermission)"
+      <nd5e-roll-result *if="this.roll?.total != null && (this.readHiddenDisplayType !== 'hidden' || this.hasInteractPermission)"
         [data-roll]="this.roll"
         [data-override-formula]="this.overrideFormula"
         [data-display-type]="this.hasReadPermission ? '' : this.readHiddenDisplayType">
@@ -37,7 +37,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
             (blur)="this.onBonusBlur($event)"
             (keyup)="this.onBonusKeyUp($event)"/>
         </div>
-      </nd5a-roll-result>
+      </nd5e-roll-result>
 
       <div class="bonus-container" *if="this.roll?.total == null || (this.readHiddenDisplayType === 'hidden' && !this.hasInteractPermission)">
         <button class="roll-button" [disabled]="!this.hasInteractPermission" (click)="this.onRollClick($event)">
@@ -100,7 +100,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
       top: 100%;
     }
     
-    nd5a-roll-result {
+    nd5e-roll-result {
       font-size: 1em;
     }
     
