@@ -1,3 +1,4 @@
+import { AttributeData, BindableString, CommentData, TextData } from "../../../../../types/html-data";
 import { UtilsLog } from "../../../utils/utils-log";
 import { applySecurity, revokeSecurity, SecureOptions } from "../secure";
 
@@ -43,10 +44,37 @@ export function isVirtualNode(value: any): value is VirtualNode {
   return value.isNode();
 }
 
+function toRawString(strings: ReadonlyArray<Readonly<BindableString>>): string {
+  const parts: string[] = [];
+
+  for (const str of strings) {
+    if (str.type === 'string') {
+      parts.push(str.text);
+    } else {
+      if (str.bindMethod === 'raw') {
+        parts.push('{{{');
+      } else {
+        parts.push('{{');
+      }
+      parts.push(str.text);
+      if (str.bindMethod === 'raw') {
+        parts.push('}}}');
+      } else {
+        parts.push('}}');
+      }
+    }
+  }
+
+  if (!parts.length) {
+    return null;
+  }
+  return parts.join('');
+}
+
 //#region attribute
 function VirtualAttributeNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualAttributeNode {
-    readonly #attributes = new Map<string, any>();
+    readonly #attributes = new Map<string, AttributeData>();
 
     public getAttributeNames(): IterableIterator<string> {
       return this.#attributes.keys();
@@ -420,16 +448,23 @@ export interface VirtualParentNode extends VirtualBaseNode {
 function VirtualTextNode<T extends Constructor>(clazz: T = PlaceholderClass as any) {
   return class extends clazz implements VirtualTextNode {
 
-    #text = '';
+    #data: ReadonlyArray<Readonly<BindableString>> = [{type: 'string', text: ''}];
     public getText(): string {
-      return this.#text;
+      return toRawString(this.#data);
+    }
+    public getTextData(): ReadonlyArray<Readonly<BindableString>> {
+      return deepClone(this.#data);
     }
 
-    public setText(text: string): void {
+    public setText(text: string | BindableString[]): void {
       if (text == null) {
-        this.#text = '';
+        text = '';
+      }
+      
+      if (Array.isArray(text)) {
+        this.#data = text;
       } else {
-        this.#text = String(text);
+        this.#data = [{type: 'string', text: String(text)}];
       }
     }
 
@@ -438,14 +473,15 @@ function VirtualTextNode<T extends Constructor>(clazz: T = PlaceholderClass as a
     }
 
     protected startTextClone(original: VirtualTextNode, deep?: boolean) {
-      this.#text = original.getText();
+      this.#data = deepClone(original.getTextData());
     }
     
   }
 }
 export interface VirtualTextNode extends VirtualBaseNode {
   getText(): string;
-  setText(text: string): void;
+  getTextData(): ReadonlyArray<Readonly<BindableString>>;
+  setText(text: string | BindableString[]): void;
 }
 //#endregion
 

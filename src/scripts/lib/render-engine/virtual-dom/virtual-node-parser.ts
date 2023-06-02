@@ -217,14 +217,12 @@ export class VirtualNodeParser {
             break;
           }
           case "comment": {
-            // TODO allow bindable text
-            const virtual = new VirtualCommmentNode(VirtualNodeParser.toRawString(item.nodeData.text));
+            const virtual = new VirtualCommmentNode(item.nodeData.text);
             item.parentVirtualNode.appendChild(virtual);
             break;
           }
           case "text": {
-            // TODO allow bindable text
-            const virtual = new VirtualTextNode(VirtualNodeParser.toRawString(item.nodeData.text));
+            const virtual = new VirtualTextNode(item.nodeData.text);
             if (virtual.getText().trim().length > 0) {
               item.parentVirtualNode.appendChild(virtual);
             }

@@ -1,8 +1,9 @@
+import { CommentData } from "../../../../../types/html-data";
 import { VirtualAttributeNode, VirtualEventNode, VirtualNode, VirtualParentNode, VNode } from "./virtual-node";
 
 export class VirtualCommmentNode extends VNode({child: true, text: true}) implements VirtualNode {
 
-  public constructor(nodeValue?: string) {
+  public constructor(nodeValue?: string | CommentData['text']) {
     super();
     this.setText(nodeValue);
   }

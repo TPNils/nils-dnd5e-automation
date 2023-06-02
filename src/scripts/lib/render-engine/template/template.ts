@@ -1,3 +1,4 @@
+import { BindableString, BindExpressionValue } from "../../../../../types/html-data";
 import { UtilsLog } from "../../../utils/utils-log";
 import { UtilsCompare } from "../../utils/utils-compare";
 import { rerenderQueue } from "../virtual-dom/render-queue";
@@ -247,15 +248,48 @@ export class Template {
           }
         }
         if (process.instance.isTextNode()) {
-          let nodeValue = this.processBindableString(process.instance.getText(), process.localVars, true);
-          const isAllText = nodeValue.every(node => node.isTextNode());
-          if (isAllText) {
-            process.instance.setText(nodeValue.map(node => (node as VirtualTextNode).getText()).join(''));
-          } else {
-            if (process.instance.isChildNode()) {
-              process.parentInstance.appendChild(...nodeValue);
-              continue;
+          let textData = (process.template as VirtualTextNode).getTextData();
+          if (textData.length === 0) {
+            continue;
+          }
+
+          process.instance.setText('');
+          let instances: Array<VirtualNode & VirtualChildNode> = [process.instance as VirtualTextNode];
+          for (const part of textData) {
+            const lastInstance = instances[instances.length - 1];
+            if (part.type === 'string') {
+              if (lastInstance.isTextNode()) {
+                lastInstance.setText(lastInstance.getText() + part.text);
+              } else {
+                instances.push(new VirtualTextNode(part.text));
+              }
+            } else if (part.bindMethod === 'raw') {
+              const result = this.parseExpression(part.text, process.localVars);
+              const expressions = Array.isArray(result) ? result : [result]
+              for (const expression of expressions) {
+                if (isVirtualNode(expression) && expression.isChildNode()) {
+                  instances.push(expression);
+                } else {
+                  const parsed = VirtualNodeParser.parseRaw(String(expression));
+                  if (parsed.length > 0) {
+                    instances.push(...parsed);
+                  }
+                }
+              }
+            } else {
+              if (lastInstance.isTextNode()) {
+                lastInstance.setText(lastInstance.getText() + this.parseExpression(part.text, process.localVars));
+              } else {
+                instances.push(new VirtualTextNode(String(this.parseExpression(part.text, process.localVars))));
+              }
             }
+          }
+          
+
+          if (instances.length > 1) {
+            // TODO check if this can be improved
+            process.parentInstance.appendChild(...instances);
+            continue;
           }
         }
         const createDom = process.instance.nodeName !== 'VIRTUAL'; // TODO Don't create <virtual> dom nodes like angular <ng-container>. this may need to be tweaked

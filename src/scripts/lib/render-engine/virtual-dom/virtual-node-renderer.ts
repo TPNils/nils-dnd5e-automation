@@ -68,6 +68,8 @@ export class VirtualNodeRenderer {
    * @param options.deepUpdate when false and the node already exists, only update the node itself, not it's children
    * @returns Created or updated DOM element
    */
+  public static renderDom<T extends VirtualNode>(virtualNode: T, options: {deepUpdate?: boolean, async: false}): Node[]
+  public static renderDom<T extends VirtualNode>(virtualNode: T, options?: {deepUpdate?: boolean, async?: true}): Promise<Node[]>
   public static renderDom<T extends VirtualNode>(virtualNode: T, options: {deepUpdate?: boolean, async?: boolean} = {}): Promise<Node[]> | Node[] {
     options = {deepUpdate: false, async: true, ...options};
     let pending: Array<{parent?: VirtualParentNode, node: VirtualNode, defaultNamespace: string | undefined;}> = [{
