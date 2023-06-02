@@ -140,7 +140,7 @@ export class ModularCardComponent implements OnInit {
     });
 
     const itemCard = thisElement.querySelector(':scope > .item-card');
-    observer.observe(itemCard, { childList: true, subtree: true });
+    observer.observe(itemCard, { childList: true });
 
     return {
       stop: () => observer.disconnect()
