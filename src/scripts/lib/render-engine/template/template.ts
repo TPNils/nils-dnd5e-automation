@@ -7,7 +7,8 @@ import { VirtualNodeParser } from "../virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
 import { VirtualTextNode } from "../virtual-dom/virtual-text-node";
 
-const forAttrRegex = /^\s*let\s+([^\s]+)\s+(of|in)\s(.+)$/;
+const forAttrRegex = /^\s*let\s+([^\s]+)\s+(of|in)\s([^;]+)(?:;(.*))?$/;
+const forAttrSuffixRegex = /\s*let\s+([^\s]+)\s+=\s([^;]+)/g;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
   template: T;
   instance: T;
@@ -162,7 +163,7 @@ export class Template {
               if (items) {
                 process.instance.removeAttribute('*for');
                 for (const item of items) {
-                  pending.push({
+                  const childItem: PendingNodes = {
                     parentInstance: process.parentInstance,
                     template: process.template,
                     instance: process.instance.cloneNode(false),
@@ -176,7 +177,20 @@ export class Template {
                     pathContext: {
                       parentPrefix: process.pathContext.parentPrefix + `${forIndex}.`
                     },
-                  });
+                  };
+                  if (regexResult[4]) {
+                    const expressions = regexResult[4].matchAll(forAttrSuffixRegex);
+                    for (const [fullMatch, assignVarName, readVarName] of expressions) {
+                      if (readVarName in childItem.localVars) {
+                        childItem.localVars[assignVarName] = childItem.localVars[readVarName];
+                      } else if (readVarName in this.#context) {
+                        childItem.localVars[assignVarName] = this.#context[readVarName];
+                      } else {
+                        UtilsLog.error(`Could not find variable ${readVarName}`, {templateName: this.name, expression: regexResult[0], thisContext: this.#context, localVars: childItem.localVars})
+                      }
+                    }
+                  }
+                  pending.push(childItem);
                   forIndex++;
                 }
 
@@ -380,7 +394,6 @@ export class Template {
         localVars,
         this.proxyHandler
       );
-      UtilsLog.debug('hmmm', {templateName: this.name, expression: expression, thisContext: this.#context, localVars: localVars, result: this.parsedExpressions.get(funcKey).call(namespace)})
       return this.parsedExpressions.get(funcKey).call(namespace);
     } catch (e) {
       UtilsLog.error('Error executing expression with context', {templateName: this.name, expression: expression, thisContext: this.#context, localVars: localVars, err: e})
