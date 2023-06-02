@@ -72,7 +72,7 @@ const allTabConfigs: TabLayoutConfig[] = [
     <nav class="tabs">
       <div *for="let tab of this.allTabs" class="item {{this.selectedTab === tab.key ? 'active' : ''}}">
         <span class="nav-text" (click)="this.selectedTab = tab.key">
-          <i class="fas fa-eye"></i> {{tab.label}}
+          <i class="fas fa-eye"></i> {{localize("${staticValues.moduleName}." + tab.key)}}
         </span>
       </div>
     </nav>
@@ -80,7 +80,7 @@ const allTabConfigs: TabLayoutConfig[] = [
       <div *for="let tab of this.allTabs" class="tab {{tab.key}}">
         <virtual *for="let group of tab.groups">
           <nd5e-settings-item-page *for="let setting of group" [data-setting]="setting.key" [data-auto-save]="setting.autoSave"></nd5e-settings-item-page>
-          <div class="seperator"></div>
+          <div class="separator"></div>
         </virtual>
       </div>
     </div>
@@ -113,7 +113,7 @@ const allTabConfigs: TabLayoutConfig[] = [
       border-bottom: 1px solid #7a7971;
     }
 
-    .seperator {
+    .separator {
       grid-column: 1 / span 2;
       border-bottom: 1px solid #7a7971;
     }
@@ -132,12 +132,7 @@ export class SettingsComponent implements OnInit {
 
   public selectedTab = allTabConfigs[0].key;
   // TODO support variables in CSS during compile time so the CSS can be generated from this array
-  public allTabs: TabLayout[] = allTabConfigs.map(config => {
-    return {
-      ...deepClone(config),
-      label: game.i18n.localize(`${staticValues.moduleName}.${config.key}`)
-    };
-  });
+  public allTabs = allTabConfigs;
   public onInit(args: OnInitParam) {
     const settings: Array<Partial<SettingConfig>> = [];
     const prefix = `${staticValues.moduleName}.`;

@@ -7,7 +7,7 @@ import { VirtualNodeParser } from "../virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
 import { VirtualTextNode } from "../virtual-dom/virtual-text-node";
 
-const forAttrRegex = /^\s*let\s+([^\s]+\s)+(of|in)\s(.+)$/;
+const forAttrRegex = /^\s*let\s+([^\s]+)\s+(of|in)\s(.+)$/;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
   template: T;
   instance: T;
@@ -23,6 +23,39 @@ interface ParsedEventExpression {
   readonly exec: (event: Event) => any
 };
 const nodeIdSymbol = Symbol('nodeId');
+
+const globalTemplateScope = {
+  localize: (id: string) => game.i18n.localize(id),
+};
+class ReadonlyProxyHandler implements ProxyHandler<any> {
+  constructor(
+  ) {}
+
+  public has(target: any, p: string | symbol): boolean {
+    return Reflect.has(target, p);
+  }
+
+  public get(target: any, p: string | symbol, receiver: any) {
+    const value = Reflect.get(target, p, receiver);
+    if (value == null || typeof value !== 'object') {
+      return value;
+    }
+    return new Proxy(value, new ReadonlyProxyHandler());
+  }
+
+  public set(target: any, p: string | symbol, newValue: any, receiver: any): boolean {
+    return false;
+  }
+
+  public deleteProperty(target: any, p: string | symbol): boolean {
+    return false;
+  }
+
+}
+
+// Need to use a dummy as we otherwise get internal errors when using "for (let key in globalThis)" where globalThis is wrapped in this proxy handler
+const globalTemplateScopeProxy = new Proxy(globalTemplateScope, new ReadonlyProxyHandler());
+
 export class Template {
   
   private readonly template: VirtualNode & VirtualParentNode;
@@ -94,7 +127,7 @@ export class Template {
     let pending: Array<PendingNodes> = [{
       template: this.template,
       instance: rootInstance,
-      localVars: {},
+      localVars: globalTemplateScopeProxy,
       pathContext: {
         parentPrefix: '',
       }
@@ -277,9 +310,9 @@ export class Template {
     this.#processedVirtualNodesMap = createdNodesByMap;
   }
 
-  private processBindableString(value: string, localVars: any | null, asNode: false): string
-  private processBindableString(value: string, localVars: any | null, asNode: true): Array<VirtualNode & VirtualChildNode>
-  private processBindableString(value: string, localVars: any | null, asNode: boolean): string | Array<VirtualNode & VirtualChildNode> {
+  private processBindableString(value: string, localVars: any, asNode: false): string
+  private processBindableString(value: string, localVars: any, asNode: true): Array<VirtualNode & VirtualChildNode>
+  private processBindableString(value: string, localVars: any, asNode: boolean): string | Array<VirtualNode & VirtualChildNode> {
     // TODO this is currently a dumb implementation and does not account for the 'keywords' {{ and }} to be present within the expression (example: in a javascript string)
     // Best to write an interpreter but thats a lot of work and maybe more process intensive so lets cross that bridge when we get there :)
     let startExpression = 0;
@@ -333,34 +366,66 @@ export class Template {
   }
 
   private parsedExpressions = new Map<string, ParsedExpression>();
-  private parseExpression(expression: any, localVars: any | null): any {
+  private parseExpression(expression: any, localVars: object): any {
     if (typeof expression !== 'string') {
       // If expression is not a string, assume its the result
       return expression;
     }
-    const paramNames: string[] = [];
-    const paramValues: any[] = [];
     try {
-      if (localVars) {
-        for (const field in localVars) {
-          let index = paramNames.indexOf(field);
-          if (index === -1) {
-            paramNames.push(field);
-            paramValues.push(localVars[field]);
-          } else {
-            paramValues[index] = localVars[field];
-          }
-        }
-      }
-      const funcKey = `${expression}(${paramNames.join(',')})`;
+      const funcKey = expression;
       if (!this.parsedExpressions.has(funcKey)) {
-        this.parsedExpressions.set(funcKey, Function(...paramNames, `return ${expression}`) as ParsedExpression);
+        this.parsedExpressions.set(funcKey, Function(`with (this) {return ${expression}}`) as ParsedExpression);
       }
-      return this.parsedExpressions.get(funcKey).apply(this.#context, paramValues);
+      const namespace = new Proxy(
+        localVars,
+        this.proxyHandler
+      );
+      UtilsLog.debug('hmmm', {templateName: this.name, expression: expression, thisContext: this.#context, localVars: localVars, result: this.parsedExpressions.get(funcKey).call(namespace)})
+      return this.parsedExpressions.get(funcKey).call(namespace);
     } catch (e) {
       UtilsLog.error('Error executing expression with context', {templateName: this.name, expression: expression, thisContext: this.#context, localVars: localVars, err: e})
       throw e;
     }
+  }
+
+  private proxyHandler: ProxyHandler<any | null> = {
+      has: (localVars, prop): boolean => {
+        // Catch everything, otherwise it will fallback to the real global
+        return true;
+      },
+      get: (localVars, prop): any => {
+        if (Reflect.has(localVars, prop)) {
+          return Reflect.get(localVars, prop);
+        }
+        if (Reflect.has(this.#context, prop)) {
+          return Reflect.get(this.#context, prop);
+        }
+        return undefined;
+      },
+      set: (localVars, prop, newValue): boolean => {
+        if (prop in localVars) {
+          return Reflect.set(localVars, prop, newValue);
+        }
+        if (prop in this.#context) {
+          return Reflect.set(this.#context, prop, newValue);
+        }
+        return Reflect.set(localVars, prop, newValue);
+      },
+      ownKeys: (localVars): Array<string | symbol> => {
+        const keys = new Set<string | symbol>();
+
+        for (const key of Reflect.ownKeys(this.#context)) {
+          keys.add(key);
+        }
+        for (const key in Reflect.ownKeys(localVars)) {
+          keys.add(key);
+        }
+
+        return Array.from(keys);
+      },
+      preventExtensions: (localVars): boolean => {
+        return true;
+      }
   }
 
   // Use the same cached function so the change detection knows no new event listeners are made
@@ -410,6 +475,7 @@ export class Template {
       return alreadyParsedExpression.exec;
     } catch (e) {
       UtilsLog.error('Error parsing expression with context', {expression: expression, thisContext: this.#context, localVars: localVars, err: e})
+      UtilsLog.error(e)
       throw e;
     }
   }
