@@ -231,35 +231,13 @@ export class Template {
             if (name.length > 2 && name.startsWith('[') && name.endsWith(']')) {
               process.instance.removeAttribute(name);
               name = name.substring(1, name.length - 1);
-              switch (name) {
-                case 'innerhtml': {
-                  if (process.instance.isParentNode()) {
-                    let nodeValue = value;
-                    if (typeof value === 'string') {
-                      nodeValue = VirtualNodeParser.parse(this.parseExpression(value, process.localVars));
-                    }
-                    if (isVirtualNode(nodeValue)) {
-                      if (nodeValue.isChildNode()) {
-                        process.instance.appendChild(nodeValue);
-                      } else if (nodeValue.isParentNode()) {
-                        for (const child of [...nodeValue.childNodes]) {
-                          child.remove();
-                          process.instance.appendChild(child);
-                        }
-                      }
-                      continue;
-                    }
-                  }
-                }
-                default: {
-                  if (typeof value === 'string') {
-                    process.instance.setAttribute(name, this.parseExpression(value, process.localVars));
-                  } else {
-                    process.instance.setAttribute(name, value);
-                  }
-                  break;
-                }
+              
+              if (typeof value === 'string') {
+                process.instance.setAttribute(name, this.parseExpression(value, process.localVars));
+              } else {
+                process.instance.setAttribute(name, value);
               }
+              
             } else if (typeof value === 'string') {
               const processedValue = this.processBindableString(value, process.localVars, false);
               if (value !== processedValue) {
