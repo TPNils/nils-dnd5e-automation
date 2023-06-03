@@ -2,12 +2,17 @@ import { DocumentListener } from "../lib/db/document-listener";
 import { Component, OnInit, OnInitParam } from "../lib/render-engine/component";
 import { Stoppable } from "../lib/utils/stoppable";
 import { staticValues } from "../static-values";
+import { UtilsLog } from "../utils/utils-log";
 import { ModularCard } from "./modular-card";
+import { ModularCardPart } from "./modular-card-part";
 
 @Component({
   tag: ModularCardComponent.getSelector(),
   html: /*html*/`
     <div class="item-card">{{{this.body}}}</div>
+    <div *if="erroredTypes.length > 0" class="errors">
+      Internal errors in these components: {{erroredTypes.join(', ')}}.
+    </div>
     <div class="placeholder">
       <slot name="not-installed-placeholder"></slot>
     </div>
@@ -15,6 +20,10 @@ import { ModularCard } from "./modular-card";
   style: /*css*/`
     .placeholder {
       display: none;
+    }
+
+    .errors {
+      color: red;
     }
 
     /* root layout */
@@ -98,7 +107,6 @@ export class ModularCardComponent implements OnInit {
     return `${staticValues.code}-modular-card`;
   }
 
-  public body = '';
   public onInit(args: OnInitParam) {
     args.addStoppable(this.provideHasClasses(args.html));
 
@@ -147,6 +155,8 @@ export class ModularCardComponent implements OnInit {
     }
   }
 
+  public body = '';
+  public erroredTypes: string[] = [];
   private async calcBody(message: ChatMessage): Promise<string> {
     const parts = ModularCard.getCardPartDatas(message);
     if (!parts) {
@@ -154,16 +164,26 @@ export class ModularCardComponent implements OnInit {
     }
 
     const htmlParts$: Array<{html: string} | Promise<{html: string}>> = [];
+    const erroredTypes: ModularCardPart[] = [];
     for (const typeHandler of parts.getAllTypes()) {
       const partData = parts.getTypeData(typeHandler);
 
       // TODO error handeling during render
       if (typeHandler?.getHtml) {
-        const htmlPart = typeHandler.getHtml({messageId: message.id, data: partData, allMessageParts: parts});
-        if (htmlPart instanceof Promise) {
-          htmlParts$.push(htmlPart.then(html => {return {html: html}}));
-        } else if (typeof htmlPart === 'string') {
-          htmlParts$.push({html: htmlPart});
+        try {
+          const htmlPart = typeHandler.getHtml({messageId: message.id, data: partData, allMessageParts: parts});
+          if (htmlPart instanceof Promise) {
+            htmlParts$.push(htmlPart.then(html => {return {html: html}}).catch(e => {
+              UtilsLog.error('An error occurred when trying generate the html for a card part.', {typeHandler, messageId: message.id, data: partData, allMessageParts: parts}, e);
+              erroredTypes.push(typeHandler);
+              return {html: null};
+            }));
+          } else if (typeof htmlPart === 'string') {
+            htmlParts$.push({html: htmlPart});
+          }
+        } catch (e) {
+          UtilsLog.error('An error occurred when trying generate the html for a card part.', {typeHandler, messageId: message.id, data: partData, allMessageParts: parts}, e);
+          erroredTypes.push(typeHandler)
         }
       }
     }
@@ -174,6 +194,7 @@ export class ModularCardComponent implements OnInit {
     }
     
     const htmlParts = (await Promise.all(htmlParts$)).filter(part => part.html != null);
+    this.erroredTypes = erroredTypes.map(e => e.getType());
 
     const enrichedHtmlParts: string[] = [];
     for (const enrichedPart of await Promise.all(htmlParts.map(part => TextEditor.enrichHTML(part.html, enrichOptions as any)))) {
