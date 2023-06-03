@@ -85,7 +85,7 @@ export class Git {
   public async tagCurrentVersion(): Promise<void> {
     let version = 'v' + foundryManifest.getManifest().file.version;
     cli.throwError(await cli.execPromise(`git tag -a ${version} -m "Updated to ${version}"`));
-    cli.throwError(await cli.execPromise(`git push origin ${version}`));
+    cli.throwError(await cli.execPromise(`git push origin ${version}`), {ignoreOut: true});
   }
 
   public async push(): Promise<void> {
