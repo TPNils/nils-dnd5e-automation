@@ -435,12 +435,12 @@ export function updateExternalManifestForGithub() {
   return git.updateManifestForGithub({source: false, externalManifest: false})
 }
 export const publish = gulp.series(
-  function validateVersion() {args.validateVersion()},
-  function validateCleanRepo() {git.validateCleanRepo()},
-  function updateManifestForGithub() {git.updateManifestForGithub({source: true, externalManifest: false})},
-  function gitCommit() {git.commitNewVersion()},
-  function gitDeleteCurrentVersionTag() {git.deleteVersionTag()},
-  function gitTag() {git.tagCurrentVersion()},
+  function validateVersion() {return args.validateVersion()},
+  function validateCleanRepo() {return git.validateCleanRepo()},
+  function updateManifestForGithub() {return git.updateManifestForGithub({source: true, externalManifest: false})},
+  function gitCommit() {return git.commitNewVersion()},
+  function gitDeleteCurrentVersionTag() {return git.deleteVersionTag()},
+  function gitTag() {return git.tagCurrentVersion()},
 );
 export const reupload = gulp.series(
   function gitDeleteTag() {git.deleteVersionTag()},
