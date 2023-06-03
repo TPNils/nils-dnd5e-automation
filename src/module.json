@@ -29,15 +29,6 @@
       "path": "lang/en.json"
     }
   ],
-  "packs": [
-    {
-      "system": "dnd5e",
-      "name": "automated-spells",
-      "label": "Automated spells",
-      "path": "packs/automated-spells.db",
-      "type": "Item"
-    }
-  ],
   "relationships": {
     "requires": [
       {
