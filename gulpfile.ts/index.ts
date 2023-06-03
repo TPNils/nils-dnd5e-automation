@@ -443,6 +443,6 @@ export const publish = gulp.series(
   function gitTag() {return git.tagCurrentVersion()},
 );
 export const reupload = gulp.series(
-  function gitDeleteTag() {git.deleteVersionTag()},
-  function gitTag() {git.tagCurrentVersion()},
+  function gitDeleteTag() {return git.deleteVersionTag()},
+  function gitTag() {return git.tagCurrentVersion()},
 );
