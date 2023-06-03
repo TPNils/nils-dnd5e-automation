@@ -1,24 +1,21 @@
 # Index
 TODO maybe automate as a deploy action?
 
-# Nils' dnd5e automation - FoundryVTT Module
+# Why use Nils' dnd5e automation (Nd5e)
 TODO introduction
 
 ## Installation
 
-### Method 1 (latest version)
-1. TODO register as a module on foundry onceI deem it ready for release
+### Get the latest and greatest
+1. Start up Foundry and click "Install Module" in the "Add-on Modules" tab.
+2. Search for "Nd5e" and click install.
 
-### Method 2 (latest or older versions)
+### Alternative
 1. Start up Foundry and click "Install Module" in the "Add-on Modules" tab.
 2. Paste one of the following into the "Manifest URL" field:
   - _Latest Release:_ `https://github.com/TPNils/nils-dnd5e-automation/releases/download/latest/module.json`
   - _Previous Releases:_ A link to the `module.json` file from any of the [previous releases](https://github.com/TPNils/nils-dnd5e-automation/releases).
 3. Click "Install" and the module should download and appear in your modules list.
-
-URLs with the latest version for previous Foundry VTT editions
-- TODO _Latest 9.x Release_:
-- TODO _Latest 0.8.9 Release_:
 
 ## Compatibility
 
