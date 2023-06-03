@@ -168,7 +168,6 @@ export class ModularCardComponent implements OnInit {
     for (const typeHandler of parts.getAllTypes()) {
       const partData = parts.getTypeData(typeHandler);
 
-      // TODO error handeling during render
       if (typeHandler?.getHtml) {
         try {
           const htmlPart = typeHandler.getHtml({messageId: message.id, data: partData, allMessageParts: parts});
