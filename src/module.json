@@ -1,25 +1,34 @@
 {
   "id": "nils-dnd5e-automation",
   "title": "Nils' dnd5e automation (Nd5e)",
+  "version": "2.2.3-beta",
+  "compatibility": {
+    "minimum": "0.8.9",
+    "verified": "10.291"
+  },
   "description": "",
-  "authors": [{"name": "TPNils"}],
-  "version": "2.2.2-beta",
-  "compatibility": {"minimum": "0.8.9", "verified": "10.291"},
-  "socket": true,
+  "authors": [
+    {
+      "name": "TPNils"
+    }
+  ],
   "url": "https://github.com/TPNils/nils-dnd5e-automation",
   "manifest": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/latest/module.json",
-  "download": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/v2.2.1-beta/module.zip",
+  "download": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/v2.2.3-beta/module.zip",
   "bugs": "https://github.com/TPNils/nils-dnd5e-automation/issues",
-  "esmodules": ["scripts/main.js"],
-  "flags": {"allowBugReporter": true},
-  "relationships": {
-    "requires": [
-      {"id": "dnd5e", "type": "system"},
-      {"id": "lib-wrapper", "type": "module"},
-      {"id": "socketlib", "type": "module"}
-    ]
+  "flags": {
+    "allowBugReporter": true
   },
-  "languages": [{"lang": "en", "name": "English", "path": "lang/en.json"}],
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
   "packs": [
     {
       "system": "dnd5e",
@@ -28,5 +37,23 @@
       "path": "packs/automated-spells.db",
       "type": "Item"
     }
-  ]
+  ],
+  "relationships": {
+    "requires": [
+      {
+        "id": "dnd5e",
+        "type": "system"
+      },
+      {
+        "id": "lib-wrapper",
+        "type": "module"
+      },
+      {
+        "id": "socketlib",
+        "type": "module"
+      }
+    ],
+    "systems": []
+  },
+  "socket": true
 }
