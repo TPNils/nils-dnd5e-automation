@@ -2,7 +2,7 @@
 import { RollDamageEventData, RollDamageMode } from "../../elements/roll-damage-element";
 import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
 import { DocumentListener } from "../../lib/db/document-listener";
-import { UtilsDocument, PermissionCheck, DmlUpdateRequest } from "../../lib/db/utils-document";
+import { UtilsDocument, PermissionCheck, DmlUpdateRequest, PermissionResponse } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
 import { AsyncAttribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
@@ -13,15 +13,14 @@ import { staticValues } from "../../static-values";
 import { MyActor, DamageType, MyItemData, MyItem } from "../../types/fixed-types";
 import { UtilsArray } from "../../utils/utils-array";
 import { UtilsFoundry } from "../../utils/utils-foundry";
-import { UtilsLog } from "../../utils/utils-log";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
-import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
-import { CheckCardData, CheckCardPart, TargetCache as CheckTargetCache } from "./check-card-part";
-import { SpellLevelCardData, SpellLevelCardPart } from "./spell-level-card-part";
+import { CheckCardPart, TargetCache as CheckTargetCache } from "./check-card-part";
+import { SpellLevelCardPart } from "./spell-level-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type KeyOfType<T, V> = keyof {
@@ -308,9 +307,9 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   public flavor = '';
   public userBonus: string;
   public overrideFormula: string;
-  public readPermission: string;
+  public readPermission: string = 'GM';
   public readHiddenDisplayType: string;
-  public interactionPermission: string;
+  public interactionPermission: string = 'GM';
   
   public onInit(args: OnInitParam): void {
     args.addStoppable(
@@ -419,6 +418,96 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   public onRollMode(event: CustomEvent<RollDamageEventData<RollDamageMode>>): void {
     DamageCardComponent.modeChange({event, messageId: this.messageId});
   }
+}
+
+@Component({
+  tag: DamageTargetComponent.getSelector(),
+  html: /*html*/`
+    <div *if="this.renderType === 'hidden'">?</div>
+    <div *if="this.renderType === '0'">0</div>
+    <div *if="this.renderType === '+'" class="positive">+{{this.hpDiff}}</div>
+    <div *if="this.renderType === '-'" class="negative">{{this.hpDiff}}</div>
+  `,
+  style: /*css*/`
+    :host {
+      display: block;
+    }
+
+    .positive {
+      color: green;
+    }
+
+    .negative {
+      color: red;
+    }
+  `
+})
+class DamageTargetComponent extends BaseCardComponent implements OnInit {
+
+  public static getSelector(): string {
+    return `${staticValues.code}-damage-target`;
+  }
+
+  @AsyncAttribute('data-selection-id')
+  private selectionId = new ValueProvider<string>();
+  
+  public onInit(args: OnInitParam): void {
+    args.addStoppable(
+      ValueProvider.mergeObject({
+        data: this.getData<DamageCardData>(DamageCardPart.instance),
+        selectionId: this.selectionId,
+      })
+      .switchMap(({data, selectionId}) => {
+        const targetPart = data.allParts.getTypeData(TargetCardPart.instance);
+        const targetUuid = targetPart?.selected?.find(target => target.selectionId === selectionId)?.tokenUuid;
+        const cache = data.part.calc$.targetCaches.find(cache => cache.targetUuid === targetUuid);
+        return ValueProvider.mergeObject({
+          ...data,
+          selectionId: selectionId,
+          damageHiddenRollSetting: DocumentListener.listenSettingValue<string>(staticValues.moduleName, 'damageHiddenRoll'),
+          permissions: UtilsDocument.hasPermissions([
+            {uuid: data.allParts.getItemUuid(), permission: `${staticValues.code}ReadDamage`, user: game.user},
+            {uuid: cache.actorUuid, permission: `${staticValues.code}ReadImmunity`, user: game.user},
+          ]),
+        })
+      })
+      .listen(async (data) => {
+        this.calc(data.allParts, data.selectionId, data.damageHiddenRollSetting, data.permissions)
+      })
+    )
+  }
+
+  public renderType: 'hidden' | '+' | '0' | '-' = 'hidden';
+  public hpDiff: number;
+  private calc(allParts: ModularCardInstance, selectionId: string, damageHiddenRollSetting: string, permissions: PermissionResponse[]) {
+    // TODO UI: add a square wich is full, half, or empty depending on the damage calculation.
+    //  Also allow manual overrides somehow 
+    const targetPart = allParts.getTypeData(TargetCardPart.instance);
+    const targetUuid = targetPart?.selected?.find(target => target.selectionId === selectionId)?.tokenUuid;
+    const damagePart = allParts.getTypeData<ModularCardPart<DamageCardData>>(DamageCardPart.instance);
+    const targetCache = damagePart.calc$.targetCaches.find(cache => cache.targetUuid === targetUuid);
+
+    this.hpDiff = 0;
+    const canSeeDamage = damageHiddenRollSetting === 'total' || permissions.find(p => p.requestedCheck.permission === `${staticValues.code}ReadDamage`).result;
+    const canSeeTarget = permissions.find(p => p.requestedCheck.permission === `${staticValues.code}ReadImmunity`).result;
+    if (canSeeDamage && canSeeTarget) {
+      this.hpDiff += (targetCache.calcHpChange ?? 0);
+      this.hpDiff += (targetCache.calcAddTmpHp ?? 0);
+    } else {
+      this.hpDiff = null;
+      this.renderType = 'hidden';
+      return;
+    }
+    
+    if (this.hpDiff === 0) {
+      this.renderType = '0';
+    } else if (this.hpDiff > 0) /* heal */ {
+      this.renderType = '+';
+    } else /* damage */ {
+      this.renderType = '-';
+    }
+  }
+  
 }
 
 export class DamageCardPart implements ModularCardPart<DamageCardData> {
@@ -653,14 +742,18 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       return [];
     }
     
-    const states = new Map<string, Omit<VisualState, 'columns'> & {hpDiff: number, hidden: boolean}>();
+    const states = new Map<string, VisualState>();
     for (const selected of context.selected) {
-      states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, hpDiff: 0, hidden: false});
+      states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, columns: [{
+        key: 'dmg',
+        label: `<i class="fas fa-heart" title="${game.i18n.localize('DND5E.Damage')}"></i>`,
+        rowValue: `<${DamageTargetComponent.getSelector()} data-message-id="${context.messageId}" data-selection-id="${selected.selectionId}"></${DamageTargetComponent.getSelector()}>`,
+      }]});
     }
 
     for (const targetCache of part.calc$.targetCaches) {
       if (!states.has(targetCache.selectionId)) {
-        states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, hpDiff: 0, hidden: false});
+        states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, columns: []});
       }
       const state = states.get(targetCache.selectionId);
       if (state.state == null) {
@@ -675,34 +768,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
       if (state.smartState !== targetCache.smartState) {
         state.smartState === 'partial-applied';
-      }
-
-      // TODO this is weird right now, if damage is hidden you cant see it
-      //      but you can apply it to yourself, this should be improved
-      let canSeeDamage: boolean;
-      if (part.calc$.actorUuid) {
-        canSeeDamage = game.settings.get(staticValues.moduleName, 'damageHiddenRoll') === 'total';
-        if (!canSeeDamage) {
-          UtilsDocument.hasAllPermissions([{
-            uuid: part.calc$.actorUuid,
-            permission: `${staticValues.code}ReadDamage`,
-            user: game.user,
-          }], {sync: true});
-        }
-      } else {
-        canSeeDamage = game.user.isGM;
-      }
-      const canSeeTarget = UtilsDocument.hasAllPermissions([{
-        uuid: targetCache.actorUuid,
-        permission: `${staticValues.code}ReadImmunity`,
-        user: game.user,
-      }], {sync: true});
-      if (canSeeDamage && canSeeTarget) {
-        state.hpDiff += (targetCache.calcHpChange ?? 0);
-        state.hpDiff += (targetCache.calcAddTmpHp ?? 0);
-      } else {
-        state.hpDiff = null;
-        state.hidden = true;
       }
     }
     
@@ -726,17 +791,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         const column: VisualState['columns'][0] = {
           key: 'dmg',
           label: `<i class="fas fa-heart" title="${game.i18n.localize('DND5E.Damage')}"></i>`,
-          rowValue: '',
+          rowValue: `<${DamageTargetComponent.getSelector()} data-message-id="${context.messageId}" data-selection-id="${state.selectionId}"></${DamageTargetComponent.getSelector()}>`,
         };
-        if (state.hidden) {
-          column.rowValue = '?';
-        } else if (state.hpDiff === 0) {
-          column.rowValue = '0';
-        } else if (state.hpDiff > 0) /* heal */ {
-          column.rowValue = `<span style="color: green">+${state.hpDiff}</span>`;
-        } else /* damage */ {
-          column.rowValue = `<span style="color: red">${state.hpDiff}</span>`;
-        }
         visualState.columns.push(column);
 
         return visualState;
