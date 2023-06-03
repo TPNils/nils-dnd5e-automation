@@ -61,16 +61,16 @@ export class Git {
 
   public async validateCleanRepo(): Promise<void> {
     const cmd = await cli.execPromise('git status --porcelain');
-    cli.throwOnAnyError(cmd);
+    cli.throwError(cmd);
     if (typeof cmd.stdout === 'string' && cmd.stdout.length > 0) {
       throw new Error("You must first commit your pending changes");
     }
   }
 
   public async commitNewVersion(): Promise<void> {
-    cli.throwOnAnyError(await cli.execPromise('git add .'));
+    cli.throwError(await cli.execPromise('git add .'), {ignoreOut: true});
     let newVersion = 'v' + foundryManifest.getManifest().file.version;
-    cli.throwOnAnyError(await cli.execPromise(`git commit -m "Updated to ${newVersion}`));
+    cli.throwError(await cli.execPromise(`git commit -m "Updated to ${newVersion}`));
   }
 
   public async deleteVersionTag(version?: string): Promise<void> {
@@ -84,12 +84,12 @@ export class Git {
 
   public async tagCurrentVersion(): Promise<void> {
     let version = 'v' + foundryManifest.getManifest().file.version;
-    cli.throwOnAnyError(await cli.execPromise(`git tag -a ${version} -m "Updated to ${version}"`));
-    cli.throwOnAnyError(await cli.execPromise(`git push origin ${version}`));
+    cli.throwError(await cli.execPromise(`git tag -a ${version} -m "Updated to ${version}"`));
+    cli.throwError(await cli.execPromise(`git push origin ${version}`));
   }
 
   public async push(): Promise<void> {
-    cli.throwOnAnyError(await cli.execPromise(`git push`));
+    cli.throwError(await cli.execPromise(`git push`));
   }
 
   public async gitMoveTag() {
