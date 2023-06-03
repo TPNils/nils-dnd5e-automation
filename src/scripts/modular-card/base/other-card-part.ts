@@ -69,7 +69,7 @@ class OtherCardPartComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(OtherCardPartComponent.actionPermissionCheck)
     .build(({messageId, event, cardParts}) => {
-      const part = cardParts.getTypeData<OtherCardData>(OtherCardPart.instance);
+      const part = cardParts.getTypeData(OtherCardPart.instance);
       if (part.userBonus === event.userBonus && part.phase === 'result') {
         return;
       }

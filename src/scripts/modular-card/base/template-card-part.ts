@@ -259,8 +259,8 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         }
       }
 
-      let templatePart = parts.getTypeData<TemplateCardData>(TemplateCardPart.instance)
-      let targetPart = parts.getTypeData<TargetCardData>(TargetCardPart.instance)
+      let templatePart = parts.getTypeData(TemplateCardPart.instance)
+      let targetPart = parts.getTypeData(TargetCardPart.instance)
       if (!templatePart || !targetPart) {
         continue;
       }

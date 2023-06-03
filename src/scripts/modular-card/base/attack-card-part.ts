@@ -89,7 +89,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
     const documents: CreatePermissionCheckArgs['documents'] = [];
-    const part = cardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+    const part = cardParts.getTypeData(AttackCardPart.instance);
     if (part?.actorUuid$) {
       documents.push({uuid: part.actorUuid$, permission: 'OWNER', security: true});
     }
@@ -101,7 +101,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
     .build(({messageId, event, cardParts}) => {
-      const part = cardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const part = cardParts.getTypeData(AttackCardPart.instance);
       if (part.userBonus === event.userBonus && part.phase === 'result') {
         return;
       }
@@ -115,7 +115,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
     .build(({messageId, cardParts, event}) => {
-      const part = cardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const part = cardParts.getTypeData(AttackCardPart.instance);
       if (part.mode === event.data) {
         return;
       }
@@ -230,7 +230,7 @@ class AttackTargetComponent extends BaseCardComponent implements OnInit {
         selectionId: this._selectionId,
       })
       .switchMap(({data, selectionId}) => {
-        const targetPart = data.allParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+        const targetPart = data.allParts.getTypeData(TargetCardPart.instance);
         const targetUuid = targetPart?.selected?.find(target => target.selectionId === selectionId)?.tokenUuid;
         const cache = data.part.targetCaches$.find(cache => cache.targetUuid$ === targetUuid);
         return ValueProvider.mergeObject({
@@ -516,7 +516,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       for (const selected of newRow.part.selected) {
         allTargetUuids.add(selected.tokenUuid);
       }
-      for (const target of newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance).targetCaches$) {
+      for (const target of newRow.allParts.getTypeData(AttackCardPart.instance).targetCaches$) {
         cachedTargetUuids.add(target.targetUuid$);
       }
 
@@ -542,7 +542,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         allTargetUuids.add(selected.tokenUuid);
       }
 
-      const attackPart = newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const attackPart = newRow.allParts.getTypeData(AttackCardPart.instance);
       const cachedTargetUuids = new Set<string>();
       for (const target of attackPart.targetCaches$) {
         cachedTargetUuids.add(target.targetUuid$);
@@ -614,7 +614,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
   private setDamageAsCrit(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
       if (newRow.part.isCrit$ !== oldRow?.part?.isCrit$) {
-        const damagePart = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+        const damagePart = newRow.allParts.getTypeData(DamageCardPart.instance);
         if (damagePart != null) {
           continue;
         }

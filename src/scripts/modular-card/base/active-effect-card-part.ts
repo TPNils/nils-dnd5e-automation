@@ -112,9 +112,9 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       }
       processedMessages.push(message);
 
-      const activeEffect = message.getTypeData<ActiveEffectCardData>(ActiveEffectCardPart.instance);
-      const attack = message.getTypeData<AttackCardData>(AttackCardPart.instance);
-      const check = message.getTypeData<CheckCardData>(CheckCardPart.instance);
+      const activeEffect = message.getTypeData(ActiveEffectCardPart.instance);
+      const attack = message.getTypeData(AttackCardPart.instance);
+      const check = message.getTypeData(CheckCardPart.instance);
       if (activeEffect == null) {
         continue;
       }
@@ -352,7 +352,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     const newSelectedByMessageId = new Map<string, TargetCardData['selected']>();
     const recalcTokens: Array<{selectionId: string, tokenUuid: string, data: ActiveEffectCardData, messageId: string}> = [];
     for (const {newRow, oldRow} of context.rows) {
-      const activeEffect = newRow.allParts.getTypeData<ActiveEffectCardData>(ActiveEffectCardPart.instance);
+      const activeEffect = newRow.allParts.getTypeData(ActiveEffectCardPart.instance);
       if (!activeEffect) {
         continue;
       }

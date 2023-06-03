@@ -22,7 +22,7 @@ export class BaseCardComponent {
     .switchMap(id => DocumentListener.listenUuid<ChatMessage>(`ChatMessage.${id}`))
     .map((message) => {
       const allParts = ModularCard.getCardPartDatas(message);
-      const part = allParts == null ? null : allParts.getTypeData<T>(type);
+      const part = allParts == null ? null : allParts.getTypeData(type);
       return {
         message: message,
         allParts: allParts,

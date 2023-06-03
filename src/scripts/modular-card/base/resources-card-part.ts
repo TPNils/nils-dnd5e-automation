@@ -165,19 +165,19 @@ function getMessageState(allParts: ModularCardInstance): MessageState {
 
   if (allParts.hasType(AttackCardPart.instance)) {
     messageState.hasStates.add('attack');
-    if (allParts.getTypeData<AttackCardData>(AttackCardPart.instance).phase === 'result') {
+    if (allParts.getTypeData(AttackCardPart.instance).phase === 'result') {
       messageState.completedStates.add('attack');
     }
   }
   if (allParts.hasType(DamageCardPart.instance)) {
     messageState.hasStates.add('damage');
-    if (allParts.getTypeData<DamageCardData>(DamageCardPart.instance).phase === 'result') {
+    if (allParts.getTypeData(DamageCardPart.instance).phase === 'result') {
       messageState.completedStates.add('damage');
     }
   }
   if (allParts.hasType(CheckCardPart.instance)) {
     messageState.hasStates.add('check');
-    for (const target of (allParts.getTypeData<CheckCardData>(CheckCardPart.instance).targetCaches$ ?? [])) {
+    for (const target of (allParts.getTypeData(CheckCardPart.instance).targetCaches$ ?? [])) {
       if (target.phase === 'result') {
         messageState.completedStates.add('check');
         break;
@@ -186,13 +186,13 @@ function getMessageState(allParts: ModularCardInstance): MessageState {
   }
   if (allParts.hasType(TemplateCardPart.instance)) {
     messageState.hasStates.add('template-placed');
-    if (allParts.getTypeData<TemplateCardData>(TemplateCardPart.instance).calc$.createdTemplateUuid) {
+    if (allParts.getTypeData(TemplateCardPart.instance).calc$.createdTemplateUuid) {
       messageState.completedStates.add('template-placed');
     }
   }
   if (allParts.hasType(OtherCardPart.instance)) {
     messageState.hasStates.add('other-formula');
-    if (allParts.getTypeData<OtherCardData>(OtherCardPart.instance).roll$?.evaluated) {
+    if (allParts.getTypeData(OtherCardPart.instance).roll$?.evaluated) {
       messageState.completedStates.add('other-formula');
     }
   }
@@ -258,7 +258,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
 
   //#region actions
   private static permissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance, resourceIndex: number | '*'}>(({cardParts, resourceIndex}) => {
-    const part = cardParts.getTypeData<ResourceCardData>(ResourceCardPart.instance);
+    const part = cardParts.getTypeData(ResourceCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (resourceIndex === '*') {
       for (const resource of part.consumeResources) {
@@ -277,7 +277,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(ResourceCardComponent.permissionCheck)
     .build(async ({resourceIndex, cardParts, messageId, action}) => {
-      const part = cardParts.getTypeData<ResourceCardData>(ResourceCardPart.instance);
+      const part = cardParts.getTypeData(ResourceCardPart.instance);
       const consumeResources: ResourceCardData['consumeResources'] = [];
       if (resourceIndex === '*') {
         for (const consumeResource of part.consumeResources) {

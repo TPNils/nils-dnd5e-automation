@@ -231,7 +231,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     .addSerializer(ItemCardHelpers.getRawSerializer('uuid'))
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
-      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      const part = cardParts.getTypeData(TargetCardPart.instance);
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (part?.calc$?.actorUuid) {
         documents.push({uuid: part.calc$.actorUuid, permission: 'update', security: true});
@@ -239,7 +239,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       return {documents: documents};
     }))
     .build(async ({messageId, cardParts, uuid}) => {
-      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      const part = cardParts.getTypeData(TargetCardPart.instance);
       part.selected = uuidsToSelected([...part.selected.map(s => s.tokenUuid), uuid]);
       return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     })
@@ -249,7 +249,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     .addSerializer(ItemCardHelpers.getRawSerializer('uuid'))
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
-      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      const part = cardParts.getTypeData(TargetCardPart.instance);
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (part?.calc$?.actorUuid) {
         documents.push({uuid: part.calc$.actorUuid, permission: 'update', security: true});
@@ -257,7 +257,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       return {documents: documents};
     }))
     .build(async ({messageId, cardParts, uuid, user}) => {
-      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      const part = cardParts.getTypeData(TargetCardPart.instance);
       part.selected = part.selected.filter(s => s.selectionId !== uuid);
       await TargetCardComponent.fireEvent('undo', [uuid], part, messageId, cardParts, user.id);
       return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
@@ -267,7 +267,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
-      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      const part = cardParts.getTypeData(TargetCardPart.instance);
       const documents: CreatePermissionCheckArgs['documents'] = [];
       if (part?.calc$?.actorUuid) {
         documents.push({uuid: part.calc$.actorUuid, permission: 'update', security: true});
@@ -275,7 +275,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       return {documents: documents};
     }))
     .build(async ({messageId, cardParts, user}) => {
-      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      const part = cardParts.getTypeData(TargetCardPart.instance);
       await setTargetsFromUser(part, user);
       return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     })
@@ -290,7 +290,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       return {updatesMessage: true};
     }))
     .build(async ({messageId, cardParts, action, targetUuid, user}) => {
-      const part = cardParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      const part = cardParts.getTypeData(TargetCardPart.instance);
       await TargetCardComponent.fireEvent(action, [targetUuid], part, messageId, cardParts, user.id);
       return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     })
@@ -717,10 +717,10 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         continue;
       }
 
-      const attackCardData = newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance);
-      const checkCardData = newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance);
-      const damageCardData = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance);
-      const resourceCardData = newRow.allParts.getTypeData<ResourceCardData>(ResourceCardPart.instance);
+      const attackCardData = newRow.allParts.getTypeData(AttackCardPart.instance);
+      const checkCardData = newRow.allParts.getTypeData(CheckCardPart.instance);
+      const damageCardData = newRow.allParts.getTypeData(DamageCardPart.instance);
+      const resourceCardData = newRow.allParts.getTypeData(ResourceCardPart.instance);
 
       if (damageCardData != null && damageCardData.phase === 'result') {
         newRow.part.calc$.autoChangeTarget = false;
@@ -866,7 +866,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         continue;
       }
 
-      const targetData = parts.getTypeData<TargetCardData>(TargetCardPart.instance);
+      const targetData = parts.getTypeData(TargetCardPart.instance);
       if (targetData) {
         if (targetData.calc$.autoChangeTarget) {
           const partsClone = deepClone(parts);
@@ -975,7 +975,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
       return;
     }
     
-    const targetData = partsWithTarget.getTypeData<TargetCardData>(TargetCardPart.instance);
+    const targetData = partsWithTarget.getTypeData(TargetCardPart.instance);
     const chatMessageUser = UtilsFoundry.getModelData(chatMessage).user as User | string;
     // V9 this is the user id, V10 this is the user model
     if (!targetData.calc$.autoChangeTarget || ((chatMessageUser instanceof User) ? (chatMessageUser.id !== game.userId) : (chatMessageUser !== game.userId))) {

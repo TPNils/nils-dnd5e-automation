@@ -42,7 +42,7 @@ export interface SpellLevelCardData {
 export class SpellLevelCardComponent extends BaseCardComponent implements OnInit {
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
-    const part = cardParts.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance);
+    const part = cardParts.getTypeData(SpellLevelCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (part?.calc$?.actorUuid) {
       documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
@@ -55,7 +55,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(SpellLevelCardComponent.actionPermissionCheck)
     .build(async ({messageId, inputValue, cardParts}) => {
-      const part = cardParts.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance);
+      const part = cardParts.getTypeData(SpellLevelCardPart.instance);
       part.selectedLevel = inputValue === 'pact' ? inputValue : Number.parseInt(inputValue);
       return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
     });

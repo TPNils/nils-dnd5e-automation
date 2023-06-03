@@ -219,10 +219,10 @@ export class ModularCardInstance {
     return this.getTypeData(partType) != null;
   }
 
-  public getTypeData<T>(partType: string): any | null;
-  public getTypeData<T>(partType: ModularCardPart<T>): T | null;
-  public getTypeData<T>(partType: ModularCardPart<T> | string): any | null
-  public getTypeData<T>(partType: ModularCardPart<T> | string): T | null {
+  public getTypeData(partType: string): any | null;
+  public getTypeData<T extends ModularCardPart>(partType: T): Parameters<T['refresh']>[0] | null
+  public getTypeData<T extends ModularCardPart | string>(partType: T): (T extends ModularCardPart ? Parameters<T['refresh']>[0] : any) | null
+  public getTypeData<T extends ModularCardPart | string>(partType: T): (T extends ModularCardPart ? Parameters<T['refresh']>[0] : any) | null {
     const partTypeName = this.getTypeName(partType);
     if (this.data[partTypeName] != null) {
       return this.data[partTypeName];
@@ -304,15 +304,15 @@ export class ModularCardInstance {
     }
 
     // legacy
-    let itemUuid = this.getTypeData<AttackCardData>(AttackCardPart.instance)?.attackSource$?.itemUuid;
+    let itemUuid = this.getTypeData(AttackCardPart.instance)?.attackSource$?.itemUuid;
     if (itemUuid == null) {
-      const calc = this.getTypeData<DamageCardData>(DamageCardPart.instance)?.calc$;
+      const calc = this.getTypeData(DamageCardPart.instance)?.calc$;
       if (calc && calc.damageSource.type === 'Item') {
         itemUuid = calc.damageSource.itemUuid;
       }
     }
     if (itemUuid == null) {
-      itemUuid = this.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance)?.calc$?.itemUuid;
+      itemUuid = this.getTypeData(SpellLevelCardPart.instance)?.calc$?.itemUuid;
     }
     
     return itemUuid;
@@ -324,24 +324,24 @@ export class ModularCardInstance {
     }
 
     // legacy
-    let actorUuid = this.getTypeData<AttackCardData>(AttackCardPart.instance)?.actorUuid$;
+    let actorUuid = this.getTypeData(AttackCardPart.instance)?.actorUuid$;
     if (actorUuid == null) {
-      actorUuid = this.getTypeData<CheckCardData>(CheckCardPart.instance)?.actorUuid$;
+      actorUuid = this.getTypeData(CheckCardPart.instance)?.actorUuid$;
     }
     if (actorUuid == null) {
-      actorUuid = this.getTypeData<DamageCardData>(DamageCardPart.instance)?.calc$?.actorUuid;
+      actorUuid = this.getTypeData(DamageCardPart.instance)?.calc$?.actorUuid;
     }
     if (actorUuid == null) {
-      actorUuid = this.getTypeData<ResourceCardData>(ResourceCardPart.instance)?.calc$?.actorUuid;
+      actorUuid = this.getTypeData(ResourceCardPart.instance)?.calc$?.actorUuid;
     }
     if (actorUuid == null) {
-      actorUuid = this.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance)?.calc$?.actorUuid;
+      actorUuid = this.getTypeData(SpellLevelCardPart.instance)?.calc$?.actorUuid;
     }
     if (actorUuid == null) {
-      actorUuid = this.getTypeData<TargetCardData>(TargetCardPart.instance)?.calc$?.actorUuid;
+      actorUuid = this.getTypeData(TargetCardPart.instance)?.calc$?.actorUuid;
     }
     if (actorUuid == null) {
-      actorUuid = this.getTypeData<TemplateCardData>(TemplateCardPart.instance)?.calc$?.actorUuid;
+      actorUuid = this.getTypeData(TemplateCardPart.instance)?.calc$?.actorUuid;
     }
 
     return actorUuid;
@@ -353,12 +353,12 @@ export class ModularCardInstance {
     }
 
     // legacy
-    let tokenUuid = this.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance)?.calc$?.tokenUuid;
+    let tokenUuid = this.getTypeData(SpellLevelCardPart.instance)?.calc$?.tokenUuid;
     if (tokenUuid == null) {
-      tokenUuid = this.getTypeData<TargetCardData>(TargetCardPart.instance)?.calc$?.tokenUuid;
+      tokenUuid = this.getTypeData(TargetCardPart.instance)?.calc$?.tokenUuid;
     }
     if (tokenUuid == null) {
-      tokenUuid = this.getTypeData<TemplateCardData>(TemplateCardPart.instance)?.calc$?.tokenUuid;
+      tokenUuid = this.getTypeData(TemplateCardPart.instance)?.calc$?.tokenUuid;
     }
 
     return tokenUuid;

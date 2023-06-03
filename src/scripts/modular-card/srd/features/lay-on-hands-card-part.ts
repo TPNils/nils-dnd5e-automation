@@ -49,7 +49,7 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
 
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
-    const part = cardParts.getTypeData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance);
+    const part = cardParts.getTypeData(SrdLayOnHandsCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (part?.calc$?.actorUuid) {
       documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
@@ -63,7 +63,7 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(SrdLayOnHandsComponent.actionPermissionCheck)
     .build(async ({messageId, cardParts, heal, cure}) => {
-      const part = cardParts.getTypeData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance);
+      const part = cardParts.getTypeData<ModularCardPart<SrdLayOnHandsCardData>>(SrdLayOnHandsCardPart.instance);
       if (heal != null) {
         part.heal = heal;
       }
@@ -267,7 +267,7 @@ class SrdLayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<SrdLay
       }
       let amountOfTargets = 0;
       if (newRow.allParts.hasType(TargetCardPart.instance)) {
-        amountOfTargets += newRow.allParts.getTypeData<TargetCardData>(TargetCardPart.instance).selected.length;
+        amountOfTargets += newRow.allParts.getTypeData(TargetCardPart.instance).selected.length;
       }
       // If there are no targets, assume it has been mentioned verbally => set to 1
       amountOfTargets = Math.max(1, amountOfTargets);
@@ -276,7 +276,7 @@ class SrdLayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<SrdLay
       healAmount += (newRow.part.cure * 5);
       
       const resourceAmount = healAmount * amountOfTargets;
-      for (const resource of newRow.allParts.getTypeData<ResourceCardData>(ResourceCardPart.instance).consumeResources) {
+      for (const resource of newRow.allParts.getTypeData(ResourceCardPart.instance).consumeResources) {
         if (resource.calc$.uuid.includes('Item.') && resource.calc$.path === 'data.uses.value') {
           resource.calc$.calcChange = resourceAmount;
           break;

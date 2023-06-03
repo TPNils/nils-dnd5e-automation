@@ -89,7 +89,7 @@ export interface SrdSneakAttackCardData {
 export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit {
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
-    const part = cardParts.getTypeData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance);
+    const part = cardParts.getTypeData(SrdSneakAttackCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (part?.calc$?.actorUuid) {
       documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
@@ -102,7 +102,7 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(SrdSneakAttackComponent.actionPermissionCheck)
     .build(({messageId, addSneak, cardParts}) => {
-      const part = cardParts.getTypeData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance);
+      const part = cardParts.getTypeData(SrdSneakAttackCardPart.instance);
       if (part.shouldAdd === addSneak) {
         return;
       }
@@ -115,7 +115,7 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(SrdSneakAttackComponent.actionPermissionCheck)
     .build(({messageId, dmg, cardParts}) => {
-      const part = cardParts.getTypeData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance);
+      const part = cardParts.getTypeData(SrdSneakAttackCardPart.instance);
       if (part.selectedDamage === dmg) {
         return;
       }
@@ -332,7 +332,7 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
 
   private syncWithBaseDamage(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
     for (const {newRow, oldRow} of context.rows) {
-      const baseDamage = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance)
+      const baseDamage = newRow.allParts.getTypeData(DamageCardPart.instance)
 
       if (!baseDamage) {
         continue;
@@ -356,11 +356,11 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
 
   private async calcDamageTypeOptions(context: IAfterDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
     for (const {newRow, oldRow} of context.rows) {
-      const baseDamage = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance)
+      const baseDamage = newRow.allParts.getTypeData(DamageCardPart.instance)
       if (!baseDamage) {
         continue;
       }
-      const oldDamage = oldRow?.allParts?.getTypeData<DamageCardData>(DamageCardPart.instance)
+      const oldDamage = oldRow?.allParts?.getTypeData(DamageCardPart.instance)
 
       const newChangeDetect = {
         damageSource: baseDamage.calc$.damageSource,

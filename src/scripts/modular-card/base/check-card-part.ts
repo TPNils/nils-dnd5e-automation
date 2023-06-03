@@ -99,7 +99,7 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
 
   
   private static getTargetCacheEnricher(this: null, data: ChatPartIdData & ChatPartEnriched & {targetId: string;}): {targetCache: TargetCache} {
-    const cache = getTargetCache(data.cardParts.getTypeData<CheckCardData>(CheckCardPart.instance), data.targetId);
+    const cache = getTargetCache(data.cardParts.getTypeData(CheckCardPart.instance), data.targetId);
     if (!cache) {
       throw {
         success: false,
@@ -270,7 +270,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
 
     let partNr = 0;
     if (context.allMessageParts.hasType(CheckCardPart.instance)) {
-      const part = context.allMessageParts.getTypeData<CheckCardData>(CheckCardPart.instance)
+      const part = context.allMessageParts.getTypeData(CheckCardPart.instance)
       for (const selected of context.selected) {
         if (!visualStatesBySelectionId.get(selected.selectionId)) {
           visualStatesBySelectionId.set(selected.selectionId, {
@@ -321,7 +321,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       for (const selected of newRow.part.selected) {
         allTargetIds.add(selected.selectionId);
       }
-      for (const target of newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance).targetCaches$) {
+      for (const target of newRow.allParts.getTypeData(CheckCardPart.instance).targetCaches$) {
         cachedSelectionIds.add(target.selectionId$);
       }
 
@@ -343,7 +343,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         continue;
       }
       const allSelected = newRow.part.selected;
-      const part = newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance);
+      const part = newRow.allParts.getTypeData(CheckCardPart.instance);
       const cachedBySelectionId = new Set<string>();
 
       for (const target of part.targetCaches$) {

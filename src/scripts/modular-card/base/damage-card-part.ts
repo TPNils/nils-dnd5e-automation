@@ -4,7 +4,7 @@ import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigge
 import { DocumentListener } from "../../lib/db/document-listener";
 import { UtilsDocument, PermissionCheck, DmlUpdateRequest } from "../../lib/db/utils-document";
 import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
+import { AsyncAttribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
 import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { TermData, RollData, UtilsRoll } from "../../lib/roll/utils-roll";
 import { UtilsCompare } from "../../lib/utils/utils-compare";
@@ -231,7 +231,7 @@ async function itemSourceToManualSource(itemSource: ItemDamageSource | MyItem, a
 class DamageCardComponent extends BaseCardComponent implements OnInit {
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
-    const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+    const part = cardParts.getTypeData(DamageCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (part?.calc$?.actorUuid) {
       documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
@@ -244,7 +244,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
     .build(({messageId, event, cardParts}) => {
-      const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const part = cardParts.getTypeData(DamageCardPart.instance);
       if (part.userBonus === event.userBonus && part.phase === 'result') {
         return;
       }
@@ -258,7 +258,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
     .build(({messageId, cardParts, event}) => {
-      const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const part = cardParts.getTypeData(DamageCardPart.instance);
       if (part.mode === event.data) {
         return;
       }
@@ -275,7 +275,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
     .build(({messageId, cardParts, event}) => {
-      const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const part = cardParts.getTypeData(DamageCardPart.instance);
       if (part.source === event.data) {
         return;
       }
@@ -524,8 +524,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       const snapshot = tokenHpSnapshot.get(targetEvent.selected.tokenUuid);
       const tokenHp = deepClone(snapshot);
       
-      const attackCard = targetEvent.messageCardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
-      const damageCard = targetEvent.messageCardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const attackCard = targetEvent.messageCardParts.getTypeData(AttackCardPart.instance);
+      const damageCard = targetEvent.messageCardParts.getTypeData(DamageCardPart.instance);
 
       // Undo already applied damage
       if (damageCard) {
@@ -648,7 +648,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   private getTargetState(context: StateContext): VisualState[] {
     // TODO UI: add a square wich is full, half, or empty depending on the damage calculation.
     //  Also allow manual overrides somehow 
-    const part = context.allMessageParts.getTypeData<DamageCardData>(this);
+    const part = context.allMessageParts.getTypeData(this);
     if (part == null) {
       return [];
     }
@@ -758,7 +758,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
   private async calcTargetCache(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const recalcTokens: Array<{selectionId: string, tokenUuid: string, data: DamageCardData}> = [];
     for (const {newRow, oldRow} of context.rows) {
-      const damagePart = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const damagePart = newRow.allParts.getTypeData(DamageCardPart.instance);
       if (damagePart == null) {
         continue;
       }
@@ -877,7 +877,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
   
   private calcTargetCache(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
     for (const {newRow} of context.rows) {
-      const checkPart = newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance);
+      const checkPart = newRow.allParts.getTypeData(CheckCardPart.instance);
       
       const checkResultsBySelectionId = new Map<string, CheckTargetCache>();
       if (checkPart) {
@@ -961,7 +961,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
       if (newRow.part.phase === 'result') {
         continue;
       }
-      const attack = newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const attack = newRow.allParts.getTypeData(AttackCardPart.instance);
       let countAsHit = false;
       if (attack == null) {
         countAsHit = true;
@@ -1061,7 +1061,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
             return await itemToRoll.rollDamage({
               critical: newRow.part.mode === 'critical',
               versatile: newRow.part.source === 'versatile',
-              spellLevel: newRow.allParts.getTypeData<SpellLevelCardData>(SpellLevelCardPart.instance)?.selectedLevelNr,
+              spellLevel: newRow.allParts.getTypeData(SpellLevelCardPart.instance)?.selectedLevelNr,
               options: {
                 parts: rollRolls.map(r => r.formula),
                 critical: newRow.part.mode === 'critical',
