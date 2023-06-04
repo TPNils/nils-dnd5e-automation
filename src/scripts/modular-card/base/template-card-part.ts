@@ -7,12 +7,11 @@ import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { MyItemData } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
-import { UtilsLog } from "../../utils/utils-log";
 import { UtilsTemplate } from "../../utils/utils-template";
 import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
-import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-part";
+import { TargetCardPart, uuidsToSelected } from "./target-card-part";
 
 export interface TemplateCardData {
   calc$: {

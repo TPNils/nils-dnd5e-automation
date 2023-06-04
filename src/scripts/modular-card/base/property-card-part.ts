@@ -15,7 +15,7 @@ interface Property {
 }
 
 interface PropertyCardData {
-  properties$: Array<Property> | string[]; // string[] is deprecaded
+  properties$: Array<Property>;
 }
 
 @Component({
@@ -93,6 +93,10 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
 
   public refresh(data: PropertyCardData, args: ModularCardCreateArgs): Promise<PropertyCardData> {
     return this.create(args);
+  }
+
+  public refreshVisual(data: PropertyCardData, args: ModularCardCreateArgs): Promise<PropertyCardData> {
+    return this.refresh(data, args);
   }
 
   @RunOnce()

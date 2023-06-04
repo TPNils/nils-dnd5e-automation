@@ -123,5 +123,6 @@ export interface ModularCardPart<D = any> {
   getType(): string; // TODO getType should be static => use as param when registering
   create(args: ModularCardCreateArgs): PromiseOrSync<D>;
   refresh(data: D, args: ModularCardCreateArgs): PromiseOrSync<D>;
+  refreshVisual?(data: D, args: ModularCardCreateArgs): PromiseOrSync<D>;
   getHtml?(data: HtmlContext<D>): PromiseOrSync<string | null>;
 }

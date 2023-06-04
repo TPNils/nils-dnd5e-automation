@@ -176,13 +176,17 @@ class ChatMessageAccessPropertyV10 implements ProxyHandler<any> {
 
 export class ModularCardInstance {
   private data: ModularCardData = {};
+  private inactiveData: ModularCardData = {};
   private meta: ModularCardMeta = {};
 
   constructor(private message: ChatMessage) {
-    
     this.data = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
     if (this.data == null) {
       this.data = {};
+    }
+    this.inactiveData = message.getFlag(staticValues.moduleName, 'modularCardInactiveData') as any;
+    if (this.inactiveData == null) {
+      this.inactiveData = {};
     }
     this.meta = message.getFlag(staticValues.moduleName, 'modularCardDataMeta') as any;
     if (this.meta == null) {
@@ -193,9 +197,11 @@ export class ModularCardInstance {
     // So changes made within this instance are also reflected on the chat message
     if (UtilsFoundry.usesDataModel(message)) {
       this.data = ChatMessageAccessPropertyV10.wrap(deepClone(this.data), message, `flags.${staticValues.moduleName}.modularCardData`);
+      this.inactiveData = ChatMessageAccessPropertyV10.wrap(deepClone(this.inactiveData), message, `flags.${staticValues.moduleName}.modularCardInactiveData`);
       this.meta = ChatMessageAccessPropertyV10.wrap(deepClone(this.meta), message, `flags.${staticValues.moduleName}.modularCardDataMeta`);
     } else if (UtilsFoundry.usesDocumentData(message)) {
-      setProperty(message.data, `flags.${staticValues.moduleName}.modularCardData`, this.data);
+      setProperty(message.data, `flags.${staticValues.moduleName}.modularCardData`, this.inactiveData);
+      setProperty(message.data, `flags.${staticValues.moduleName}.modularCardInactiveData`, this.data);
       setProperty(message.data, `flags.${staticValues.moduleName}.modularCardDataMeta`, this.meta);
     }
   }
@@ -217,6 +223,28 @@ export class ModularCardInstance {
       const extendedTypes = getExtendedTypes(type);
       if (extendedTypes.includes(partTypeName)) {
         return this.data[type];
+      }
+    }
+    return null;
+  }
+
+  public hasInactiveType<T>(partType: ModularCardPart<T> | string): boolean {
+    return this.getInactiveTypeData(partType) != null;
+  }
+
+  public getInactiveTypeData(partType: string): any | null;
+  public getInactiveTypeData<T extends ModularCardPart>(partType: T): Parameters<T['refresh']>[0] | null
+  public getInactiveTypeData<T extends ModularCardPart | string>(partType: T): (T extends ModularCardPart ? Parameters<T['refresh']>[0] : any) | null
+  public getInactiveTypeData<T extends ModularCardPart | string>(partType: T): (T extends ModularCardPart ? Parameters<T['refresh']>[0] : any) | null {
+    const partTypeName = this.getTypeName(partType);
+    if (this.inactiveData[partTypeName] != null) {
+      return this.inactiveData[partTypeName];
+    }
+
+    for (const type in this.inactiveData) {
+      const extendedTypes = getExtendedTypes(type);
+      if (extendedTypes.includes(partTypeName)) {
+        return this.inactiveData[type];
       }
     }
     return null;
@@ -249,16 +277,21 @@ export class ModularCardInstance {
   public setTypeData<T>(partType: string, data: any | null): void;
   public setTypeData<T>(partType: ModularCardPart<T>, data: T | null): void;
   public setTypeData<T>(partType: ModularCardPart<T> | string, data: any | null): void {
+    const typeName = this.getTypeName(partType);
     if (data == null) {
-      delete this.data[this.getTypeName(partType)];
+      if (typeName in this.data) {
+        this.inactiveData[typeName] = this.data[this.getTypeName(partType)];
+        delete this.data[typeName];
+      }
       return;
     }
     
-    if (this.data[this.getTypeName(partType)] == null) {
-      this.data[this.getTypeName(partType)] = {};
+    if (this.data[typeName] == null) {
+      this.data[typeName] = {};
     }
 
-    ModularCardInstance.update(this.data[this.getTypeName(partType)], data);
+    ModularCardInstance.update(this.data[typeName], data);
+    delete this.inactiveData[typeName];
   }
   
   public setMeta(meta: ModularCardMeta): void {
@@ -624,51 +657,37 @@ export class ModularCard {
     return ModularCard.registeredPartsByType.get(type).part as T;
   }
 
-  public static async getDefaultItemParts(data: {actor?: MyActor, token?: TokenDocument, item: MyItem}): Promise<ModularCardInstance> {
+  public static async createInstanceNoDml(createArgs: {actor?: MyActor, token?: TokenDocument, item: MyItem}, refresh?: {instance: ModularCardInstance; type: 'all' | 'visual'}): Promise<ModularCardInstance> {
     const parts: Promise<{data: any, cardPart: ModularCardPart}>[] = [];
-    const itemData = UtilsFoundry.getSystemData(data.item);
-    const actorData = UtilsFoundry.getSystemData(data.actor);
-    
-    // Find the first available spellslot, auto upcast if missing spell slots
-    if (actorData && itemData.level > 0) {
-      const itemLevel = itemData.level;
-      const spellIsPact = itemData?.preparation?.mode === 'pact';
-      let selectedLevel: number | 'pact' = spellIsPact ? actorData.spells.pact.level : itemData.level;
-      let selectedSpell: SpellData = spellIsPact ? actorData.spells.pact : actorData.spells[`spell${selectedLevel}`];
-      
-      if (selectedLevel < itemLevel || selectedSpell.value < 1) {
-        let newItemLevel = itemLevel;
-        if (actorData.spells.pact.level >= itemLevel && actorData.spells.pact.value > 0) {
-          newItemLevel = actorData.spells.pact.level;
-        } else {
-          const spellLevels = Object.keys(actorData.spells)
-            .map(prop => /^spell([0-9]+)$/i.exec(prop))
-            .filter(rgx => !!rgx)
-            .map(rgx => Number(rgx[1]))
-            .sort();
-          for (const spellLevel of spellLevels) {
-            if (spellLevel <= itemLevel) {
-              continue;
-            }
-            let actorSpellData: SpellData = actorData.spells[`spell${spellLevel}`];
-            if (actorSpellData.value > 0) {
-              newItemLevel = spellLevel;
-              break;
-            }
-          }
-        }
-        if (itemLevel != newItemLevel) {
-          data.item = ItemUtils.createUpcastItem(data.item, newItemLevel);
-        }
-      }
-    }
+    createArgs.item = ItemUtils.createUpcastItemByFirstSpellSlot(createArgs.item, createArgs.actor);
 
-    const createEvent = new BeforeCreateModuleCardEvent(data);
-    // Ignore returned boolean
-    Hooks.call(`create${staticValues.code.capitalize()}ModuleCard`, createEvent);
+    const createEvent = new BeforeCreateModuleCardEvent({actor: createArgs.actor, item: createArgs.item, token: createArgs.token});
+    Hooks.callAll(`create${staticValues.code.capitalize()}ModuleCard`, createEvent);
     
-    for (const cardPart of createEvent.getParts()) {
-      const response = cardPart.create(data);
+    const instance = refresh ? refresh.instance.deepClone() : new ModularCardInstance(new ChatMessage());
+    const originalTypes = instance.getAllTypes();
+    const newTypes = createEvent.getParts();
+    for (const cardPart of newTypes) {
+      let response: any | Promise<any>;
+      if (instance.hasType(cardPart)) {
+        if (refresh.type === 'all') {
+          response = cardPart.refresh(instance.getTypeData(cardPart), createArgs);
+        } else if (refresh.type === 'visual' && cardPart.refreshVisual) {
+          response = cardPart.refreshVisual(instance.getTypeData(cardPart), createArgs);
+        } else {
+          response = instance.getTypeData(cardPart);
+        }
+      } else if (instance.hasInactiveType(cardPart)) {
+        if (refresh.type === 'all') {
+          response = cardPart.refresh(instance.getInactiveTypeData(cardPart), createArgs);
+        } else if (refresh.type === 'visual' && cardPart.refreshVisual) {
+          response = cardPart.refreshVisual(instance.getInactiveTypeData(cardPart), createArgs);
+        } else {
+          response = instance.getInactiveTypeData(cardPart);
+        }
+      } else {
+        response = cardPart.create(createArgs);
+      }
       if (response instanceof Promise) {
         parts.push(response.then(resp => ({data: resp, cardPart: cardPart})))
       } else {
@@ -676,20 +695,23 @@ export class ModularCard {
       }
     }
 
-    const response = new ModularCardInstance(new ChatMessage());
-    response.setMeta({
+    instance.setMeta({
       created: {
-        actorUuid: data.actor?.uuid,
-        tokenUuid: data.token?.uuid,
-        itemUuid: data.item?.uuid,
+        actorUuid: createArgs.actor?.uuid,
+        tokenUuid: createArgs.token?.uuid,
+        itemUuid: createArgs.item?.uuid,
       }
     });
     for (const part of await Promise.all(parts)) {
-      if (part.data != null) {
-        response.setTypeData(part.cardPart, part.data);
+      instance.setTypeData(part.cardPart, part.data);
+    }
+    for (const original of originalTypes) {
+      if (!newTypes.includes(original)) {
+        instance.setTypeData(original, null);
       }
     }
-    return response;
+
+    return instance;
   }
   
   public static createCardData(parts: ModularCardInstance): ChatMessageDataConstructorData {

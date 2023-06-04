@@ -134,6 +134,10 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
     return this.create(args);
   }
 
+  public refreshVisual(data: DescriptionCardData, args: ModularCardCreateArgs): DescriptionCardData {
+    return this.refresh(data, args);
+  }
+
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);

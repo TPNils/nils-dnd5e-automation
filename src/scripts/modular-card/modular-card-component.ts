@@ -1,10 +1,16 @@
+import { message } from "gulp-typescript/release/utils";
 import { DocumentListener } from "../lib/db/document-listener";
 import { Component, OnInit, OnInitParam } from "../lib/render-engine/component";
 import { Stoppable } from "../lib/utils/stoppable";
+import { ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
+import { MyActor, MyItem } from "../types/fixed-types";
 import { UtilsLog } from "../utils/utils-log";
-import { ModularCard } from "./modular-card";
-import { ModularCardPart } from "./modular-card-part";
+import { ModularCard, ModularCardInstance } from "./modular-card";
+import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { deepEqual } from "assert";
+import { UtilsObject } from "../lib/utils/utils-object";
+import { UtilsCompare } from "../lib/utils/utils-compare";
 
 @Component({
   tag: ModularCardComponent.getSelector(),
@@ -107,6 +113,8 @@ export class ModularCardComponent implements OnInit {
     return `${staticValues.code}-modular-card`;
   }
 
+  public body = '';
+  public erroredTypes: string[] = [];
   public onInit(args: OnInitParam) {
     args.addStoppable(this.provideHasClasses(args.html));
 
@@ -117,14 +125,30 @@ export class ModularCardComponent implements OnInit {
     }
 
     const messageId = messageIdElement.getAttribute('data-message-id');
+    const messageListener = DocumentListener.listenUuid<ChatMessage>(game.messages.get(messageId).uuid);
     args.addStoppable(
-      DocumentListener.listenUuid<ChatMessage>(game.messages.get(messageId).uuid)
-        .listen(async message => {
-          const body = await this.calcBody(message);
-          if (this.body !== body) {
-            this.body = body;
-          }
-        })
+      messageListener.listen(async message => {
+        const content = await ModularCardComponent.calcContent(message);
+        if (this.body !== content.body || !UtilsCompare.deepEquals(this.erroredTypes, content.errors)) {
+          this.body = content.body;
+          this.erroredTypes = content.errors;
+        }
+      }),
+      messageListener
+        // TODO Only 1 user should update the message, even when the creator is offline
+        .map(message => ({message: message, parts: ModularCard.getCardPartDatas(message)}))
+        .filter(parts => !!parts)
+        .switchMap(({message, parts}) => {
+          return ValueReader.mergeObject({
+            message: message,
+            parts: parts,
+            item: parts.getItemUuid() == null ? null : DocumentListener.listenUuid<MyItem>(parts.getItemUuid()),
+            actor: parts.getActorUuid() == null ? null : DocumentListener.listenUuid<MyActor>(parts.getActorUuid()),
+            token: parts.getTokenUuid() == null ? null : DocumentListener.listenUuid<TokenDocument>(parts.getTokenUuid()),
+          })
+        }).listen(((args) => {
+          this.refreshMessage(args.message, args.parts, args);
+        })),
     );
   }
 
@@ -155,12 +179,10 @@ export class ModularCardComponent implements OnInit {
     }
   }
 
-  public body = '';
-  public erroredTypes: string[] = [];
-  private async calcBody(message: ChatMessage): Promise<string> {
+  private static async calcContent(message: ChatMessage): Promise<{body: string, errors: string[]}> {
     const parts = ModularCard.getCardPartDatas(message);
     if (!parts) {
-      return ''
+      return {body: '', errors: []}
     }
 
     const htmlParts$: Array<{html: string} | Promise<{html: string}>> = [];
@@ -193,13 +215,29 @@ export class ModularCardComponent implements OnInit {
     }
     
     const htmlParts = (await Promise.all(htmlParts$)).filter(part => part.html != null);
-    this.erroredTypes = erroredTypes.map(e => e.getType());
 
     const enrichedHtmlParts: string[] = [];
     for (const enrichedPart of await Promise.all(htmlParts.map(part => TextEditor.enrichHTML(part.html, enrichOptions as any)))) {
       enrichedHtmlParts.push(enrichedPart);
     }
-    return enrichedHtmlParts.join('');
+    return {body: enrichedHtmlParts.join(''), errors: erroredTypes.map(e => e.getType())};
+  }
+
+  private latestCreateArgs: ModularCardCreateArgs
+  private async refreshMessage(message: ChatMessage, parts: ModularCardInstance, args: ModularCardCreateArgs): Promise<void> {
+    if (args.item == null || args.actor == null || args.token == null) {
+      // Don't refresh
+      return;
+    }
+    if (this.latestCreateArgs == null) {
+      this.latestCreateArgs = args;
+      return;
+    }
+
+    if (this.latestCreateArgs.item !== args.item || this.latestCreateArgs.actor !== args.actor || this.latestCreateArgs.token !== args.token) {
+      const updatedParts = await ModularCard.createInstanceNoDml(args, {type: 'visual', instance: parts});
+      await ModularCard.setBulkCardPartDatas([{message, data: updatedParts}]);
+    }
   }
 
 }

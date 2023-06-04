@@ -64,7 +64,7 @@ async function displayCard(this: MyItem, wrapped: (...args: any) => any, ...args
       }
     }
   }
-  const parts = await ModularCard.getDefaultItemParts({
+  const parts = await ModularCard.createInstanceNoDml({
     item: this as any,
     actor: this.actor as MyActor,
     token: token,

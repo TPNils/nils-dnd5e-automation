@@ -14,11 +14,11 @@ import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
 import { ActiveEffectCardPart } from "./active-effect-card-part";
-import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
-import { CheckCardData, CheckCardPart } from "./check-card-part";
-import { DamageCardData, DamageCardPart } from "./damage-card-part";
-import { ResourceCardData, ResourceCardPart } from "./resources-card-part";
+import { CheckCardPart } from "./check-card-part";
+import { DamageCardPart } from "./damage-card-part";
+import { ResourceCardPart } from "./resources-card-part";
 
 export interface TargetCardData {
   selected: Array<{selectionId: string, tokenUuid: string;}>;
