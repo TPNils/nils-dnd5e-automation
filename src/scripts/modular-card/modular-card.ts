@@ -16,13 +16,6 @@ import { ModularCardComponent } from "./modular-card-component";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { UtilsFoundry } from "../utils/utils-foundry";
 
-interface ModularCardPartDataLegacy<T = any> {
-  readonly id: string;
-  readonly type: string;
-  data: T;
-}
-
-export type ModularCardDataLegacy = ModularCardPartDataLegacy[];
 type ModularCardData = {[partType: string]: any};
 interface ModularCardMeta {
   created?: {
@@ -205,14 +198,6 @@ export class ModularCardInstance {
       setProperty(message.data, `flags.${staticValues.moduleName}.modularCardData`, this.data);
       setProperty(message.data, `flags.${staticValues.moduleName}.modularCardDataMeta`, this.meta);
     }
-
-    for (const key of Object.keys(this.data)) {
-      if (!Number.isNaN(Number.parseInt(key))) {
-        // Legacy format => parse to new format
-        this.data[this.data[key].type] = this.data[key].data;
-        delete this.data[key];
-      }
-    }
   }
 
   public hasType<T>(partType: ModularCardPart<T> | string): boolean {
@@ -299,69 +284,15 @@ export class ModularCardInstance {
   }
 
   public getItemUuid(): string {
-    if (this.meta != null) {
-      return this.meta.created?.itemUuid;
-    }
-
-    // legacy
-    let itemUuid = this.getTypeData(AttackCardPart.instance)?.attackSource$?.itemUuid;
-    if (itemUuid == null) {
-      const calc = this.getTypeData(DamageCardPart.instance)?.calc$;
-      if (calc && calc.damageSource.type === 'Item') {
-        itemUuid = calc.damageSource.itemUuid;
-      }
-    }
-    if (itemUuid == null) {
-      itemUuid = this.getTypeData(SpellLevelCardPart.instance)?.calc$?.itemUuid;
-    }
-    
-    return itemUuid;
+    return this.meta.created?.itemUuid;
   }
 
   public getActorUuid(): string {
-    if (this.meta != null) {
-      return this.meta.created?.actorUuid;
-    }
-
-    // legacy
-    let actorUuid = this.getTypeData(AttackCardPart.instance)?.actorUuid$;
-    if (actorUuid == null) {
-      actorUuid = this.getTypeData(CheckCardPart.instance)?.actorUuid$;
-    }
-    if (actorUuid == null) {
-      actorUuid = this.getTypeData(DamageCardPart.instance)?.calc$?.actorUuid;
-    }
-    if (actorUuid == null) {
-      actorUuid = this.getTypeData(ResourceCardPart.instance)?.calc$?.actorUuid;
-    }
-    if (actorUuid == null) {
-      actorUuid = this.getTypeData(SpellLevelCardPart.instance)?.calc$?.actorUuid;
-    }
-    if (actorUuid == null) {
-      actorUuid = this.getTypeData(TargetCardPart.instance)?.calc$?.actorUuid;
-    }
-    if (actorUuid == null) {
-      actorUuid = this.getTypeData(TemplateCardPart.instance)?.calc$?.actorUuid;
-    }
-
-    return actorUuid;
+    return this.meta.created?.actorUuid;
   }
 
   public getTokenUuid(): string {
-    if (this.meta != null) {
-      return this.meta.created?.tokenUuid;
-    }
-
-    // legacy
-    let tokenUuid = this.getTypeData(SpellLevelCardPart.instance)?.calc$?.tokenUuid;
-    if (tokenUuid == null) {
-      tokenUuid = this.getTypeData(TargetCardPart.instance)?.calc$?.tokenUuid;
-    }
-    if (tokenUuid == null) {
-      tokenUuid = this.getTypeData(TemplateCardPart.instance)?.calc$?.tokenUuid;
-    }
-
-    return tokenUuid;
+    return this.meta.created?.tokenUuid;
   }
 
   private getTypeName(partType: ModularCardPart | string): string {
@@ -850,7 +781,7 @@ export class ModularCard {
     }
   }
   
-  public static async setBulkCardPartDatas(updates: Array<{message: ChatMessage, data: ModularCardInstance | ModularCardDataLegacy}>): Promise<void> {
+  public static async setBulkCardPartDatas(updates: Array<{message: ChatMessage, data: ModularCardInstance}>): Promise<void> {
     const bulkUpdateRequest: DmlUpdateRequest<any>[] = [];
     for (const update of updates) {
       if (update.message == null) {
@@ -868,24 +799,16 @@ export class ModularCard {
     return UtilsDocument.bulkUpdate(bulkUpdateRequest);
   }
 
-  public static setCardPartDatas(message: ChatMessage, data: ModularCardInstance | ModularCardDataLegacy): Promise<void> {
+  public static setCardPartDatas(message: ChatMessage, data: ModularCardInstance): Promise<void> {
     return ModularCard.setBulkCardPartDatas([{message, data}])
   }
 
-  private static createFlagObject(data: ModularCardInstance | ModularCardDataLegacy): ModularCardData {
+  private static createFlagObject(data: ModularCardInstance): ModularCardData {
     const cardsObj: ModularCardData = {};
-    if (Array.isArray(data)) {
-      for (const part of data) {
-        if (part.data != null) {
-          cardsObj[part.id] = part;
-        }
-      }
-    } else if (data instanceof ModularCardInstance) {
-      for (const type of data.getAllTypes()) {
-        const typeData = data.getTypeData(type);
-        if (typeData != null) {
-          cardsObj[type.getType()] = typeData;
-        }
+    for (const type of data.getAllTypes()) {
+      const typeData = data.getTypeData(type);
+      if (typeData != null) {
+        cardsObj[type.getType()] = typeData;
       }
     }
     return cardsObj;
