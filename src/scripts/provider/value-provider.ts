@@ -21,6 +21,22 @@ export abstract class ValueReader<T> implements ValueReader<T> {
       }
     });
   }
+  public first(): ValueReader<T> {
+    const first = new ValueProvider<T>();
+    let shouldStop = false;
+    let stoppable: Stoppable;
+    stoppable = this.listen(value => {
+      shouldStop = true;
+      if (stoppable != null) {
+        stoppable.stop();
+      }
+      first.set(value);
+    });
+    if (shouldStop) {
+      stoppable.stop();
+    }
+    return first;
+  }
   public abstract listen(callback: (value?: T) => void): Stoppable;
 
   public switchMap<R>(transformer: (value: T) => ValueReader<R>): ValueReader<R> {

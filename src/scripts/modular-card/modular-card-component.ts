@@ -1,4 +1,3 @@
-import { message } from "gulp-typescript/release/utils";
 import { DocumentListener } from "../lib/db/document-listener";
 import { Component, OnInit, OnInitParam } from "../lib/render-engine/component";
 import { Stoppable } from "../lib/utils/stoppable";
@@ -8,8 +7,6 @@ import { MyActor, MyItem } from "../types/fixed-types";
 import { UtilsLog } from "../utils/utils-log";
 import { ModularCard, ModularCardInstance } from "./modular-card";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
-import { deepEqual } from "assert";
-import { UtilsObject } from "../lib/utils/utils-object";
 import { UtilsCompare } from "../lib/utils/utils-compare";
 
 @Component({
@@ -143,8 +140,8 @@ export class ModularCardComponent implements OnInit {
             message: message,
             parts: parts,
             item: parts.getItemUuid() == null ? null : DocumentListener.listenUuid<MyItem>(parts.getItemUuid()),
-            actor: parts.getActorUuid() == null ? null : DocumentListener.listenUuid<MyActor>(parts.getActorUuid()),
-            token: parts.getTokenUuid() == null ? null : DocumentListener.listenUuid<TokenDocument>(parts.getTokenUuid()),
+            actor: parts.getActorUuid() == null ? null : DocumentListener.listenUuid<MyActor>(parts.getActorUuid()).first(),
+            token: parts.getTokenUuid() == null ? null : DocumentListener.listenUuid<TokenDocument>(parts.getTokenUuid()).first(),
           })
         }).listen(((args) => {
           this.refreshMessage(args.message, args.parts, args);
