@@ -44,7 +44,7 @@ export class UtilsDiceSoNice {
       }
     }
 
-    // DiceSoNice does something weird to find the dice, but I think this is to solve some weird foundry behaviour
+    // DiceSoNice does something weird to find the dice, but I think this is to solve some weird foundry behavior
     // Simplified: only give DiceSoNice vanilla foundry dice
     const vanillaTerms: RollTerm[] = [];
     let hasCustomTerms = false;

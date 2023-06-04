@@ -57,7 +57,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
     .build(async ({messageId, inputValue, cardParts}) => {
       const part = cardParts.getTypeData(SpellLevelCardPart.instance);
       part.selectedLevel = inputValue === 'pact' ? inputValue : Number.parseInt(inputValue);
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   //#endregion
 
@@ -78,7 +78,7 @@ export class SpellLevelCardComponent extends BaseCardComponent implements OnInit
               uuid: data.part.calc$.actorUuid,
               // TODO Don't know if I want to bloat more settings
               //  ReadImmunity has the same idea as read spell slots => are you allowed to see details in the character sheet
-              //  Maybe make a proper setting settings page with a global behaviour with the option to fine tune
+              //  Maybe make a proper setting settings page with a global behavior with the option to fine tune
               permission: `${staticValues.code}ReadImmunity`,
               user: game.user,
             },
@@ -188,7 +188,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
         });
       }
     }
-    // The item passed may have its level changed => vanilla foundry/dnd5e behaviour.
+    // The item passed may have its level changed => vanilla foundry/dnd5e behavior.
     const originalLevel = await ItemUtils.getOriginalLevel(item);
     spellSlots = spellSlots.filter(slot => slot.level >= originalLevel);
     

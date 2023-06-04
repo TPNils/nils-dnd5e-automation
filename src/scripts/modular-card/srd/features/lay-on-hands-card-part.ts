@@ -73,7 +73,7 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
       if ((part.heal + (part.cure * 5)) > part.maxUsage) {
         return;
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   //#endregion
   

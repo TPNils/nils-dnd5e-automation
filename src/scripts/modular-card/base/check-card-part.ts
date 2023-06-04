@@ -124,7 +124,7 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
       // TODO ge kunt de roll zien als player via dice so nice
       targetCache.userBonus = event.userBonus;
       targetCache.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     })
     
 private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>; targetId: string;} & ChatPartIdData>('AttackOnModeChange')
@@ -143,7 +143,7 @@ private static modeChange = new Action<{event: CustomEvent<RollD20EventData<Roll
     if (event.quickRoll) {
       targetCache.phase = 'result';
     }
-    return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+    return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
   });
   //#endregion
 

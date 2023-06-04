@@ -84,7 +84,7 @@ async function updateMessage(this: ChatLog, wrapped: (...args: any) => any, ...a
       }
     } else {
       // sameTopLevelLayout should always be true, but just in case have a fallback
-      // Default behaviour isn foundry V9
+      // Default behavior isn foundry V9
       li.replaceWith(updatedHtml);
     }
   } else {
@@ -132,7 +132,7 @@ export class ComponentFoundryConnector {
       observer.observe(document, { childList: true, subtree: true });
     });
 
-    // Override render behaviour
+    // Override render behavior
     UtilsHooks.setup().then(() => {
       libWrapper.register(staticValues.moduleName, 'ChatLog.prototype.updateMessage', updateMessage, 'MIXED');
     });
@@ -153,7 +153,7 @@ export class ComponentFoundryConnector {
       }
 
       // Only support Components
-      // Main reason is securty like prevent <script> tags
+      // Main reason is security like prevent <script> tags
       // Might want to support _all_ custom elements, but we will cross that bridge when we get there.
       if (constructorIter) {
         const children = Array.from(node.childNodes);

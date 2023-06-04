@@ -41,7 +41,7 @@ export class Action<ClientData, ServerData = {user: User}> {
   private enricherFuncs: Array<(serializedData: ServerData) => any> = [];
   /**
    * <b>Optional</b>
-   * The serialized data cotnains the bare minimum.
+   * The serialized data contains the bare minimum.
    * To help the permission check and execute,
    * 
    * @param enricher function which return data which should be extended to the serialized data

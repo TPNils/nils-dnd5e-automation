@@ -35,7 +35,7 @@ class DataModelCls<DATA, PARENT extends foundry.abstract.Document<any, any> = fo
   public updateSource(diff: DeepPartial<DATA>, options?: any);
 }
 
-/** Sinds foundry V10 */
+/** Since foundry V10 */
 declare global {
   namespace foundry {
     namespace abstract {

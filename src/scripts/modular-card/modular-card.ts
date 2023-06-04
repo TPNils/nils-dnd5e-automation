@@ -379,7 +379,7 @@ class ChatMessageTransformer<T> extends TransformTrigger<ChatMessage, ModularCar
   }
 
   private transformFunc(from: ChatMessage): {uniqueKey: string, data: ModularCardTriggerData} | Array<{uniqueKey: string, data: ModularCardTriggerData}> {
-    const parts = ModularCard.getCardPartDatas(from);
+    const parts = ModularCard.readModuleCard(from);
     if (parts == null) {
       return [];
     }
@@ -413,7 +413,7 @@ class ChatMessageTrigger implements IDmlTrigger<ChatMessage> {
       if (newRow == null) {
         continue;
       }
-      const parts = ModularCard.getCardPartDatas(newRow);
+      const parts = ModularCard.readModuleCard(newRow);
       if (parts != null) {
         const attr: [string, string][] = [];
         if (parts.getItemUuid()) {
@@ -564,7 +564,7 @@ export class BeforeCreateModuleCardEvent {
 
         if (processing.length === pendingAddActions.length) {
           // Nothing got processed => missing a reference, use fallback
-          // TODO be smarter, detect wich are also still pending
+          // TODO be smarter, detect which are also still pending
           for (const pending of pendingAddActions) {
             pending.position = [fallbackPosition];
           }
@@ -579,7 +579,7 @@ export class BeforeCreateModuleCardEvent {
       }
     }
 
-    // Try to detect conflics, only 1 ModularCardPart per type is allowed
+    // Try to detect conflicts, only 1 ModularCardPart per type is allowed
     // If you extend a ModularCardPart, that part is both itself and the extended part (= 2 different types or more)
     const handlerMetas: Array<{type: ModularCardPart, extendedTypes: string[]}> = []
     for (const resolvedPart of resolvedParts) {
@@ -765,7 +765,7 @@ export class ModularCard {
   
   @RunOnce()
   public static registerHooks(): void {
-    // Override render behaviour
+    // Override render behavior
     DmlTrigger.registerTrigger(new ChatMessageTrigger());
     
     // - Keep scrollbar at the bottom
@@ -789,7 +789,7 @@ export class ModularCard {
     })
   }
 
-  public static getCardPartDatas(message: ChatMessage): ModularCardInstance | null {
+  public static readModuleCard(message: ChatMessage): ModularCardInstance | null {
     if (message == null) {
       return null;
     }
@@ -803,7 +803,7 @@ export class ModularCard {
     }
   }
   
-  public static async setBulkCardPartDatas(updates: Array<{message: ChatMessage, data: ModularCardInstance}>): Promise<void> {
+  public static async writeBulkModuleCards(updates: Array<{message: ChatMessage, data: ModularCardInstance}>): Promise<void> {
     const bulkUpdateRequest: DmlUpdateRequest<any>[] = [];
     for (const update of updates) {
       if (update.message == null) {
@@ -821,8 +821,8 @@ export class ModularCard {
     return UtilsDocument.bulkUpdate(bulkUpdateRequest);
   }
 
-  public static setCardPartDatas(message: ChatMessage, data: ModularCardInstance): Promise<void> {
-    return ModularCard.setBulkCardPartDatas([{message, data}])
+  public static writeModuleCard(message: ChatMessage, data: ModularCardInstance): Promise<void> {
+    return ModularCard.writeBulkModuleCards([{message, data}])
   }
 
   private static createFlagObject(data: ModularCardInstance): ModularCardData {

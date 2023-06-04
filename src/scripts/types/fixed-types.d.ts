@@ -43,14 +43,14 @@ export interface ActorAbility {
   checkBonus: number;
   dc: number;
   mod: number;
-  prof: number; // Flat proficiantie bonus
-  proficient: number; // Proficiantie multiplier
+  prof: number; // Flat proficiency bonus
+  proficient: number; // proficiency multiplier
   save: number; // The bonus on saving throws
   saveBonus: number; // Not sure what this is?
 }
 
 export interface ActorSkill {
-  value: number; // Proficiantie multiplier
+  value: number; // proficiency multiplier
   ability: keyof MyActorData['abilities'];
   bonus: number;
   mod: number;

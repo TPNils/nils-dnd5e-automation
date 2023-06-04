@@ -101,8 +101,8 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
     } else if (resource.resource.consumeResourcesAction === 'manual-apply') {
       shouldApply = true;
     } else {
-      const autoBehaviour = game.settings.get(staticValues.moduleName, 'autoConsumeResources') as string;
-      switch (autoBehaviour) {
+      const autobehavior = game.settings.get(staticValues.moduleName, 'autoConsumeResources') as string;
+      switch (autobehavior) {
         case 'detection': {
           const states = messageDataById.get(resource.messageId);
           if (states.hasStates.size > 0) {
@@ -307,7 +307,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
         }
 
         await applyResourceConsumption(request);
-        return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+        return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
       }
     })
   //#endregion
@@ -648,11 +648,11 @@ class ResourceTrigger implements ITrigger<ModularCardTriggerData<ResourceCardDat
       const newResourceByKey = new Map<string, ResourceCardData['consumeResources'][number]>();
       for (const consumeResource of newRow.part.consumeResources) {
         const key = `${consumeResource.calc$.uuid}-${consumeResource.calc$.path}`;
-        const oldResouce = oldResourceByKey.get(key);
+        const oldResource = oldResourceByKey.get(key);
         newResourceByKey.set(key, consumeResource);
 
-        const changed = consumeResource.consumeResourcesAction !== (oldResouce?.consumeResourcesAction || 'undo') ||
-          consumeResource.calc$.calcChange != (oldResouce?.calc$.calcChange || 0);
+        const changed = consumeResource.consumeResourcesAction !== (oldResource?.consumeResourcesAction || 'undo') ||
+          consumeResource.calc$.calcChange != (oldResource?.calc$.calcChange || 0);
 
         if (changed || consumeResource.consumeResourcesAction == 'auto') {
           switch (consumeResource.consumeResourcesAction) {

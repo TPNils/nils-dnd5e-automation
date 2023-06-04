@@ -121,7 +121,7 @@ export class ItemCardHelpers {
     return data => {
       const message = game.messages.get(data.messageId);
       return {
-        cardParts: ModularCard.getCardPartDatas(message).deepClone()
+        cardParts: ModularCard.readModuleCard(message).deepClone()
       }
     }
   }

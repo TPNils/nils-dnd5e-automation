@@ -107,7 +107,7 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
         return;
       }
       part.shouldAdd = addSneak;
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   private static setDamageType = new Action<{dmg: DamageType} & ChatPartIdData>('SneakAttackSetDamageType')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
@@ -120,7 +120,7 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
         return;
       }
       part.selectedDamage = dmg;
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   //#endregion
   

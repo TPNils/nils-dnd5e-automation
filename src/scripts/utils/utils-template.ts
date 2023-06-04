@@ -141,7 +141,7 @@ export class UtilsTemplate {
     }
     const steps = Math.min(grid / 2, rectangle.width / 2, rectangle.height / 2);
 
-    // This isnt't perfect, but it should work well enough with the limitations of PIXI
+    // This isn't perfect, but it should work well enough with the limitations of PIXI
     for (let x = 0; x <= rectangle.width; x += steps) {
       for (let y = 0; y <= rectangle.height; y += steps) {
         if (UtilsTemplate.containsPoint(templateDetails, {x: rectangle.x + x, y: rectangle.y + y}, wallsBlockTargeting)) {

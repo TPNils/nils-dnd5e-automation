@@ -309,7 +309,7 @@ export class Template {
               localVars: process.localVars,
               template: child,
               instance: child.cloneNode(false),
-              pathContext: pathContext, // Same path context intsnace needs to be shared by all children/siblings
+              pathContext: pathContext, // Same path context instance needs to be shared by all children/siblings
             })
           }
         }

@@ -23,7 +23,6 @@ export class ItemSheetHooks {
     const targetFormula = this.getFlag(staticValues.moduleName, 'targetFormula');
     if (targetFormula) {
       const onActorDataIsSet = () => {
-        // TODO V10: check compatibility
         const itemData = UtilsFoundry.getSystemData(this);
         const formula = Roll.replaceFormulaData(targetFormula, this.getRollData());
         if (itemData?.target == null) {
@@ -34,7 +33,7 @@ export class ItemSheetHooks {
         };
         try {
           itemData.target.value = Roll.safeEval(formula);
-        } catch {/* ignore, probably an error for a formula refering to actor data, while not having an actor */}
+        } catch {/* ignore, probably an error for a formula referring to actor data, while not having an actor */}
       }
 
       if (this.actor == null || UtilsFoundry.getSystemData(this.actor) != null) {

@@ -236,7 +236,7 @@ function VirtualEventNode<T extends Constructor>(clazz: T = PlaceholderClass as 
   return class extends clazz implements VirtualEventNode {
     #callbackMap = new Map<number, StoredEventCallback>();
 
-    public getEventListerners(): Iterable<StoredEventCallback> {
+    public getEventListeners(): Iterable<StoredEventCallback> {
       return this.#callbackMap.values();
     }
 
@@ -256,14 +256,14 @@ function VirtualEventNode<T extends Constructor>(clazz: T = PlaceholderClass as 
     }
 
     protected startEventClone(original: VirtualEventNode, deep?: boolean) {
-      for (const listener of original.getEventListerners()) {
+      for (const listener of original.getEventListeners()) {
         this.#callbackMap.set(listener.callback[eventCallbackId], listener);
       }
     }
   }
 }
 export interface VirtualEventNode extends VirtualBaseNode {
-  getEventListerners(): Iterable<StoredEventCallback>;
+  getEventListeners(): Iterable<StoredEventCallback>;
   addEventListener(type: string, callback: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
   removeEventListener(type: string, callback: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
   isEventNode(): this is VirtualEventNode;

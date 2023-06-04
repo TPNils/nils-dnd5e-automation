@@ -6,9 +6,9 @@ class GlobalHtmlListener {
 
   public static registerHooks(): void {
     UtilsHooks.chatRendered().then(() => {
-      // Register that a click happend
+      // Register that a click happened
       document.addEventListener('click', GlobalHtmlListener.toggleRadioClick);
-      // If a change event is fired immidatly after the click, cancel the delayed click toggle
+      // If a change event is fired immediately after the click, cancel the delayed click toggle
       document.addEventListener('change', GlobalHtmlListener.toggleRadioChange);
       
       document.addEventListener('keyup', GlobalHtmlListener.onKeyPress);

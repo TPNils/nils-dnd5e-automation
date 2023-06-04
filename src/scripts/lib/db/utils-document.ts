@@ -228,28 +228,28 @@ class UpdateQueue {
                 rootRows.push(rowData)
               }
   
-              const embededByDocumentName = new Map<string, any[]>();
-              for (const embeded of bulkEntry.embededDocuments) {
-                if (!embededByDocumentName.has(embeded.document.documentName)) {
-                  embededByDocumentName.set(embeded.document.documentName, []);
+              const embeddedByDocumentName = new Map<string, any[]>();
+              for (const embedded of bulkEntry.embeddedDocuments) {
+                if (!embeddedByDocumentName.has(embedded.document.documentName)) {
+                  embeddedByDocumentName.set(embedded.document.documentName, []);
                 }
-                const embededData = {...embeded.rootData};
-                if (embeded.systemData) {
+                const embeddedData = {...embedded.rootData};
+                if (embedded.systemData) {
                   if (UtilsFoundry.usesDataModel()) {
-                    embededData.system = embeded.systemData;
+                    embeddedData.system = embedded.systemData;
                   } else {
-                    embededData.data = embeded.systemData;
+                    embeddedData.data = embedded.systemData;
                   }
                 }
-                embededByDocumentName.get(embeded.document.documentName).push(embededData);
+                embeddedByDocumentName.get(embedded.document.documentName).push(embeddedData);
               }
-              for (const embededDocumentName of embededByDocumentName.keys()) {
+              for (const embeddedDocumentName of embeddedByDocumentName.keys()) {
                 let parentDocument: foundry.abstract.Document<any, any> | Promise<foundry.abstract.Document<any, any>> = documentsByUuid.get(bulkEntry.uuid)?.document;
                 if (parentDocument == null) {
                   parentDocument = fromUuid(bulkEntry.uuid);
                 }
                 promises.push(Promise.resolve(parentDocument).then(async doc => {
-                  const returnValue = doc.updateEmbeddedDocuments(embededDocumentName, embededByDocumentName.get(embededDocumentName));
+                  const returnValue = doc.updateEmbeddedDocuments(embeddedDocumentName, embeddedByDocumentName.get(embeddedDocumentName));
                   return returnValue;
                 }));
               }
@@ -306,7 +306,7 @@ class UpdateQueue {
 
     const dmlsPerDocumentName = new Map<string, Map<string, BulkEntry>>();
     for (let documentWrapper of documentsByUuid.values()) {
-      // Special use case for actors since they are not an embeded entity
+      // Special use case for actors since they are not an embedded entity
       if (documentWrapper.document.documentName === 'Actor' && (documentWrapper.document as FoundryDocument & MyActor).isToken) {
         documentWrapper.document = documentWrapper.document.parent;
         if (documentWrapper.rootData) {
@@ -326,7 +326,7 @@ class UpdateQueue {
         if (!dmlsByUuid.has(documentWrapper.document.uuid)) {
           dmlsByUuid.set(documentWrapper.document.uuid, {
             uuid: documentWrapper.document.uuid,
-            embededDocuments: [],
+            embeddedDocuments: [],
           });
         }
         dmlsByUuid.get(documentWrapper.document.uuid).rootData = documentWrapper.rootData;
@@ -339,10 +339,10 @@ class UpdateQueue {
         if (!dmlsByUuid.has(documentWrapper.document.parent.uuid)) {
           dmlsByUuid.set(documentWrapper.document.parent.uuid, {
             uuid: documentWrapper.document.parent.uuid,
-            embededDocuments: [],
+            embeddedDocuments: [],
           });
         }
-        dmlsByUuid.get(documentWrapper.document.parent.uuid).embededDocuments.push(documentWrapper);
+        dmlsByUuid.get(documentWrapper.document.parent.uuid).embeddedDocuments.push(documentWrapper);
       }
     }
 
@@ -725,7 +725,7 @@ export class UtilsDocument {
 
   public static async setTargets(params: {tokenUuids: string[], user?: User}): Promise<void> {
     const user = params.user ?? game.user;
-    // Game seems buggy when unetting targets, this however does work
+    // Game seems buggy when unsetting targets, this however does work
     if (user.targets.size > 0) {
       Array.from(user.targets)[0].setTarget(false, {releaseOthers: true});
     }
@@ -956,8 +956,8 @@ globalThis.UtilsDocument = UtilsDocument;
 interface BulkEntry {
   uuid: string;
 
-  // when provided, update the embeded documents
-  embededDocuments: {document: FoundryDocument, rootData?: any; systemData?: any;}[];
+  // when provided, update the embedded documents
+  embeddedDocuments: {document: FoundryDocument, rootData?: any; systemData?: any;}[];
 
   // when provided, update this record itself
   rootData?: any;

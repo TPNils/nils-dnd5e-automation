@@ -105,7 +105,8 @@ export class VirtualNodeRenderer {
           }
     
           if (process.node.isEventNode()) {
-            for (const listener of process.node.getEventListerners()) {
+            document.addEventListener
+            for (const listener of process.node.getEventListeners()) {
               allSyncDomActions.push({
                 type: 'addEventListener',
                 node: state.domNode,
@@ -161,11 +162,11 @@ export class VirtualNodeRenderer {
 
           if (process.node.isEventNode()) {
             const oldListeners = new Map<number, StoredEventCallback>();
-            for (const listener of (state.lastRenderSelfState as VirtualEventNode & VirtualNode).getEventListerners()) {
+            for (const listener of (state.lastRenderSelfState as VirtualEventNode & VirtualNode).getEventListeners()) {
               oldListeners.set(listener.guid, listener);
             }
             
-            for (const listener of process.node.getEventListerners()) {
+            for (const listener of process.node.getEventListeners()) {
               if (oldListeners.has(listener.guid)) {
                 oldListeners.delete(listener.guid);
               } else {

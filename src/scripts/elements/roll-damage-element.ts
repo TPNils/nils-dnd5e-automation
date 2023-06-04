@@ -61,7 +61,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
         <div class="left">
           <button *if="!this.disableModeSelect" (click)="this.onModeChange($event, '-')" class="mode-minus" [disabled]="this.rollMode === 'normal'"><i class="fas fa-minus"></i></button>
         </div>
-        <div class="middel"></div>
+        <div class="middle"></div>
         <div class="right">
           <button *if="!this.disableSourceSelect" (click)="this.onRollSourceClick($event)" class="damage-source-toggle source-{{this.rollSource}}">
             <i class="fas fa-hand-holding hand-1" data-fa-transform="rotate-90"></i>

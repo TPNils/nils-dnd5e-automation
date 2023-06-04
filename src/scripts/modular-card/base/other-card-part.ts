@@ -75,7 +75,7 @@ class OtherCardPartComponent extends BaseCardComponent implements OnInit {
       }
       part.userBonus = event.userBonus;
       part.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   //#endregion
 

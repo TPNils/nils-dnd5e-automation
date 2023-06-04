@@ -73,7 +73,7 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
 
   public async startPlace() {
     const template = UtilsTemplate.fromItem(await UtilsDocument.itemFromUuid(this.itemUuid), this.messageId);
-    // TODO area of Minor Illlusion (Caspian) is too big with XGE area (did not test default)
+    // TODO area of Minor Illusion (Caspian) is too big with XGE area (did not test default)
     if (template?.drawPreview) {
       template.drawPreview();
     }
@@ -234,7 +234,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         continue;
       }
       const chatMessage = game.messages.get(messageId);
-      const parts = updateChatMessageMap.has(messageId) ? updateChatMessageMap.get(messageId) : ModularCard.getCardPartDatas(chatMessage).deepClone();
+      const parts = updateChatMessageMap.has(messageId) ? updateChatMessageMap.get(messageId) : ModularCard.readModuleCard(chatMessage).deepClone();
       if (parts == null) {
         continue;
       }
@@ -291,7 +291,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
     }
 
     for (const [chatMessageId, parts] of updateChatMessageMap.entries()) {
-      await ModularCard.setCardPartDatas(game.messages.get(chatMessageId), parts);
+      await ModularCard.writeModuleCard(game.messages.get(chatMessageId), parts);
     }
 
     deleteTemplateUuids.delete(null);

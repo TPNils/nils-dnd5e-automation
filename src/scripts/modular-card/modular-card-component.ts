@@ -80,7 +80,7 @@ import { UtilsCompare } from "../lib/utils/utils-compare";
       width: fit-content;
     }
     
-    :deep .overlay > .middel {
+    :deep .overlay > .middle {
       flex-grow: 1;
     }
     
@@ -133,7 +133,7 @@ export class ModularCardComponent implements OnInit {
       }),
       messageListener
         // TODO Only 1 user should update the message, even when the creator is offline
-        .map(message => ({message: message, parts: ModularCard.getCardPartDatas(message)}))
+        .map(message => ({message: message, parts: ModularCard.readModuleCard(message)}))
         .filter(parts => !!parts)
         .switchMap(({message, parts}) => {
           return ValueReader.mergeObject({
@@ -177,7 +177,7 @@ export class ModularCardComponent implements OnInit {
   }
 
   private static async calcContent(message: ChatMessage): Promise<{body: string, errors: string[]}> {
-    const parts = ModularCard.getCardPartDatas(message);
+    const parts = ModularCard.readModuleCard(message);
     if (!parts) {
       return {body: '', errors: []}
     }
@@ -233,7 +233,7 @@ export class ModularCardComponent implements OnInit {
 
     if (this.latestCreateArgs.item !== args.item || this.latestCreateArgs.actor !== args.actor || this.latestCreateArgs.token !== args.token) {
       const updatedParts = await ModularCard.createInstanceNoDml(args, {type: 'visual', instance: parts});
-      await ModularCard.setBulkCardPartDatas([{message, data: updatedParts}]);
+      await ModularCard.writeBulkModuleCards([{message, data: updatedParts}]);
     }
   }
 

@@ -76,7 +76,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
         <div class="left">
           <button (click)="this.onModeChange($event, '-')" class="mode-minus" [disabled]="this.rollMode === 'disadvantage'"><i class="fas fa-minus"></i></button>
         </div>
-        <div class="middel"></div>
+        <div class="middle"></div>
         <div class="right">
           <button (click)="this.onModeChange($event, '+')" class="mode-plus" [disabled]="this.rollMode === 'advantage'"><i class="fas fa-plus"></i></button>
         </div>

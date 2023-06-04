@@ -81,7 +81,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
     // since active effects (3 parents deep) have no id => no uuid, we can't really recalculate
     // We need to know which effects are them same and which have been added/removed, can't do that
     // TODO maybe this is solved in foundry v10?
-    //  Also this might be bullshit, I did come to this conclustion around 02h in the morning
+    //  Also this might be bullshit, I did come to this conclusion around 02h in the morning
     return oldData;
   }
 

@@ -168,7 +168,7 @@ export class SettingsItemComponent {
     
     let isClientSetting = this.setting.scope === 'client';
     if (!isClientSetting) {
-      // Client settings gets overwittten to 'world' when forced
+      // Client settings gets overwritten to 'world' when forced
       isClientSetting = UtilsForceClientSettings.getState(this.settingKey) === 'hard';
     }
     if (!isClientSetting) {

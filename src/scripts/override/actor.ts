@@ -17,7 +17,7 @@ function getLastCheckMessage(): CheckMessage | null {
   let minMessageIndex = Math.max(0, game.messages.contents.length - 10);
   for (let messageIndex = game.messages.contents.length - 1; messageIndex >= minMessageIndex; messageIndex--) {
     const chatMessage = game.messages.contents[messageIndex];
-    const parts = ModularCard.getCardPartDatas(chatMessage);
+    const parts = ModularCard.readModuleCard(chatMessage);
     if (!parts) {
       continue;
     }
@@ -85,9 +85,9 @@ async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args:
     return wrapped(...args);
   }
 
-  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
+  await ModularCard.writeModuleCard(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
 
-  const parts = ModularCard.getCardPartDatas(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
+  const parts = ModularCard.readModuleCard(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
   const target = parts.getTypeData(CheckCardPart.instance)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
   if (!target?.roll$) {
     // This should never happen? but just in case.
@@ -138,9 +138,9 @@ async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ..
     return wrapped(...args);
   }
 
-  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
+  await ModularCard.writeModuleCard(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
 
-  const parts = ModularCard.getCardPartDatas(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
+  const parts = ModularCard.readModuleCard(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
   const target = parts.getTypeData(CheckCardPart.instance)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
   if (!target?.roll$) {
     // This should never happen? but just in case.
@@ -191,9 +191,9 @@ async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ..
     return wrapped(...args);
   }
 
-  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
+  await ModularCard.writeModuleCard(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
 
-  const parts = ModularCard.getCardPartDatas(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
+  const parts = ModularCard.readModuleCard(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
   const target = parts.getTypeData(CheckCardPart.instance)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
   if (!target?.roll$) {
     // This should never happen? but just in case.

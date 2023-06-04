@@ -75,7 +75,7 @@ export interface DamageCardData {
     actorUuid?: string;
     properties: MyItemData['properties'];
     damageSource: ItemDamageSource | ManualDamageSource;
-    modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
+    modifierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     roll?: RollData;
     displayFormula?: string;
     displayDamageTypes?: string;
@@ -149,7 +149,7 @@ async function itemSourceToManualSource(itemSource: ItemDamageSource | MyItem, a
     rollKeys.push('versatileBaseRoll');
   }
   
-  // Upcasting
+  // Up-casting
   for (const key of rollKeys) {
     const scaling = itemData.scaling;
 
@@ -249,7 +249,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
       }
       part.userBonus = event.userBonus;
       part.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   private static modeChange = new Action<{event: CustomEvent<RollDamageEventData<RollDamageMode>>} & ChatPartIdData>('DamageOnModeChange')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
@@ -266,7 +266,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
       if (event.quickRoll) {
         part.phase = 'result';
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   private static sourceChange = new Action<{event: CustomEvent<RollDamageEventData<DamageCardData['source']>>} & ChatPartIdData>('DamageOnSourceChange')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
@@ -283,7 +283,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
       if (event.quickRoll) {
         part.phase = 'result';
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   //#endregion
 
@@ -480,7 +480,7 @@ class DamageTargetComponent extends BaseCardComponent implements OnInit {
   public renderType: 'hidden' | '+' | '0' | '-' = 'hidden';
   public hpDiff: number;
   private calc(allParts: ModularCardInstance, selectionId: string, damageHiddenRollSetting: string, permissions: PermissionResponse[]) {
-    // TODO UI: add a square wich is full, half, or empty depending on the damage calculation.
+    // TODO UI: add a square which is full, half, or empty depending on the damage calculation.
     //  Also allow manual overrides somehow 
     const targetPart = allParts.getTypeData(TargetCardPart.instance);
     const targetUuid = targetPart?.selected?.find(target => target.selectionId === selectionId)?.tokenUuid;
@@ -544,10 +544,10 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
     if (itemData.level === 0) {
       // Non homebrew cantrips take no damage on save
-      inputDamages.calc$.modfierRule = 'save-no-dmg';
+      inputDamages.calc$.modifierRule = 'save-no-dmg';
     } else if (itemData.level > 0) {
       // Not confirmed, but I believe most leveled spells that do damage use half damage on save
-      inputDamages.calc$.modfierRule = 'save-halve-dmg';
+      inputDamages.calc$.modifierRule = 'save-halve-dmg';
     }
 
     if (actor) {
@@ -668,7 +668,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           tokenHp.hp += hpChange;
           tokenHp.failedDeathSaves += cache.calcFailedDeathSaved;
           
-          // Stay within the min/max bounderies
+          // Stay within the min/max boundaries
           tokenHp.hp = Math.max(0, Math.min(tokenHp.hp, maxHp));
           tokenHp.tempHp = Math.max(0, tokenHp.tempHp);
           
@@ -735,7 +735,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   private getTargetState(context: StateContext): VisualState[] {
-    // TODO UI: add a square wich is full, half, or empty depending on the damage calculation.
+    // TODO UI: add a square which is full, half, or empty depending on the damage calculation.
     //  Also allow manual overrides somehow 
     const part = context.allMessageParts.getTypeData(this);
     if (part == null) {
@@ -965,7 +965,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
             }
             const checkResult = checkResultsBySelectionId.get(cache.selectionId);
             if (checkResult?.resultType$ === 'pass') {
-              switch (newRow.part.calc$.modfierRule) {
+              switch (newRow.part.calc$.modifierRule) {
                 case 'save-halve-dmg': {
                   amount /= 2;
                   break;

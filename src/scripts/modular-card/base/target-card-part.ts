@@ -241,7 +241,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     .build(async ({messageId, cardParts, uuid}) => {
       const part = cardParts.getTypeData(TargetCardPart.instance);
       part.selected = uuidsToSelected([...part.selected.map(s => s.tokenUuid), uuid]);
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     })
     
   private static deleteUuid = new Action<{uuid: string;} & ChatPartIdData>('TargetDeleteUuid')
@@ -260,7 +260,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       const part = cardParts.getTypeData(TargetCardPart.instance);
       part.selected = part.selected.filter(s => s.selectionId !== uuid);
       await TargetCardComponent.fireEvent('undo', [uuid], part, messageId, cardParts, user.id);
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     })
     
   private static refreshTargets = new Action<ChatPartIdData>('TargetRefresh')
@@ -277,7 +277,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     .build(async ({messageId, cardParts, user}) => {
       const part = cardParts.getTypeData(TargetCardPart.instance);
       await setTargetsFromUser(part, user);
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     })
     
   private static setTargetstate = new Action<{action: TargetCallbackData['apply']; targetUuid: string;} & ChatPartIdData>('TargetSetState')
@@ -292,7 +292,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
     .build(async ({messageId, cardParts, action, targetUuid, user}) => {
       const part = cardParts.getTypeData(TargetCardPart.instance);
       await TargetCardComponent.fireEvent(action, [targetUuid], part, messageId, cardParts, user.id);
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     })
   //#endregion
   
@@ -847,7 +847,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     }
     const newestMessageCreatedDate = timestamps.sort()[timestamps.length - 1];
     
-    const bulkUpdateRequest: Parameters<typeof ModularCard.setBulkCardPartDatas>[0] = [];
+    const bulkUpdateRequest: Parameters<typeof ModularCard.writeBulkModuleCards>[0] = [];
     for (let messageIndex = game.messages.contents.length - 1; messageIndex >= 0; messageIndex--) {
       const chatMessage = game.messages.contents[messageIndex];
       // If active gm is not null, current user i active gm
@@ -861,7 +861,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       if (UtilsFoundry.getModelData(chatMessage).timestamp >= newestMessageCreatedDate) {
         return;
       }
-      const parts = ModularCard.getCardPartDatas(chatMessage);
+      const parts = ModularCard.readModuleCard(chatMessage);
       if (!parts) {
         continue;
       }
@@ -873,12 +873,12 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
           targetData.calc$.autoChangeTarget = false;
           bulkUpdateRequest.push({message: chatMessage, data: partsClone});
         } else {
-          // Once you find 1 which is marked false, assume all of the previous have aswel
+          // Once you find 1 which is marked false, assume all of the previous have as wel
           break;
         }
       }
     }
-    ModularCard.setBulkCardPartDatas(bulkUpdateRequest);
+    ModularCard.writeBulkModuleCards(bulkUpdateRequest);
   }
   //#endregion
 
@@ -960,7 +960,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
     let partsWithTarget: ModularCardInstance;
     for (let messageIndex = game.messages.contents.length - 1; messageIndex >= 0; messageIndex--) {
       chatMessage = game.messages.contents[messageIndex];
-      const parts = ModularCard.getCardPartDatas(chatMessage);
+      const parts = ModularCard.readModuleCard(chatMessage);
       if (!parts) {
         continue;
       }
@@ -989,7 +989,7 @@ class DmlTriggerUser implements IDmlTrigger<User> {
 
     // Don't auto change targets after
     await setTargetsFromUser(targetData, game.user);
-    await ModularCard.setCardPartDatas(chatMessage, partsWithTarget);
+    await ModularCard.writeModuleCard(chatMessage, partsWithTarget);
   }
   
 }

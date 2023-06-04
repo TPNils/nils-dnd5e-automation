@@ -41,7 +41,7 @@ export interface AttackCardData {
   advantageSources$: Array<{$uuid: string, $name: string, $image: string}>;
   disadvantageSources$: Array<{$uuid: string, $name: string, $image: string}>;
   roll$?: RollData;
-  critTreshold$: number;
+  critThreshold$: number;
   isCrit$?: boolean;
   targetCaches$: TargetCache[]
 }
@@ -51,7 +51,7 @@ export interface AttackCardData {
  * Most attack items only have 1 target.
  * However there are a few with multiple targets and I could not find a written rule to handle those.
  * So I decided that you need to roll an attack for each target based on multiple spells/feats RAW
- * - Ranger (Hunter): Multiattack
+ * - Ranger (Hunter): Multi-attack
  * - Scorching Ray
  * - Eldritch Blast
  */
@@ -67,7 +67,7 @@ export interface AttackCardData {
       [data-roll-mode]="this.part.mode"
       [data-bonus-formula]="this.part.userBonus"
       [data-show-bonus]="this.part.phase !== 'mode-select'"
-      [data-override-max-roll]="this.part.critTreshold$"
+      [data-override-max-roll]="this.part.critThreshold$"
 
       [data-interaction-permission]="this.interactionPermission"
       [data-read-permission]="this.readPermission"
@@ -107,7 +107,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
       }
       part.userBonus = event.userBonus;
       part.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>} & ChatPartIdData>('AttackOnModeChange')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
@@ -124,7 +124,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
       if (event.quickRoll) {
         part.phase = 'result';
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   //#endregion
 
@@ -304,21 +304,21 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       advantageSources$: [],
       disadvantageSources$: [],
       actorUuid$: actor?.uuid,
-      critTreshold$: 20
+      critThreshold$: 20
     };
 
     const itemData = UtilsFoundry.getSystemData(item);
     const actorSystemData = UtilsFoundry.getSystemData(actor);
     const actorModelData = UtilsFoundry.getModelData(actor);
-    let critTreshold = itemData.critical?.threshold ?? attack.critTreshold$;
+    let critThreshold = itemData.critical?.threshold ?? attack.critThreshold$;
     const actorDnd5eFlags = actorModelData.flags?.dnd5e;
     if (item.type === 'weapon' && actorDnd5eFlags?.weaponCriticalThreshold != null) {
-      critTreshold = Math.min(critTreshold, actorDnd5eFlags.weaponCriticalThreshold);
+      critThreshold = Math.min(critThreshold, actorDnd5eFlags.weaponCriticalThreshold);
     }
     if (item.type === 'spell' && actorDnd5eFlags?.spellCriticalThreshold != null) {
-      critTreshold = Math.min(critTreshold, actorDnd5eFlags.spellCriticalThreshold);
+      critThreshold = Math.min(critThreshold, actorDnd5eFlags.spellCriticalThreshold);
     }
-    attack.critTreshold$ = critTreshold;
+    attack.critThreshold$ = critThreshold;
 
     {
       let suffixes = ['all', itemData.actionType, item.abilityMod];
@@ -607,7 +607,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
       }
 
       const baseRollResult = newRow.part.roll$.terms[0].results.filter(result => result.active)[0];
-      newRow.part.isCrit$ = baseRollResult?.result >= newRow.part.critTreshold$;
+      newRow.part.isCrit$ = baseRollResult?.result >= newRow.part.critThreshold$;
     }
   }
 
@@ -636,8 +636,8 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
         if (newRow.part.roll$?.evaluated) {
           const firstRoll = newRow.part.roll$.terms[0].results.find(r => r.active);
           if (firstRoll.result === 20 || targetCache.ac$ <= newRow.part.roll$.total) {
-            // 20 always hits, lower crit treshold does not
-            if (firstRoll.result >= newRow.part.critTreshold$) {
+            // 20 always hits, lower crit threshold does not
+            if (firstRoll.result >= newRow.part.critThreshold$) {
               targetCache.resultType$ = 'critical-hit';
             } else {
               targetCache.resultType$ = 'hit';
@@ -719,7 +719,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
               rollPromises.push(item.rollAttack({
                 advantage: newData.mode === 'advantage',
                 disadvantage: newData.mode === 'disadvantage',
-                critical: newData.critTreshold$,  
+                critical: newData.critThreshold$,  
                 fastForward: true,
                 chatMessage: false,
               }));

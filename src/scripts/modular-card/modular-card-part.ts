@@ -11,7 +11,7 @@ export interface CreatePermissionCheckArgs {
     permission: PermissionCheck['permission'],
     /** 
      * Default: false
-     * if false, this permissions is used to determen if this action can run local or must be run by the gm 
+     * if false, this permissions is used to determine if this action can run local or must be run by the gm 
      * if true, it will be used to prevent the action
      */
     security?: boolean

@@ -267,13 +267,13 @@ const outputConfigSymbol = Symbol('OutputConfig');
 export interface OutputConfig {
   eventName?: string;
   /* default: false */
-  bubbels?: boolean;
+  bubbles?: boolean;
   /* default: false. Won't emit if the last emit was the same. If it's a function, return true of the values are the same */
   deduplicate?: boolean | ((oldValue: any, newValue: any) => boolean);
 }
 interface OutputConfigInternal {
   eventName: OutputConfig['eventName'];
-  bubbels: OutputConfig['bubbels'];
+  bubbles: OutputConfig['bubbles'];
   deduplicate: OutputConfig['deduplicate'];
 }
 interface OutputConfigsInternal {
@@ -290,7 +290,7 @@ export function Output(config?: string | OutputConfig) {
     }
     const internalConfig: OutputConfigInternal = {
       eventName: propertyKey,
-      bubbels: false,
+      bubbles: false,
       deduplicate: false,
     }
 
@@ -312,8 +312,8 @@ export function Output(config?: string | OutputConfig) {
       if (config.eventName != null) {
         internalConfig.eventName = config.eventName;
       }
-      if (config.bubbels != null) {
-        internalConfig.bubbels = config.bubbels;
+      if (config.bubbles != null) {
+        internalConfig.bubbles = config.bubbles;
       }
       if (config.deduplicate != null) {
         internalConfig.deduplicate = config.deduplicate;
@@ -347,7 +347,7 @@ export function Output(config?: string | OutputConfig) {
       if (value instanceof Event) {
         this[htmlElementSymbol].dispatchEvent(new (value.constructor as ConstructorOf<Event>)(internalConfig.eventName.toLowerCase(), value));
       } else {
-        this[htmlElementSymbol].dispatchEvent(new CustomEvent(internalConfig.eventName.toLowerCase(), {detail: value, cancelable: false, bubbles: internalConfig.bubbels}));
+        this[htmlElementSymbol].dispatchEvent(new CustomEvent(internalConfig.eventName.toLowerCase(), {detail: value, cancelable: false, bubbles: internalConfig.bubbles}));
       }
     };
     if (descriptor) {
@@ -441,7 +441,7 @@ export class ComponentElement extends HTMLElement {
       // If the attribute is not an @Attribute, also reflect changes to it
       // If attribute was not set, keep it all internal
       // This aligns a bit (not 100%) with the best practices https://web.dev/custom-elements-best-practices/
-      //   and teaked by my opinion
+      //   and tweaked by my opinion
       if (newValue === false) {
         // disabled="false" is still disabled => don't set false attributes
         this.removeAttribute(name);

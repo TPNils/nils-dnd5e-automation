@@ -26,7 +26,7 @@ export class VirtualHtmlNode extends VNode({attribute: true, child: true, event:
     if (this.getAttribute('xmlns')) {
       return document.createElementNS(this.getAttribute('xmlns'), this.#nodeName);
     } else if (this.#nodeName.toLowerCase() === 'svg') { // should this be case insensitive?
-      // SVG overwites default namespace
+      // SVG overwrites default namespace
       return document.createElementNS('http://www.w3.org/2000/svg', this.#nodeName);
     } else if (defaultNamespace) {
       return document.createElementNS(defaultNamespace, this.#nodeName);

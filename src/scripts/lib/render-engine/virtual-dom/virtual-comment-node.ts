@@ -1,7 +1,7 @@
 import { CommentData } from "../../../../../types/html-data";
 import { VirtualAttributeNode, VirtualEventNode, VirtualNode, VirtualParentNode, VNode } from "./virtual-node";
 
-export class VirtualCommmentNode extends VNode({child: true, text: true}) implements VirtualNode {
+export class VirtualCommentNode extends VNode({child: true, text: true}) implements VirtualNode {
 
   public constructor(nodeValue?: string | CommentData['text']) {
     super();
@@ -13,7 +13,7 @@ export class VirtualCommmentNode extends VNode({child: true, text: true}) implem
   }
 
   public cloneNode(deep?: boolean): this {
-    const clone = new VirtualCommmentNode();
+    const clone = new VirtualCommentNode();
     clone.startTextClone(this, deep);
     clone.startChildClone(this, deep);
     return clone as this;
