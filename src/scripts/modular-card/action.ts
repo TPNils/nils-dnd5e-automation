@@ -84,7 +84,7 @@ export class Action<ClientData, ServerData = {user: User}> {
         if (this.permissionCheckFunc && !user.isGM) {
           let permissionResponse = await this.permissionCheckFunc(enrichedData as typeof enrichedData & ChatPartIdData, user);
           if (permissionResponse instanceof ValueReader) {
-            permissionResponse = await permissionResponse.listenFirst();
+            permissionResponse = await permissionResponse.firstPromise();
           }
           if (permissionResponse === 'can-run-local' || (permissionResponse === 'can-run-as-gm' && game.user.isGM)) {
             const response = await serverExecutor(enrichedData);

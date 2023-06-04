@@ -760,7 +760,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
       }
     }
     
-    UtilsDocument.hasPermissions(showRolls).listenFirst().then(responses => {
+    UtilsDocument.hasPermissions(showRolls).firstPromise().then(responses => {
       const rolls: Roll[] = [];
       for (const response of responses) {
         if (response.result) {

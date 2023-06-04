@@ -1,11 +1,11 @@
 import { Stoppable } from "../lib/utils/stoppable";
 
 export type ValueReaderType<T> = T extends null | undefined ? T :
-  T extends ValueReader<any> & { listenFirst(): infer F } ? 
+  T extends ValueReader<any> & { firstPromise(): infer F } ? 
     Awaited<F> : T;
 
-export abstract class ValueReader<T> implements ValueReader<T> {
-  public listenFirst(): Promise<T> {
+export abstract class ValueReader<T> {
+  public firstPromise(): Promise<T> {
     return new Promise((resolve) => {
       let shouldStop = false;
       let stoppable: Stoppable;
@@ -136,9 +136,9 @@ class SwitchMap<D, T> extends ValueReader<T> {
     super();
   }
 
-  public async listenFirst(): Promise<T> {
-    const value = await this.delegate.listenFirst();
-    return this.transformer(value).listenFirst();
+  public async firstPromise(): Promise<T> {
+    const value = await this.delegate.firstPromise();
+    return this.transformer(value).firstPromise();
   }
 
   public listen(callback: (value?: T) => void): Stoppable {
@@ -168,8 +168,8 @@ class Mapper<D, T> extends ValueReader<T> {
     super();
   }
 
-  public async listenFirst(): Promise<T> {
-    const value = await this.delegate.listenFirst();
+  public async firstPromise(): Promise<T> {
+    const value = await this.delegate.firstPromise();
     return this.transformer(value);
   }
 

@@ -540,7 +540,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
       }
     }
     
-    UtilsDocument.hasPermissions(showRolls).listenFirst().then(responses => {
+    UtilsDocument.hasPermissions(showRolls).firstPromise().then(responses => {
       const rolls: Roll[] = [];
       for (const response of responses) {
         if (response.result) {

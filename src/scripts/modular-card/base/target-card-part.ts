@@ -304,7 +304,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       meta: {
         selectionId: selected.selectionId
       }
-    }))).listenFirst();
+    }))).firstPromise();
     
     const callbackData: TargetCallbackData[] = tokenPermissions.filter(permission => permission.result).map(permission => ({
       messageId: messageId,
@@ -391,7 +391,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
   public autoChangeTarget = false;
   private async calc(message: ChatMessage, allParts: ModularCardInstance, part: TargetCardData) {
     this.autoChangeTarget = part.calc$.autoChangeTarget;
-    UtilsDocument.hasAllPermissions([{uuid: part.calc$.actorUuid, permission: 'OWNER', user: game.user}]).listenFirst().then(isOwner => {
+    UtilsDocument.hasAllPermissions([{uuid: part.calc$.actorUuid, permission: 'OWNER', user: game.user}]).firstPromise().then(isOwner => {
       this.isOwner = isOwner;
     });
 
@@ -526,7 +526,7 @@ export class TargetCardComponent extends BaseCardComponent implements OnInit {
       const permissions = await UtilsDocument.hasPermissions([
         {uuid: tokenCache.actorUuid, permission: 'LIMITED', user: game.user},
         {uuid: tokenCache.actorUuid, permission: 'UPDATE', user: game.user},
-      ]).listenFirst();
+      ]).firstPromise();
       // TODO keep listening
       const canRead = permissions.find(p => p.requestedCheck.permission === 'LIMITED').result;
       const canWrite = permissions.find(p => p.requestedCheck.permission === 'UPDATE').result;

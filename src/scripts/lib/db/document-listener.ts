@@ -18,7 +18,7 @@ if (game.settings) {
   })
 }
 
-afterSettingHook.listenFirst().then(() => SettingListener.initClientSideSettingsHook());
+afterSettingHook.firstPromise().then(() => SettingListener.initClientSideSettingsHook());
 
 class CallbackDocumentTrigger<T extends FoundryDocument> implements IDmlTrigger<T> {
   private callbacksByUuid = new Map<string, Map<number, (value?: T) => void>>();
