@@ -381,6 +381,7 @@ export interface OnInit {
 
 export interface OnInitParam {
   html: ComponentElement,
+  markChanged: () => void;
   addStoppable(...stoppable: Stoppable[]): void;
 }
 
@@ -555,6 +556,7 @@ export class ComponentElement extends HTMLElement {
       if (ComponentElement.isOnInit(this.#controller)) {
         this.#controller.onInit({
           html: this,
+          markChanged: () => this.generateHtmlQueue(),
           addStoppable: (...stoppable: Stoppable[]) => {
             this.unregisters.push(...stoppable);
           }
