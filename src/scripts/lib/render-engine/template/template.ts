@@ -247,6 +247,8 @@ export class Template {
                 process.instance.setAttribute(name, value);
               }
               
+            } else if (typeof value === 'string' && value.length > 4 && value.startsWith('{{') && value.endsWith('}}')) {
+              process.instance.setAttribute(name, this.parseExpression(value.substring(2, value.length - 2), process.localVars));
             } else if (typeof value === 'string') {
               const processedValue = this.processBindableString(value, process.localVars, false);
               if (value !== processedValue) {
@@ -392,6 +394,7 @@ export class Template {
       startExpression = endExpression;
     }
     parsedParts.push(value.substring(endExpression));
+    UtilsLog.debug('bind', parsedParts, value)
     if (asNode) {
       return parsedParts.map(v => typeof v === 'string' ? new VirtualTextNode(v) : v);
     } else {
