@@ -214,7 +214,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
         }
         const effect = activeEffectCard.activeEffects[i];
         const activeEffectData = deepClone(effect);
-        activeEffectData.origin = null; // TODO
+        activeEffectData.origin = targetEvent.messageCardParts.getItemUuid();
         activeEffectData.flags = activeEffectData.flags ?? {};
         activeEffectData.flags[staticValues.moduleName] = activeEffectData.flags[staticValues.moduleName] ?? {};
         (activeEffectData.flags[staticValues.moduleName] as any).origin = {
