@@ -222,7 +222,6 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
           activeEffectIndex: i,
         };
         delete activeEffectData._id;
-        // @ts-ignore
         createActiveEffects.push(new ActiveEffect(activeEffectData, {parent: actor}));
       }
     }
