@@ -385,6 +385,7 @@ export interface OnInitParam {
 }
 
 const deepUpdateOptions = {deepUpdate: true};
+const deepSyncUpdateOptions: {sync: true, deepUpdate: true} = {sync: true, deepUpdate: true};
 
 export class ComponentElement extends HTMLElement {
   #controller: object
@@ -630,8 +631,8 @@ export class ComponentElement extends HTMLElement {
         this.template = null;
       } else {
         this.template = new Template(this.nodeName, parsedHtml, this.#controller);
-        this.templateRenderResult = await this.template.render();
-        const rootNodes = await VirtualNodeRenderer.renderDom(this.templateRenderResult, deepUpdateOptions);
+        this.templateRenderResult = this.template.render({sync: true});
+        const rootNodes = VirtualNodeRenderer.renderDom(this.templateRenderResult, deepSyncUpdateOptions);
         this.findSlots();
         this.applySlots();
         this.setInnerNode(rootNodes);

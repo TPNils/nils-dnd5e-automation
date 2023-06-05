@@ -68,10 +68,10 @@ export class VirtualNodeRenderer {
    * @param options.deepUpdate when false and the node already exists, only update the node itself, not it's children
    * @returns Created or updated DOM element
    */
-  public static renderDom<T extends VirtualNode>(virtualNode: T, options: {deepUpdate?: boolean, async: false}): Node[]
-  public static renderDom<T extends VirtualNode>(virtualNode: T, options?: {deepUpdate?: boolean, async?: true}): Promise<Node[]>
-  public static renderDom<T extends VirtualNode>(virtualNode: T, options: {deepUpdate?: boolean, async?: boolean} = {}): Promise<Node[]> | Node[] {
-    options = {deepUpdate: false, async: true, ...options};
+  public static renderDom<T extends VirtualNode>(virtualNode: T, options: {deepUpdate?: boolean, sync: true}): Node[]
+  public static renderDom<T extends VirtualNode>(virtualNode: T, options?: {deepUpdate?: boolean, sync?: false}): Promise<Node[]>
+  public static renderDom<T extends VirtualNode>(virtualNode: T, options: {deepUpdate?: boolean, sync?: boolean} = {}): Promise<Node[]> | Node[] {
+    options = {deepUpdate: false, sync: false, ...options};
     let pending: Array<{parent?: VirtualParentNode, node: VirtualNode, defaultNamespace: string | undefined;}> = [{
       node: virtualNode,
       defaultNamespace: document?.head?.namespaceURI,
@@ -256,7 +256,7 @@ export class VirtualNodeRenderer {
         }
       }
     }
-    if (!options.async) {
+    if (options.sync) {
       allSyncDomActions.push(...allAsyncDomActions);
       allAsyncDomActions = [];
     }
@@ -269,10 +269,10 @@ export class VirtualNodeRenderer {
         return VirtualNodeRenderer.getNodes(virtualNode);
       });
     }
-    if (options.async) {
-      return Promise.resolve(VirtualNodeRenderer.getNodes(virtualNode));
-    } else {
+    if (options.sync) {
       return VirtualNodeRenderer.getNodes(virtualNode);
+    } else {
+      return Promise.resolve(VirtualNodeRenderer.getNodes(virtualNode));
     }
   }
 

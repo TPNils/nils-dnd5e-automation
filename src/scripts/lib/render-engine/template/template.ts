@@ -91,28 +91,30 @@ export class Template {
     }
   }
 
-  #context: any;
+  #context: Record<string | number | symbol, any>;
   /**
    * @param context The new context to render the template
    * @returns A promise when the change has been applied returning itself
    */
-  public setContext(context: any): void {
+  public setContext(context: Record<string | number | symbol, any>): void {
     this.#context = context;
     if (this.#processedVirtualNode != null) {
       this.render({force: true});
     }
   }
 
-  public async render(options: {force?: boolean} = {}): Promise<VirtualNode & VirtualParentNode> {
-    if (this.#processedVirtualNode == null) {
-      if (this.#context) {
-        await rerenderQueue.add(this.rerenderCallback);
+  public render(options: {force?: boolean, sync: true}): VirtualNode & VirtualParentNode
+  public render(options?: {force?: boolean, sync?: false}): Promise<VirtualNode & VirtualParentNode>
+  public render(options: {force?: boolean, sync?: boolean} = {}): Promise<VirtualNode & VirtualParentNode> | VirtualNode & VirtualParentNode {
+    if (this.#processedVirtualNode == null || options.force) {
+      if (options.sync) {
+        rerenderQueue.delete(this.rerenderCallback);
+        this.rerenderCallback();
       } else {
-        this.#processedVirtualNode = new VirtualFragmentNode();
+        return rerenderQueue.add(this.rerenderCallback).then(() => this.#processedVirtualNode);
       }
-    } else if (options.force) {
-      await rerenderQueue.add(this.rerenderCallback);
     }
+
     return this.#processedVirtualNode;
   }
 
@@ -123,6 +125,12 @@ export class Template {
   #processedVirtualNode: VirtualNode & VirtualParentNode;
   #processedVirtualNodesMap = new Map<string, VirtualNode>();
   private calcVirtualNode(): void {
+    if (this.#context == null) {
+      if (!(this.#processedVirtualNode instanceof VirtualFragmentNode) || this.#processedVirtualNode.hasChildNodes()) {
+        this.#processedVirtualNode = new VirtualFragmentNode();
+      }
+      return;
+    }
     const rootInstance: VirtualNode & VirtualParentNode = this.template.cloneNode(false);
     const createdNodesByMap = new Map<string, VirtualNode>();
 
