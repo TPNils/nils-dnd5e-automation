@@ -3,5 +3,8 @@
   "nils-dnd5e-automation.Cure": "Cure",
   "nils-dnd5e-automation.CriticalMis": "Critical mis",
   "nils-dnd5e-automation.Roll": "Roll",
-  "nils-dnd5e-automation.Visibility": "Visibility"
+  "nils-dnd5e-automation.Visibility": "Visibility",
+  "nils-dnd5e-automation.Visibility-presets-noSecrets": "No secrets",
+  "nils-dnd5e-automation.Visibility-presets-transparency": "Transparency",
+  "nils-dnd5e-automation.Visibility-presets-dmScreen": "DM screen (recommended)"
 }
