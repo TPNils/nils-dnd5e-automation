@@ -246,7 +246,7 @@ export class Template {
                 process.instance.setAttribute(name, value);
               }
               
-            } else if (typeof value === 'string' && value.length > 4 && value.startsWith('{{') && value.endsWith('}}')) {
+            } else if (typeof value === 'string' && value.length > 4 && value.startsWith('{{') && value.endsWith('}}') && value.indexOf('{{', 2) === -1) {
               process.instance.setAttribute(name, this.parseExpression(value.substring(2, value.length - 2), process.localVars));
             } else if (typeof value === 'string') {
               const processedValue = this.processBindableString(value, process.localVars, false);
