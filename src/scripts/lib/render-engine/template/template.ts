@@ -1,4 +1,3 @@
-import { BindableString, BindExpressionValue } from "../../../../../types/html-data";
 import { UtilsLog } from "../../../utils/utils-log";
 import { UtilsCompare } from "../../utils/utils-compare";
 import { rerenderQueue } from "../virtual-dom/render-queue";
@@ -394,7 +393,6 @@ export class Template {
       startExpression = endExpression;
     }
     parsedParts.push(value.substring(endExpression));
-    UtilsLog.debug('bind', parsedParts, value)
     if (asNode) {
       return parsedParts.map(v => typeof v === 'string' ? new VirtualTextNode(v) : v);
     } else {
