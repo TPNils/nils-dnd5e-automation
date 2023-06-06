@@ -4,7 +4,7 @@ import { RunOnce } from "../lib/decorator/run-once";
 import { AsyncAttribute, Attribute, Component, OnInit, OnInitParam, Output } from "../lib/render-engine/component";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
 import { Stoppable } from "../lib/utils/stoppable";
-import { DamageCardData } from "../modular-card/base";
+import { DamageCardData } from "../modular-card/item/base";
 import { ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 import { RollResultElement } from "./roll-result-element";

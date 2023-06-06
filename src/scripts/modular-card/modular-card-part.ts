@@ -2,7 +2,7 @@ import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { MaybeAsyncWrapper } from "../lib/utils/maybe-async-wrapper";
 import { ValueProvider, ValueReader } from "../provider/value-provider";
 import { MyActor, MyItem } from "../types/fixed-types";
-import { ChatPartIdData } from "./item-card-helpers";
+import { ChatPartIdData } from "./item/item-card-helpers";
 import { ModularCardInstance } from "./modular-card";
 
 export interface CreatePermissionCheckArgs {

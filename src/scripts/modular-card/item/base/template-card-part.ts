@@ -1,15 +1,15 @@
-import { DmlTrigger, ITrigger, IAfterDmlContext, IDmlTrigger, IDmlContext } from "../../lib/db/dml-trigger";
-import { UtilsDocument } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { UtilsCompare } from "../../lib/utils/utils-compare";
-import { ValueReader } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { MyItemData } from "../../types/fixed-types";
-import { UtilsFoundry } from "../../utils/utils-foundry";
-import { UtilsTemplate } from "../../utils/utils-template";
-import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
+import { DmlTrigger, ITrigger, IAfterDmlContext, IDmlTrigger, IDmlContext } from "../../../lib/db/dml-trigger";
+import { UtilsDocument } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { UtilsCompare } from "../../../lib/utils/utils-compare";
+import { ValueReader } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { MyItemData } from "../../../types/fixed-types";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { UtilsTemplate } from "../../../utils/utils-template";
+import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { TargetCardPart, uuidsToSelected } from "./target-card-part";
 

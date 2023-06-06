@@ -1,9 +1,10 @@
-import { DmlUpdateRequest, FoundryDocument, UtilsDocument } from "../lib/db/utils-document";
-import { RunOnce } from "../lib/decorator/run-once";
-import { staticValues } from "../static-values";
-import { MyItem, MyItemData } from "../types/fixed-types";
-import { UtilsFoundry } from "../utils/utils-foundry";
-import { UtilsHooks } from "../utils/utils-hooks";
+import { FoundryDocument, DmlUpdateRequest, UtilsDocument } from "../../lib/db/utils-document";
+import { RunOnce } from "../../lib/decorator/run-once";
+import { staticValues } from "../../static-values";
+import { MyItem, MyItemData } from "../../types/fixed-types";
+import { UtilsFoundry } from "../../utils/utils-foundry";
+import { UtilsHooks } from "../../utils/utils-hooks";
+
 
 /**
  * Implement formulas for amount og targets

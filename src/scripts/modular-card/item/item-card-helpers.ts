@@ -1,6 +1,5 @@
-import { DamageType, MyItemData } from "../types/fixed-types";
-import { ModularCard, ModularCardInstance } from "./modular-card";
-import { ModularCardPart } from "./modular-card-part";
+import { DamageType, MyItemData } from "../../types/fixed-types";
+import { ModularCard, ModularCardInstance } from "../modular-card";
 
 export interface ChatPartIdData {
   readonly messageId: string;

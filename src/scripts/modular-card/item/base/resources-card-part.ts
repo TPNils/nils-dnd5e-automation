@@ -1,21 +1,21 @@
-import { IAfterDmlContext, ITrigger } from "../../lib/db/dml-trigger";
-import { DmlUpdateRequest, UtilsDocument } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { ValueReader } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { UtilsFoundry } from "../../utils/utils-foundry";
-import { UtilsHooks } from "../../utils/utils-hooks";
-import { Action } from "../action";
+import { IAfterDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
+import { DmlUpdateRequest, UtilsDocument } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { ValueReader } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { UtilsHooks } from "../../../utils/utils-hooks";
+import { Action } from "../../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
-import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../../modular-card-part";
+import { AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
-import { CheckCardData, CheckCardPart } from "./check-card-part";
-import { DamageCardData, DamageCardPart } from "./damage-card-part";
-import { OtherCardData, OtherCardPart } from "./other-card-part";
-import { TemplateCardData, TemplateCardPart } from "./template-card-part";
+import { CheckCardPart } from "./check-card-part";
+import { DamageCardPart } from "./damage-card-part";
+import { OtherCardPart } from "./other-card-part";
+import { TemplateCardPart } from "./template-card-part";
 
 type AutoConsumeAfter = 'never' | 'init' | 'attack' | 'damage' | 'other-formula' | 'check' | 'template-placed';
 

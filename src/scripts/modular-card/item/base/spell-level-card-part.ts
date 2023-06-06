@@ -1,17 +1,17 @@
-import { IAfterDmlContext, ITrigger } from "../../lib/db/dml-trigger";
-import { DocumentListener } from "../../lib/db/document-listener";
-import { FoundryDocument, UtilsDocument } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { ValueReader } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { SpellData, MyActor, MyActorData } from "../../types/fixed-types";
-import { UtilsFoundry } from "../../utils/utils-foundry";
-import { Action } from "../action";
+import { IAfterDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
+import { DocumentListener } from "../../../lib/db/document-listener";
+import { FoundryDocument, UtilsDocument } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { ValueReader } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { SpellData, MyActor, MyActorData } from "../../../types/fixed-types";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { Action } from "../../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ItemUtils } from "../item-utils";
-import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction, PermissionResponse } from "../modular-card-part";
+import { ItemUtils } from "../../item-utils";
+import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction, PermissionResponse } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
 export interface SpellLevelCardData {

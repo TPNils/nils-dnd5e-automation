@@ -1,16 +1,15 @@
 import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
-import { IAfterDmlContext, IDmlContext, ITrigger } from "../../lib/db/dml-trigger";
-import { UtilsDocument } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { staticValues } from "../../static-values";
-import { BaseDocument, MyActor } from "../../types/fixed-types";
-import { AttackCardData, AttackCardPart } from "./attack-card-part";
-import { CheckCardData, CheckCardPart } from "./check-card-part";
-import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
-import { ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
+import { IAfterDmlContext, IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
+import { UtilsDocument } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { staticValues } from "../../../static-values";
+import { MyActor } from "../../../types/fixed-types";
+import { AttackCardPart } from "./attack-card-part";
+import { CheckCardPart } from "./check-card-part";
+import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
+import { ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
 import { StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
-import { UtilsFoundry } from "../../utils/utils-foundry";
-import { DataModel } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/module.mjs";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
 
 interface TargetCache {
   actorUuid$: string;

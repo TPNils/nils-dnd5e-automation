@@ -1,12 +1,12 @@
-import { UtilsDocument } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { ValueReader } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { MyItem } from "../../types/fixed-types";
-import { UtilsFoundry } from "../../utils/utils-foundry";
-import { ModularCard } from "../modular-card";
-import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
+import { UtilsDocument } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { ValueReader } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { MyItem } from "../../../types/fixed-types";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { ModularCard } from "../../modular-card";
+import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
 interface Property {

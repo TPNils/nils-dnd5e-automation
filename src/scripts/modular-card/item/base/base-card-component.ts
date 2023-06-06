@@ -1,8 +1,8 @@
-import { DocumentListener } from "../../lib/db/document-listener";
-import { Attribute } from "../../lib/render-engine/component";
-import { ValueProvider } from "../../provider/value-provider";
-import { ModularCard } from "../modular-card";
-import { ModularCardPart } from "../modular-card-part";
+import { DocumentListener } from "../../../lib/db/document-listener";
+import { Attribute } from "../../../lib/render-engine/component";
+import { ValueProvider } from "../../../provider/value-provider";
+import { ModularCard } from "../../modular-card";
+import { ModularCardPart } from "../../modular-card-part";
 
 export class BaseCardComponent {
   

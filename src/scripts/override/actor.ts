@@ -1,5 +1,5 @@
 import { ModularCard, ModularCardInstance } from "../modular-card/modular-card";
-import { CheckCardData, CheckCardPart } from "../modular-card/base/check-card-part";
+import { CheckCardData, CheckCardPart } from "../modular-card/item/base/check-card-part";
 import { staticValues } from "../static-values";
 import type { D20RollOptions, MyActor, MyActorData } from "../types/fixed-types";
 import { UtilsDocument } from "../lib/db/utils-document";

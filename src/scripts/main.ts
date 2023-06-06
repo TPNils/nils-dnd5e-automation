@@ -6,13 +6,13 @@ import { staticValues } from "./static-values";
 import { ReusableDiceTerm } from "./lib/roll/reusable-dice-term";
 import { registerHooks as registerHooksElement } from "./elements/index";
 import { ModuleSettings } from "./settings/module-settings";
-import { registerHooks as registerModularCardBaseHooks } from "./modular-card/base/index";
-import { registerHooks as registerModularCardSrdHooks } from "./modular-card/srd/index";
-import { ItemSheetHooks } from "./modular-card/item-sheet-hooks";
+import { registerHooks as registerModularCardBaseHooks } from "./modular-card/item/base/index";
+import { registerHooks as registerModularCardSrdHooks } from "./modular-card/item/srd/index";
 import { VirtualNodeParser } from "./lib/render-engine/virtual-dom/virtual-node-parser";
 import { UtilsHooks } from "./utils/utils-hooks";
 import { ComponentFoundryConnector } from "./lib/render-engine/component-foundry-connector";
 import { UtilsFoundry } from "./utils/utils-foundry";
+import { ItemSheetHooks } from "./modular-card/item/item-sheet-hooks";
 
 UtilsHooks.registerHooks();
 VirtualNodeParser.init();

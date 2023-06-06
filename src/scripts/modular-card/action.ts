@@ -1,8 +1,7 @@
 import { provider } from "../provider/provider";
 import { ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
-import { UtilsLog } from "../utils/utils-log";
-import { ChatPartIdData } from "./item-card-helpers";
+import { ChatPartIdData } from "./item/item-card-helpers";
 import { ActionPermissionCheck } from "./modular-card-part";
 
 type ServerResponse<T> = {success: true; response: T} | {success: false; errorMessage: any[], stackTrace?: string[], errorType: 'warn' | 'error'};

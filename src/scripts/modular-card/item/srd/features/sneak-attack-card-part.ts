@@ -1,22 +1,23 @@
-import type { RoundData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/client/data/documents/combat";
-import { IAfterDmlContext, IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
-import { DocumentListener } from "../../../lib/db/document-listener";
-import { UtilsDocument } from "../../../lib/db/utils-document";
-import { RunOnce } from "../../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
-import { UtilsRoll } from "../../../lib/roll/utils-roll";
-import { UtilsCompare } from "../../../lib/utils/utils-compare";
-import { ValueReader } from "../../../provider/value-provider";
-import { staticValues } from "../../../static-values";
-import { DamageType, MyActor, MyItem } from "../../../types/fixed-types";
-import { UtilsItem } from "../../../utils/utils-item";
-import { Action } from "../../action";
+import { RoundData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/client/data/documents/combat";
+import { ITrigger, IDmlContext, IAfterDmlContext } from "../../../../lib/db/dml-trigger";
+import { DocumentListener } from "../../../../lib/db/document-listener";
+import { UtilsDocument } from "../../../../lib/db/utils-document";
+import { RunOnce } from "../../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../../lib/render-engine/component";
+import { UtilsRoll } from "../../../../lib/roll/utils-roll";
+import { UtilsCompare } from "../../../../lib/utils/utils-compare";
+import { ValueReader } from "../../../../provider/value-provider";
+import { staticValues } from "../../../../static-values";
+import { DamageType, MyActor, MyItem } from "../../../../types/fixed-types";
+import { UtilsFoundry } from "../../../../utils/utils-foundry";
+import { UtilsItem } from "../../../../utils/utils-item";
+import { Action } from "../../../action";
+import { ModularCardInstance, ModularCard, BeforeCreateModuleCardEvent, ModularCardTriggerData } from "../../../modular-card";
+import { createPermissionCheckAction, CreatePermissionCheckArgs, PermissionResponse, ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../../../modular-card-part";
+import { ManualDamageSource, DamageCardPart } from "../../base";
 import { BaseCardComponent } from "../../base/base-card-component";
-import { DamageCardData, DamageCardPart, ManualDamageSource } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
-import { BeforeCreateModuleCardEvent, ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
-import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart, PermissionResponse } from "../../modular-card-part";
-import { UtilsFoundry } from "../../../utils/utils-foundry";
+
 
 export interface SrdSneakAttackCardData {
   itemUuid: string;
