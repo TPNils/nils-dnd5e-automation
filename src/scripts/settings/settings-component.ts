@@ -200,7 +200,7 @@ const allTabConfigs: TabLayoutConfig[] = [
           <div class="separator"></div>
         </virtual>
         <virtual *for="let group of tab.groups">
-          <nd5e-settings-item-page *for="let setting of group" [data-setting]="setting.key" [data-auto-save]="setting.autoSave"></nd5e-settings-item-page>
+          <nd5e-settings-item *for="let setting of group" [data-setting]="setting.key" [data-auto-save]="setting.autoSave"></nd5e-settings-item>
           <div class="separator"></div>
         </virtual>
       </div>

@@ -64,7 +64,7 @@ import { UtilsLog } from "../utils/utils-log";
 export class SettingsItemComponent implements OnInit {
   
   public static selector(): string {
-    return `${staticValues.code}-settings-item-page`;
+    return `${staticValues.code}-settings-item`;
   }
 
   public setting: SettingConfig<any> & {module?: string};
