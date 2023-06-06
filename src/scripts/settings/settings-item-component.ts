@@ -73,7 +73,6 @@ export class SettingsItemComponent implements OnInit {
   public canEdit = false;
   
   public onInit(args: OnInitParam) {
-    UtilsLog.debug('init', this.settingKey)
     args.addStoppable(
       this.settingKey$
         .switchMap(settingKey => ValueReader.mergeObject({
@@ -81,9 +80,6 @@ export class SettingsItemComponent implements OnInit {
           settingValue: DocumentListener.listenSettingValue<string>(settingKey),
         }))
         .listen(({settingKey, settingValue}) => {
-          // TODO in V10, listen settings doesn't seem to work
-          //   in V8 listener seems to work but doesn't rerender
-          UtilsLog.debug(settingKey, settingValue)
           this.settingKey = settingKey;
           this.setting = game.settings.settings.get(this.settingKey);
           this.renderType = null;

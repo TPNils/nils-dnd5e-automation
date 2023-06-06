@@ -1,6 +1,7 @@
 import { RunOnce } from "../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../lib/render-engine/component";
 import { staticValues } from "../static-values";
+import { UtilsLog } from "../utils/utils-log";
 
 interface TabLayoutConfig {
   key: string;

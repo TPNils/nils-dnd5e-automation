@@ -7,6 +7,106 @@ import { StoredEventCallback, VirtualAttributeNode, VirtualChildNode, VirtualEve
 import { VirtualTextNode } from "./virtual-text-node";
 
 const domEscapeCharactersByCode = new Map<string, string>();
+interface DomAttributeDescribe {
+  tag: string;
+  attribute: string;
+  type: 'string' | 'boolean' | 'number' | 'function' | 'unknown';
+}
+interface DomNodeDescribe {
+  tag: string;
+  attributes: Map<string, DomAttributeDescribe>;
+}
+class DomAttributeDescribes {
+  #describesByKey = new Map<string, DomNodeDescribe>();
+
+  public getType(node: Element, attribute: string): string {
+    if (!this.#describesByKey.has(node.tagName)) {
+      const keys = new Set<string>();
+      const readonlyKeys = new Set<string>();
+      let loopingKeys = node;
+      while (loopingKeys != null) {
+        for (const key of Object.keys(loopingKeys)) {
+          keys.add(key);
+          const descriptor = Object.getOwnPropertyDescriptor(loopingKeys, key);
+          if (descriptor) {
+            if (descriptor.writable === false) {
+              readonlyKeys.add(key);
+            } else if (descriptor.get && !descriptor.set) {
+              readonlyKeys.add(key);
+            }
+          }
+        }
+        loopingKeys = Object.getPrototypeOf(loopingKeys);
+      }
+
+      const nodeDescribe: DomNodeDescribe = {
+        tag: node.tagName,
+        attributes: new Map(),
+      }
+      this.#describesByKey.set(nodeDescribe.tag, nodeDescribe);
+
+      const elem = document.createElement(nodeDescribe.tag);
+      for (const key of keys) {
+        const attrDescribe: DomAttributeDescribe = {
+          tag: nodeDescribe.tag,
+          attribute: key.toLowerCase(),
+          type: 'unknown',
+        }
+        nodeDescribe.attributes.set(attrDescribe.attribute, attrDescribe);
+
+        if (node[key] == null) {
+          if (key.startsWith('on')) {
+            attrDescribe.type = 'function';
+          } else if (!readonlyKeys.has(key)) {
+            // Check if we can write that data type
+            try {
+              if (attrDescribe.type === 'unknown') {
+                elem[key] = 1;
+                if (elem[key] === 1) {
+                  attrDescribe.type = 'number';
+                }
+              }
+            } catch {/*ignore*/}
+            try {
+              if (attrDescribe.type === 'unknown') {
+                elem[key] = 'a';
+                if (elem[key] === 'a') {
+                  attrDescribe.type = 'string';
+                }
+              }
+            } catch {/*ignore*/}
+          }
+        } else {
+          switch (typeof node[key]) {
+            case 'bigint': {
+              attrDescribe.type = 'number';
+              break;
+            }
+            case 'boolean':
+            case 'function':
+            case 'number':
+            case 'string': {
+              attrDescribe.type = typeof node[key] as DomAttributeDescribe['type'];
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return this.#describesByKey.get(node.tagName).attributes.get(attribute.toLowerCase())?.type;
+  }
+
+  public getValue(node: Element, attribute: string): any {
+    const type = this.getType(node, attribute);
+    if (type == null) {
+      return node.getAttribute(attribute);
+    } else {
+      return node[attribute];
+    }
+  }
+}
+const domAttributeDescribes = new DomAttributeDescribes();
 type DomAction = {
 
 } & ({
@@ -341,6 +441,11 @@ export class VirtualNodeRenderer {
                 break;
               }
               case 'setAttribute': {
+                // Some attributes need to be updated with javascript
+                // https://developer.mozilla.org/en-US/docs/Glossary/IDL
+                if (domAttributeDescribes.getType(item.node, item.attrName) === 'boolean') {
+                  item.node[item.attrName] = AttributeParser.parseBoolean(item.value);
+                }
                 if (!item.preventInput && Component.isComponentElement(item.node)) {
                   item.node.setInput(item.attrName, item.value);
                 } else {
