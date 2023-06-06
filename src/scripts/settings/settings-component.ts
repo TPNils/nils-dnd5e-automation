@@ -179,7 +179,7 @@ const allTabConfigs: TabLayoutConfig[] = [
         <virtual *if="tab.presets != null">
           <div class="preset-selector">
             <p>
-              These are presets for this settings tab and don't affect other tabs.
+              These are presets for this {{localize("${staticValues.moduleName}." + tab.key)}} tab and won't affect other tabs.
             </p>
             <p>
               The presets are designed to help you find a starting point on how you want to play.
