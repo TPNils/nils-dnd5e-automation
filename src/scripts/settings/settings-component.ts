@@ -185,6 +185,9 @@ const allTabConfigs: TabLayoutConfig[] = [
               The presets are designed to help you find a starting point on how you want to play.
               If none of the presets fit your needs, you can select the best one and tweak the individual settings below.
             </p>
+            <p>
+              These settings update in real time, no need to refresh before the changes apply.
+            </p>
             <label *for="let presetKey in tab.presets">
               <input type="radio" name="{{tab.key}}" value="{{presetKey}}" checked="{{this.selectedPresetPerTab[tab.key] === presetKey}}" (change)="this.setSelectedTab(tab.key, presetKey)"/>
               {{localize('${staticValues.moduleName}.' + tab.key + '-presets-' + presetKey)}}
