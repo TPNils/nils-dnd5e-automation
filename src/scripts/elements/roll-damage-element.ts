@@ -140,10 +140,15 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
       background: #f2f2e3;
       border: 1px solid #b5b3a4;
       line-height: 0;
-      height: calc(1.5em - 1px);
-      width: calc(1.5em - 1px);
+      height: calc(var(--button-height) - calc(var(--button-height) / 5));
+      width: calc(var(--button-height) - calc(var(--button-height) / 5));
       margin: 0 1px;
-      padding: 0
+      padding: 0;
+
+      > i {
+        font-size: .7em;
+        transform: translateX(10%);
+      }
     }
     
     .damage-source-toggle {

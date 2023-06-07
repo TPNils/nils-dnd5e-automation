@@ -85,7 +85,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
   `,
   style: scss`
   @import 'overlay.scss';
-  
+
   :host {
     display: block;
     font-size: var(--font-size-14, 14px);
@@ -123,8 +123,9 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
   .roll-wrapper .advantage-icon,
   .roll-wrapper .disadvantage-icon,
   .roll-wrapper .normal-mode-icon {
-    width: calc(var(--button-height) - 4px);
-    height: calc(var(--button-height) - 4px)
+    display: block;
+    width: calc(var(--button-height) - var(--button-height) / 5);
+    height: calc(var(--button-height) - var(--button-height) / 5);
   }
   
   .roll-wrapper .advantage-icon .d20 {
@@ -151,15 +152,15 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
     background: #f2f2e3;
     border: 1px solid #b5b3a4;
     line-height: 0;
-    height: calc(1.5em - 1px);
-    width: calc(1.5em - 1px);
+    height: calc(var(--button-height) - calc(var(--button-height) / 5));
+    width: calc(var(--button-height) - calc(var(--button-height) / 5));
     margin: 0 1px;
-    padding: 0
-  }
-  
-  .roll-wrapper .mode-minus>i,
-  .roll-wrapper .mode-plus>i {
-    font-size: .7em
+    padding: 0;
+
+    > i {
+      font-size: .7em;
+      transform: translateX(10%);
+    }
   }
   
   .roll-wrapper .mode-minus[disabled],

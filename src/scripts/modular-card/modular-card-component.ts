@@ -49,7 +49,6 @@ import { UtilsCompare } from "../lib/utils/utils-compare";
     .item-card {
       font-style: normal;
       font-size: var(--font-size-12, 12px);
-      --button-height: calc(2em - 2px);
     }
 
     :deep button {
