@@ -101,7 +101,7 @@ export class ModularCardComponent implements OnInit {
     const messageId = messageIdElement.getAttribute('data-message-id');
     const messageListener = DocumentListener.listenUuid<ChatMessage>(game.messages.get(messageId).uuid);
     args.addStoppable(
-      messageListener.listen(async message => {
+      messageListener.filter(msg => msg != null).listen(async message => {
         const content = await ModularCardComponent.calcContent(message);
         if (this.body !== content.body || !UtilsCompare.deepEquals(this.erroredTypes, content.errors)) {
           this.body = content.body;
