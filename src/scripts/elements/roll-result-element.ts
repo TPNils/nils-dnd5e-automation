@@ -68,7 +68,7 @@ const defaultDisplayType: DisplayType = 'result';
   .boxed {
     position: relative;
     margin: 0;
-    line-height: 1.5em;
+    line-height: calc(calc(26 / 14) * 1em);
     text-align: center;
     background: rgba(0, 0, 0, .1);
     border: 1px solid var(--color-border-light-2, #999);
