@@ -20,7 +20,7 @@ import { UtilsCompare } from "../lib/utils/utils-compare";
       <slot name="not-installed-placeholder"></slot>
     </div>
   `,
-  style: /*css*/`
+  style: scss`
     .placeholder {
       display: none;
     }
@@ -60,28 +60,6 @@ import { UtilsCompare } from "../lib/utils/utils-compare";
       border: 2px groove #eeede0;
       height: var(--button-height);
       line-height: calc(var(--button-height) - 4px);
-    }
-    
-    :deep .overlay {
-      display: flex;
-      position: absolute;
-      left: 0px;
-      top: 0px;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      padding: 3px;
-    }
-    
-    :deep .overlay > .left,
-    :deep .overlay > .right {
-      pointer-events: initial;
-      display: flex;
-      width: fit-content;
-    }
-    
-    :deep .overlay > .middle {
-      flex-grow: 1;
     }
     
     /* default foundry css */

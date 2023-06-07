@@ -71,8 +71,9 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
       </div>
     </div>
   `,
-  style: /*css*/`
-    
+  style: scss`
+    @import 'overlay.scss';
+  
     :host {
       display: block;
       font-size: var(--font-size-14, 14px);

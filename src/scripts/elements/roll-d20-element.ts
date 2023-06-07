@@ -83,7 +83,9 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
       </div>
     </div>
   `,
-  style: /*css*/`
+  style: scss`
+  @import 'overlay.scss';
+  
   :host {
     display: block;
     font-size: var(--font-size-14, 14px);

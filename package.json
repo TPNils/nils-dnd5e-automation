@@ -15,7 +15,8 @@
     "reupload": "gulp reupload",
     "updateSrcPacks": "gulp updateSrcPacks",
     "updateZipManifestForGithub": "gulp updateZipManifestForGithub",
-    "updateExternalManifestForGithub": "gulp updateExternalManifestForGithub"
+    "updateExternalManifestForGithub": "gulp updateExternalManifestForGithub",
+    "test": "gulp test"
   },
   "author": "TPNils",
   "license": "MIT",
