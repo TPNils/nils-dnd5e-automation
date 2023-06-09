@@ -1,7 +1,6 @@
 import { AnyNodeData } from "../../../../types/html-data";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
@@ -199,7 +198,13 @@ export function AsyncAttribute(config?: AttributeConfig | string) {
         this[asyncAttributeSymbol] = {};
       }
       if (!this[asyncAttributeSymbol][propertyKey]) {
-        this[asyncAttributeSymbol][propertyKey] = new ValueProvider();
+        if (arg instanceof ValueProvider) {
+          // Allow to set the initial value
+          this[asyncAttributeSymbol][propertyKey] = arg;
+          return;
+        } else {
+          this[asyncAttributeSymbol][propertyKey] = new ValueProvider();
+        }
       }
       this[asyncAttributeSymbol][propertyKey].set(arg);
     };
