@@ -1,33 +1,25 @@
 import { registerHooks as registerHtmlHooks } from "./global-html-listener";
 import { registerHooks as registerOverrideHooks } from "./override/index.js";
 import { provider } from "./provider/provider";
-import { ModularCard } from "./modular-card/modular-card";
 import { staticValues } from "./static-values";
 import { ReusableDiceTerm } from "./lib/roll/reusable-dice-term";
 import { registerHooks as registerHooksElement } from "./elements/index";
 import { ModuleSettings } from "./settings/module-settings";
-import { registerHooks as registerModularCardBaseHooks } from "./modular-card/item/base/index";
-import { registerHooks as registerModularCardSrdHooks } from "./modular-card/item/srd/index";
+import { registerHooks as registerModularCardHooks } from "./modular-card/index";
 import { VirtualNodeParser } from "./lib/render-engine/virtual-dom/virtual-node-parser";
 import { UtilsHooks } from "./utils/utils-hooks";
 import { ComponentFoundryConnector } from "./lib/render-engine/component-foundry-connector";
-import { UtilsFoundry } from "./utils/utils-foundry";
-import { ItemSheetHooks } from "./modular-card/item/item-sheet-hooks";
 
 UtilsHooks.registerHooks();
 VirtualNodeParser.init();
 registerHooksElement();
 ReusableDiceTerm.registerHooks();
-ItemSheetHooks.registerHooks();
 registerHtmlHooks();
 provider.registerHooks();
 registerOverrideHooks()
-ModularCard.registerHooks();
 ModuleSettings.registerHooks();
-registerModularCardBaseHooks();
-registerModularCardSrdHooks();
+registerModularCardHooks();
 ComponentFoundryConnector.registerHooks();
-globalThis.UtilsFoundry = UtilsFoundry;
 
 Hooks.on('init', () => {
   const hbsFiles: string[] = [];

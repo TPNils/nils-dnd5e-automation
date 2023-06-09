@@ -13,6 +13,9 @@ export class UtilsDiceSoNice {
   * @returns {Promise<boolean>} when resolved true if the animation was displayed, false if not.
    */
   public static async showRoll({roll, user, rollMode, showUserIds}: ShowRollRequest): Promise<boolean> {
+    if (!roll || !roll.terms?.length || roll.total == null) {
+      return false;
+    }
     if (!(game as any).dice3d) {
       return false;
     }

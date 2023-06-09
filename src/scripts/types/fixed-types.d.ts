@@ -462,9 +462,13 @@ export type MyActor = BaseDocument<MyActorData, ActorData> & {
   isOwner: boolean;
   isToken: boolean;
   update(data: any, context?: any);
+  getRollData: () => {[key: string]: any};
+  rollDeathSave(options?: D20RollOptions): Promise<Roll>;
+  rollInitiative(options?: D20RollOptions): Promise<Roll>;
   rollSkill(skillId: keyof MyActorData['skills'], options?: D20RollOptions): Promise<Roll>;
   rollAbilityTest(abilityId: keyof MyActorData['abilities'], options?: D20RollOptions): Promise<Roll>;
   rollAbilitySave(abilityId: keyof MyActorData['abilities'], options?: D20RollOptions): Promise<Roll>;
+  rollToolCheck(toolId: string, options?: Record<string, any>): Promise<Roll>;
 }
 
 export type MyCompendiumCollection = CompendiumCollection & BaseDocument<CompendiumCollection.Metadata>;

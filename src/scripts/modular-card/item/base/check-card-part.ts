@@ -110,7 +110,7 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
     return {targetCache: cache};
   }
 
-  private static rollClick = new Action<{event: CustomEvent<{userBonus?: string}>; targetId: string;} & ChatPartIdData>('CheckOnRollClick')
+  private static rollClick = new Action<{event: CustomEvent<{userBonus?: string}>; targetId: string;} & ChatPartIdData>('ItemCheckOnRollClick')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
     .addSerializer(ItemCardHelpers.getCustomEventSerializer())
@@ -127,7 +127,7 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
       return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     })
     
-private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>; targetId: string;} & ChatPartIdData>('AttackOnModeChange')
+private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>; targetId: string;} & ChatPartIdData>('ItemCheckOnModeChange')
   .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
   .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
   .addSerializer(ItemCardHelpers.getCustomEventSerializer())
