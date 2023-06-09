@@ -28,7 +28,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
         [data-highlight-total-on-first-term]="this.highlightTotalOnFirstTerm"
         [data-display-type]="this.hasReadPermission ? '' : this.readHiddenDisplayType"
         [data-override-max-roll]="this.overrideMaxRoll">
-        <div slot="top">
+        <div slot="{{bonusPosition === 'inside' ? 'top' : 'between'}}">
           <input *if="this.hasInteractPermission"
             class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
             type="text"
@@ -63,7 +63,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
           </slot>
         </button>
         
-        <input *if="this.showBonus && this.hasInteractPermission"
+        <input *if="(showBonus || bonusPosition === 'outside') && this.hasInteractPermission"
           autofocus
           class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
           type="text"
@@ -235,6 +235,9 @@ export class RollD20Element implements OnInit {
     }
   }
 
+  @Attribute({name: 'data-bonus-position', dataType: 'string'})
+  public bonusPosition: 'inside' | 'outside' = 'inside';
+
   /**
    * The roll mode when the roll was not rolled yet
    */
@@ -311,7 +314,7 @@ export class RollD20Element implements OnInit {
         .switchMap(interactionPermission => UtilsDocument.hasPermissionsFromString(interactionPermission))
         .listen(response => {
           this.hasInteractPermission = response.some(check => check.result);
-        })
+        }),
     )
   }
 

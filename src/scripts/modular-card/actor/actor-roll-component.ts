@@ -214,6 +214,7 @@ const rollTypeHandlers: Dnd5eRollHandler[] = [
       [data-show-bonus]="roll.total != null"
       [data-roll-mode]="this.d20rollMode"
       [data-bonus-formula]="this.userBonus"
+      data-bonus-position="outside"
 
       [data-interaction-permission]="this.interactionPermission"
       [data-read-permission]="this.readPermission"

@@ -21,7 +21,7 @@ export interface RollEventData<T> {
         [data-highlight-total-on-first-term]="this.highlightTotalOnFirstTerm"
         [data-display-type]="this.hasReadPermission ? '' : this.readHiddenDisplayType"
         [data-override-max-roll]="this.overrideMaxRoll">
-        <div slot="top">
+        <div slot="{{bonusPosition === 'inside' ? 'top' : 'between'}}">
           <input *if="this.hasInteractPermission"
             class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
             type="text"
@@ -40,7 +40,7 @@ export interface RollEventData<T> {
           </slot>
         </button>
         
-        <input *if="this.showBonus && this.hasInteractPermission"
+        <input *if="(showBonus || bonusPosition === 'outside') && this.hasInteractPermission"
           autofocus
           class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
           type="text"

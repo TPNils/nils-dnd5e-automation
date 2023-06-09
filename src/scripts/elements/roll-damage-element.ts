@@ -28,7 +28,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
         [data-roll]="this.roll"
         [data-override-formula]="this.overrideFormula"
         [data-display-type]="this.hasReadPermission ? '' : this.readHiddenDisplayType">
-        <div slot="top">
+        <div slot="{{bonusPosition === 'inside' ? 'top' : 'between'}}">
           <input *if="this.hasInteractPermission"
             class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
             type="text"
@@ -47,7 +47,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
           </slot>
         </button>
         
-        <input *if="this.showBonus && this.hasInteractPermission"
+        <input *if="(showBonus || bonusPosition === 'outside') && this.hasInteractPermission"
           autofocus
           class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
           type="text"
@@ -239,6 +239,9 @@ export class RollDamageElement implements OnInit {
       this.userBonus = value;
     }
   }
+
+  @Attribute({name: 'data-bonus-position', dataType: 'string'})
+  public bonusPosition: 'inside' | 'outside' = 'inside';
 
   @Attribute({name: 'data-override-formula', dataType: 'string'})
   public overrideFormula: string;

@@ -18,6 +18,10 @@ const defaultDisplayType: DisplayType = 'result';
     </div>
     <div *if="this.displayType === 'result'">
       <div class="roll-total boxed {{this.rollCssClass}}">{{this.roll.total}}</div>
+
+      <div class="between-slot">
+        <slot name="between"></slot>
+      </div>
     
       <div class="top-slot">
         <slot name="top"></slot>
