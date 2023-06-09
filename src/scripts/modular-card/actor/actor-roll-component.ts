@@ -7,11 +7,13 @@ import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { UtilsRoll } from "../../lib/roll/utils-roll";
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { MyActorData } from "../../types/fixed-types";
+import { MyActor, MyActorData } from "../../types/fixed-types";
 import { UtilsFoundry, Version } from "../../utils/utils-foundry";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item/item-card-helpers";
 import { CreatePermissionCheckArgs, createPermissionCheckAction } from "../modular-card-part";
+import { RunOnce } from "../../lib/decorator/run-once";
+import { UtilsLog } from "../../utils/utils-log";
 
 export interface Dnd5eRollHandler {
   type: string;
@@ -324,6 +326,17 @@ export class ActorRollComponent implements OnInit {
 
   public onRollMode(event: CustomEvent<RollD20EventData<RollMode>>): void {
     ActorRollComponent.modeChange({event, messageId: this.messageId});
+  }
+  
+  @RunOnce()
+  public static registerHooks(): void {
+    const fastForwardCallback = (actor: MyActor, config: {fastForward: boolean}) => {
+      config.fastForward = true;
+    }
+    Hooks.on('dnd5e.preRollAbilityTest', fastForwardCallback);
+    Hooks.on('dnd5e.preRollAbilitySave', fastForwardCallback);
+    Hooks.on('dnd5e.preRollToolCheck', fastForwardCallback);
+    Hooks.on('dnd5e.preRollSkill', fastForwardCallback);
   }
 
 }
