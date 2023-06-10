@@ -87,6 +87,38 @@ function showDiceSoNice(msgData: ChatMessageData, roll: Roll): Promise<boolean> 
   return UtilsDiceSoNice.showRoll({roll: roll, rollMode: rollMode, showUserIds: whispers})
 }
 
+const toolHandlerDndV2 = {
+  type: 'tool',
+  async doRoll(msg: ChatMessage, mode: string | null, userBonus: string | null) {
+    const msgData = UtilsFoundry.getModelData(msg);
+    const actor = await UtilsDocument.actorFromUuid(`Actor.${msgData.speaker.actor}`);
+    const dndFlag = msg.getFlag('dnd5e', 'roll') as {toolId: string };
+    const roll = deepClone(getRollFromMsg(msg));
+    if (mode == null) {
+      mode = getRollMode(roll);
+    }
+    if (userBonus == null) {
+      userBonus = msg.getFlag(staticValues.moduleName, 'userBonus') as string | null;
+    }
+
+    const result = await UtilsRoll.modifyRoll(roll, async () => {
+      const rolls: Promise<Roll>[] = [];
+      rolls.push(actor.rollToolCheck(dndFlag.toolId, {
+        advantage: mode === 'advantage',
+        disadvantage: mode === 'disadvantage',
+        fastForward: true,
+        chatMessage: false,
+      }));
+      if (userBonus) {
+        rolls.push(new Roll(userBonus, actor.getRollData()).roll({async: true}));
+      }
+      return UtilsRoll.mergeRolls(...(await Promise.all(rolls)))
+    });
+    await saveRollToMsg(msg, result.result, userBonus);
+    showDiceSoNice(msgData, result.rollToDisplay);
+  }
+}
+
 const rollTypeHandlers: Dnd5eRollHandler[] = [
   {
     type: 'skill',
@@ -105,37 +137,6 @@ const rollTypeHandlers: Dnd5eRollHandler[] = [
       const result = await UtilsRoll.modifyRoll(roll, async () => {
         const rolls: Promise<Roll>[] = [];
         rolls.push(actor.rollSkill(dndFlag.skillId, {
-          advantage: mode === 'advantage',
-          disadvantage: mode === 'disadvantage',
-          fastForward: true,
-          chatMessage: false,
-        }));
-        if (userBonus) {
-          rolls.push(new Roll(userBonus, actor.getRollData()).roll({async: true}));
-        }
-        return UtilsRoll.mergeRolls(...(await Promise.all(rolls)))
-      });
-      await saveRollToMsg(msg, result.result, userBonus);
-      showDiceSoNice(msgData, result.rollToDisplay);
-    }
-  },
-  {
-    type: 'tool',
-    async doRoll(msg: ChatMessage, mode: string | null, userBonus: string | null) {
-      const msgData = UtilsFoundry.getModelData(msg);
-      const actor = await UtilsDocument.actorFromUuid(`Actor.${msgData.speaker.actor}`);
-      const dndFlag = msg.getFlag('dnd5e', 'roll') as {toolId: string };
-      const roll = deepClone(getRollFromMsg(msg));
-      if (mode == null) {
-        mode = getRollMode(roll);
-      }
-      if (userBonus == null) {
-        userBonus = msg.getFlag(staticValues.moduleName, 'userBonus') as string | null;
-      }
-
-      const result = await UtilsRoll.modifyRoll(roll, async () => {
-        const rolls: Promise<Roll>[] = [];
-        rolls.push(actor.rollToolCheck(dndFlag.toolId, {
           advantage: mode === 'advantage',
           disadvantage: mode === 'disadvantage',
           fastForward: true,
@@ -338,6 +339,8 @@ export class ActorRollComponent implements OnInit {
   public static registerHooks(): void {
     UtilsHooks.init(() => {
       if (UtilsFoundry.getSystemVersion() >= new Version(2)) {
+        rollTypeHandlers.push(toolHandlerDndV2);
+        ActorRollComponent.SUPPORTED_DND5E_TYPES = rollTypeHandlers.map(h => h.type);
         const fastForwardCallback = (actor: MyActor, config: {fastForward: boolean}) => {
           config.fastForward = true;
         }
