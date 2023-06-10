@@ -36,11 +36,13 @@
         "type": "system"
       },
       {
-        "id": "lib-wrapper",
-        "type": "module"
-      },
-      {
         "id": "socketlib",
+        "type": "module"
+      }
+    ],
+    "recommends": [
+      {
+        "id": "lib-wrapper",
         "type": "module"
       }
     ],

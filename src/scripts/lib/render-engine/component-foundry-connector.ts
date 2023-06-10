@@ -1,5 +1,6 @@
 import { staticValues } from "../../static-values";
 import { UtilsHooks } from "../../utils/utils-hooks";
+import { UtilsLibWrapper } from "../../utils/utils-lib-wrapper";
 import { RunOnce } from "../decorator/run-once";
 import { Component, ComponentElement } from "./component";
 
@@ -133,8 +134,8 @@ export class ComponentFoundryConnector {
     });
 
     // Override render behavior
-    UtilsHooks.setup().then(() => {
-      libWrapper.register(staticValues.moduleName, 'ChatLog.prototype.updateMessage', updateMessage, 'MIXED');
+    UtilsHooks.chatRendered(() => {
+      UtilsLibWrapper.mixed('ChatLog.prototype.updateMessage', updateMessage);
     });
   }
 

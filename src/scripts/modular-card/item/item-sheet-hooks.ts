@@ -3,7 +3,7 @@ import { RunOnce } from "../../lib/decorator/run-once";
 import { staticValues } from "../../static-values";
 import { MyItem, MyItemData } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
-import { UtilsHooks } from "../../utils/utils-hooks";
+import { UtilsLibWrapper } from "../../utils/utils-lib-wrapper";
 
 
 /**
@@ -13,9 +13,7 @@ export class ItemSheetHooks {
   
   @RunOnce()
   public static registerHooks(): void {
-    UtilsHooks.init().then(() => {
-      libWrapper.register(staticValues.moduleName, 'CONFIG.Item.documentClass.prototype.prepareDerivedData', ItemSheetHooks.prepareDerivedData, 'WRAPPER');
-    })
+    UtilsLibWrapper.wrapper('CONFIG.Item.documentClass.prototype.prepareDerivedData', ItemSheetHooks.prepareDerivedData);
     Hooks.on('renderItemSheet5e', ItemSheetHooks.renderItemSheet);
   }
 

@@ -1,9 +1,9 @@
 import { ChatMessageDataConstructorData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs/chatMessageData";
 import { ModularCard } from "../modular-card/modular-card";
-import { staticValues } from "../static-values";
 import { MyActor, MyItem } from "../types/fixed-types";
 import { UtilsFoundry, Version } from "../utils/utils-foundry";
 import { UtilsHooks } from "../utils/utils-hooks";
+import { UtilsLibWrapper } from "../utils/utils-lib-wrapper";
 
 interface ItemUseOptions {
   configureDialog?: boolean;
@@ -85,12 +85,11 @@ export function registerHooks(): void {
   UtilsHooks.setup().then(() => {
     if (UtilsFoundry.getSystemVersion() < new Version(2)) {
       // deprecated since 2.0.0, dnd5e hooks are the replacement
-      libWrapper.register(staticValues.moduleName, 'CONFIG.Item.documentClass.prototype.roll', roll, 'MIXED');
+      UtilsLibWrapper.mixed('CONFIG.Item.documentClass.prototype.roll', roll);
     }
-
-    // I want to use promises for displayCard so can't hook into dnd5e.preDisplayCard
-    libWrapper.register(staticValues.moduleName, 'CONFIG.Item.documentClass.prototype.displayCard', displayCard, 'MIXED');
   });
+  // I want to use promises for displayCard so can't hook into dnd5e.preDisplayCard
+  UtilsLibWrapper.mixed('CONFIG.Item.documentClass.prototype.displayCard', displayCard);
 
   // dnd 2.0.0 and up
   Hooks.on('dnd5e.preUseItem', (item: MyItem, config: ItemUseConfiguration, options: ItemUseOptions) => {

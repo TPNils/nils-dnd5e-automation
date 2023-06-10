@@ -9,8 +9,10 @@ import { registerHooks as registerModularCardHooks } from "./modular-card/index"
 import { VirtualNodeParser } from "./lib/render-engine/virtual-dom/virtual-node-parser";
 import { UtilsHooks } from "./utils/utils-hooks";
 import { ComponentFoundryConnector } from "./lib/render-engine/component-foundry-connector";
+import { UtilsLibWrapper } from "./utils/utils-lib-wrapper";
 
 UtilsHooks.registerHooks();
+UtilsLibWrapper.registerHooks();
 VirtualNodeParser.init();
 registerHooksElement();
 ReusableDiceTerm.registerHooks();
