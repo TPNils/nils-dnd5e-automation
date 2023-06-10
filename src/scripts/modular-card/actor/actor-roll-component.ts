@@ -7,13 +7,14 @@ import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
 import { UtilsRoll } from "../../lib/roll/utils-roll";
 import { ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { MyActor, MyActorData } from "../../types/fixed-types";
+import { D20RollOptions, MyActor, MyActorData } from "../../types/fixed-types";
 import { UtilsFoundry, Version } from "../../utils/utils-foundry";
 import { Action } from "../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item/item-card-helpers";
 import { CreatePermissionCheckArgs, createPermissionCheckAction } from "../modular-card-part";
 import { RunOnce } from "../../lib/decorator/run-once";
-import { UtilsLog } from "../../utils/utils-log";
+import { UtilsHooks } from "../../utils/utils-hooks";
+import { UtilsLibWrapper } from "../../utils/utils-lib-wrapper";
 
 export interface Dnd5eRollHandler {
   type: string;
@@ -43,9 +44,14 @@ async function saveRollToMsg(message: ChatMessage, roll: Roll, userBonus?: strin
     rolls[0] = roll.toJSON();
     updateData.rolls = rolls;
   } else {
-    updateData.roll = roll;
+    updateData.roll = JSON.stringify(roll.toJSON());
   }
-  await message.update(updateData);
+  await message.update(updateData, {diff: false});
+  if (UtilsFoundry.getGameVersion() < new Version(10)) {
+    // Reset cached roll so it evaluates it again with the new data
+    // @ts-ignore
+    message._roll = null;
+  }
 }
 
 function getRollMode(roll: Roll): string {
@@ -330,13 +336,26 @@ export class ActorRollComponent implements OnInit {
   
   @RunOnce()
   public static registerHooks(): void {
-    const fastForwardCallback = (actor: MyActor, config: {fastForward: boolean}) => {
-      config.fastForward = true;
-    }
-    Hooks.on('dnd5e.preRollAbilityTest', fastForwardCallback);
-    Hooks.on('dnd5e.preRollAbilitySave', fastForwardCallback);
-    Hooks.on('dnd5e.preRollToolCheck', fastForwardCallback);
-    Hooks.on('dnd5e.preRollSkill', fastForwardCallback);
+    UtilsHooks.init(() => {
+      if (UtilsFoundry.getSystemVersion() >= new Version(2)) {
+        const fastForwardCallback = (actor: MyActor, config: {fastForward: boolean}) => {
+          config.fastForward = true;
+        }
+        Hooks.on('dnd5e.preRollAbilityTest', fastForwardCallback);
+        Hooks.on('dnd5e.preRollAbilitySave', fastForwardCallback);
+        Hooks.on('dnd5e.preRollToolCheck', fastForwardCallback);
+        Hooks.on('dnd5e.preRollSkill', fastForwardCallback);
+      } else {
+        function fastForwardOverride(this: MyActor, wrapped: (...args: any[]) => any, ...args: [string, D20RollOptions]) {
+          args[1].fastForward = true;
+          return wrapped(...args)
+        }
+        
+        UtilsLibWrapper.wrapper('CONFIG.Actor.documentClass.prototype.rollSkill', fastForwardOverride);
+        UtilsLibWrapper.wrapper('CONFIG.Actor.documentClass.prototype.rollAbilityTest', fastForwardOverride);
+        UtilsLibWrapper.wrapper('CONFIG.Actor.documentClass.prototype.rollAbilitySave', fastForwardOverride);
+      }
+    })
   }
 
 }
