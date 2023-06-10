@@ -146,11 +146,17 @@ export interface FoundryManifestJsonV10 extends Omit<FoundryManifestJsonV8, 'nam
   exclusive: boolean;
 }
 
+export interface FoundryManifestJsonV11 extends Omit<FoundryManifestJsonV10, 'relationships'> {
+  relationships: FoundryManifestJsonV10['relationships'] & {
+    recommends?: Array<FoundryRelationship>;
+  },
+}
+
 export type FoundryManifestJson = {
   type: 'module' | 'system';
-  file: FoundryManifestJsonV10;
+  file: FoundryManifestJsonV11;
 };
-type FoundryManifestJsonFile = Partial<FoundryManifestJsonV8 & FoundryManifestJsonV10>;
+type FoundryManifestJsonFile = Partial<FoundryManifestJsonV8 & FoundryManifestJsonV11>;
 
 class FoundryManifest {
 
@@ -174,14 +180,14 @@ class FoundryManifest {
 
       this.manifest = {
         type: type,
-        file: FoundryManifest.toV10(json),
+        file: FoundryManifest.toV11(json),
       }
     }
     return this.manifest;
   }
 
-  private static toV10(input: FoundryManifestJsonFile): FoundryManifestJsonV10 {
-    const v10: Partial<FoundryManifestJsonV10> = {};
+  private static toV11(input: FoundryManifestJsonFile): FoundryManifestJsonV11 {
+    const v10: Partial<FoundryManifestJsonV11> = {};
     v10.authors = input.authors;
     if (input.author) {
       if (v10.authors == null) {
@@ -253,6 +259,7 @@ class FoundryManifest {
       requires: Array.from(relationshipRequiredById.values()),
       systems: Array.from(relationshipSystemsById.values()),
       conflicts: input.relationships?.conflicts,
+      recommends: input.relationships?.recommends,
     };
     v10.scripts = input.scripts;
     v10.socket = input.socket;
