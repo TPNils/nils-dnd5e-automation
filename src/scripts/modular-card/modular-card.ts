@@ -200,9 +200,15 @@ export class ModularCardInstance {
       this.inactiveData = ChatMessageAccessPropertyV10.wrap(deepClone(this.inactiveData), message, `flags.${staticValues.moduleName}.modularCardInactiveData`);
       this.meta = ChatMessageAccessPropertyV10.wrap(deepClone(this.meta), message, `flags.${staticValues.moduleName}.modularCardDataMeta`);
     } else if (UtilsFoundry.usesDocumentData(message)) {
-      setProperty(message.data, `flags.${staticValues.moduleName}.modularCardData`, this.inactiveData);
-      setProperty(message.data, `flags.${staticValues.moduleName}.modularCardInactiveData`, this.data);
-      setProperty(message.data, `flags.${staticValues.moduleName}.modularCardDataMeta`, this.meta);
+      message.data.update({
+        flags: {
+          [staticValues.moduleName]: {
+            modularCardData: this.data,
+            modularCardInactiveData: this.inactiveData,
+            modularCardDataMeta: this.meta,
+          }
+        }
+      })
     }
   }
 
@@ -347,11 +353,13 @@ export class ModularCardInstance {
     if (UtilsFoundry.usesDataModel(this.message)) {
       this.data = ChatMessageAccessPropertyV10.revoke(this.data);
       this.meta = ChatMessageAccessPropertyV10.revoke(this.meta);
+      this.inactiveData = ChatMessageAccessPropertyV10.revoke(this.inactiveData);
 
       const clone = new ModularCardInstance(new ChatMessage(this.message.toObject()));
 
       this.data = ChatMessageAccessPropertyV10.wrap(this.data, this.message, `flags.${staticValues.moduleName}.modularCardData`);
       this.meta = ChatMessageAccessPropertyV10.wrap(this.meta, this.message, `flags.${staticValues.moduleName}.modularCardDataMeta`);
+      this.inactiveData = ChatMessageAccessPropertyV10.wrap(this.data, this.message, `flags.${staticValues.moduleName}.modularCardInactiveData`);
 
       return clone;
     }
