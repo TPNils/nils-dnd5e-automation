@@ -1,13 +1,10 @@
 import { DocumentListener } from "../lib/db/document-listener";
-import { Stoppable } from "../lib/utils/stoppable";
 import { ValueProvider, ValueReader } from "../provider/value-provider";
 import { MyActor, MyItem } from "../types/fixed-types";
-import { ModularCard } from "./modular-card";
-import { ModularCardCreateArgs } from "./modular-card-part";
+import { ModularCard, ModularCardInstance } from "./modular-card";
 import { RunOnce } from "../lib/decorator/run-once";
 import { DmlTrigger } from "../lib/db/dml-trigger";
 import { UtilsHooks } from "../utils/utils-hooks";
-import { UtilsLog } from "../utils/utils-log";
 
 const onlinePlayersTrigger = new ValueProvider();
 const onlinePlayers: ValueReader<User[]> = onlinePlayersTrigger.map(() => {
@@ -19,78 +16,25 @@ const onlinePlayers: ValueReader<User[]> = onlinePlayersTrigger.map(() => {
 
 export class ModularCardRefresher {
 
-  private static uuidOrder: string[] = [];
-  private static listenersByUuid = new Map<string, Stoppable>();
+  private static uuidOrder = new ValueProvider<string[]>([]);
   private static maxListeners = 10;
 
   private static removeUuid(uuid: string): void {
-    ModularCardRefresher.uuidOrder.splice(ModularCardRefresher.uuidOrder.indexOf(uuid), 1);
-    const stoppable = ModularCardRefresher.listenersByUuid.get(uuid);
-    ModularCardRefresher.listenersByUuid.delete(uuid);
-    stoppable.stop();
+    ModularCardRefresher.uuidOrder.set(
+      ModularCardRefresher.uuidOrder.get().filter(id => id !== uuid)
+    );
   }
 
   private static addUuid(uuid: string): void {
-    if (ModularCardRefresher.listenersByUuid.has(uuid)) {
+    if (ModularCardRefresher.uuidOrder.get().includes(uuid)) {
       return;
     }
 
-    if (ModularCardRefresher.maxListeners === ModularCardRefresher.listenersByUuid.size) {
-      ModularCardRefresher.removeUuid(ModularCardRefresher.uuidOrder[0]);
+    if (ModularCardRefresher.maxListeners <= ModularCardRefresher.uuidOrder.get().length) {
+      ModularCardRefresher.removeUuid(ModularCardRefresher.uuidOrder.get()[0]);
     }
 
-    ModularCardRefresher.uuidOrder.push(uuid);
-    
-    let latestCreateArgs: ModularCardCreateArgs;
-    ModularCardRefresher.listenersByUuid.set(uuid, DocumentListener.listenUuid<ChatMessage>(uuid)
-      .switchMap(message => {
-        return ValueReader.mergeObject({
-          message: message,
-          parts: ModularCard.readModuleCard(message),
-          onlinePlayers: onlinePlayers,
-        });
-      })
-      .filter(({message, parts, onlinePlayers}) => {
-        // Not a modular message
-        if (!parts) {
-          return false;
-        }
-
-        // If the owner of the message is online, only they should execute the refresh
-        const isMessageUserOnline = onlinePlayers.includes(message.user);
-        if (isMessageUserOnline) {
-          return game.userId === message.user.id;
-        }
-
-        // fallback to the first online GM.
-        // If no valid users are found, no update will happen (which is fine)
-        const gmsSortedIds = onlinePlayers.filter(u => u.isGM).map(u => u.id).sort();
-        return gmsSortedIds[0] === game.userId;
-      })
-      .switchMap(({message, parts}) => {
-        return ValueReader.mergeObject({
-          message: message,
-          parts: parts,
-          item: parts.getItemUuid() == null ? null : DocumentListener.listenUuid<MyItem>(parts.getItemUuid()),
-          actor: parts.getActorUuid() == null ? null : DocumentListener.listenUuid<MyActor>(parts.getActorUuid()).first(),
-          token: parts.getTokenUuid() == null ? null : DocumentListener.listenUuid<TokenDocument>(parts.getTokenUuid()).first(),
-        })
-      }).listen((async (args) => {
-        if (args.item == null || args.actor == null || args.token == null) {
-          // Don't refresh
-          return;
-        }
-        if (latestCreateArgs == null) {
-          latestCreateArgs = args;
-          return;
-        }
-    
-        if (latestCreateArgs.item !== args.item || latestCreateArgs.actor !== args.actor || latestCreateArgs.token !== args.token) {
-          const updatedParts = await ModularCard.createInstanceNoDml(args, {type: 'visual', instance: args.parts});
-          await ModularCard.writeBulkModuleCards([{message: args.message, data: updatedParts}]);
-        }
-      }))
-    )
+    ModularCardRefresher.uuidOrder.set([...ModularCardRefresher.uuidOrder.get(), uuid]);
   }
 
   @RunOnce()
@@ -120,12 +64,124 @@ export class ModularCardRefresher {
     // Track online players
     Hooks.on('userConnected', (user: User, isConnected: boolean) => {
       onlinePlayersTrigger.set(null);
-    })
+    });
     
     // Trigger to detect initial online users
     UtilsHooks.ready(() => {
       onlinePlayersTrigger.set(null);
-    })
+    });
+
+    // Start listening for changes
+    {
+      const cacheByMsgUuid = new Map<string, {item: MyItem, actor: MyActor, token: TokenDocument}>();
+      ModularCardRefresher.uuidOrder
+        .switchMap(uuids => {
+          return ValueReader.mergeObject({
+            chatMessages: DocumentListener.listenUuid<ChatMessage>(uuids),
+            onlinePlayers: onlinePlayers,
+          })
+        })
+        .map(({chatMessages, onlinePlayers}) => {
+          const modularInstances: Array<{msg: ChatMessage, inst: ModularCardInstance}> = [];
+          for (const msg of chatMessages) {
+            const inst = ModularCard.readModuleCard(msg);
+            if (inst == null) {
+              continue;
+            }
+            
+            // If the owner of the message is online, only they should execute the refresh
+            const isMessageUserOnline = onlinePlayers.includes(msg.user);
+            if (isMessageUserOnline && game.userId !== msg.user.id) {
+              continue;
+            }
+
+            // fallback to the first online GM.
+            // If no valid users are found, no update will happen (which is fine)
+            const gmsSortedIds = onlinePlayers.filter(u => u.isGM).map(u => u.id).sort();
+            if (gmsSortedIds.length === 0 || gmsSortedIds[0] !== game.userId) {
+              continue;
+            }
+
+            modularInstances.push({msg, inst});
+          }
+          return modularInstances;
+        })
+        .switchMap(modularInstances => {
+          const itemUuids = new Set<string>();
+          const actorUuids = new Set<string>();
+          const tokenUuids = new Set<string>();
+          for (const modularInstance of modularInstances) {
+            itemUuids.add(modularInstance.inst.getItemUuid());
+            actorUuids.add(modularInstance.inst.getActorUuid());
+            tokenUuids.add(modularInstance.inst.getTokenUuid());
+          }
+          itemUuids.delete(null);
+          actorUuids.delete(null);
+          tokenUuids.delete(null);
+          itemUuids.delete(undefined);
+          actorUuids.delete(undefined);
+          tokenUuids.delete(undefined);
+          return ValueReader.mergeObject({
+            modularInstances: modularInstances,
+            items: DocumentListener.listenUuid<MyItem>(itemUuids),
+            actors: DocumentListener.listenUuid<MyActor>(actorUuids),
+            tokens: DocumentListener.listenUuid<TokenDocument>(tokenUuids),
+          });
+        })
+        .listen(async ({modularInstances, items, actors, tokens}) => {
+          const msgByUuid = new Map<string, ChatMessage>();
+          const itemByUuid = new Map<string, MyItem>();
+          const actorByUuid = new Map<string, MyActor>();
+          const tokenByUuid = new Map<string, TokenDocument>();
+          for (const modularInstance of modularInstances) {
+            msgByUuid.set(modularInstance.msg.uuid, modularInstance.msg);
+          }
+          for (const item of items) {
+            itemByUuid.set(item.uuid, item);
+          }
+          for (const actor of actors) {
+            actorByUuid.set(actor.uuid, actor);
+          }
+          for (const token of tokens) {
+            tokenByUuid.set(token.uuid, token);
+          }
+          
+          const updatesByMsgUuid = new Map<string, Promise<{message: ChatMessage, data: ModularCardInstance}>>();
+          for (const modularInstance of modularInstances) {
+            const item = itemByUuid.get(modularInstance.inst.getItemUuid());
+            const actor = actorByUuid.get(modularInstance.inst.getActorUuid());
+            const token = tokenByUuid.get(modularInstance.inst.getTokenUuid());
+            if (item == null || actor == null || token == null) {
+              // Don't refresh
+              continue;
+            }
+            
+            let latestCreateArgs = cacheByMsgUuid.get(modularInstance.msg.uuid);
+            if (latestCreateArgs == null) {
+              cacheByMsgUuid.set(modularInstance.msg.uuid, {item, actor, token});
+              continue;
+            }
+            
+      
+            if (latestCreateArgs.item !== item || latestCreateArgs.actor !== actor || latestCreateArgs.token !== token) {
+              updatesByMsgUuid.set(modularInstance.msg.uuid, 
+                ModularCard.createInstanceNoDml({item, actor, token}, {type: 'visual', instance: modularInstance.inst}).then(dml => (
+                  {
+                    message: modularInstance.msg,
+                    data: dml
+                  }
+                )))
+            }
+          }
+
+          if (updatesByMsgUuid.size === 0) {
+            return;
+          }
+
+          await ModularCard.writeBulkModuleCards(await Promise.all(updatesByMsgUuid.values()));
+        })
+
+    }
   }
 
 }

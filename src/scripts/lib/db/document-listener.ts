@@ -201,12 +201,12 @@ class SettingListener<T> extends ValueReader<T> {
 export class DocumentListener {
 
   public static listenUuid<T = FoundryDocument>(uuid: string): ValueReader<T>;
-  public static listenUuid<T = FoundryDocument>(uuid: string[]): ValueReader<T[]>;
-  public static listenUuid<T = FoundryDocument>(uuid: string | string[]): ValueReader<T> | ValueReader<T[]> {
+  public static listenUuid<T = FoundryDocument>(uuid: Iterable<string>): ValueReader<T[]>;
+  public static listenUuid<T = FoundryDocument>(uuid: string | Iterable<string>): ValueReader<T> | ValueReader<T[]> {
     if (typeof uuid === 'string') {
       return new UuidListener<T>(uuid);
     }
-    return ValueProvider.all(uuid.map(id => new UuidListener<T>(id)));
+    return ValueProvider.all(Array.from(uuid).map(id => new UuidListener<T>(id)));
   }
 
   public static listenSettingValue<T = any>(...settingKeyParts: string[]): ValueReader<T> {
