@@ -175,7 +175,7 @@ const allTabConfigs: TabLayoutConfig[] = [
       </div>
     </nav>
     <div class="wrapper" selected-tab="{{this.selectedTab}}">
-      <div *for="let tab of this.allTabs" class="tab {{tab.key}}">
+      <div *for="let tab of this.allTabs" class="tab {{tab.key}} {{this.selectedTab === tab.key ? 'selected' : ''}}">
         <virtual *if="tab.presets != null">
           <div class="preset-selector">
             <p>
@@ -227,6 +227,10 @@ const allTabConfigs: TabLayoutConfig[] = [
       grid-template-columns: 1fr 1fr;
     }
 
+    .wrapper .tab:not(.selected) {
+      display: none;
+    }
+
     .tab-section-header {
       grid-column: 1 / span 2;
       font-size: 1.5em;
@@ -241,11 +245,6 @@ const allTabConfigs: TabLayoutConfig[] = [
     .separator {
       grid-column: 1 / span 2;
       border-bottom: 1px solid #7a7971;
-    }
-
-    .wrapper:not([selected-tab="Visibility"]) .Visibility,
-    .wrapper:not([selected-tab="Automation"]) .Automation {
-      display: none;
     }
   `
 })
@@ -270,7 +269,6 @@ export class SettingsComponent {
 
   public selectedTab = allTabConfigs[0].key;
   public selectedPresetPerTab: Record<string, string> = {};
-  // TODO support variables in CSS during compile time so the CSS can be generated from this array
   public allTabs = allTabConfigs;
   private markChanged: () => void;
   public onInit(args: OnInitParam) {
