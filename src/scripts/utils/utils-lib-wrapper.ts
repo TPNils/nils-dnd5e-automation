@@ -64,7 +64,10 @@ class ModifiedFunctionWrapper {
               if (isLibWrapperActive()) {
                 libWrapper.unregister(staticValues.moduleName, this.target);
               } else {
-                // TODO
+                const parentTarget = this.target.split('.');
+                const childProp = parentTarget.pop();
+                const parent = getGlobalProperty(parentTarget.join('.'));
+                parent[childProp] = this.originalFunction;
               }
               modifiedFunctionsByTarget.delete(this.target);
             }
