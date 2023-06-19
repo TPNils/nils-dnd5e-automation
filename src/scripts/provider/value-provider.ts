@@ -48,6 +48,7 @@ export abstract class ValueReader<T> {
   }
   /**
    * @param predicate The filter method calls the predicate function one time for each element in the array.
+   * Will continue when returned true
    */
   public filter(predicate: (value: T) => boolean | Promise<boolean>): ValueReader<T> {
     return new Filter<T>(this, predicate);

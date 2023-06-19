@@ -108,21 +108,6 @@ export class ModularCardComponent implements OnInit {
           this.erroredTypes = content.errors;
         }
       }),
-      messageListener
-        // TODO Only 1 user should update the message, even when the creator is offline
-        .map(message => ({message: message, parts: ModularCard.readModuleCard(message)}))
-        .filter(parts => !!parts)
-        .switchMap(({message, parts}) => {
-          return ValueReader.mergeObject({
-            message: message,
-            parts: parts,
-            item: parts.getItemUuid() == null ? null : DocumentListener.listenUuid<MyItem>(parts.getItemUuid()),
-            actor: parts.getActorUuid() == null ? null : DocumentListener.listenUuid<MyActor>(parts.getActorUuid()).first(),
-            token: parts.getTokenUuid() == null ? null : DocumentListener.listenUuid<TokenDocument>(parts.getTokenUuid()).first(),
-          })
-        }).listen(((args) => {
-          this.refreshMessage(args.message, args.parts, args);
-        })),
     );
   }
 
@@ -195,23 +180,6 @@ export class ModularCardComponent implements OnInit {
       enrichedHtmlParts.push(enrichedPart);
     }
     return {body: enrichedHtmlParts.join(''), errors: erroredTypes.map(e => e.getType())};
-  }
-
-  private latestCreateArgs: ModularCardCreateArgs
-  private async refreshMessage(message: ChatMessage, parts: ModularCardInstance, args: ModularCardCreateArgs): Promise<void> {
-    if (args.item == null || args.actor == null || args.token == null) {
-      // Don't refresh
-      return;
-    }
-    if (this.latestCreateArgs == null) {
-      this.latestCreateArgs = args;
-      return;
-    }
-
-    if (this.latestCreateArgs.item !== args.item || this.latestCreateArgs.actor !== args.actor || this.latestCreateArgs.token !== args.token) {
-      const updatedParts = await ModularCard.createInstanceNoDml(args, {type: 'visual', instance: parts});
-      await ModularCard.writeBulkModuleCards([{message, data: updatedParts}]);
-    }
   }
 
 }
