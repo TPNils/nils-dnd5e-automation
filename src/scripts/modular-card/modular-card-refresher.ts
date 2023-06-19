@@ -17,7 +17,7 @@ const onlinePlayers: ValueReader<User[]> = onlinePlayersTrigger.map(() => {
 export class ModularCardRefresher {
 
   private static uuidOrder = new ValueProvider<string[]>([]);
-  private static maxListeners = 10;
+  private static maxListeners = 5;
 
   private static removeUuid(uuid: string): void {
     ModularCardRefresher.uuidOrder.set(
