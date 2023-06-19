@@ -52,7 +52,6 @@ async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args:
 
   const lastCheckMessage = getLastCheckMessage();
   if (!game.settings.get(staticValues.moduleName, `captureManualRolls`) || lastCheckMessage == null || lastCheckMessage.checkPart.skill !== skillId) {
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
@@ -81,7 +80,6 @@ async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args:
 
   if (!selectionId) {
     // Nothing found to roll in the modular card, just roll normally
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
@@ -105,7 +103,6 @@ async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ..
 
   const lastCheckMessage = getLastCheckMessage();
   if (!game.settings.get(staticValues.moduleName, `captureManualRolls`) || lastCheckMessage == null || lastCheckMessage.checkPart.isSave || lastCheckMessage.checkPart.ability !== abilityId) {
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
@@ -134,7 +131,6 @@ async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ..
 
   if (!selectionId) {
     // Nothing found to roll in the modular card, just roll normally
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
@@ -158,7 +154,6 @@ async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ..
 
   const lastCheckMessage = getLastCheckMessage();
   if (!game.settings.get(staticValues.moduleName, `captureManualRolls`) || lastCheckMessage == null || !lastCheckMessage.checkPart.isSave || lastCheckMessage.checkPart.ability !== abilityId) {
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
@@ -187,7 +182,6 @@ async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ..
 
   if (!selectionId) {
     // Nothing found to roll in the modular card, just roll normally
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
