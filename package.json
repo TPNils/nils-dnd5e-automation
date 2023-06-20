@@ -43,8 +43,12 @@
     "postcss": "^8.4.19",
     "postcss-minify": "^1.1.0",
     "sass": "^1.26.10",
+    "ts-algebra": "^1.2.0",
     "ts-node": "^10.9.1",
     "typescript": "^4.9.5"
   },
-  "dependencies": {"gulp-filter": "^7.0.0", "gulp-uglify": "^3.0.2"}
+  "dependencies": {
+    "gulp-filter": "^7.0.0",
+    "gulp-uglify": "^3.0.2"
+  }
 }
