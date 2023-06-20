@@ -4,20 +4,17 @@ import { RunOnce } from "../../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
 import { ValueReader } from "../../../provider/value-provider";
 import { staticValues } from "../../../static-values";
-import { SchemaOf } from "../../../types/document-schema-convertor";
 import { UtilsFoundry } from "../../../utils/utils-foundry";
 import { ModularCard } from "../../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
-const schema = {
-  name$: foundry.data.fields.REQUIRED_STRING,
-  img$: foundry.data.fields.REQUIRED_STRING,
-  description$: foundry.data.fields.STRING_FIELD,
-  materials$: foundry.data.fields.STRING_FIELD,
-} as const;
-
-type DescriptionCardData = SchemaOf<typeof schema>;
+interface DescriptionCardData {
+  name$: string;
+  img$: string;
+  description$?: string;
+  materials$?: string;
+}
 
 let defaultCardCollpased = false;
 DocumentListener.listenSettingValue<boolean>('dnd5e', 'autoCollapseItemCards').listen(value => {
