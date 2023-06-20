@@ -1,4 +1,3 @@
-import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
 import { StaticInitFunc } from "../lib/decorator/static-init-func";
 import { BaseDocument, BaseDocumentV10, BaseDocumentV8, DataHolderV10, DataHolderV8 } from "../types/fixed-types";
 import { UtilsHooks } from "./utils-hooks";
