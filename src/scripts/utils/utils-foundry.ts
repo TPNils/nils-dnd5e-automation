@@ -139,6 +139,7 @@ export class UtilsFoundry {
     throw new Error('Should never get called')
   }
   
+  public static getModelData<T extends ActiveEffect>(document: T): T['data'];
   public static getModelData<T extends foundry.abstract.Document<any, any>>(document: T): T['data'];
   public static getModelData<T extends BaseDocument<any>>(document: T): DataHolderV10<T['___GENERIC_SYSTEM_TYPE___'], T['___GENERIC_DATA_TYPE___']>;
   @StaticInitFunc(() => {

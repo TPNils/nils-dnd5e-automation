@@ -457,6 +457,7 @@ export type MyActor = BaseDocument<MyActorData, ActorData> & {
   img: string;
   type: 'character' | 'npc' | 'vehicle';
   items: Map<string, MyItem>;
+  effects: Map<string, ActiveEffect>;
   parent: any;
   pack: any;
   isOwner: boolean;
