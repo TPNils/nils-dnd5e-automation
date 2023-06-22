@@ -121,7 +121,6 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
       if (targetCache.userBonus === event.userBonus && targetCache.phase === 'result') {
         return;
       }
-      // TODO ge kunt de roll zien als player via dice so nice
       targetCache.userBonus = event.userBonus;
       targetCache.phase = 'result';
       return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
