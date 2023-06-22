@@ -1,11 +1,12 @@
-import { UtilsDocument } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { ValueReader } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { MyItem } from "../../types/fixed-types";
-import { ModularCard } from "../modular-card";
-import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
+import { UtilsDocument } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { ValueReader } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { MyItem } from "../../../types/fixed-types";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { ModularCard } from "../../modular-card";
+import { HtmlContext, ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
 interface Property {
@@ -14,7 +15,7 @@ interface Property {
 }
 
 interface PropertyCardData {
-  properties$: Array<Property> | string[]; // string[] is deprecaded
+  properties$: Array<Property>;
 }
 
 @Component({
@@ -80,10 +81,11 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
   
   public async create({item}: {item: MyItem}): Promise<PropertyCardData> {
     const chatData: {properties: string[]} = await item.getChatData();
+    const itemData = UtilsFoundry.getSystemData(item);
     return {
       properties$: (chatData.properties ?? []).map(prop => {
-        const consumed = item.data?.data?.materials?.consumed;
-        const propIsConsumed = item.data?.data?.materials?.value != null && prop.includes(`(${item.data?.data?.materials?.value})`);
+        const consumed = itemData?.materials?.consumed;
+        const propIsConsumed = itemData?.materials?.value != null && prop.includes(`(${itemData?.materials?.value})`);
         return {text: prop, highlight: consumed && propIsConsumed}
       }),
     };
@@ -91,6 +93,10 @@ export class PropertyCardPart implements ModularCardPart<PropertyCardData> {
 
   public refresh(data: PropertyCardData, args: ModularCardCreateArgs): Promise<PropertyCardData> {
     return this.create(args);
+  }
+
+  public refreshVisual(data: PropertyCardData, args: ModularCardCreateArgs): Promise<PropertyCardData> {
+    return this.refresh(data, args);
   }
 
   @RunOnce()

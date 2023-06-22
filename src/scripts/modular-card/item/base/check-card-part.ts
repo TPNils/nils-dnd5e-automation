@@ -1,19 +1,20 @@
-import { RollD20EventData, RollMode } from "../../elements/roll-d20-element";
-import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
-import { DocumentListener } from "../../lib/db/document-listener";
-import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Attribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
-import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
-import { UtilsCompare } from "../../lib/utils/utils-compare";
-import { ValueProvider } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { MyActor, MyActorData } from "../../types/fixed-types";
-import { Action } from "../action";
+import { RollD20EventData, RollMode } from "../../../elements/roll-d20-element";
+import { ITrigger, IDmlContext, IAfterDmlContext } from "../../../lib/db/dml-trigger";
+import { DocumentListener } from "../../../lib/db/document-listener";
+import { UtilsDocument, PermissionCheck } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { Attribute, Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { UtilsDiceSoNice } from "../../../lib/roll/utils-dice-so-nice";
+import { RollData, UtilsRoll } from "../../../lib/roll/utils-roll";
+import { UtilsCompare } from "../../../lib/utils/utils-compare";
+import { ValueProvider } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { MyActor, MyActorData } from "../../../types/fixed-types";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { Action } from "../../action";
 import { ItemCardHelpers, ChatPartIdData, ChatPartEnriched } from "../item-card-helpers";
-import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, createPermissionCheckAction } from "../modular-card-part";
+import { ModularCard, ModularCardTriggerData } from "../../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, createPermissionCheckAction } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
@@ -32,9 +33,9 @@ export interface TargetCache {
 
 export interface CheckCardData {
   actorUuid$?: string;
-  ability: keyof MyActorData['data']['abilities'];
+  ability: keyof MyActorData['abilities'];
   dc: number;
-  skill?: keyof MyActorData['data']['skills'];
+  skill?: keyof MyActorData['skills'];
   /**@deprecated use isSave*/
   iSave?: boolean;
   isSave?: boolean;
@@ -98,7 +99,7 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
 
   
   private static getTargetCacheEnricher(this: null, data: ChatPartIdData & ChatPartEnriched & {targetId: string;}): {targetCache: TargetCache} {
-    const cache = getTargetCache(data.cardParts.getTypeData<CheckCardData>(CheckCardPart.instance), data.targetId);
+    const cache = getTargetCache(data.cardParts.getTypeData(CheckCardPart.instance), data.targetId);
     if (!cache) {
       throw {
         success: false,
@@ -109,7 +110,7 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
     return {targetCache: cache};
   }
 
-  private static rollClick = new Action<{event: CustomEvent<{userBonus?: string}>; targetId: string;} & ChatPartIdData>('CheckOnRollClick')
+  private static rollClick = new Action<{event: CustomEvent<{userBonus?: string}>; targetId: string;} & ChatPartIdData>('ItemCheckOnRollClick')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
     .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
     .addSerializer(ItemCardHelpers.getCustomEventSerializer())
@@ -120,13 +121,12 @@ export class CheckCardComponent extends BaseCardComponent implements OnInit {
       if (targetCache.userBonus === event.userBonus && targetCache.phase === 'result') {
         return;
       }
-      // TODO ge kunt de roll zien als player via dice so nice
       targetCache.userBonus = event.userBonus;
       targetCache.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     })
     
-private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>; targetId: string;} & ChatPartIdData>('AttackOnModeChange')
+private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>; targetId: string;} & ChatPartIdData>('ItemCheckOnModeChange')
   .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
   .addSerializer(ItemCardHelpers.getRawSerializer('targetId'))
   .addSerializer(ItemCardHelpers.getCustomEventSerializer())
@@ -142,7 +142,7 @@ private static modeChange = new Action<{event: CustomEvent<RollD20EventData<Roll
     if (event.quickRoll) {
       targetCache.phase = 'result';
     }
-    return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+    return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
   });
   //#endregion
 
@@ -205,14 +205,15 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
   private constructor(){}
   
   public create({item, actor}: ModularCardCreateArgs): CheckCardData {
-    if (item.data.data.save?.dc == null || !item.data.data.save?.ability) {
+    const itemData = UtilsFoundry.getSystemData(item);
+    if (itemData.save?.dc == null || !itemData.save?.ability) {
       return null;
     }
 
     return {
       actorUuid$: actor?.uuid,
-      ability: item.data.data.save?.ability,
-      dc: item.data.data.save.dc,
+      ability: itemData.save?.ability,
+      dc: itemData.save.dc,
       isSave: true,
       targetCaches$: []
     };
@@ -268,7 +269,7 @@ export class CheckCardPart implements ModularCardPart<CheckCardData> {
 
     let partNr = 0;
     if (context.allMessageParts.hasType(CheckCardPart.instance)) {
-      const part = context.allMessageParts.getTypeData<CheckCardData>(CheckCardPart.instance)
+      const part = context.allMessageParts.getTypeData(CheckCardPart.instance)
       for (const selected of context.selected) {
         if (!visualStatesBySelectionId.get(selected.selectionId)) {
           visualStatesBySelectionId.set(selected.selectionId, {
@@ -319,7 +320,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       for (const selected of newRow.part.selected) {
         allTargetIds.add(selected.selectionId);
       }
-      for (const target of newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance).targetCaches$) {
+      for (const target of newRow.allParts.getTypeData(CheckCardPart.instance).targetCaches$) {
         cachedSelectionIds.add(target.selectionId$);
       }
 
@@ -341,7 +342,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         continue;
       }
       const allSelected = newRow.part.selected;
-      const part = newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance);
+      const part = newRow.allParts.getTypeData(CheckCardPart.instance);
       const cachedBySelectionId = new Set<string>();
 
       for (const target of part.targetCaches$) {
@@ -538,7 +539,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
       }
     }
     
-    UtilsDocument.hasPermissions(showRolls).listenFirst().then(responses => {
+    UtilsDocument.hasPermissions(showRolls).firstPromise().then(responses => {
       const rolls: Roll[] = [];
       for (const response of responses) {
         if (response.result) {

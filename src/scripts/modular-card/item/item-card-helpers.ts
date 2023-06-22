@@ -1,6 +1,5 @@
-import { DamageType, MyItemData } from "../types/fixed-types";
-import { ModularCard, ModularCardInstance } from "./modular-card";
-import { ModularCardPart } from "./modular-card-part";
+import { DamageType, MyItemData } from "../../types/fixed-types";
+import { ModularCard, ModularCardInstance } from "../modular-card";
 
 export interface ChatPartIdData {
   readonly messageId: string;
@@ -47,7 +46,7 @@ export class ItemCardHelpers {
     return Object.keys((CONFIG as any).DND5E.healingTypes) as any;
   }
   
-  public static get spellUpcastModes(): Array<MyItemData['data']['preparation']['mode']> {
+  public static get spellUpcastModes(): Array<MyItemData['preparation']['mode']> {
     return (CONFIG as any).DND5E.spellUpcastModes;
   }
 
@@ -121,7 +120,7 @@ export class ItemCardHelpers {
     return data => {
       const message = game.messages.get(data.messageId);
       return {
-        cardParts: ModularCard.getCardPartDatas(message).deepClone()
+        cardParts: ModularCard.readModuleCard(message).deepClone()
       }
     }
   }

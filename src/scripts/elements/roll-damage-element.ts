@@ -3,8 +3,7 @@ import { UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { AsyncAttribute, Attribute, Component, OnInit, OnInitParam, Output } from "../lib/render-engine/component";
 import { RollData, UtilsRoll } from "../lib/roll/utils-roll";
-import { Stoppable } from "../lib/utils/stoppable";
-import { DamageCardData } from "../modular-card/base";
+import { DamageCardData } from "../modular-card/item/base/index";
 import { ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 import { RollResultElement } from "./roll-result-element";
@@ -29,7 +28,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
         [data-roll]="this.roll"
         [data-override-formula]="this.overrideFormula"
         [data-display-type]="this.hasReadPermission ? '' : this.readHiddenDisplayType">
-        <div slot="top">
+        <div slot="{{bonusPosition === 'inside' ? 'top' : 'between'}}">
           <input *if="this.hasInteractPermission"
             class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
             type="text"
@@ -48,7 +47,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
           </slot>
         </button>
         
-        <input *if="this.showBonus && this.hasInteractPermission"
+        <input *if="(showBonus || bonusPosition === 'outside') && this.hasInteractPermission"
           autofocus
           class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
           type="text"
@@ -61,7 +60,7 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
         <div class="left">
           <button *if="!this.disableModeSelect" (click)="this.onModeChange($event, '-')" class="mode-minus" [disabled]="this.rollMode === 'normal'"><i class="fas fa-minus"></i></button>
         </div>
-        <div class="middel"></div>
+        <div class="middle"></div>
         <div class="right">
           <button *if="!this.disableSourceSelect" (click)="this.onRollSourceClick($event)" class="damage-source-toggle source-{{this.rollSource}}">
             <i class="fas fa-hand-holding hand-1" data-fa-transform="rotate-90"></i>
@@ -72,8 +71,9 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
       </div>
     </div>
   `,
-  style: /*css*/`
-    
+  style: scss`
+    @import 'overlay.scss';
+  
     :host {
       display: block;
       font-size: var(--font-size-14, 14px);
@@ -140,10 +140,15 @@ const dedupeEventData = (oldValue: RollDamageEventData<string>, newValue: RollDa
       background: #f2f2e3;
       border: 1px solid #b5b3a4;
       line-height: 0;
-      height: calc(1.5em - 1px);
-      width: calc(1.5em - 1px);
+      height: calc(var(--button-height) - calc(var(--button-height) / 5));
+      width: calc(var(--button-height) - calc(var(--button-height) / 5));
       margin: 0 1px;
-      padding: 0
+      padding: 0;
+
+      > i {
+        font-size: .7em;
+        transform: translateX(10%);
+      }
     }
     
     .damage-source-toggle {
@@ -235,6 +240,9 @@ export class RollDamageElement implements OnInit {
     }
   }
 
+  @Attribute({name: 'data-bonus-position', dataType: 'string'})
+  public bonusPosition: 'inside' | 'outside' = 'inside';
+
   @Attribute({name: 'data-override-formula', dataType: 'string'})
   public overrideFormula: string;
 
@@ -243,22 +251,6 @@ export class RollDamageElement implements OnInit {
 
   @AsyncAttribute({name: 'data-read-permission'})
   private readPermission: ValueReader<string | string[]>;
-  
-  private readHiddenDisplayTypeListener: Stoppable;
-  private _readHiddenDisplayType: RollResultElement['displayType'];
-  @Attribute({name: 'data-read-hidden-display-type', dataType: 'string'})
-  public get readHiddenDisplayType(): RollResultElement['displayType'] {
-    return this._readHiddenDisplayType;
-  }
-  public set readHiddenDisplayType(v: RollResultElement['displayType']) {
-    this._readHiddenDisplayType = v;
-    // When the value is provided, stop listener for the default value.
-    if (this.readHiddenDisplayTypeListener) {
-      this.readHiddenDisplayTypeListener.stop();
-      this.readHiddenDisplayTypeListener = null;
-    }
-    this.calcRollModeLabel();
-  }
 
   private _rollMode : RollDamageMode = 'normal';
   @Attribute({name: 'data-roll-mode', dataType: 'string'})
@@ -303,16 +295,13 @@ export class RollDamageElement implements OnInit {
   
   public hasReadPermission = true;
   public hasInteractPermission = true;
+  public readHiddenDisplayType: RollResultElement['displayType'];
   public onInit(args: OnInitParam): void {
-    if (this._readHiddenDisplayType == null) {
-      // If no type is provided, set a default.
-      args.addStoppable(this.readHiddenDisplayTypeListener = DocumentListener.listenSettingValue(`${staticValues.moduleName}.damageHiddenRoll`).listen(value => {
-        this._readHiddenDisplayType = value;
-        this.calcRollModeLabel();
-      }));
-    }
-    
     args.addStoppable(
+      DocumentListener.listenSettingValue(`${staticValues.moduleName}.damageHiddenRoll`).listen(value => {
+        this.readHiddenDisplayType = value;
+        this.calcRollModeLabel();
+      }),
       this.readPermission
         .map(value => Array.isArray(value) ? value : [value])
         .switchMap(readPermission => UtilsDocument.hasPermissionsFromString(readPermission))

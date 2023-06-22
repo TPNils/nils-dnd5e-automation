@@ -1,4 +1,6 @@
+import { DataModel } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/module.mjs";
 import { staticValues } from "../../static-values";
+import { UtilsFoundry } from "../../utils/utils-foundry";
 import { UtilsLog } from "../../utils/utils-log";
 import { buffer } from "../decorator/buffer";
 import { RunOnce } from "../decorator/run-once";
@@ -6,6 +8,7 @@ import { Stoppable } from "../utils/stoppable";
 import { UtilsCompare } from "../utils/utils-compare";
 import { TimeoutError, UtilsPromise } from "../utils/utils-promise";
 import { FoundryDocument, UtilsDocument } from "./utils-document";
+import { StaticInitFunc } from "../decorator/static-init-func";
 
 const thisSessionId = crypto.randomUUID()
 const unsupportedAfterDocuments = [
@@ -55,21 +58,21 @@ export interface ITrigger<T> {
    * A hook event that fires for every Document type after execution of a creation workflow.
    * This hook only fires for the client who is initiating the creation request.
    * 
-   * The hook provides the commited document instance can be modified, which will trigger another update.
+   * The hook provides the committed document instance can be modified, which will trigger another update.
    */
    create?(context: IAfterDmlContext<T>): void | Promise<void>;
    /**
     * A hook event that fires for every Document type after execution of an update workflow.
     * This hook only fires for the client who is initiating the update request.
     * 
-   * The hook provides the commited document instance can be modified, which will trigger another update.
+   * The hook provides the committed document instance can be modified, which will trigger another update.
     */
    update?(context: IAfterDmlContext<T>): void | Promise<void>;
    /**
     * A hook event that fires for every Document type after execution of an insert or update workflow.
     * This hook only fires for the client who is initiating the insert or update request.
     * 
-    * The hook provides the commited document instance can be modified, which will trigger another update.
+    * The hook provides the committed document instance can be modified, which will trigger another update.
     */
    upsert?(context: IAfterDmlContext<T>): void | Promise<void>;
 
@@ -119,7 +122,7 @@ class MinifierHelper implements Required<{[PropertyKey in keyof ITrigger<any>]: 
   private static functionMap: Map<string, string>;
 
   /**
-   * Get the name of the function (key) transated to the label.
+   * Get the name of the function (key) translated to the label.
    * This is to support minifying
    */
   public static getFunctionMap(): Map<string, string> {
@@ -246,7 +249,7 @@ type OnFoundryTargetToken = (user: User, token: Token, targeted: boolean) => Pro
 
 /**
  * Output the diff when detection a recurring dml
- * Automatically gets activated AFTER the first infinit loop is detected
+ * Automatically gets activated AFTER the first infinite loop is detected
  */
 let outputDiff = false;
 const functionLabelSymbol = Symbol('functionLabel');
@@ -431,6 +434,17 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }
   }
 
+  @StaticInitFunc(() => {
+    if (UtilsFoundry.usesDataModel()) {
+      return (document: FoundryDocument) => document.toObject(true);
+    } else {
+      return (document: FoundryDocument) => document.data;
+    }
+  })
+  private static getDocumentData(document: any): Record<string, object> {
+    throw new Error('Should never get called');
+  }
+
   //#region Before
   private onFoundryBeforeCreate(document: T & {constructor: new (...args: any[]) => T}, data: any, options: DmlOptions, userId: string): void | boolean {
     this.setCurrentUser(options);
@@ -451,7 +465,11 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
     const totalDiff = UtilsCompare.findDiff(originalDocumentData, document.toObject(true));
     if (totalDiff.changed) {
-      document.data.update(totalDiff.diff);
+      if (UtilsFoundry.usesDataModel()) {
+        (document as any as DataModel<any>).updateSource(totalDiff.diff);
+      } else {
+        document.data.update(totalDiff.diff);
+      }
     }
   }
   
@@ -475,7 +493,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }
 
     // Apply the changes made to the document
-    const totalDiff = UtilsCompare.findDiff(document.data, modifiedDocument.data);
+    const totalDiff = UtilsCompare.findDiff(
+      Wrapper.getDocumentData(document),
+      Wrapper.getDocumentData(modifiedDocument),
+    );
     const id = change._id
     for (const key in change) {
       if (Object.prototype.hasOwnProperty.call(change, key)) {
@@ -555,7 +576,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
         } catch (err) {
           if (err instanceof TimeoutError) {
-            ui.notifications.error('An error occured during the save');
+            ui.notifications.error('An error occurred during the save');
             UtilsLog.error(callback[functionLabelSymbol], err);
           } else {
             throw err;
@@ -563,7 +584,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         }
       }
 
-      const diff = UtilsCompare.findDiff(document.data, documentSnapshot.data);
+      const diff = UtilsCompare.findDiff(
+        Wrapper.getDocumentData(document),
+        Wrapper.getDocumentData(documentSnapshot),
+      );
       if (diff.changed) {
         if (options?.[staticValues.moduleName]?.recursiveUpdate > 5) {
           UtilsLog.error('Infinite update loop. Stopping any further updates.', {diff: diff, newRow: documentSnapshot});
@@ -601,7 +625,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
       } catch (err) {
         if (err instanceof TimeoutError) {
-          ui.notifications.error('An error occured during the save');
+          ui.notifications.error('An error occurred during the save');
           UtilsLog.error(callback[functionLabelSymbol], err);
         } else {
           throw err;
@@ -635,7 +659,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         // See injector (initOldValueInjector) for more info
         return;
       }
-      const originalDiff = UtilsCompare.findDiff(modifiedDocument.data, oldDocument.data);
+      const originalDiff = UtilsCompare.findDiff(
+        Wrapper.getDocumentData(modifiedDocument),
+        Wrapper.getDocumentData(oldDocument),
+      );
       let context = new AfterDmlContext<T>(
         [{
           newRow: documentSnapshot,
@@ -664,7 +691,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
           } catch (err) {
             if (err instanceof TimeoutError) {
-              ui.notifications.error('An error occured during the save');
+              ui.notifications.error('An error occurred during the save');
               UtilsLog.error(callback[functionLabelSymbol], err);
             } else {
               throw err;
@@ -672,7 +699,10 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           }
         }
 
-        const diff = UtilsCompare.findDiff(modifiedDocument.data, documentSnapshot.data);
+        const diff = UtilsCompare.findDiff(
+          Wrapper.getDocumentData(modifiedDocument),
+          Wrapper.getDocumentData(documentSnapshot),
+        );
         if (!UtilsCompare.deepEquals(originalDiff, diff)) {
           if (outputDiff) {
             UtilsLog.debug('trigger diff', {
@@ -681,8 +711,8 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
               diff: diff,
               originalDiff: originalDiff,
               diffDiff: UtilsCompare.findDiff(originalDiff, diff),
-              oldRow: deepClone(oldDocument.data),
-              newRow: deepClone(modifiedDocument.data)
+              oldRow: deepClone(Wrapper.getDocumentData(oldDocument)),
+              newRow: deepClone(Wrapper.getDocumentData(modifiedDocument))
             });
           }
           if (recursiveUpdate > 5) {
@@ -724,7 +754,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
           } catch (err) {
             if (err instanceof TimeoutError) {
-              ui.notifications.error('An error occured during the save');
+              ui.notifications.error('An error occurred during the save');
               UtilsLog.error(callback[functionLabelSymbol], err);
             } else {
               throw err;
@@ -762,7 +792,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
       } catch (err) {
         if (err instanceof TimeoutError) {
-          ui.notifications.error('An error occured during the save');
+          ui.notifications.error('An error occurred during the save');
           UtilsLog.error(callback[functionLabelSymbol], err);
         } else {
           throw err;
@@ -824,7 +854,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   //#region Special usecases
 
-  // There is a bug in foundry when you clear the targets and delete the target aswel, the hooks triggers twice with the same data
+  // There is a bug in foundry when you clear the targets and delete the target as wel, the hooks triggers twice with the same data
   // Also, every 1 target changes fires an event. If you target multiple targets at once, it fires multiple events
   // Buffer solved both issues
   @buffer({bufferTime: 5}) 

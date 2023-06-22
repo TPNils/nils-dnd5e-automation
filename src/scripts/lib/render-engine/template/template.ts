@@ -7,7 +7,8 @@ import { VirtualNodeParser } from "../virtual-dom/virtual-node-parser";
 import { VirtualNodeRenderer } from "../virtual-dom/virtual-node-renderer";
 import { VirtualTextNode } from "../virtual-dom/virtual-text-node";
 
-const forAttrRegex = /^\s*let\s+([^\s]+\s)+(of|in)\s(.+)$/;
+const forAttrRegex = /^\s*let\s+([^\s]+)\s+(of|in)\s([^;]+)(?:;(.*))?$/;
+const forAttrSuffixRegex = /\s*let\s+([^\s]+)\s+=\s([^;]+)/g;
 type PendingNodes<T extends VirtualNode = VirtualNode> = {
   template: T;
   instance: T;
@@ -23,6 +24,39 @@ interface ParsedEventExpression {
   readonly exec: (event: Event) => any
 };
 const nodeIdSymbol = Symbol('nodeId');
+
+const globalTemplateScope = {
+  localize: (id: string) => game.i18n.localize(id),
+};
+class ReadonlyProxyHandler implements ProxyHandler<any> {
+  constructor(
+  ) {}
+
+  public has(target: any, p: string | symbol): boolean {
+    return Reflect.has(target, p);
+  }
+
+  public get(target: any, p: string | symbol, receiver: any) {
+    const value = Reflect.get(target, p, receiver);
+    if (value == null || typeof value !== 'object') {
+      return value;
+    }
+    return new Proxy(value, new ReadonlyProxyHandler());
+  }
+
+  public set(target: any, p: string | symbol, newValue: any, receiver: any): boolean {
+    return false;
+  }
+
+  public deleteProperty(target: any, p: string | symbol): boolean {
+    return false;
+  }
+
+}
+
+// Need to use a dummy as we otherwise get internal errors when using "for (let key in globalThis)" where globalThis is wrapped in this proxy handler
+const globalTemplateScopeProxy = new Proxy(globalTemplateScope, new ReadonlyProxyHandler());
+
 export class Template {
   
   private readonly template: VirtualNode & VirtualParentNode;
@@ -56,28 +90,30 @@ export class Template {
     }
   }
 
-  #context: any;
+  #context: Record<string | number | symbol, any>;
   /**
    * @param context The new context to render the template
    * @returns A promise when the change has been applied returning itself
    */
-  public setContext(context: any): void {
+  public setContext(context: Record<string | number | symbol, any>): void {
     this.#context = context;
     if (this.#processedVirtualNode != null) {
       this.render({force: true});
     }
   }
 
-  public async render(options: {force?: boolean} = {}): Promise<VirtualNode & VirtualParentNode> {
-    if (this.#processedVirtualNode == null) {
-      if (this.#context) {
-        await rerenderQueue.add(this.rerenderCallback);
+  public render(options: {force?: boolean, sync: true}): VirtualNode & VirtualParentNode
+  public render(options?: {force?: boolean, sync?: false}): Promise<VirtualNode & VirtualParentNode>
+  public render(options: {force?: boolean, sync?: boolean} = {}): Promise<VirtualNode & VirtualParentNode> | VirtualNode & VirtualParentNode {
+    if (this.#processedVirtualNode == null || options.force) {
+      if (options.sync) {
+        rerenderQueue.delete(this.rerenderCallback);
+        this.rerenderCallback();
       } else {
-        this.#processedVirtualNode = new VirtualFragmentNode();
+        return rerenderQueue.add(this.rerenderCallback).then(() => this.#processedVirtualNode);
       }
-    } else if (options.force) {
-      await rerenderQueue.add(this.rerenderCallback);
     }
+
     return this.#processedVirtualNode;
   }
 
@@ -88,13 +124,19 @@ export class Template {
   #processedVirtualNode: VirtualNode & VirtualParentNode;
   #processedVirtualNodesMap = new Map<string, VirtualNode>();
   private calcVirtualNode(): void {
+    if (this.#context == null) {
+      if (!(this.#processedVirtualNode instanceof VirtualFragmentNode) || this.#processedVirtualNode.hasChildNodes()) {
+        this.#processedVirtualNode = new VirtualFragmentNode();
+      }
+      return;
+    }
     const rootInstance: VirtualNode & VirtualParentNode = this.template.cloneNode(false);
     const createdNodesByMap = new Map<string, VirtualNode>();
 
     let pending: Array<PendingNodes> = [{
       template: this.template,
       instance: rootInstance,
-      localVars: {},
+      localVars: globalTemplateScopeProxy,
       pathContext: {
         parentPrefix: '',
       }
@@ -129,7 +171,7 @@ export class Template {
               if (items) {
                 process.instance.removeAttribute('*for');
                 for (const item of items) {
-                  pending.push({
+                  const childItem: PendingNodes = {
                     parentInstance: process.parentInstance,
                     template: process.template,
                     instance: process.instance.cloneNode(false),
@@ -143,7 +185,20 @@ export class Template {
                     pathContext: {
                       parentPrefix: process.pathContext.parentPrefix + `${forIndex}.`
                     },
-                  });
+                  };
+                  if (regexResult[4]) {
+                    const expressions = regexResult[4].matchAll(forAttrSuffixRegex);
+                    for (const [fullMatch, assignVarName, readVarName] of expressions) {
+                      if (readVarName in childItem.localVars) {
+                        childItem.localVars[assignVarName] = childItem.localVars[readVarName];
+                      } else if (readVarName in this.#context) {
+                        childItem.localVars[assignVarName] = this.#context[readVarName];
+                      } else {
+                        UtilsLog.error(`Could not find variable ${readVarName}`, {templateName: this.name, expression: regexResult[0], thisContext: this.#context, localVars: childItem.localVars})
+                      }
+                    }
+                  }
+                  pending.push(childItem);
                   forIndex++;
                 }
 
@@ -184,35 +239,15 @@ export class Template {
             if (name.length > 2 && name.startsWith('[') && name.endsWith(']')) {
               process.instance.removeAttribute(name);
               name = name.substring(1, name.length - 1);
-              switch (name) {
-                case 'innerhtml': {
-                  if (process.instance.isParentNode()) {
-                    let nodeValue = value;
-                    if (typeof value === 'string') {
-                      nodeValue = VirtualNodeParser.parse(this.parseExpression(value, process.localVars));
-                    }
-                    if (isVirtualNode(nodeValue)) {
-                      if (nodeValue.isChildNode()) {
-                        process.instance.appendChild(nodeValue);
-                      } else if (nodeValue.isParentNode()) {
-                        for (const child of [...nodeValue.childNodes]) {
-                          child.remove();
-                          process.instance.appendChild(child);
-                        }
-                      }
-                      continue;
-                    }
-                  }
-                }
-                default: {
-                  if (typeof value === 'string') {
-                    process.instance.setAttribute(name, this.parseExpression(value, process.localVars));
-                  } else {
-                    process.instance.setAttribute(name, value);
-                  }
-                  break;
-                }
+              
+              if (typeof value === 'string') {
+                process.instance.setAttribute(name, this.parseExpression(value, process.localVars));
+              } else {
+                process.instance.setAttribute(name, value);
               }
+              
+            } else if (typeof value === 'string' && value.length > 4 && value.startsWith('{{') && value.endsWith('}}') && value.indexOf('{{', 2) === -1) {
+              process.instance.setAttribute(name, this.parseExpression(value.substring(2, value.length - 2), process.localVars));
             } else if (typeof value === 'string') {
               const processedValue = this.processBindableString(value, process.localVars, false);
               if (value !== processedValue) {
@@ -222,15 +257,48 @@ export class Template {
           }
         }
         if (process.instance.isTextNode()) {
-          let nodeValue = this.processBindableString(process.instance.getText(), process.localVars, true);
-          const isAllText = nodeValue.every(node => node.isTextNode());
-          if (isAllText) {
-            process.instance.setText(nodeValue.map(node => (node as VirtualTextNode).getText()).join(''));
-          } else {
-            if (process.instance.isChildNode()) {
-              process.parentInstance.appendChild(...nodeValue);
-              continue;
+          let textData = (process.template as VirtualTextNode).getTextData();
+          if (textData.length === 0) {
+            continue;
+          }
+
+          process.instance.setText('');
+          let instances: Array<VirtualNode & VirtualChildNode> = [process.instance as VirtualTextNode];
+          for (const part of textData) {
+            const lastInstance = instances[instances.length - 1];
+            if (part.type === 'string') {
+              if (lastInstance.isTextNode()) {
+                lastInstance.setText(lastInstance.getText() + part.text);
+              } else {
+                instances.push(new VirtualTextNode(part.text));
+              }
+            } else if (part.bindMethod === 'raw') {
+              const result = this.parseExpression(part.text, process.localVars);
+              const expressions = Array.isArray(result) ? result : [result]
+              for (const expression of expressions) {
+                if (isVirtualNode(expression) && expression.isChildNode()) {
+                  instances.push(expression);
+                } else {
+                  const parsed = VirtualNodeParser.parseRaw(String(expression));
+                  if (parsed.length > 0) {
+                    instances.push(...parsed);
+                  }
+                }
+              }
+            } else {
+              if (lastInstance.isTextNode()) {
+                lastInstance.setText(lastInstance.getText() + this.parseExpression(part.text, process.localVars));
+              } else {
+                instances.push(new VirtualTextNode(String(this.parseExpression(part.text, process.localVars))));
+              }
             }
+          }
+          
+
+          if (instances.length > 1) {
+            // TODO check if this can be improved
+            process.parentInstance.appendChild(...instances);
+            continue;
           }
         }
         const createDom = process.instance.nodeName !== 'VIRTUAL'; // TODO Don't create <virtual> dom nodes like angular <ng-container>. this may need to be tweaked
@@ -250,7 +318,7 @@ export class Template {
               localVars: process.localVars,
               template: child,
               instance: child.cloneNode(false),
-              pathContext: pathContext, // Same path context intsnace needs to be shared by all children/siblings
+              pathContext: pathContext, // Same path context instance needs to be shared by all children/siblings
             })
           }
         }
@@ -277,9 +345,9 @@ export class Template {
     this.#processedVirtualNodesMap = createdNodesByMap;
   }
 
-  private processBindableString(value: string, localVars: any | null, asNode: false): string
-  private processBindableString(value: string, localVars: any | null, asNode: true): Array<VirtualNode & VirtualChildNode>
-  private processBindableString(value: string, localVars: any | null, asNode: boolean): string | Array<VirtualNode & VirtualChildNode> {
+  private processBindableString(value: string, localVars: any, asNode: false): string
+  private processBindableString(value: string, localVars: any, asNode: true): Array<VirtualNode & VirtualChildNode>
+  private processBindableString(value: string, localVars: any, asNode: boolean): string | Array<VirtualNode & VirtualChildNode> {
     // TODO this is currently a dumb implementation and does not account for the 'keywords' {{ and }} to be present within the expression (example: in a javascript string)
     // Best to write an interpreter but thats a lot of work and maybe more process intensive so lets cross that bridge when we get there :)
     let startExpression = 0;
@@ -333,34 +401,65 @@ export class Template {
   }
 
   private parsedExpressions = new Map<string, ParsedExpression>();
-  private parseExpression(expression: any, localVars: any | null): any {
+  private parseExpression(expression: any, localVars: object): any {
     if (typeof expression !== 'string') {
       // If expression is not a string, assume its the result
       return expression;
     }
-    const paramNames: string[] = [];
-    const paramValues: any[] = [];
     try {
-      if (localVars) {
-        for (const field in localVars) {
-          let index = paramNames.indexOf(field);
-          if (index === -1) {
-            paramNames.push(field);
-            paramValues.push(localVars[field]);
-          } else {
-            paramValues[index] = localVars[field];
-          }
-        }
-      }
-      const funcKey = `${expression}(${paramNames.join(',')})`;
+      const funcKey = expression;
       if (!this.parsedExpressions.has(funcKey)) {
-        this.parsedExpressions.set(funcKey, Function(...paramNames, `return ${expression}`) as ParsedExpression);
+        this.parsedExpressions.set(funcKey, Function(`with (this) {return ${expression}}`) as ParsedExpression);
       }
-      return this.parsedExpressions.get(funcKey).apply(this.#context, paramValues);
+      const namespace = new Proxy(
+        localVars,
+        this.proxyHandler
+      );
+      return this.parsedExpressions.get(funcKey).call(namespace);
     } catch (e) {
       UtilsLog.error('Error executing expression with context', {templateName: this.name, expression: expression, thisContext: this.#context, localVars: localVars, err: e})
       throw e;
     }
+  }
+
+  private proxyHandler: ProxyHandler<any | null> = {
+      has: (localVars, prop): boolean => {
+        // Catch everything, otherwise it will fallback to the real global
+        return true;
+      },
+      get: (localVars, prop): any => {
+        if (Reflect.has(localVars, prop)) {
+          return Reflect.get(localVars, prop);
+        }
+        if (Reflect.has(this.#context, prop)) {
+          return Reflect.get(this.#context, prop);
+        }
+        return undefined;
+      },
+      set: (localVars, prop, newValue): boolean => {
+        if (prop in localVars) {
+          return Reflect.set(localVars, prop, newValue);
+        }
+        if (prop in this.#context) {
+          return Reflect.set(this.#context, prop, newValue);
+        }
+        return Reflect.set(localVars, prop, newValue);
+      },
+      ownKeys: (localVars): Array<string | symbol> => {
+        const keys = new Set<string | symbol>();
+
+        for (const key of Reflect.ownKeys(this.#context)) {
+          keys.add(key);
+        }
+        for (const key in Reflect.ownKeys(localVars)) {
+          keys.add(key);
+        }
+
+        return Array.from(keys);
+      },
+      preventExtensions: (localVars): boolean => {
+        return true;
+      }
   }
 
   // Use the same cached function so the change detection knows no new event listeners are made
@@ -410,6 +509,7 @@ export class Template {
       return alreadyParsedExpression.exec;
     } catch (e) {
       UtilsLog.error('Error parsing expression with context', {expression: expression, thisContext: this.#context, localVars: localVars, err: e})
+      UtilsLog.error(e)
       throw e;
     }
   }

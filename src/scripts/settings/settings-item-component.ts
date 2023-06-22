@@ -1,7 +1,10 @@
+import { DocumentListener } from "../lib/db/document-listener";
 import { RunOnce } from "../lib/decorator/run-once";
-import { Attribute, Component, Output } from "../lib/render-engine/component";
+import { AsyncAttribute, Attribute, Component, OnInit, OnInitParam, Output } from "../lib/render-engine/component";
 import { UtilsForceClientSettings } from "../lib/utils/utils-force-client-settings";
+import { ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
+import { UtilsLog } from "../utils/utils-log";
 
 @Component({
   tag: SettingsItemComponent.selector(),
@@ -58,57 +61,59 @@ import { staticValues } from "../static-values";
     }
   `
 })
-export class SettingsItemComponent {
+export class SettingsItemComponent implements OnInit {
   
   public static selector(): string {
-    return `${staticValues.code}-settings-item-page`;
+    return `${staticValues.code}-settings-item`;
   }
 
   public setting: SettingConfig<any> & {module?: string};
   public renderType: 'string' | 'picklist' | 'number' | 'boolean';
   public currentValue: any;
   public canEdit = false;
-
-  @Attribute({name: 'data-setting', dataType: 'string'})
-  public set settingKey(v: string) {
-    this.setting = game.settings.settings.get(v);
-    this.renderType = null;
-    this.currentValue = null;
-    this.canEdit = false;
-    if (this.setting) {
-      if (this.setting.scope === 'client') {
-        this.canEdit = true;
-      } else {
-        this.canEdit = game.user.isGM;
-      }
-      const keyParts = v.split('.');
-      const namespace = keyParts.splice(0, 1)[0];
-      this.currentValue = game.settings.get(namespace, keyParts.join('.'));
-      if (this.setting.type === String) {
-        if (this.setting.choices == null) {
-          this.renderType = 'string';
-        } else {
-          this.renderType = 'picklist';
-        }
-      } else if (this.setting.type === Number) {
-        this.renderType = 'number';
-      } else if (this.setting.type === Boolean) {
-        this.renderType = 'boolean';
-      }
-    }
-
-    this.calcForceClientSettingsInteraction();
+  
+  public onInit(args: OnInitParam) {
+    args.addStoppable(
+      this.settingKey$
+        .switchMap(settingKey => ValueReader.mergeObject({
+          settingKey: settingKey,
+          settingValue: DocumentListener.listenSettingValue<string>(settingKey),
+        }))
+        .listen(({settingKey, settingValue}) => {
+          this.settingKey = settingKey;
+          this.setting = game.settings.settings.get(this.settingKey);
+          this.renderType = null;
+          this.currentValue = null;
+          this.canEdit = false;
+          if (this.setting) {
+            if (this.setting.scope === 'client') {
+              this.canEdit = true;
+            } else {
+              this.canEdit = game.user.isGM;
+            }
+            this.currentValue = settingValue;
+            if (this.setting.type === String) {
+              if (this.setting.choices == null) {
+                this.renderType = 'string';
+              } else {
+                this.renderType = 'picklist';
+              }
+            } else if (this.setting.type === Number) {
+              this.renderType = 'number';
+            } else if (this.setting.type === Boolean) {
+              this.renderType = 'boolean';
+            }
+          }
+      
+          this.calcForceClientSettingsInteraction();
+      }),
+    );
   }
-  public get settingKey(): string {
-    if (this.setting == null) {
-      return null;
-    }
-    if (this.setting.module) {
-      return `${this.setting.module}.${this.setting.key}`
-    } else {
-      return `${this.setting.namespace}.${this.setting.key}`
-    }
-  }
+
+  @AsyncAttribute({name: 'data-setting', dataType: 'string'})
+  public settingKey$: ValueReader<string>;
+  private settingKey: string;
+  
 
   @Attribute({name: 'data-auto-save', dataType: 'boolean'})
   public autoSave: boolean;
@@ -168,7 +173,7 @@ export class SettingsItemComponent {
     
     let isClientSetting = this.setting.scope === 'client';
     if (!isClientSetting) {
-      // Client settings gets overwittten to 'world' when forced
+      // Client settings gets overwritten to 'world' when forced
       isClientSetting = UtilsForceClientSettings.getState(this.settingKey) === 'hard';
     }
     if (!isClientSetting) {

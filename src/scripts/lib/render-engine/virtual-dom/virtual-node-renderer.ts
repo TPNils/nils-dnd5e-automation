@@ -7,6 +7,106 @@ import { StoredEventCallback, VirtualAttributeNode, VirtualChildNode, VirtualEve
 import { VirtualTextNode } from "./virtual-text-node";
 
 const domEscapeCharactersByCode = new Map<string, string>();
+interface DomAttributeDescribe {
+  tag: string;
+  attribute: string;
+  type: 'string' | 'boolean' | 'number' | 'function' | 'unknown';
+}
+interface DomNodeDescribe {
+  tag: string;
+  attributes: Map<string, DomAttributeDescribe>;
+}
+class DomAttributeDescribes {
+  #describesByKey = new Map<string, DomNodeDescribe>();
+
+  public getType(node: Element, attribute: string): string {
+    if (!this.#describesByKey.has(node.tagName)) {
+      const keys = new Set<string>();
+      const readonlyKeys = new Set<string>();
+      let loopingKeys = node;
+      while (loopingKeys != null) {
+        for (const key of Object.keys(loopingKeys)) {
+          keys.add(key);
+          const descriptor = Object.getOwnPropertyDescriptor(loopingKeys, key);
+          if (descriptor) {
+            if (descriptor.writable === false) {
+              readonlyKeys.add(key);
+            } else if (descriptor.get && !descriptor.set) {
+              readonlyKeys.add(key);
+            }
+          }
+        }
+        loopingKeys = Object.getPrototypeOf(loopingKeys);
+      }
+
+      const nodeDescribe: DomNodeDescribe = {
+        tag: node.tagName,
+        attributes: new Map(),
+      }
+      this.#describesByKey.set(nodeDescribe.tag, nodeDescribe);
+
+      const elem = document.createElement(nodeDescribe.tag);
+      for (const key of keys) {
+        const attrDescribe: DomAttributeDescribe = {
+          tag: nodeDescribe.tag,
+          attribute: key.toLowerCase(),
+          type: 'unknown',
+        }
+        nodeDescribe.attributes.set(attrDescribe.attribute, attrDescribe);
+
+        if (node[key] == null) {
+          if (key.startsWith('on')) {
+            attrDescribe.type = 'function';
+          } else if (!readonlyKeys.has(key)) {
+            // Check if we can write that data type
+            try {
+              if (attrDescribe.type === 'unknown') {
+                elem[key] = 1;
+                if (elem[key] === 1) {
+                  attrDescribe.type = 'number';
+                }
+              }
+            } catch {/*ignore*/}
+            try {
+              if (attrDescribe.type === 'unknown') {
+                elem[key] = 'a';
+                if (elem[key] === 'a') {
+                  attrDescribe.type = 'string';
+                }
+              }
+            } catch {/*ignore*/}
+          }
+        } else {
+          switch (typeof node[key]) {
+            case 'bigint': {
+              attrDescribe.type = 'number';
+              break;
+            }
+            case 'boolean':
+            case 'function':
+            case 'number':
+            case 'string': {
+              attrDescribe.type = typeof node[key] as DomAttributeDescribe['type'];
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return this.#describesByKey.get(node.tagName).attributes.get(attribute.toLowerCase())?.type;
+  }
+
+  public getValue(node: Element, attribute: string): any {
+    const type = this.getType(node, attribute);
+    if (type == null) {
+      return node.getAttribute(attribute);
+    } else {
+      return node[attribute];
+    }
+  }
+}
+const domAttributeDescribes = new DomAttributeDescribes();
 type DomAction = {
 
 } & ({
@@ -68,8 +168,10 @@ export class VirtualNodeRenderer {
    * @param options.deepUpdate when false and the node already exists, only update the node itself, not it's children
    * @returns Created or updated DOM element
    */
-  public static renderDom<T extends VirtualNode>(virtualNode: T, options: {deepUpdate?: boolean, async?: boolean} = {}): Promise<Node[]> | Node[] {
-    options = {deepUpdate: false, async: true, ...options};
+  public static renderDom<T extends VirtualNode>(virtualNode: T, options: {deepUpdate?: boolean, sync: true}): Node[]
+  public static renderDom<T extends VirtualNode>(virtualNode: T, options?: {deepUpdate?: boolean, sync?: false}): Promise<Node[]>
+  public static renderDom<T extends VirtualNode>(virtualNode: T, options: {deepUpdate?: boolean, sync?: boolean} = {}): Promise<Node[]> | Node[] {
+    options = {deepUpdate: false, sync: false, ...options};
     let pending: Array<{parent?: VirtualParentNode, node: VirtualNode, defaultNamespace: string | undefined;}> = [{
       node: virtualNode,
       defaultNamespace: document?.head?.namespaceURI,
@@ -103,7 +205,8 @@ export class VirtualNodeRenderer {
           }
     
           if (process.node.isEventNode()) {
-            for (const listener of process.node.getEventListerners()) {
+            document.addEventListener
+            for (const listener of process.node.getEventListeners()) {
               allSyncDomActions.push({
                 type: 'addEventListener',
                 node: state.domNode,
@@ -159,11 +262,11 @@ export class VirtualNodeRenderer {
 
           if (process.node.isEventNode()) {
             const oldListeners = new Map<number, StoredEventCallback>();
-            for (const listener of (state.lastRenderSelfState as VirtualEventNode & VirtualNode).getEventListerners()) {
+            for (const listener of (state.lastRenderSelfState as VirtualEventNode & VirtualNode).getEventListeners()) {
               oldListeners.set(listener.guid, listener);
             }
             
-            for (const listener of process.node.getEventListerners()) {
+            for (const listener of process.node.getEventListeners()) {
               if (oldListeners.has(listener.guid)) {
                 oldListeners.delete(listener.guid);
               } else {
@@ -253,7 +356,7 @@ export class VirtualNodeRenderer {
         }
       }
     }
-    if (!options.async) {
+    if (options.sync) {
       allSyncDomActions.push(...allAsyncDomActions);
       allAsyncDomActions = [];
     }
@@ -266,10 +369,10 @@ export class VirtualNodeRenderer {
         return VirtualNodeRenderer.getNodes(virtualNode);
       });
     }
-    if (options.async) {
-      return Promise.resolve(VirtualNodeRenderer.getNodes(virtualNode));
-    } else {
+    if (options.sync) {
       return VirtualNodeRenderer.getNodes(virtualNode);
+    } else {
+      return Promise.resolve(VirtualNodeRenderer.getNodes(virtualNode));
     }
   }
 
@@ -338,6 +441,11 @@ export class VirtualNodeRenderer {
                 break;
               }
               case 'setAttribute': {
+                // Some attributes need to be updated with javascript
+                // https://developer.mozilla.org/en-US/docs/Glossary/IDL
+                if (domAttributeDescribes.getType(item.node, item.attrName) === 'boolean') {
+                  item.node[item.attrName] = AttributeParser.parseBoolean(item.value);
+                }
                 if (!item.preventInput && Component.isComponentElement(item.node)) {
                   item.node.setInput(item.attrName, item.value);
                 } else {

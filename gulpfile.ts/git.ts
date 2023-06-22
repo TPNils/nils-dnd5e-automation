@@ -22,7 +22,7 @@ export class Git {
       throw new Error(chalk.red('Missing "githubRepository" property in ./config.json. Expected format: <githubUsername>/<githubRepo>'));
     }
 
-    const currentVersion = await this.getLatestVersion();
+    const currentVersion = manifest.file.version;
     let targetVersion = args.getVersion(currentVersion, true);
     if (targetVersion == null) {
       targetVersion = currentVersion;
@@ -61,16 +61,16 @@ export class Git {
 
   public async validateCleanRepo(): Promise<void> {
     const cmd = await cli.execPromise('git status --porcelain');
-    cli.throwOnAnyError(cmd);
+    cli.throwError(cmd);
     if (typeof cmd.stdout === 'string' && cmd.stdout.length > 0) {
       throw new Error("You must first commit your pending changes");
     }
   }
 
   public async commitNewVersion(): Promise<void> {
-    cli.throwOnAnyError(await cli.execPromise('git add .'));
+    cli.throwError(await cli.execPromise('git add .'), {ignoreOut: true});
     let newVersion = 'v' + foundryManifest.getManifest().file.version;
-    cli.throwOnAnyError(await cli.execPromise(`git commit -m "Updated to ${newVersion}`));
+    cli.throwError(await cli.execPromise(`git commit -m "Updated to ${newVersion}`));
   }
 
   public async deleteVersionTag(version?: string): Promise<void> {
@@ -83,17 +83,19 @@ export class Git {
   }
 
   public async getLatestVersion(): Promise<string> {
-    return cli.throwOnAnyError(cli.execPromise('git describe --tags `git rev-list --tags --max-count=1`'));
+    const cmd = await cli.execPromise('git describe --tags `git rev-list --tags --max-count=1`');
+    cli.throwError(cmd);
+    return cmd.stdout;
   }
 
   public async tagCurrentVersion(): Promise<void> {
     let version = 'v' + foundryManifest.getManifest().file.version;
-    cli.throwOnAnyError(await cli.execPromise(`git tag -a ${version} -m "Updated to ${version}"`));
-    cli.throwOnAnyError(await cli.execPromise(`git push origin ${version}`));
+    cli.throwError(await cli.execPromise(`git tag -a ${version} -m "Updated to ${version}"`));
+    cli.throwError(await cli.execPromise(`git push origin ${version}`), {ignoreOut: true});
   }
 
   public async push(): Promise<void> {
-    cli.throwOnAnyError(await cli.execPromise(`git push`));
+    cli.throwError(await cli.execPromise(`git push`));
   }
 
   public async gitMoveTag() {

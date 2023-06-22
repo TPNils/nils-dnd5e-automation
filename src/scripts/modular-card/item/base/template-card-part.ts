@@ -1,25 +1,25 @@
-import { DmlTrigger, ITrigger, IAfterDmlContext, IDmlTrigger, IDmlContext } from "../../lib/db/dml-trigger";
-import { UtilsDocument } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { UtilsCompare } from "../../lib/utils/utils-compare";
-import MyAbilityTemplate from "../../pixi/ability-template";
-import { ValueReader } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { MyItemData } from "../../types/fixed-types";
-import { UtilsTemplate } from "../../utils/utils-template";
-import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
+import { DmlTrigger, ITrigger, IAfterDmlContext, IDmlTrigger, IDmlContext } from "../../../lib/db/dml-trigger";
+import { UtilsDocument } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { UtilsCompare } from "../../../lib/utils/utils-compare";
+import { ValueReader } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { MyItemData } from "../../../types/fixed-types";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { UtilsTemplate } from "../../../utils/utils-template";
+import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
-import { TargetCardData, TargetCardPart, uuidsToSelected } from "./target-card-part";
+import { TargetCardPart, uuidsToSelected } from "./target-card-part";
 
 export interface TemplateCardData {
   calc$: {
     actorUuid: string;
     tokenUuid?: string;
     createdTemplateUuid?: string;
-    target: MyItemData['data']['target'];
-    rangeUnit?: MyItemData['data']['range']['units'];
+    target: MyItemData['target'];
+    rangeUnit?: MyItemData['range']['units'];
   }
 }
 
@@ -54,14 +54,16 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
             hasPermission: UtilsDocument.hasAllPermissions([{uuid: data.part.calc$.actorUuid, permission: 'Owner', user: game.user}]),
           })
         })
-        .listen(data => this.setData(data.part, data.hasPermission))
+        .listen(data => this.setData(data.allParts, data.part, data.hasPermission))
     );
   }
 
   public hasPermission = false;
+  private itemUuid: string;
   private target: TemplateCardData['calc$']['target'];
-  private async setData(part: TemplateCardData, hasPermission: boolean) {
+  private async setData(allParts: ModularCardInstance, part: TemplateCardData, hasPermission: boolean) {
     if (part) {
+      this.itemUuid = allParts.getItemUuid();
       this.hasPermission = hasPermission;
       this.target = part.calc$.target;
     } else {
@@ -69,18 +71,11 @@ export class TemplateCardComponent extends BaseCardComponent implements OnInit {
     }
   }
 
-  public startPlace() {
-    const template = MyAbilityTemplate.fromItem({
-      target: this.target,
-      flags: {
-        [staticValues.moduleName]: {
-          dmlCallbackMessageId: this.messageId,
-        }
-      }
-    });
-    // TODO area of Minor Illlusion (Caspian) is too big with XGE area (did not test default)
-    if ((template as MyAbilityTemplate)?.drawPreview) {
-      (template as MyAbilityTemplate).drawPreview();
+  public async startPlace() {
+    const template = UtilsTemplate.fromItem(await UtilsDocument.itemFromUuid(this.itemUuid), this.messageId);
+    // TODO area of Minor Illusion (Caspian) is too big with XGE area (did not test default)
+    if (template?.drawPreview) {
+      template.drawPreview();
     }
   }
 
@@ -92,8 +87,8 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
   private constructor(){}
   
   public create({item, actor, token}: ModularCardCreateArgs): TemplateCardData {
-    // @ts-expect-error
-    const hasAoe = CONFIG.DND5E.areaTargetTypes.hasOwnProperty(item.data.data.target?.type);
+    const itemData = UtilsFoundry.getSystemData(item);
+    const hasAoe = (CONFIG as any).DND5E.areaTargetTypes.hasOwnProperty(itemData.target?.type);
     if (!hasAoe) {
       return null;
     }
@@ -101,8 +96,8 @@ export class TemplateCardPart implements ModularCardPart<TemplateCardData> {
       calc$: {
         actorUuid: actor?.uuid,
         tokenUuid: token?.uuid,
-        target: item.data.data.target,
-        rangeUnit: item.data.data.range?.units
+        target: itemData.target,
+        rangeUnit: itemData.range?.units
       }
     };
   }
@@ -158,29 +153,33 @@ class TemplateCardTrigger implements ITrigger<ModularCardTriggerData<TemplateCar
         continue;
       }
       // Initiate measured template creation
-      const template = MyAbilityTemplate.fromItem({
-        target: newRow.part.calc$.target,
-        flags: {
-          [staticValues.moduleName]: {
-            dmlCallbackMessageId: newRow.messageId,
-          }
-        }
-      });
+      const template = UtilsTemplate.fromItem(await UtilsDocument.itemFromUuid(newRow.allParts.getItemUuid()), newRow.messageId);
       // Auto place circle templates with range self
       if (newRow.part.calc$.tokenUuid && newRow.part.calc$.rangeUnit === 'self' && template.document.data.t === 'circle') {
         const token = await UtilsDocument.tokenFromUuid(newRow.part.calc$.tokenUuid);
         if (token) {
-          template.document.data.update({
-            x: token.data.x + (token.data.width * token.parent.data.grid / 2),
-            y: token.data.y + (token.data.height * token.parent.data.grid / 2),
-          })
+          const tokenData = UtilsFoundry.getModelData(token);
+          let grid = UtilsFoundry.getModelData(token.parent).grid;
+          // Foundry V9 has grid as a number, V10 as an object
+          if (typeof grid === 'object') {
+            grid = grid.size;
+          }
+          const updateData = {
+            x: tokenData.x + (tokenData.width * grid / 2),
+            y: tokenData.y + (tokenData.height * grid / 2),
+          };
+          if (UtilsFoundry.usesDataModel<MeasuredTemplateDocument>(template.document)) {
+            template.document.updateSource(updateData);
+          } else if (UtilsFoundry.usesDocumentData<MeasuredTemplateDocument>(template.document)) {
+            template.document.data.update(updateData);
+          }
           UtilsDocument.bulkCreate([template.document]);
           return;
         }
       }
       // Manually place template
-      if (template && (template as MyAbilityTemplate).drawPreview) {
-        (template as MyAbilityTemplate).drawPreview();
+      if (template && template.drawPreview) {
+        template.drawPreview();
         return;
       }
     }
@@ -235,7 +234,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         continue;
       }
       const chatMessage = game.messages.get(messageId);
-      const parts = updateChatMessageMap.has(messageId) ? updateChatMessageMap.get(messageId) : ModularCard.getCardPartDatas(chatMessage).deepClone();
+      const parts = updateChatMessageMap.has(messageId) ? updateChatMessageMap.get(messageId) : ModularCard.readModuleCard(chatMessage).deepClone();
       if (parts == null) {
         continue;
       }
@@ -259,8 +258,8 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         }
       }
 
-      let templatePart = parts.getTypeData<TemplateCardData>(TemplateCardPart.instance)
-      let targetPart = parts.getTypeData<TargetCardData>(TargetCardPart.instance)
+      let templatePart = parts.getTypeData(TemplateCardPart.instance)
+      let targetPart = parts.getTypeData(TargetCardPart.instance)
       if (!templatePart || !targetPart) {
         continue;
       }
@@ -272,7 +271,9 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
         updateChatMessageMap.set(chatMessage.id, parts);
       }
 
-      if (newTemplate.data.x !== oldTemplate?.data?.x || newTemplate.data.y !== oldTemplate?.data?.y) {
+      const newTemplateData = UtilsFoundry.getModelData(newTemplate);
+      const oldTemplateData = UtilsFoundry.getModelData(oldTemplate);
+      if (newTemplateData.x !== oldTemplateData?.x || newTemplateData.y !== oldTemplateData?.y) {
         const templateDetails = UtilsTemplate.getTemplateDetails(newTemplate);
         const scene = newTemplate.parent;
         const newTargets = new Set<string>();
@@ -290,7 +291,7 @@ class DmlTriggerTemplate implements IDmlTrigger<MeasuredTemplateDocument> {
     }
 
     for (const [chatMessageId, parts] of updateChatMessageMap.entries()) {
-      await ModularCard.setCardPartDatas(game.messages.get(chatMessageId), parts);
+      await ModularCard.writeModuleCard(game.messages.get(chatMessageId), parts);
     }
 
     deleteTemplateUuids.delete(null);

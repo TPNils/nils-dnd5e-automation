@@ -137,20 +137,26 @@ export interface FoundryManifestJsonV10 extends Omit<FoundryManifestJsonV8, 'nam
     flags?: FoundryFlags;
   }>;
   relationships: {
-    /** Systems that this Package supports */
+    /** Systems that this Package supports, all of them optional */
     systems?: Array<FoundryRelationship<'system'>>;
     /** Packages that are required for base functionality */
-    required?: Array<FoundryRelationship>;
+    requires?: Array<FoundryRelationship>;
     conflicts?: Array<FoundryRelationship>;
   }
   exclusive: boolean;
 }
 
+export interface FoundryManifestJsonV11 extends Omit<FoundryManifestJsonV10, 'relationships'> {
+  relationships: FoundryManifestJsonV10['relationships'] & {
+    recommends?: Array<FoundryRelationship>;
+  },
+}
+
 export type FoundryManifestJson = {
   type: 'module' | 'system';
-  file: FoundryManifestJsonV10;
+  file: FoundryManifestJsonV11;
 };
-type FoundryManifestJsonFile = Partial<FoundryManifestJsonV8 & FoundryManifestJsonV10>;
+type FoundryManifestJsonFile = Partial<FoundryManifestJsonV8 & FoundryManifestJsonV11>;
 
 class FoundryManifest {
 
@@ -174,14 +180,14 @@ class FoundryManifest {
 
       this.manifest = {
         type: type,
-        file: FoundryManifest.toV10(json),
+        file: FoundryManifest.toV11(json),
       }
     }
     return this.manifest;
   }
 
-  private static toV10(input: FoundryManifestJsonFile): FoundryManifestJsonV10 {
-    const v10: Partial<FoundryManifestJsonV10> = {};
+  private static toV11(input: FoundryManifestJsonFile): FoundryManifestJsonV11 {
+    const v10: Partial<FoundryManifestJsonV11> = {};
     v10.authors = input.authors;
     if (input.author) {
       if (v10.authors == null) {
@@ -227,21 +233,11 @@ class FoundryManifest {
     }
     v10.protected = input.protected;
     v10.readme = input.readme;
-    const relationshipModulesById = new Map<string, FoundryRelationship>();
+    const relationshipRequiredById = new Map<string, FoundryRelationship>();
     const relationshipSystemsById = new Map<string, FoundryRelationship<'system'>>();
-    if (input.relationships?.required) {
-      for (const module of input.relationships.required) {
-        relationshipModulesById.set(module.id, module);
-      }
-    }
-    if (input.relationships?.systems) {
-      for (const system of input.relationships.systems) {
-        relationshipSystemsById.set(system.id, system);
-      }
-    }
     if (input.dependencies) {
       for (const module of input.dependencies) {
-        relationshipModulesById.set(module.name, {id: module.name, type: module.type, manifest: module.manifest});
+        relationshipRequiredById.set(module.name, {id: module.name, type: module.type, manifest: module.manifest});
       }
     }
     if (input.system) {
@@ -249,9 +245,21 @@ class FoundryManifest {
         relationshipSystemsById.set(system, {id: system, type: 'system'});
       }
     }
+    if (input.relationships?.requires) {
+      for (const required of input.relationships.requires) {
+        relationshipRequiredById.set(required.id, required);
+      }
+    }
+    if (input.relationships?.systems) {
+      for (const system of input.relationships.systems) {
+        relationshipSystemsById.set(system.id, system);
+      }
+    }
     v10.relationships = {
-      required: Array.from(relationshipModulesById.values()),
+      requires: Array.from(relationshipRequiredById.values()),
       systems: Array.from(relationshipSystemsById.values()),
+      conflicts: input.relationships?.conflicts,
+      recommends: input.relationships?.recommends,
     };
     v10.scripts = input.scripts;
     v10.socket = input.socket;
@@ -272,21 +280,29 @@ class FoundryManifest {
     }
     injected.name = input.id;
     injected.packs = input.packs?.map(p => ({...p, entity: p.type}));
-    const relationshipModulesById = new Map<string, FoundryRelationship>();
+    const relationshipModulesById = new Map<string, FoundryRelationship<'module'>>();
     const relationshipSystemsById = new Map<string, FoundryRelationship<'system'>>();
-    if (input.relationships?.required) {
-      for (const module of input.relationships.required) {
-        relationshipModulesById.set(module.id, module);
-      }
+
+    const relationships: FoundryRelationship[] = [];
+    if (input.relationships?.requires) {
+      relationships.push(...input.relationships.requires)
     }
     if (input.relationships?.systems) {
-      for (const system of input.relationships.systems) {
-        relationshipSystemsById.set(system.id, system);
+      relationships.push(...input.relationships.systems)
+    }
+    for (const relationship of relationships) {
+      switch (relationship.type) {
+        case 'module': {
+          relationshipModulesById.set(relationship.id, relationship as FoundryRelationship<'module'>);
+          break;
+        }
+        case 'system': {
+          relationshipSystemsById.set(relationship.id, relationship as FoundryRelationship<'system'>);
+          break;
+        }
       }
     }
-    injected.dependencies = Array.from(relationshipModulesById.values())
-      .filter(d => d.type !== 'world')
-      .map(d => ({name: d.id, type: d.type as any, manifest: d.type}));
+    injected.dependencies = Array.from(relationshipModulesById.values()).map(d => ({name: d.id, type: d.type as any, manifest: d.type}));
     injected.system = Array.from(relationshipSystemsById.keys());
 
     return injected;

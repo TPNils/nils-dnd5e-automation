@@ -1,21 +1,23 @@
-import type { RoundData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/client/data/documents/combat";
-import { IAfterDmlContext, IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
-import { DocumentListener } from "../../../lib/db/document-listener";
-import { UtilsDocument } from "../../../lib/db/utils-document";
-import { RunOnce } from "../../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
-import { UtilsRoll } from "../../../lib/roll/utils-roll";
-import { UtilsCompare } from "../../../lib/utils/utils-compare";
-import { ValueReader } from "../../../provider/value-provider";
-import { staticValues } from "../../../static-values";
-import { DamageType, MyActor, MyItem } from "../../../types/fixed-types";
-import { UtilsItem } from "../../../utils/utils-item";
-import { Action } from "../../action";
+import { RoundData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/client/data/documents/combat";
+import { ITrigger, IDmlContext, IAfterDmlContext } from "../../../../lib/db/dml-trigger";
+import { DocumentListener } from "../../../../lib/db/document-listener";
+import { UtilsDocument } from "../../../../lib/db/utils-document";
+import { RunOnce } from "../../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../../lib/render-engine/component";
+import { UtilsRoll } from "../../../../lib/roll/utils-roll";
+import { UtilsCompare } from "../../../../lib/utils/utils-compare";
+import { ValueReader } from "../../../../provider/value-provider";
+import { staticValues } from "../../../../static-values";
+import { DamageType, MyActor, MyItem } from "../../../../types/fixed-types";
+import { UtilsFoundry } from "../../../../utils/utils-foundry";
+import { UtilsItem } from "../../../../utils/utils-item";
+import { Action } from "../../../action";
+import { ModularCardInstance, ModularCard, BeforeCreateModuleCardEvent, ModularCardTriggerData } from "../../../modular-card";
+import { createPermissionCheckAction, CreatePermissionCheckArgs, PermissionResponse, ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../../../modular-card-part";
+import { ManualDamageSource, DamageCardPart } from "../../base/index";
 import { BaseCardComponent } from "../../base/base-card-component";
-import { DamageCardData, DamageCardPart, ManualDamageSource } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
-import { BeforeCreateModuleCardEvent, ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
-import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart, PermissionResponse } from "../../modular-card-part";
+
 
 export interface SrdSneakAttackCardData {
   itemUuid: string;
@@ -88,7 +90,7 @@ export interface SrdSneakAttackCardData {
 export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit {
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
-    const part = cardParts.getTypeData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance);
+    const part = cardParts.getTypeData(SrdSneakAttackCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (part?.calc$?.actorUuid) {
       documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
@@ -101,12 +103,12 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(SrdSneakAttackComponent.actionPermissionCheck)
     .build(({messageId, addSneak, cardParts}) => {
-      const part = cardParts.getTypeData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance);
+      const part = cardParts.getTypeData(SrdSneakAttackCardPart.instance);
       if (part.shouldAdd === addSneak) {
         return;
       }
       part.shouldAdd = addSneak;
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   private static setDamageType = new Action<{dmg: DamageType} & ChatPartIdData>('SneakAttackSetDamageType')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
@@ -114,12 +116,12 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(SrdSneakAttackComponent.actionPermissionCheck)
     .build(({messageId, dmg, cardParts}) => {
-      const part = cardParts.getTypeData<SrdSneakAttackCardData>(SrdSneakAttackCardPart.instance);
+      const part = cardParts.getTypeData(SrdSneakAttackCardPart.instance);
       if (part.selectedDamage === dmg) {
         return;
       }
       part.selectedDamage = dmg;
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   //#endregion
   
@@ -205,10 +207,11 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
 
   public async create(args: ModularCardCreateArgs): Promise<SrdSneakAttackCardData> {
     // Only add sneak attack to weapon attacks
-    if (!args.item.hasAttack || !['mwak', 'rwak'].includes(args.item.data.data.actionType)) {
+    const itemData = UtilsFoundry.getSystemData(args.item);
+    if (!args.item.hasAttack || !['mwak', 'rwak'].includes(itemData.actionType)) {
       return null;
     }
-    if (!args.item.hasDamage || !args.item.data.data.damage?.parts?.length) {
+    if (!args.item.hasDamage || !itemData.damage?.parts?.length) {
       return null;
     }
 
@@ -218,8 +221,9 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
     }
 
     const rollData = sneakItem.getRollData()
-    const normalRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(sneakItem.data.data.damage.parts, rollData));
-    const versatileRoll = UtilsRoll.toRollData(UtilsRoll.versatilePartsToRoll(sneakItem.data.data.damage.parts, sneakItem.data.data.damage.versatile, rollData));
+    const sneakItemData = UtilsFoundry.getSystemData(sneakItem);
+    const normalRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(sneakItemData.damage.parts, rollData));
+    const versatileRoll = UtilsRoll.toRollData(UtilsRoll.versatilePartsToRoll(sneakItemData.damage.parts, sneakItemData.damage.versatile, rollData));
 
     const data: SrdSneakAttackCardData = {
       itemUuid: sneakItem.uuid,
@@ -329,7 +333,7 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
 
   private syncWithBaseDamage(context: IDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
     for (const {newRow, oldRow} of context.rows) {
-      const baseDamage = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance)
+      const baseDamage = newRow.allParts.getTypeData(DamageCardPart.instance)
 
       if (!baseDamage) {
         continue;
@@ -353,11 +357,11 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
 
   private async calcDamageTypeOptions(context: IAfterDmlContext<ModularCardTriggerData<SrdSneakAttackCardData>>) {
     for (const {newRow, oldRow} of context.rows) {
-      const baseDamage = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance)
+      const baseDamage = newRow.allParts.getTypeData(DamageCardPart.instance)
       if (!baseDamage) {
         continue;
       }
-      const oldDamage = oldRow?.allParts?.getTypeData<DamageCardData>(DamageCardPart.instance)
+      const oldDamage = oldRow?.allParts?.getTypeData(DamageCardPart.instance)
 
       const newChangeDetect = {
         damageSource: baseDamage.calc$.damageSource,
@@ -396,8 +400,8 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
           }
         }
         if (source.type === 'Item') {
-          const item = await UtilsDocument.itemFromUuid(source.itemUuid);
-          for (const [formula, damage] of item.data.data.damage.parts) {
+          const itemData = UtilsFoundry.getSystemData(await UtilsDocument.itemFromUuid(source.itemUuid));
+          for (const [formula, damage] of itemData.damage.parts) {
             damageTypes.add(damage);
           }
         }

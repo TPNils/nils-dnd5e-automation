@@ -23,19 +23,12 @@ export class Cli {
     });
   }
 
-  public throwOnAnyError(cmd: ExecResponse): string
-  public throwOnAnyError(cmd: Promise<ExecResponse>): Promise<string>
-  public throwOnAnyError(cmd: ExecResponse | Promise<ExecResponse>): string | Promise<string> {
-    if (cmd instanceof Promise) {
-      cmd.then((c) => this.throwOnAnyError(c));
-    } else {
-      if (cmd.err) {
-        throw cmd.err;
-      }
-      if (cmd.stderr) {
-        throw new Error(cmd.stderr);
-      }
-      return cmd.cmd;
+  public throwError(cmd: ExecResponse, options: {ignoreOut?: boolean} = {}): void {
+    if (cmd.err) {
+      throw cmd.err;
+    }
+    if (cmd.stderr && !options.ignoreOut) {
+      throw new Error(cmd.stderr);
     }
   }
 

@@ -13,6 +13,9 @@ export class UtilsDiceSoNice {
   * @returns {Promise<boolean>} when resolved true if the animation was displayed, false if not.
    */
   public static async showRoll({roll, user, rollMode, showUserIds}: ShowRollRequest): Promise<boolean> {
+    if (!roll || !roll.terms?.length || roll.total == null) {
+      return false;
+    }
     if (!(game as any).dice3d) {
       return false;
     }
@@ -44,7 +47,7 @@ export class UtilsDiceSoNice {
       }
     }
 
-    // DiceSoNice does something weird to find the dice, but I think this is to solve some weird foundry behaviour
+    // DiceSoNice does something weird to find the dice, but I think this is to solve some weird foundry behavior
     // Simplified: only give DiceSoNice vanilla foundry dice
     const vanillaTerms: RollTerm[] = [];
     let hasCustomTerms = false;

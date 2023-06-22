@@ -1,7 +1,6 @@
 import { AnyNodeData } from "../../../../types/html-data";
 import { ValueProvider } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { UtilsLog } from "../../utils/utils-log";
 import { Stoppable } from "../utils/stoppable";
 import { AttributeParser } from "./attribute-parser";
 import { Template } from "./template/template";
@@ -199,7 +198,13 @@ export function AsyncAttribute(config?: AttributeConfig | string) {
         this[asyncAttributeSymbol] = {};
       }
       if (!this[asyncAttributeSymbol][propertyKey]) {
-        this[asyncAttributeSymbol][propertyKey] = new ValueProvider();
+        if (arg instanceof ValueProvider) {
+          // Allow to set the initial value
+          this[asyncAttributeSymbol][propertyKey] = arg;
+          return;
+        } else {
+          this[asyncAttributeSymbol][propertyKey] = new ValueProvider();
+        }
       }
       this[asyncAttributeSymbol][propertyKey].set(arg);
     };
@@ -267,13 +272,13 @@ const outputConfigSymbol = Symbol('OutputConfig');
 export interface OutputConfig {
   eventName?: string;
   /* default: false */
-  bubbels?: boolean;
+  bubbles?: boolean;
   /* default: false. Won't emit if the last emit was the same. If it's a function, return true of the values are the same */
   deduplicate?: boolean | ((oldValue: any, newValue: any) => boolean);
 }
 interface OutputConfigInternal {
   eventName: OutputConfig['eventName'];
-  bubbels: OutputConfig['bubbels'];
+  bubbles: OutputConfig['bubbles'];
   deduplicate: OutputConfig['deduplicate'];
 }
 interface OutputConfigsInternal {
@@ -290,7 +295,7 @@ export function Output(config?: string | OutputConfig) {
     }
     const internalConfig: OutputConfigInternal = {
       eventName: propertyKey,
-      bubbels: false,
+      bubbles: false,
       deduplicate: false,
     }
 
@@ -312,8 +317,8 @@ export function Output(config?: string | OutputConfig) {
       if (config.eventName != null) {
         internalConfig.eventName = config.eventName;
       }
-      if (config.bubbels != null) {
-        internalConfig.bubbels = config.bubbels;
+      if (config.bubbles != null) {
+        internalConfig.bubbles = config.bubbles;
       }
       if (config.deduplicate != null) {
         internalConfig.deduplicate = config.deduplicate;
@@ -347,7 +352,7 @@ export function Output(config?: string | OutputConfig) {
       if (value instanceof Event) {
         this[htmlElementSymbol].dispatchEvent(new (value.constructor as ConstructorOf<Event>)(internalConfig.eventName.toLowerCase(), value));
       } else {
-        this[htmlElementSymbol].dispatchEvent(new CustomEvent(internalConfig.eventName.toLowerCase(), {detail: value, cancelable: false, bubbles: internalConfig.bubbels}));
+        this[htmlElementSymbol].dispatchEvent(new CustomEvent(internalConfig.eventName.toLowerCase(), {detail: value, cancelable: false, bubbles: internalConfig.bubbles}));
       }
     };
     if (descriptor) {
@@ -381,10 +386,12 @@ export interface OnInit {
 
 export interface OnInitParam {
   html: ComponentElement,
+  markChanged: () => void;
   addStoppable(...stoppable: Stoppable[]): void;
 }
 
 const deepUpdateOptions = {deepUpdate: true};
+const deepSyncUpdateOptions: {sync: true, deepUpdate: true} = {sync: true, deepUpdate: true};
 
 export class ComponentElement extends HTMLElement {
   #controller: object
@@ -441,7 +448,7 @@ export class ComponentElement extends HTMLElement {
       // If the attribute is not an @Attribute, also reflect changes to it
       // If attribute was not set, keep it all internal
       // This aligns a bit (not 100%) with the best practices https://web.dev/custom-elements-best-practices/
-      //   and teaked by my opinion
+      //   and tweaked by my opinion
       if (newValue === false) {
         // disabled="false" is still disabled => don't set false attributes
         this.removeAttribute(name);
@@ -554,6 +561,7 @@ export class ComponentElement extends HTMLElement {
       if (ComponentElement.isOnInit(this.#controller)) {
         this.#controller.onInit({
           html: this,
+          markChanged: () => this.generateHtmlQueue(),
           addStoppable: (...stoppable: Stoppable[]) => {
             this.unregisters.push(...stoppable);
           }
@@ -630,8 +638,8 @@ export class ComponentElement extends HTMLElement {
         this.template = null;
       } else {
         this.template = new Template(this.nodeName, parsedHtml, this.#controller);
-        this.templateRenderResult = await this.template.render();
-        const rootNodes = await VirtualNodeRenderer.renderDom(this.templateRenderResult, deepUpdateOptions);
+        this.templateRenderResult = this.template.render({sync: true});
+        const rootNodes = VirtualNodeRenderer.renderDom(this.templateRenderResult, deepSyncUpdateOptions);
         this.findSlots();
         this.applySlots();
         this.setInnerNode(rootNodes);

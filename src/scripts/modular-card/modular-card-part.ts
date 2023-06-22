@@ -2,7 +2,7 @@ import { PermissionCheck, UtilsDocument } from "../lib/db/utils-document";
 import { MaybeAsyncWrapper } from "../lib/utils/maybe-async-wrapper";
 import { ValueProvider, ValueReader } from "../provider/value-provider";
 import { MyActor, MyItem } from "../types/fixed-types";
-import { ChatPartIdData } from "./item-card-helpers";
+import { ChatPartIdData } from "./item/item-card-helpers";
 import { ModularCardInstance } from "./modular-card";
 
 export interface CreatePermissionCheckArgs {
@@ -11,7 +11,7 @@ export interface CreatePermissionCheckArgs {
     permission: PermissionCheck['permission'],
     /** 
      * Default: false
-     * if false, this permissions is used to determen if this action can run local or must be run by the gm 
+     * if false, this permissions is used to determine if this action can run local or must be run by the gm 
      * if true, it will be used to prevent the action
      */
     security?: boolean
@@ -123,5 +123,6 @@ export interface ModularCardPart<D = any> {
   getType(): string; // TODO getType should be static => use as param when registering
   create(args: ModularCardCreateArgs): PromiseOrSync<D>;
   refresh(data: D, args: ModularCardCreateArgs): PromiseOrSync<D>;
+  refreshVisual?(data: D, args: ModularCardCreateArgs): PromiseOrSync<D>;
   getHtml?(data: HtmlContext<D>): PromiseOrSync<string | null>;
 }

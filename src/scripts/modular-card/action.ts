@@ -1,8 +1,7 @@
 import { provider } from "../provider/provider";
 import { ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
-import { UtilsLog } from "../utils/utils-log";
-import { ChatPartIdData } from "./item-card-helpers";
+import { ChatPartIdData } from "./item/item-card-helpers";
 import { ActionPermissionCheck } from "./modular-card-part";
 
 type ServerResponse<T> = {success: true; response: T} | {success: false; errorMessage: any[], stackTrace?: string[], errorType: 'warn' | 'error'};
@@ -41,7 +40,7 @@ export class Action<ClientData, ServerData = {user: User}> {
   private enricherFuncs: Array<(serializedData: ServerData) => any> = [];
   /**
    * <b>Optional</b>
-   * The serialized data cotnains the bare minimum.
+   * The serialized data contains the bare minimum.
    * To help the permission check and execute,
    * 
    * @param enricher function which return data which should be extended to the serialized data
@@ -84,7 +83,7 @@ export class Action<ClientData, ServerData = {user: User}> {
         if (this.permissionCheckFunc && !user.isGM) {
           let permissionResponse = await this.permissionCheckFunc(enrichedData as typeof enrichedData & ChatPartIdData, user);
           if (permissionResponse instanceof ValueReader) {
-            permissionResponse = await permissionResponse.listenFirst();
+            permissionResponse = await permissionResponse.firstPromise();
           }
           if (permissionResponse === 'can-run-local' || (permissionResponse === 'can-run-as-gm' && game.user.isGM)) {
             const response = await serverExecutor(enrichedData);

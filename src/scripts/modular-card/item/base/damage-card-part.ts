@@ -1,25 +1,26 @@
 
-import { RollDamageEventData, RollDamageMode } from "../../elements/roll-damage-element";
-import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
-import { DocumentListener } from "../../lib/db/document-listener";
-import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
-import { TermData, RollData, UtilsRoll } from "../../lib/roll/utils-roll";
-import { UtilsCompare } from "../../lib/utils/utils-compare";
-import { ValueProvider } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { MyActor, DamageType, MyItemData, MyItem } from "../../types/fixed-types";
-import { UtilsArray } from "../../utils/utils-array";
-import { UtilsLog } from "../../utils/utils-log";
-import { Action } from "../action";
+import { RollDamageEventData, RollDamageMode } from "../../../elements/roll-damage-element";
+import { ITrigger, IDmlContext, IAfterDmlContext } from "../../../lib/db/dml-trigger";
+import { DocumentListener } from "../../../lib/db/document-listener";
+import { UtilsDocument, PermissionCheck, DmlUpdateRequest, PermissionResponse } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { AsyncAttribute, Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { UtilsDiceSoNice } from "../../../lib/roll/utils-dice-so-nice";
+import { TermData, RollData, UtilsRoll } from "../../../lib/roll/utils-roll";
+import { UtilsCompare } from "../../../lib/utils/utils-compare";
+import { ValueProvider } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { MyActor, DamageType, MyItemData, MyItem } from "../../../types/fixed-types";
+import { UtilsArray } from "../../../utils/utils-array";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { Action } from "../../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
-import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../../modular-card-part";
+import { AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
-import { CheckCardData, CheckCardPart, TargetCache as CheckTargetCache } from "./check-card-part";
+import { CheckCardPart, TargetCache as CheckTargetCache } from "./check-card-part";
+import { SpellLevelCardPart } from "./spell-level-card-part";
 import { State, StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
 
 type KeyOfType<T, V> = keyof {
@@ -49,7 +50,6 @@ interface TargetCache {
 export interface ItemDamageSource {
   type: 'Item';
   itemUuid: string;
-  spellLevel?: MyItemData['data']['level'];
   hasVersatile: boolean;
 }
 
@@ -73,9 +73,9 @@ export interface DamageCardData {
   userBonus?: string;
   calc$: {
     actorUuid?: string;
-    properties: MyItemData['data']['properties'];
+    properties: MyItemData['properties'];
     damageSource: ItemDamageSource | ManualDamageSource;
-    modfierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
+    modifierRule?: 'save-full-dmg' | 'save-halve-dmg' | 'save-no-dmg';
     roll?: RollData;
     displayFormula?: string;
     displayDamageTypes?: string;
@@ -135,36 +135,38 @@ async function itemSourceToManualSource(itemSource: ItemDamageSource | MyItem, a
     normalBaseRoll: [],
   };
 
-  if (item.data.data.damage?.parts?.length > 0) {
-    manualSource.normalBaseRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(item.data.data.damage.parts, rollData)).terms;
-    if (item.data.data.damage.versatile) {
-      manualSource.versatileBaseRoll = UtilsRoll.toRollData(UtilsRoll.versatilePartsToRoll(item.data.data.damage.parts, item.data.data.damage.versatile, rollData)).terms;
+  const itemData = UtilsFoundry.getSystemData(item);
+  const actorData = UtilsFoundry.getSystemData(item.actor);
+  if (itemData.damage?.parts?.length > 0) {
+    manualSource.normalBaseRoll = UtilsRoll.toRollData(UtilsRoll.damagePartsToRoll(itemData.damage.parts, rollData)).terms;
+    if (itemData.damage.versatile) {
+      manualSource.versatileBaseRoll = UtilsRoll.toRollData(UtilsRoll.versatilePartsToRoll(itemData.damage.parts, itemData.damage.versatile, rollData)).terms;
     }
   }
 
   const rollKeys: Array<KeyOfType<ManualDamageSource, TermData[]>> = ['normalBaseRoll'];
-  if (item.data.data.damage.versatile) {
+  if (itemData.damage.versatile) {
     rollKeys.push('versatileBaseRoll');
   }
   
-  // Upcasting
+  // Up-casting
   for (const key of rollKeys) {
-    const scaling = item.data.data.scaling;
+    const scaling = itemData.scaling;
 
     let upcastLevels = 0;
     if (scaling?.mode === 'level' && scaling.formula) {
-      const originalItem = await UtilsDocument.itemFromUuid(item.uuid);
-      if (originalItem && item.data.data.level > originalItem.data.data.level) {
-        upcastLevels = item.data.data.level - originalItem.data.data.level;
+      const originalItemData = UtilsFoundry.getSystemData(await UtilsDocument.itemFromUuid(item.uuid));
+      if (originalItemData && itemData.level > originalItemData.level) {
+        upcastLevels = itemData.level - originalItemData.level;
       }
     } else if (scaling?.mode === 'cantrip' && item.actor) {
       let actorLevel = 0;
       if (item.actor.type === "character") {
-        actorLevel = item.actor.data.data.details.level;
-      } else if (item.data.data.preparation.mode === "innate") {
-        actorLevel = Math.ceil(item.actor.data.data.details.cr);
+        actorLevel = actorData.details.level;
+      } else if (itemData.preparation.mode === "innate") {
+        actorLevel = Math.ceil(actorData.details.cr);
       } else {
-        actorLevel = item.actor.data.data.details.spellLevel;
+        actorLevel = actorData.details.spellLevel;
       }
       upcastLevels = Math.floor((actorLevel + 1) / 6);
     }
@@ -185,7 +187,7 @@ async function itemSourceToManualSource(itemSource: ItemDamageSource | MyItem, a
 
   // Actor bonus
   if (addActorBonus && item.actor) {
-    const actorBonus = item.actor.data.data.bonuses?.[item.data.data.actionType];
+    const actorBonus = actorData.bonuses?.[itemData.actionType];
     if (actorBonus?.damage && parseInt(actorBonus.damage) !== 0) {
       for (const key of rollKeys) {
         const modifiedRoll = UtilsRoll.mergeRolls(UtilsRoll.fromRollTermData(manualSource[key]), new Roll(actorBonus.damage, rollData));
@@ -228,7 +230,7 @@ async function itemSourceToManualSource(itemSource: ItemDamageSource | MyItem, a
 class DamageCardComponent extends BaseCardComponent implements OnInit {
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
-    const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+    const part = cardParts.getTypeData(DamageCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (part?.calc$?.actorUuid) {
       documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
@@ -241,13 +243,13 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
     .build(({messageId, event, cardParts}) => {
-      const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const part = cardParts.getTypeData(DamageCardPart.instance);
       if (part.userBonus === event.userBonus && part.phase === 'result') {
         return;
       }
       part.userBonus = event.userBonus;
       part.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   private static modeChange = new Action<{event: CustomEvent<RollDamageEventData<RollDamageMode>>} & ChatPartIdData>('DamageOnModeChange')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
@@ -255,7 +257,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
     .build(({messageId, cardParts, event}) => {
-      const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const part = cardParts.getTypeData(DamageCardPart.instance);
       if (part.mode === event.data) {
         return;
       }
@@ -264,7 +266,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
       if (event.quickRoll) {
         part.phase = 'result';
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   private static sourceChange = new Action<{event: CustomEvent<RollDamageEventData<DamageCardData['source']>>} & ChatPartIdData>('DamageOnSourceChange')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
@@ -272,7 +274,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(DamageCardComponent.actionPermissionCheck)
     .build(({messageId, cardParts, event}) => {
-      const part = cardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const part = cardParts.getTypeData(DamageCardPart.instance);
       if (part.source === event.data) {
         return;
       }
@@ -281,7 +283,7 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
       if (event.quickRoll) {
         part.phase = 'result';
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   //#endregion
 
@@ -305,9 +307,9 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   public flavor = '';
   public userBonus: string;
   public overrideFormula: string;
-  public readPermission: string;
+  public readPermission: string = 'GM';
   public readHiddenDisplayType: string;
-  public interactionPermission: string;
+  public interactionPermission: string = 'GM';
   
   public onInit(args: OnInitParam): void {
     args.addStoppable(
@@ -418,6 +420,96 @@ class DamageCardComponent extends BaseCardComponent implements OnInit {
   }
 }
 
+@Component({
+  tag: DamageTargetComponent.getSelector(),
+  html: /*html*/`
+    <div *if="this.renderType === 'hidden'">?</div>
+    <div *if="this.renderType === '0'">0</div>
+    <div *if="this.renderType === '+'" class="positive">+{{this.hpDiff}}</div>
+    <div *if="this.renderType === '-'" class="negative">{{this.hpDiff}}</div>
+  `,
+  style: /*css*/`
+    :host {
+      display: block;
+    }
+
+    .positive {
+      color: green;
+    }
+
+    .negative {
+      color: red;
+    }
+  `
+})
+class DamageTargetComponent extends BaseCardComponent implements OnInit {
+
+  public static getSelector(): string {
+    return `${staticValues.code}-damage-target`;
+  }
+
+  @AsyncAttribute('data-selection-id')
+  private selectionId = new ValueProvider<string>();
+  
+  public onInit(args: OnInitParam): void {
+    args.addStoppable(
+      ValueProvider.mergeObject({
+        data: this.getData<DamageCardData>(DamageCardPart.instance),
+        selectionId: this.selectionId,
+      })
+      .switchMap(({data, selectionId}) => {
+        const targetPart = data.allParts.getTypeData(TargetCardPart.instance);
+        const targetUuid = targetPart?.selected?.find(target => target.selectionId === selectionId)?.tokenUuid;
+        const cache = data.part.calc$.targetCaches.find(cache => cache.targetUuid === targetUuid);
+        return ValueProvider.mergeObject({
+          ...data,
+          selectionId: selectionId,
+          damageHiddenRollSetting: DocumentListener.listenSettingValue<string>(staticValues.moduleName, 'damageHiddenRoll'),
+          permissions: UtilsDocument.hasPermissions([
+            {uuid: data.allParts.getItemUuid(), permission: `${staticValues.code}ReadDamage`, user: game.user},
+            {uuid: cache.actorUuid, permission: `${staticValues.code}ReadImmunity`, user: game.user},
+          ]),
+        })
+      })
+      .listen(async (data) => {
+        this.calc(data.allParts, data.selectionId, data.damageHiddenRollSetting, data.permissions)
+      })
+    )
+  }
+
+  public renderType: 'hidden' | '+' | '0' | '-' = 'hidden';
+  public hpDiff: number;
+  private calc(allParts: ModularCardInstance, selectionId: string, damageHiddenRollSetting: string, permissions: PermissionResponse[]) {
+    // TODO UI: add a square which is full, half, or empty depending on the damage calculation.
+    //  Also allow manual overrides somehow 
+    const targetPart = allParts.getTypeData(TargetCardPart.instance);
+    const targetUuid = targetPart?.selected?.find(target => target.selectionId === selectionId)?.tokenUuid;
+    const damagePart = allParts.getTypeData<ModularCardPart<DamageCardData>>(DamageCardPart.instance);
+    const targetCache = damagePart.calc$.targetCaches.find(cache => cache.targetUuid === targetUuid);
+
+    this.hpDiff = 0;
+    const canSeeDamage = damageHiddenRollSetting === 'total' || permissions.find(p => p.requestedCheck.permission === `${staticValues.code}ReadDamage`).result;
+    const canSeeTarget = permissions.find(p => p.requestedCheck.permission === `${staticValues.code}ReadImmunity`).result;
+    if (canSeeDamage && canSeeTarget) {
+      this.hpDiff += (targetCache.calcHpChange ?? 0);
+      this.hpDiff += (targetCache.calcAddTmpHp ?? 0);
+    } else {
+      this.hpDiff = null;
+      this.renderType = 'hidden';
+      return;
+    }
+    
+    if (this.hpDiff === 0) {
+      this.renderType = '0';
+    } else if (this.hpDiff > 0) /* heal */ {
+      this.renderType = '+';
+    } else /* damage */ {
+      this.renderType = '-';
+    }
+  }
+  
+}
+
 export class DamageCardPart implements ModularCardPart<DamageCardData> {
 
   public static readonly instance = new DamageCardPart();
@@ -433,8 +525,9 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     }
 
     const rollData: {[key: string]: any} = item.getRollData();
-    if (item.data.data.prof?.hasProficiency) {
-      rollData.prof = item.data.data.prof.term;
+    const itemData = UtilsFoundry.getSystemData(item);
+    if (itemData.prof?.hasProficiency) {
+      rollData.prof = itemData.prof.term;
     }
 
     const inputDamages: DamageCardData = {
@@ -442,19 +535,19 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       phase: 'mode-select',
       source: 'normal',
       calc$: {
-        properties: deepClone(item.data.data.properties),
+        properties: deepClone(itemData.properties),
         damageSource: await itemSourceToManualSource(item, true),
         targetCaches: [],
       },
       extraDamageSources: {},
     };
 
-    if (item.data.data.level === 0) {
+    if (itemData.level === 0) {
       // Non homebrew cantrips take no damage on save
-      inputDamages.calc$.modfierRule = 'save-no-dmg';
-    } else if (item.data.data.level > 0) {
+      inputDamages.calc$.modifierRule = 'save-no-dmg';
+    } else if (itemData.level > 0) {
       // Not confirmed, but I believe most leveled spells that do damage use half damage on save
-      inputDamages.calc$.modfierRule = 'save-halve-dmg';
+      inputDamages.calc$.modifierRule = 'save-halve-dmg';
     }
 
     if (actor) {
@@ -508,20 +601,20 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.selected.tokenUuid));
     let tokenHpSnapshot = new Map<string, {hp: number; failedDeathSaves: number; maxHp: number; tempHp: number}>();
     for (const token of tokenDocuments.values()) {
-      const actor: MyActor = token.getActor();
+      const actorData = UtilsFoundry.getSystemData(token.getActor() as MyActor);
       tokenHpSnapshot.set(token.uuid, {
-        hp: actor.data.data.attributes.hp.value,
-        failedDeathSaves: actor.data.data.attributes.death?.failure,
-        maxHp: actor.data.data.attributes.hp.max,
-        tempHp: actor.data.data.attributes.hp.temp ?? 0,
+        hp: actorData.attributes.hp.value,
+        failedDeathSaves: actorData.attributes.death?.failure,
+        maxHp: actorData.attributes.hp.max,
+        tempHp: actorData.attributes.hp.temp ?? 0,
       });
     }
     for (const targetEvent of targetEvents) {
       const snapshot = tokenHpSnapshot.get(targetEvent.selected.tokenUuid);
       const tokenHp = deepClone(snapshot);
       
-      const attackCard = targetEvent.messageCardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
-      const damageCard = targetEvent.messageCardParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const attackCard = targetEvent.messageCardParts.getTypeData(AttackCardPart.instance);
+      const damageCard = targetEvent.messageCardParts.getTypeData(DamageCardPart.instance);
 
       // Undo already applied damage
       if (damageCard) {
@@ -575,7 +668,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
           tokenHp.hp += hpChange;
           tokenHp.failedDeathSaves += cache.calcFailedDeathSaved;
           
-          // Stay within the min/max bounderies
+          // Stay within the min/max boundaries
           tokenHp.hp = Math.max(0, Math.min(tokenHp.hp, maxHp));
           tokenHp.tempHp = Math.max(0, tokenHp.tempHp);
           
@@ -611,19 +704,28 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     }
 
     // Apply healing/damage/death saves to the token
-    const updateActors: Parameters<(typeof UtilsDocument)['bulkUpdate']>[0] = [];
+    const updateActors: DmlUpdateRequest<MyActor>[] = [];
     for (const [uuid, tokenHp] of tokenHpSnapshot.entries()) {
       const token = tokenDocuments.get(uuid);
-      const actor: MyActor = token.getActor();
-      const hpDiff = tokenHp.hp - actor.data.data.attributes.hp.value;
-      const tempHpDiff = tokenHp.tempHp - actor.data.data.attributes.hp.temp;
-      const failedDeathSavesDiff = tokenHp.failedDeathSaves - (actor.data.data.attributes.death?.failure ?? 0);
+      const actor = token.getActor() as MyActor;
+      const actorData = UtilsFoundry.getSystemData(actor);
+      const hpDiff = tokenHp.hp - actorData.attributes.hp.value;
+      const tempHpDiff = tokenHp.tempHp - actorData.attributes.hp.temp;
+      const failedDeathSavesDiff = tokenHp.failedDeathSaves - (actorData.attributes.death?.failure ?? 0);
       if (hpDiff || tempHpDiff || failedDeathSavesDiff) {
-        updateActors.push({document: actor as any, data: {
-          'data.attributes.hp.value': tokenHp.hp,
-          'data.attributes.hp.temp': tokenHp.tempHp,
-          'data.attributes.death.failure': tokenHp.failedDeathSaves
-        }});
+        updateActors.push({document: actor as any, 
+          systemData: {
+            attributes: {
+              hp: {
+                value: tokenHp.hp,
+                temp: tokenHp.tempHp,
+              },
+              death: {
+                failure: tokenHp.failedDeathSaves
+              }
+            }
+          }
+        });
       }
     }
 
@@ -633,21 +735,25 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
   }
 
   private getTargetState(context: StateContext): VisualState[] {
-    // TODO UI: add a square wich is full, half, or empty depending on the damage calculation.
+    // TODO UI: add a square which is full, half, or empty depending on the damage calculation.
     //  Also allow manual overrides somehow 
-    const part = context.allMessageParts.getTypeData<DamageCardData>(this);
+    const part = context.allMessageParts.getTypeData(this);
     if (part == null) {
       return [];
     }
     
-    const states = new Map<string, Omit<VisualState, 'columns'> & {hpDiff: number, hidden: boolean}>();
+    const states = new Map<string, VisualState>();
     for (const selected of context.selected) {
-      states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, hpDiff: 0, hidden: false});
+      states.set(selected.selectionId, {selectionId: selected.selectionId, tokenUuid: selected.tokenUuid, columns: [{
+        key: 'dmg',
+        label: `<i class="fas fa-heart" title="${game.i18n.localize('DND5E.Damage')}"></i>`,
+        rowValue: `<${DamageTargetComponent.getSelector()} data-message-id="${context.messageId}" data-selection-id="${selected.selectionId}"></${DamageTargetComponent.getSelector()}>`,
+      }]});
     }
 
     for (const targetCache of part.calc$.targetCaches) {
       if (!states.has(targetCache.selectionId)) {
-        states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, hpDiff: 0, hidden: false});
+        states.set(targetCache.selectionId, {selectionId: targetCache.selectionId, tokenUuid: targetCache.targetUuid, columns: []});
       }
       const state = states.get(targetCache.selectionId);
       if (state.state == null) {
@@ -662,34 +768,6 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
       }
       if (state.smartState !== targetCache.smartState) {
         state.smartState === 'partial-applied';
-      }
-
-      // TODO this is weird right now, if damage is hidden you cant see it
-      //      but you can apply it to yourself, this should be improved
-      let canSeeDamage: boolean;
-      if (part.calc$.actorUuid) {
-        canSeeDamage = game.settings.get(staticValues.moduleName, 'damageHiddenRoll') === 'total';
-        if (!canSeeDamage) {
-          UtilsDocument.hasAllPermissions([{
-            uuid: part.calc$.actorUuid,
-            permission: `${staticValues.code}ReadDamage`,
-            user: game.user,
-          }], {sync: true});
-        }
-      } else {
-        canSeeDamage = game.user.isGM;
-      }
-      const canSeeTarget = UtilsDocument.hasAllPermissions([{
-        uuid: targetCache.actorUuid,
-        permission: `${staticValues.code}ReadImmunity`,
-        user: game.user,
-      }], {sync: true});
-      if (canSeeDamage && canSeeTarget) {
-        state.hpDiff += (targetCache.calcHpChange ?? 0);
-        state.hpDiff += (targetCache.calcAddTmpHp ?? 0);
-      } else {
-        state.hpDiff = null;
-        state.hidden = true;
       }
     }
     
@@ -713,17 +791,8 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
         const column: VisualState['columns'][0] = {
           key: 'dmg',
           label: `<i class="fas fa-heart" title="${game.i18n.localize('DND5E.Damage')}"></i>`,
-          rowValue: '',
+          rowValue: `<${DamageTargetComponent.getSelector()} data-message-id="${context.messageId}" data-selection-id="${state.selectionId}"></${DamageTargetComponent.getSelector()}>`,
         };
-        if (state.hidden) {
-          column.rowValue = '?';
-        } else if (state.hpDiff === 0) {
-          column.rowValue = '0';
-        } else if (state.hpDiff > 0) /* heal */ {
-          column.rowValue = `<span style="color: green">+${state.hpDiff}</span>`;
-        } else /* damage */ {
-          column.rowValue = `<span style="color: red">${state.hpDiff}</span>`;
-        }
         visualState.columns.push(column);
 
         return visualState;
@@ -745,7 +814,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
   private async calcTargetCache(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): Promise<void> {
     const recalcTokens: Array<{selectionId: string, tokenUuid: string, data: DamageCardData}> = [];
     for (const {newRow, oldRow} of context.rows) {
-      const damagePart = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+      const damagePart = newRow.allParts.getTypeData(DamageCardPart.instance);
       if (damagePart == null) {
         continue;
       }
@@ -792,9 +861,10 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       }
 
       if (actor) {
-        cache.immunities = [...actor.data.data.traits.di.value, ...(actor.data.data.traits.di.custom === '' ? [] : actor.data.data.traits.di.custom.split(';'))];
-        cache.resistances = [...actor.data.data.traits.dr.value, ...(actor.data.data.traits.dr.custom === '' ? [] : actor.data.data.traits.dr.custom.split(';'))];
-        cache.vulnerabilities = [...actor.data.data.traits.dv.value, ...(actor.data.data.traits.dv.custom === '' ? [] : actor.data.data.traits.dv.custom.split(';'))];
+        const actorData = UtilsFoundry.getSystemData(actor);
+        cache.immunities = [...actorData.traits.di.value, ...(actorData.traits.di.custom === '' ? [] : actorData.traits.di.custom.split(';'))];
+        cache.resistances = [...actorData.traits.dr.value, ...(actorData.traits.dr.custom === '' ? [] : actorData.traits.dr.custom.split(';'))];
+        cache.vulnerabilities = [...actorData.traits.dv.value, ...(actorData.traits.dv.custom === '' ? [] : actorData.traits.dv.custom.split(';'))];
       } else {
         cache.immunities = [];
         cache.resistances = [];
@@ -863,7 +933,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
   
   private calcTargetCache(context: IDmlContext<ModularCardTriggerData<DamageCardData>>): void {
     for (const {newRow} of context.rows) {
-      const checkPart = newRow.allParts.getTypeData<CheckCardData>(CheckCardPart.instance);
+      const checkPart = newRow.allParts.getTypeData(CheckCardPart.instance);
       
       const checkResultsBySelectionId = new Map<string, CheckTargetCache>();
       if (checkPart) {
@@ -895,7 +965,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
             }
             const checkResult = checkResultsBySelectionId.get(cache.selectionId);
             if (checkResult?.resultType$ === 'pass') {
-              switch (newRow.part.calc$.modfierRule) {
+              switch (newRow.part.calc$.modifierRule) {
                 case 'save-halve-dmg': {
                   amount /= 2;
                   break;
@@ -947,7 +1017,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
       if (newRow.part.phase === 'result') {
         continue;
       }
-      const attack = newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const attack = newRow.allParts.getTypeData(AttackCardPart.instance);
       let countAsHit = false;
       if (attack == null) {
         countAsHit = true;
@@ -1001,7 +1071,16 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
       }
 
       if (shouldModifyRoll) {
-        const damageSources: DamageSource[] = [newData.calc$.damageSource];
+        const damageSources: DamageSource[] = [];
+        let itemToRoll: MyItem;
+        // If the item still exists and the damage is based on the item, use the item.rollDamage
+        if (newData.calc$.damageSource.type === 'Item') {
+          itemToRoll = await UtilsDocument.itemFromUuid(newData.calc$.damageSource.itemUuid);
+        }
+        // Otherwise fallback to the default
+        if (itemToRoll == null) {
+          damageSources.push(newData.calc$.damageSource);
+        }
         if (newData.userBonus) {
           damageSources.push({type: 'Formula', formula: newData.userBonus});
         }
@@ -1034,11 +1113,21 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
             .filter(terms => terms?.length > 0)
             .map(terms => UtilsRoll.fromRollTermData(terms));
 
-          // TODO ammo
-          // TODO event hooks
-          const dmgRoll = UtilsRoll.createDamageRoll(UtilsRoll.mergeRolls(...rollRolls).terms, {critical: newRow.part.mode === 'critical'});
-
-          return dmgRoll.roll({async: true});
+          if (itemToRoll) {
+            return await itemToRoll.rollDamage({
+              critical: newRow.part.mode === 'critical',
+              versatile: newRow.part.source === 'versatile',
+              spellLevel: newRow.allParts.getTypeData(SpellLevelCardPart.instance)?.selectedLevelNr,
+              options: {
+                parts: rollRolls.map(r => r.formula),
+                critical: newRow.part.mode === 'critical',
+                fastForward: true,
+                chatMessage: false,
+              }
+            })
+          } else {
+            return UtilsRoll.createDamageRoll(UtilsRoll.mergeRolls(...rollRolls).terms, {critical: newRow.part.mode === 'critical'}).roll({async: true});
+          }
         }
 
         const oldRoll = oldData?.calc$?.roll == null ? null : UtilsRoll.fromRollData(oldData.calc$.roll);
@@ -1075,7 +1164,7 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
       }
     }
     
-    UtilsDocument.hasPermissions(showRolls).listenFirst().then(responses => {
+    UtilsDocument.hasPermissions(showRolls).firstPromise().then(responses => {
       const rolls: Roll[] = [];
       for (const response of responses) {
         if (response.result) {

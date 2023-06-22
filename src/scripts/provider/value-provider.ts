@@ -1,11 +1,11 @@
 import { Stoppable } from "../lib/utils/stoppable";
 
 export type ValueReaderType<T> = T extends null | undefined ? T :
-  T extends ValueReader<any> & { listenFirst(): infer F } ? 
+  T extends ValueReader<any> & { firstPromise(): infer F } ? 
     Awaited<F> : T;
 
-export abstract class ValueReader<T> implements ValueReader<T> {
-  public listenFirst(): Promise<T> {
+export abstract class ValueReader<T> {
+  public firstPromise(): Promise<T> {
     return new Promise((resolve) => {
       let shouldStop = false;
       let stoppable: Stoppable;
@@ -21,6 +21,22 @@ export abstract class ValueReader<T> implements ValueReader<T> {
       }
     });
   }
+  public first(): ValueReader<T> {
+    const first = new ValueProvider<T>();
+    let shouldStop = false;
+    let stoppable: Stoppable;
+    stoppable = this.listen(value => {
+      shouldStop = true;
+      if (stoppable != null) {
+        stoppable.stop();
+      }
+      first.set(value);
+    });
+    if (shouldStop) {
+      stoppable.stop();
+    }
+    return first;
+  }
   public abstract listen(callback: (value?: T) => void): Stoppable;
 
   public switchMap<R>(transformer: (value: T) => ValueReader<R>): ValueReader<R> {
@@ -32,6 +48,7 @@ export abstract class ValueReader<T> implements ValueReader<T> {
   }
   /**
    * @param predicate The filter method calls the predicate function one time for each element in the array.
+   * Will continue when returned true
    */
   public filter(predicate: (value: T) => boolean | Promise<boolean>): ValueReader<T> {
     return new Filter<T>(this, predicate);
@@ -120,9 +137,9 @@ class SwitchMap<D, T> extends ValueReader<T> {
     super();
   }
 
-  public async listenFirst(): Promise<T> {
-    const value = await this.delegate.listenFirst();
-    return this.transformer(value).listenFirst();
+  public async firstPromise(): Promise<T> {
+    const value = await this.delegate.firstPromise();
+    return this.transformer(value).firstPromise();
   }
 
   public listen(callback: (value?: T) => void): Stoppable {
@@ -152,8 +169,8 @@ class Mapper<D, T> extends ValueReader<T> {
     super();
   }
 
-  public async listenFirst(): Promise<T> {
-    const value = await this.delegate.listenFirst();
+  public async firstPromise(): Promise<T> {
+    const value = await this.delegate.firstPromise();
     return this.transformer(value);
   }
 

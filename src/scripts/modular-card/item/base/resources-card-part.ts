@@ -1,19 +1,21 @@
-import { IAfterDmlContext, ITrigger } from "../../lib/db/dml-trigger";
-import { UtilsDocument } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { ValueReader } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { Action } from "../action";
+import { IAfterDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
+import { DmlUpdateRequest, UtilsDocument } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { ValueReader } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { UtilsHooks } from "../../../utils/utils-hooks";
+import { Action } from "../../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
-import { AttackCardData, AttackCardPart } from "./attack-card-part";
+import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../../modular-card-part";
+import { AttackCardPart } from "./attack-card-part";
 import { BaseCardComponent } from "./base-card-component";
-import { CheckCardData, CheckCardPart } from "./check-card-part";
-import { DamageCardData, DamageCardPart } from "./damage-card-part";
-import { OtherCardData, OtherCardPart } from "./other-card-part";
-import { TemplateCardData, TemplateCardPart } from "./template-card-part";
+import { CheckCardPart } from "./check-card-part";
+import { DamageCardPart } from "./damage-card-part";
+import { OtherCardPart } from "./other-card-part";
+import { TemplateCardPart } from "./template-card-part";
 
 type AutoConsumeAfter = 'never' | 'init' | 'attack' | 'damage' | 'other-formula' | 'check' | 'template-placed';
 
@@ -99,8 +101,8 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
     } else if (resource.resource.consumeResourcesAction === 'manual-apply') {
       shouldApply = true;
     } else {
-      const autoBehaviour = game.settings.get(staticValues.moduleName, 'autoConsumeResources') as string;
-      switch (autoBehaviour) {
+      const autobehavior = game.settings.get(staticValues.moduleName, 'autoConsumeResources') as string;
+      switch (autobehavior) {
         case 'detection': {
           const states = messageDataById.get(resource.messageId);
           if (states.hasStates.size > 0) {
@@ -133,7 +135,7 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
     // If the value already is getting updated, work with the new value
     let currentValue = getProperty(updates, resource.resource.calc$.path);
     if (currentValue === undefined) {
-      currentValue = getProperty(document.data, resource.resource.calc$.path);
+      currentValue = getProperty(UtilsFoundry.getModelData(document), resource.resource.calc$.path);
     }
     const originalValue = currentValue + resource.resource.calc$.appliedChange;
     const newValue = Math.max(0, originalValue - expectedApplyAmount);
@@ -143,12 +145,12 @@ async function applyResourceConsumption({messageDataById, resources}: ApplyResou
     setProperty(updates, resource.resource.calc$.path, newValue);
   }
 
-  const bulkUpdate: Parameters<typeof UtilsDocument['bulkUpdate']>[0] = [];
+  const bulkUpdate: DmlUpdateRequest[] = [];
   for (const uuid of documentsByUuid.keys()) {
     if (updatesByUuid.has(uuid)) {
       bulkUpdate.push({
         document: documentsByUuid.get(uuid) as any,
-        data: updatesByUuid.get(uuid)
+        rootData: updatesByUuid.get(uuid),
       })
     }
   }
@@ -163,19 +165,19 @@ function getMessageState(allParts: ModularCardInstance): MessageState {
 
   if (allParts.hasType(AttackCardPart.instance)) {
     messageState.hasStates.add('attack');
-    if (allParts.getTypeData<AttackCardData>(AttackCardPart.instance).phase === 'result') {
+    if (allParts.getTypeData(AttackCardPart.instance).phase === 'result') {
       messageState.completedStates.add('attack');
     }
   }
   if (allParts.hasType(DamageCardPart.instance)) {
     messageState.hasStates.add('damage');
-    if (allParts.getTypeData<DamageCardData>(DamageCardPart.instance).phase === 'result') {
+    if (allParts.getTypeData(DamageCardPart.instance).phase === 'result') {
       messageState.completedStates.add('damage');
     }
   }
   if (allParts.hasType(CheckCardPart.instance)) {
     messageState.hasStates.add('check');
-    for (const target of (allParts.getTypeData<CheckCardData>(CheckCardPart.instance).targetCaches$ ?? [])) {
+    for (const target of (allParts.getTypeData(CheckCardPart.instance).targetCaches$ ?? [])) {
       if (target.phase === 'result') {
         messageState.completedStates.add('check');
         break;
@@ -184,13 +186,13 @@ function getMessageState(allParts: ModularCardInstance): MessageState {
   }
   if (allParts.hasType(TemplateCardPart.instance)) {
     messageState.hasStates.add('template-placed');
-    if (allParts.getTypeData<TemplateCardData>(TemplateCardPart.instance).calc$.createdTemplateUuid) {
+    if (allParts.getTypeData(TemplateCardPart.instance).calc$.createdTemplateUuid) {
       messageState.completedStates.add('template-placed');
     }
   }
   if (allParts.hasType(OtherCardPart.instance)) {
     messageState.hasStates.add('other-formula');
-    if (allParts.getTypeData<OtherCardData>(OtherCardPart.instance).roll$?.evaluated) {
+    if (allParts.getTypeData(OtherCardPart.instance).roll$?.evaluated) {
       messageState.completedStates.add('other-formula');
     }
   }
@@ -256,7 +258,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
 
   //#region actions
   private static permissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance, resourceIndex: number | '*'}>(({cardParts, resourceIndex}) => {
-    const part = cardParts.getTypeData<ResourceCardData>(ResourceCardPart.instance);
+    const part = cardParts.getTypeData(ResourceCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (resourceIndex === '*') {
       for (const resource of part.consumeResources) {
@@ -275,7 +277,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(ResourceCardComponent.permissionCheck)
     .build(async ({resourceIndex, cardParts, messageId, action}) => {
-      const part = cardParts.getTypeData<ResourceCardData>(ResourceCardPart.instance);
+      const part = cardParts.getTypeData(ResourceCardPart.instance);
       const consumeResources: ResourceCardData['consumeResources'] = [];
       if (resourceIndex === '*') {
         for (const consumeResource of part.consumeResources) {
@@ -305,7 +307,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
         }
 
         await applyResourceConsumption(request);
-        return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+        return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
       }
     })
   //#endregion
@@ -386,6 +388,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
     const documentName = uuidParts[uuidParts.length - 2];
     if (documentName === (Actor as any).documentName) {
       switch (pathParts[0]) {
+        case 'system':
         case 'data': {
           switch (pathParts[1]) {
             case 'attributes': {
@@ -399,8 +402,9 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
             case 'resources': {
               if (pathParts[3] === 'value') {
                 const actor = UtilsDocument.actorFromUuid(usage.calc$.uuid, {sync: true});
-                if (actor?.data?.data?.resources[pathParts[2]].label) {
-                  return actor.data.data.resources[pathParts[2]].label;
+                const actorData = UtilsFoundry.getSystemData(actor);
+                if (actorData?.resources[pathParts[2]].label) {
+                  return actorData.resources[pathParts[2]].label;
                 }
                 return `${game.i18n.localize('DND5E.Resource' + pathParts[2].capitalize())}`;
               }
@@ -441,34 +445,35 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
         actorUuid: actor?.uuid,
       }
     };
+    const itemData = UtilsFoundry.getSystemData(item);
     
     // TODO this is currently hard coded, would be nice if it could be extended
     // Consume actor resources
     if (actor) {
-      const spellSlot = item.type === "spell" && item.data.data.level > 0 && ItemCardHelpers.spellUpcastModes.includes(item.data.data.preparation.mode);
+      const spellSlot = item.type === "spell" && itemData.level > 0 && ItemCardHelpers.spellUpcastModes.includes(itemData.preparation.mode);
       if (spellSlot) {
-        let spellPropertyName = item.data.data.preparation.mode === "pact" ? "pact" : `spell${item.data.data.level}`;
+        let spellPropertyName = itemData.preparation.mode === "pact" ? "pact" : `spell${itemData.level}`;
         data.consumeResources.push({
           consumeResourcesAction: 'auto',
           calc$: {
             uuid: actor.uuid,
-            path: `data.spells.${spellPropertyName}.value`,
+            path: `system.spells.${spellPropertyName}.value`,
             calcChange: 1,
             appliedChange: 0,
           }
         });
       }
       
-      switch (item.data.data.consume?.type) {
+      switch (itemData.consume?.type) {
         case 'attribute': {
-          if (item.data.data.consume.target && item.data.data.consume.amount > 0) {
-            let propertyPath = `data.${item.data.data.consume.target}`;
+          if (itemData.consume.target && itemData.consume.amount > 0) {
+            let propertyPath = `system.${itemData.consume.target}`;
             data.consumeResources.push({
               consumeResourcesAction: 'auto',
               calc$: {
                 uuid: actor.uuid,
                 path: propertyPath,
-                calcChange: item.data.data.consume.amount,
+                calcChange: itemData.consume.amount,
                 appliedChange: 0,
               }
             });
@@ -480,18 +485,18 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
 
     // Consume item resources
     {
-      switch (item.data.data.consume?.type) {
+      switch (itemData.consume?.type) {
         case 'ammo':
         case 'material': {
-          if (item.data.data.consume?.target && item.data.data.consume.amount > 0) {
-            const targetItem = item.actor.items.get(item.data.data.consume.target);
-            let propertyPath = `data.quantity`;
+          if (itemData.consume?.target && itemData.consume.amount > 0) {
+            const targetItem = item.actor.items.get(itemData.consume.target);
+            let propertyPath = `system.quantity`;
             data.consumeResources.push({
               consumeResourcesAction: 'auto',
               calc$: {
                 uuid: targetItem.uuid,
                 path: propertyPath,
-                calcChange: item.data.data.consume.amount,
+                calcChange: itemData.consume.amount,
                 appliedChange: 0,
               }
             });
@@ -499,15 +504,15 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
           break;
         }
         case 'charges': {
-          if (item.data.data.consume?.target && item.data.data.consume.amount > 0) {
-            const targetItem = item.actor.items.get(item.data.data.consume.target);
-            let propertyPath = `data.uses.value`;
+          if (itemData.consume?.target && itemData.consume.amount > 0) {
+            const targetItem = item.actor.items.get(itemData.consume.target);
+            let propertyPath = `system.uses.value`;
             data.consumeResources.push({
               consumeResourcesAction: 'auto',
               calc$: {
                 uuid: targetItem.uuid,
                 path: propertyPath,
-                calcChange: item.data.data.consume.amount,
+                calcChange: itemData.consume.amount,
                 appliedChange: 0,
               }
             });
@@ -516,8 +521,8 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
         }
       }
       
-      if (item.data.data.uses?.per != null && item.data.data.uses?.per != '') {
-        let propertyPath = `data.uses.value`;
+      if (itemData.uses?.per != null && itemData.uses?.per != '') {
+        let propertyPath = `system.uses.value`;
         data.consumeResources.push({
           consumeResourcesAction: 'auto',
           calc$: {
@@ -541,7 +546,7 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
 
     const newData = this.create(args);
     const newKeys = new Set<string>();
-    const spellKeyRegex = /^data\.spells\.(?:pact|spell[0-9]+)\.value$/;
+    const spellKeyRegex = /^data|system\.spells\.(?:pact|spell[0-9]+)\.value$/;
     let spellResource: ResourceCardData['consumeResources'][number];
     for (const resource of newData.consumeResources) {
       if (spellKeyRegex.exec(resource.calc$.path)) {
@@ -599,6 +604,11 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
   @RunOnce()
   public registerHooks(): void {
     ModularCard.registerModularCardTrigger(this, new ResourceTrigger());
+    UtilsHooks.init().then(() => {
+      if (UtilsFoundry.usesDocumentData()) {
+        ModularCard.registerModularCardTrigger(this, new DowngradeConsumtionKeys());
+      }
+    })
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
   }
 
@@ -638,11 +648,11 @@ class ResourceTrigger implements ITrigger<ModularCardTriggerData<ResourceCardDat
       const newResourceByKey = new Map<string, ResourceCardData['consumeResources'][number]>();
       for (const consumeResource of newRow.part.consumeResources) {
         const key = `${consumeResource.calc$.uuid}-${consumeResource.calc$.path}`;
-        const oldResouce = oldResourceByKey.get(key);
+        const oldResource = oldResourceByKey.get(key);
         newResourceByKey.set(key, consumeResource);
 
-        const changed = consumeResource.consumeResourcesAction !== (oldResouce?.consumeResourcesAction || 'undo') ||
-          consumeResource.calc$.calcChange != (oldResouce?.calc$.calcChange || 0);
+        const changed = consumeResource.consumeResourcesAction !== (oldResource?.consumeResourcesAction || 'undo') ||
+          consumeResource.calc$.calcChange != (oldResource?.calc$.calcChange || 0);
 
         if (changed || consumeResource.consumeResourcesAction == 'auto') {
           switch (consumeResource.consumeResourcesAction) {
@@ -693,6 +703,22 @@ class ResourceTrigger implements ITrigger<ModularCardTriggerData<ResourceCardDat
 
     if (applyRequest.resources.length > 0) {
       await applyResourceConsumption(applyRequest);
+    }
+  }
+  //#endregion
+
+}
+
+class DowngradeConsumtionKeys implements ITrigger<ModularCardTriggerData<ResourceCardData>> {
+  
+  //#region upsert
+  public beforeUpsert(context: IAfterDmlContext<ModularCardTriggerData<ResourceCardData>>): void {
+    for (const {newRow} of context.rows) {
+      for (const consumeResource of newRow.part.consumeResources) {
+        if (consumeResource.calc$.path.startsWith('system.')) {
+          consumeResource.calc$.path = 'data.' + consumeResource.calc$.path.substring(7)
+        }
+      }
     }
   }
   //#endregion

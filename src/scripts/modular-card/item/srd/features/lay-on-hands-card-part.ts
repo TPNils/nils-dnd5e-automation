@@ -1,16 +1,18 @@
-import { IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
-import { RunOnce } from "../../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
-import { UtilsRoll } from "../../../lib/roll/utils-roll";
-import { ValueReader } from "../../../provider/value-provider";
-import { staticValues } from "../../../static-values";
-import { UtilsItem } from "../../../utils/utils-item";
-import { Action } from "../../action";
+import { ITrigger, IDmlContext } from "../../../../lib/db/dml-trigger";
+import { RunOnce } from "../../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../../lib/render-engine/component";
+import { UtilsRoll } from "../../../../lib/roll/utils-roll";
+import { ValueReader } from "../../../../provider/value-provider";
+import { staticValues } from "../../../../static-values";
+import { UtilsFoundry } from "../../../../utils/utils-foundry";
+import { UtilsItem } from "../../../../utils/utils-item";
+import { Action } from "../../../action";
+import { ModularCardInstance, ModularCard, BeforeCreateModuleCardEvent, ModularCardTriggerData } from "../../../modular-card";
+import { createPermissionCheckAction, CreatePermissionCheckArgs, ModularCardPart, PermissionResponse, ModularCardCreateArgs, HtmlContext } from "../../../modular-card-part";
+import { DamageCardData, DamageCardPart, ResourceCardPart, TargetCardPart } from "../../base/index";
 import { BaseCardComponent } from "../../base/base-card-component";
-import { DamageCardData, DamageCardPart, ResourceCardData, ResourceCardPart, TargetCardData, TargetCardPart } from "../../base/index";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
-import { BeforeCreateModuleCardEvent, ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
-import { createPermissionCheckAction, CreatePermissionCheckArgs, HtmlContext, ModularCardCreateArgs, ModularCardPart, PermissionResponse } from "../../modular-card-part";
+
 
 export interface SrdLayOnHandsCardData extends DamageCardData {
   heal: number;
@@ -48,7 +50,7 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
 
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
-    const part = cardParts.getTypeData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance);
+    const part = cardParts.getTypeData(SrdLayOnHandsCardPart.instance);
     const documents: CreatePermissionCheckArgs['documents'] = [];
     if (part?.calc$?.actorUuid) {
       documents.push({uuid: part.calc$.actorUuid, permission: 'OWNER', security: true});
@@ -62,7 +64,7 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(SrdLayOnHandsComponent.actionPermissionCheck)
     .build(async ({messageId, cardParts, heal, cure}) => {
-      const part = cardParts.getTypeData<SrdLayOnHandsCardData>(SrdLayOnHandsCardPart.instance);
+      const part = cardParts.getTypeData<ModularCardPart<SrdLayOnHandsCardData>>(SrdLayOnHandsCardPart.instance);
       if (heal != null) {
         part.heal = heal;
       }
@@ -72,7 +74,7 @@ export class SrdLayOnHandsComponent extends BaseCardComponent implements OnInit 
       if ((part.heal + (part.cure * 5)) > part.maxUsage) {
         return;
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   //#endregion
   
@@ -187,13 +189,19 @@ export class SrdLayOnHandsCardPart extends DamageCardPart implements ModularCard
   public static readonly instance = new SrdLayOnHandsCardPart();
 
   private injectCreateHealing(args: ModularCardCreateArgs): ModularCardCreateArgs {
-    const merge = args.item.data.data.damage == null ? {} : deepClone(args.item.data.data.damage);
+    const itemData = UtilsFoundry.getSystemData(args.item);
+    const merge = itemData.damage == null ? {} : deepClone(itemData.damage);
     if (!merge.parts) {
       merge.parts = [];
     }
     // insert at index 0
     merge.parts.splice(0, 0, ['0', 'healing']);
-    const modifiedItem = args.item.clone({data: {damage: merge}}, {keepId: true});
+    let modifiedItem = args.item;
+    if (UtilsFoundry.usesDataModel(args.item)) {
+      modifiedItem = args.item.clone({system: {damage: merge}}, {keepId: true});
+    } else if (UtilsFoundry.usesDocumentData(args.item)) {
+      modifiedItem = args.item.clone({data: {damage: merge}}, {keepId: true});
+    }
     return {...args, item: modifiedItem};
   }
 
@@ -260,7 +268,7 @@ class SrdLayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<SrdLay
       }
       let amountOfTargets = 0;
       if (newRow.allParts.hasType(TargetCardPart.instance)) {
-        amountOfTargets += newRow.allParts.getTypeData<TargetCardData>(TargetCardPart.instance).selected.length;
+        amountOfTargets += newRow.allParts.getTypeData(TargetCardPart.instance).selected.length;
       }
       // If there are no targets, assume it has been mentioned verbally => set to 1
       amountOfTargets = Math.max(1, amountOfTargets);
@@ -269,7 +277,7 @@ class SrdLayOnHandsCardTrigger implements ITrigger<ModularCardTriggerData<SrdLay
       healAmount += (newRow.part.cure * 5);
       
       const resourceAmount = healAmount * amountOfTargets;
-      for (const resource of newRow.allParts.getTypeData<ResourceCardData>(ResourceCardPart.instance).consumeResources) {
+      for (const resource of newRow.allParts.getTypeData(ResourceCardPart.instance).consumeResources) {
         if (resource.calc$.uuid.includes('Item.') && resource.calc$.path === 'data.uses.value') {
           resource.calc$.calcChange = resourceAmount;
           break;

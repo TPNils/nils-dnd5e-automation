@@ -18,6 +18,10 @@ const defaultDisplayType: DisplayType = 'result';
     </div>
     <div *if="this.displayType === 'result'">
       <div class="roll-total boxed {{this.rollCssClass}}">{{this.roll.total}}</div>
+
+      <div class="between-slot">
+        <slot name="between"></slot>
+      </div>
     
       <div class="top-slot">
         <slot name="top"></slot>
@@ -68,7 +72,7 @@ const defaultDisplayType: DisplayType = 'result';
   .boxed {
     position: relative;
     margin: 0;
-    line-height: 1.5em;
+    line-height: calc(calc(26 / 14) * 1em);
     text-align: center;
     background: rgba(0, 0, 0, .1);
     border: 1px solid var(--color-border-light-2, #999);
@@ -233,7 +237,7 @@ export class RollResultElement {
   }
   
   private _highlightTotalOnFirstTerm = false;
-  @Attribute({name: 'data-highlight-total-on-firstTerm', dataType: 'boolean'})
+  @Attribute({name: 'data-highlight-total-on-first-term', dataType: 'boolean'})
   public get highlightTotalOnFirstTerm(): boolean {
     return this._highlightTotalOnFirstTerm;
   }

@@ -25,10 +25,10 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
       <nd5e-roll-result *if="this.roll?.total != null && (this.readHiddenDisplayType !== 'hidden' || this.hasInteractPermission)"
         [data-roll]="this.roll"
         [data-override-formula]="this.overrideFormula"
-        [data-highlight-total-on-firstTerm]="this.highlightTotalOnFirstTerm"
+        [data-highlight-total-on-first-term]="this.highlightTotalOnFirstTerm"
         [data-display-type]="this.hasReadPermission ? '' : this.readHiddenDisplayType"
         [data-override-max-roll]="this.overrideMaxRoll">
-        <div slot="top">
+        <div slot="{{bonusPosition === 'inside' ? 'top' : 'between'}}">
           <input *if="this.hasInteractPermission"
             class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
             type="text"
@@ -63,7 +63,7 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
           </slot>
         </button>
         
-        <input *if="this.showBonus && this.hasInteractPermission"
+        <input *if="(showBonus || bonusPosition === 'outside') && this.hasInteractPermission"
           autofocus
           class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
           type="text"
@@ -76,14 +76,16 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
         <div class="left">
           <button (click)="this.onModeChange($event, '-')" class="mode-minus" [disabled]="this.rollMode === 'disadvantage'"><i class="fas fa-minus"></i></button>
         </div>
-        <div class="middel"></div>
+        <div class="middle"></div>
         <div class="right">
           <button (click)="this.onModeChange($event, '+')" class="mode-plus" [disabled]="this.rollMode === 'advantage'"><i class="fas fa-plus"></i></button>
         </div>
       </div>
     </div>
   `,
-  style: /*css*/`
+  style: scss`
+  @import 'overlay.scss';
+
   :host {
     display: block;
     font-size: var(--font-size-14, 14px);
@@ -121,8 +123,9 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
   .roll-wrapper .advantage-icon,
   .roll-wrapper .disadvantage-icon,
   .roll-wrapper .normal-mode-icon {
-    width: calc(var(--button-height) - 4px);
-    height: calc(var(--button-height) - 4px)
+    display: block;
+    width: calc(var(--button-height) - var(--button-height) / 5);
+    height: calc(var(--button-height) - var(--button-height) / 5);
   }
   
   .roll-wrapper .advantage-icon .d20 {
@@ -149,15 +152,15 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
     background: #f2f2e3;
     border: 1px solid #b5b3a4;
     line-height: 0;
-    height: calc(1.5em - 1px);
-    width: calc(1.5em - 1px);
+    height: calc(var(--button-height) - calc(var(--button-height) / 5));
+    width: calc(var(--button-height) - calc(var(--button-height) / 5));
     margin: 0 1px;
-    padding: 0
-  }
-  
-  .roll-wrapper .mode-minus>i,
-  .roll-wrapper .mode-plus>i {
-    font-size: .7em
+    padding: 0;
+
+    > i {
+      font-size: .7em;
+      transform: translateX(10%);
+    }
   }
   
   .roll-wrapper .mode-minus[disabled],
@@ -231,6 +234,9 @@ export class RollD20Element implements OnInit {
       this.userBonus = value;
     }
   }
+
+  @Attribute({name: 'data-bonus-position', dataType: 'string'})
+  public bonusPosition: 'inside' | 'outside' = 'inside';
 
   /**
    * The roll mode when the roll was not rolled yet
@@ -308,7 +314,7 @@ export class RollD20Element implements OnInit {
         .switchMap(interactionPermission => UtilsDocument.hasPermissionsFromString(interactionPermission))
         .listen(response => {
           this.hasInteractPermission = response.some(check => check.result);
-        })
+        }),
     )
   }
 

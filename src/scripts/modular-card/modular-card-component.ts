@@ -1,20 +1,32 @@
 import { DocumentListener } from "../lib/db/document-listener";
 import { Component, OnInit, OnInitParam } from "../lib/render-engine/component";
 import { Stoppable } from "../lib/utils/stoppable";
+import { ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
-import { ModularCard } from "./modular-card";
+import { MyActor, MyItem } from "../types/fixed-types";
+import { UtilsLog } from "../utils/utils-log";
+import { ModularCard, ModularCardInstance } from "./modular-card";
+import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
+import { UtilsCompare } from "../lib/utils/utils-compare";
 
 @Component({
   tag: ModularCardComponent.getSelector(),
   html: /*html*/`
     <div class="item-card">{{{this.body}}}</div>
+    <div *if="erroredTypes.length > 0" class="errors">
+      Internal errors in these components: {{erroredTypes.join(', ')}}.
+    </div>
     <div class="placeholder">
       <slot name="not-installed-placeholder"></slot>
     </div>
   `,
-  style: /*css*/`
+  style: scss`
     .placeholder {
       display: none;
+    }
+
+    .errors {
+      color: red;
     }
 
     /* root layout */
@@ -37,7 +49,6 @@ import { ModularCard } from "./modular-card";
     .item-card {
       font-style: normal;
       font-size: var(--font-size-12, 12px);
-      --button-height: calc(2em - 2px);
     }
 
     :deep button {
@@ -48,28 +59,6 @@ import { ModularCard } from "./modular-card";
       border: 2px groove #eeede0;
       height: var(--button-height);
       line-height: calc(var(--button-height) - 4px);
-    }
-    
-    :deep .overlay {
-      display: flex;
-      position: absolute;
-      left: 0px;
-      top: 0px;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      padding: 3px;
-    }
-    
-    :deep .overlay > .left,
-    :deep .overlay > .right {
-      pointer-events: initial;
-      display: flex;
-      width: fit-content;
-    }
-    
-    :deep .overlay > .middel {
-      flex-grow: 1;
     }
     
     /* default foundry css */
@@ -99,6 +88,7 @@ export class ModularCardComponent implements OnInit {
   }
 
   public body = '';
+  public erroredTypes: string[] = [];
   public onInit(args: OnInitParam) {
     args.addStoppable(this.provideHasClasses(args.html));
 
@@ -109,14 +99,15 @@ export class ModularCardComponent implements OnInit {
     }
 
     const messageId = messageIdElement.getAttribute('data-message-id');
+    const messageListener = DocumentListener.listenUuid<ChatMessage>(game.messages.get(messageId).uuid).filter(msg => msg != null);
     args.addStoppable(
-      DocumentListener.listenUuid<ChatMessage>(game.messages.get(messageId).uuid)
-        .listen(async message => {
-          const body = await this.calcBody(message);
-          if (this.body !== body) {
-            this.body = body;
-          }
-        })
+      messageListener.listen(async message => {
+        const content = await ModularCardComponent.calcContent(message);
+        if (this.body !== content.body || !UtilsCompare.deepEquals(this.erroredTypes, content.errors)) {
+          this.body = content.body;
+          this.erroredTypes = content.errors;
+        }
+      }),
     );
   }
 
@@ -140,30 +131,39 @@ export class ModularCardComponent implements OnInit {
     });
 
     const itemCard = thisElement.querySelector(':scope > .item-card');
-    observer.observe(itemCard, { childList: true, subtree: true });
+    observer.observe(itemCard, { childList: true });
 
     return {
       stop: () => observer.disconnect()
     }
   }
 
-  private async calcBody(message: ChatMessage): Promise<string> {
-    const parts = ModularCard.getCardPartDatas(message);
+  private static async calcContent(message: ChatMessage): Promise<{body: string, errors: string[]}> {
+    const parts = ModularCard.readModuleCard(message);
     if (!parts) {
-      return ''
+      return {body: '', errors: []}
     }
 
     const htmlParts$: Array<{html: string} | Promise<{html: string}>> = [];
+    const erroredTypes: ModularCardPart[] = [];
     for (const typeHandler of parts.getAllTypes()) {
       const partData = parts.getTypeData(typeHandler);
 
-      // TODO error handeling during render
       if (typeHandler?.getHtml) {
-        const htmlPart = typeHandler.getHtml({messageId: message.id, data: partData, allMessageParts: parts});
-        if (htmlPart instanceof Promise) {
-          htmlParts$.push(htmlPart.then(html => {return {html: html}}));
-        } else if (typeof htmlPart === 'string') {
-          htmlParts$.push({html: htmlPart});
+        try {
+          const htmlPart = typeHandler.getHtml({messageId: message.id, data: partData, allMessageParts: parts});
+          if (htmlPart instanceof Promise) {
+            htmlParts$.push(htmlPart.then(html => {return {html: html}}).catch(e => {
+              UtilsLog.error('An error occurred when trying generate the html for a card part.', {typeHandler, messageId: message.id, data: partData, allMessageParts: parts}, e);
+              erroredTypes.push(typeHandler);
+              return {html: null};
+            }));
+          } else if (typeof htmlPart === 'string') {
+            htmlParts$.push({html: htmlPart});
+          }
+        } catch (e) {
+          UtilsLog.error('An error occurred when trying generate the html for a card part.', {typeHandler, messageId: message.id, data: partData, allMessageParts: parts}, e);
+          erroredTypes.push(typeHandler)
         }
       }
     }
@@ -179,7 +179,7 @@ export class ModularCardComponent implements OnInit {
     for (const enrichedPart of await Promise.all(htmlParts.map(part => TextEditor.enrichHTML(part.html, enrichOptions as any)))) {
       enrichedHtmlParts.push(enrichedPart);
     }
-    return enrichedHtmlParts.join('');
+    return {body: enrichedHtmlParts.join(''), errors: erroredTypes.map(e => e.getType())};
   }
 
 }

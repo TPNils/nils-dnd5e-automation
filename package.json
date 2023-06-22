@@ -1,21 +1,22 @@
 {
   "name": "nils-dnd5e-automation",
-  "version": "2.2.1-beta",
+  "version": "2.2.3-beta",
   "description": "",
   "scripts": {
     "build": "gulp build",
     "package": "gulp buildZip",
     "dev": "gulp watch",
-    "dev8": "gulp watch -fi v8",
-    "dev9": "gulp watch -fi v9",
-    "dev10": "gulp watch -fi v10",
+    "dev8": "gulp watch --fi v8",
+    "dev9": "gulp watch --fi v9",
+    "dev10": "gulp watch --fi v10",
     "patch": "gulp publish -u patch",
     "minor": "gulp publish -u minor",
     "major": "gulp publish -u major",
     "reupload": "gulp reupload",
     "updateSrcPacks": "gulp updateSrcPacks",
     "updateZipManifestForGithub": "gulp updateZipManifestForGithub",
-    "updateExternalManifestForGithub": "gulp updateExternalManifestForGithub"
+    "updateExternalManifestForGithub": "gulp updateExternalManifestForGithub",
+    "test": "gulp test"
   },
   "author": "TPNils",
   "license": "MIT",

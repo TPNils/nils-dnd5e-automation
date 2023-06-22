@@ -1,7 +1,7 @@
 import { AttributeData, BindableString, ElementData } from "../../../../../types/html-data";
 import { AnyNodeData } from "../../../../../types/html-data";
 import { UtilsLog } from "../../../utils/utils-log";
-import { VirtualCommmentNode } from "./virtual-comment-node";
+import { VirtualCommentNode } from "./virtual-comment-node";
 import { VirtualFragmentNode } from "./virtual-fragment-node";
 import { VirtualHtmlNode } from "./virtual-html-node";
 import { VirtualChildNode, VirtualNode, VirtualParentNode } from "./virtual-node";
@@ -217,14 +217,12 @@ export class VirtualNodeParser {
             break;
           }
           case "comment": {
-            // TODO allow bindable text
-            const virtual = new VirtualCommmentNode(VirtualNodeParser.toRawString(item.nodeData.text));
+            const virtual = new VirtualCommentNode(item.nodeData.text);
             item.parentVirtualNode.appendChild(virtual);
             break;
           }
           case "text": {
-            // TODO allow bindable text
-            const virtual = new VirtualTextNode(VirtualNodeParser.toRawString(item.nodeData.text));
+            const virtual = new VirtualTextNode(item.nodeData.text);
             if (virtual.getText().trim().length > 0) {
               item.parentVirtualNode.appendChild(virtual);
             }

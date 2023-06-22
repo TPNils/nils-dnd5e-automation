@@ -6,8 +6,9 @@
 !/package.json
 !/package-lock.json
 !/tsconfig.json
-!/LICENSE.MIT
+!/LICENSE
 !/README.md
+!/TODO.md
 !/lib-find-the-path
 !/.gitmodules
 !/.eslintrc.json
@@ -23,6 +24,7 @@
 !/src/packs
 !/src/scripts
 !/src/styles
+!/src/styles-component
 !/src/templates
 
 

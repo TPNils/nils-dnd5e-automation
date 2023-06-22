@@ -27,7 +27,7 @@ export interface DamageRollOptions extends Partial<RollTerm.EvaluationOptions> {
 export class UtilsRoll {
 
   /**
-   * @param value valid synax: "fire" or "fire:comment"
+   * @param value valid syntax: "fire" or "fire:comment"
    * @returns the damage type or null if no match was found
    */
   public static toDamageType(value: any): DamageType | null {
@@ -68,7 +68,7 @@ export class UtilsRoll {
   }
 
   private static damagePartsEndWithComment = /(.*)\[([^\]]*)\]$/;
-  public static damagePartsToRoll(parts: MyItemData['data']['damage']['parts'], rollData?: any): Roll {
+  public static damagePartsToRoll(parts: MyItemData['damage']['parts'], rollData?: any): Roll {
     return new Roll(parts.map(([formula, damageType]) => {
       if (damageType) {
         const match = UtilsRoll.damagePartsEndWithComment.exec(formula);
@@ -83,7 +83,7 @@ export class UtilsRoll {
     }).join(' + '), rollData);
   }
   
-  public static versatilePartsToRoll(parts: MyItemData['data']['damage']['parts'], versatile: string, rollData?: any): Roll | null {
+  public static versatilePartsToRoll(parts: MyItemData['damage']['parts'], versatile: string, rollData?: any): Roll | null {
     if (versatile == null) {
       return null;
     }
@@ -282,7 +282,7 @@ export class UtilsRoll {
 
   /**
    * @param originalRoll The original roll where you wish to retain any existing roll results from
-   * @param newRollOrFormula What the new roll should be, either a formula or a factory wich returns a new roll
+   * @param newRollOrFormula What the new roll should be, either a formula or a factory which returns a new roll
    * @returns The new modified roll
    */
   public static async modifyRoll(originalRoll: Roll, newRollOrFormula: string | Roll | (() => Roll | Promise<Roll>)): Promise<{result: Roll, rollToDisplay: Roll | null}> {
@@ -410,7 +410,7 @@ export class UtilsRoll {
   public static createDamageRoll(roll: string | RollTerm[], options: DamageRollOptions = {}): Roll {
     const DamageRoll = CONFIG.Dice.rolls.find(a => a.name === 'DamageRoll') as typeof Roll;
     // Whats the point of having this damage roll? If someone else adds custom crit rules I still need to implement them.
-    // You can use damageRoll, but that always rolls the dice which I can't use since it doesnt HAVE to be rolled
+    // You can use damageRoll, but that always rolls the dice which I can't use since it doesn't HAVE to be rolled
     options = {
       multiplyNumeric: game.settings.get("dnd5e", "criticalDamageModifiers") === true,
       powerfulCritical: game.settings.get("dnd5e", "criticalDamageMaxDice") === true,

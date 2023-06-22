@@ -6,6 +6,7 @@ import * as postCssMinify from 'postcss-minify';
 import { CssSelectorParser, Rule } from 'css-selector-parser';
 import { parseHtml } from '../chevrotain/html-parser';
 import { UtilsTransformer } from './utils-transformer';
+import * as path from 'path';
 
 
 const cssParser = new CssSelectorParser();
@@ -175,11 +176,17 @@ function doCssTransform(prefix: string, css: string): string {
 
   const rootCss = postcss(new CssScoperPlugin(hostAttr, itemAttr), postCssMinify()).process(css);
   
-  return rootCss.toString()
+  return rootCss.toString();
 }
 
 function doScssTransform(prefix: string, scss: string): string {
-  return doCssTransform(prefix, sassCompiler.compileString(scss).css)
+  return doCssTransform(prefix, sassCompiler.compileString(scss, {
+    importers: [{
+      findFileUrl(url: string) {
+        return new URL(url, 'file:' + path.join(process.cwd(), 'src', 'styles-component') + path.sep);
+      }
+    }]
+  }).css)
 }
 
 function isComponentObjectParam(node: typescript.Node): node is typescript.ObjectLiteralExpression {

@@ -1,4 +1,9 @@
-declare interface LibWrapper {
+export {};
+
+declare global {
+  namespace libWrapper {
+
+    type Func<ARG extends any[] = any[]> = (original: (...ARG) => any, ...args: ARG) => any;
   
     /**
      * Register a new wrapper.
@@ -74,17 +79,37 @@ declare interface LibWrapper {
      *     Will allow the GM to choose which performance mode to use.
      *     Equivalent to 'FAST' when the libWrapper 'High-Performance Mode' setting is enabled by the GM, otherwise 'NORMAL'.
      */
-    public register(
+    function register(
       packageId: string,
       target: string,
-      fn: function,
+      fn: libWrapper.Func,
       type: 'WRAPPER' | 'MIXED' | 'OVERRIDE' = 'MIXED',
       options:{
         chain?: boolean;
         perf_mode?: 'NORMAL' | 'FAST' | 'AUTO'
       }={}
     ): void;
-  
-}
 
-declare const libWrapper: LibWrapper;
+    
+    /**
+     * Unregister an existing wrapper.
+     *
+     * Triggers FVTT hook 'libWrapper.Unregister' when successful.
+     *
+     * @param {string} package_id     The package identifier, i.e. the 'id' field in your module/system/world's manifest.
+     *
+     * @param {number|string} target  The target identifier, specifying which wrapper should be unregistered.
+     *
+     *   This can be either:
+     *     1. A unique target identifier obtained from a previous 'libWrapper.register' call. This is the recommended option.
+     *     2. A string containing the path to the function you wish to remove the wrapper from, starting at global scope, with the same syntax as the 'target' parameter to 'libWrapper.register'.
+     *
+     *   It is recommended to use option #1 if possible, in order to guard against the case where the class or object at the given path is no longer the same as when `libWrapper.register' was called.
+     *
+     *   Support for the unique target identifiers (option #1) was added in v1.11.0.0, with previous versions only supporting option #2.
+     *
+     * @param {function} fail         [Optional] If true, this method will throw an exception if it fails to find the method to unwrap. Default is 'true'.
+     */
+    function unregister(package_id: string, target: number | string, fail=true);
+  }
+}

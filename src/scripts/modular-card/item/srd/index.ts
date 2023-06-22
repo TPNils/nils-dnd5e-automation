@@ -7,3 +7,4 @@ export function registerHooks() {
 }
 
 export * from "./features/lay-on-hands-card-part";
+export * from "./features/sneak-attack-card-part";

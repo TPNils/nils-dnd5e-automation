@@ -1,10 +1,10 @@
 import { ModularCard, ModularCardInstance } from "../modular-card/modular-card";
-import { CheckCardData, CheckCardPart } from "../modular-card/base/check-card-part";
+import { CheckCardData, CheckCardPart } from "../modular-card/item/base/check-card-part";
 import { staticValues } from "../static-values";
 import type { D20RollOptions, MyActor, MyActorData } from "../types/fixed-types";
 import { UtilsDocument } from "../lib/db/utils-document";
 import { UtilsRoll } from "../lib/roll/utils-roll";
-import { UtilsHooks } from "../utils/utils-hooks";
+import { UtilsLibWrapper } from "../utils/utils-lib-wrapper";
 
 interface CheckMessage {
   chatMessage: ChatMessage;
@@ -17,7 +17,7 @@ function getLastCheckMessage(): CheckMessage | null {
   let minMessageIndex = Math.max(0, game.messages.contents.length - 10);
   for (let messageIndex = game.messages.contents.length - 1; messageIndex >= minMessageIndex; messageIndex--) {
     const chatMessage = game.messages.contents[messageIndex];
-    const parts = ModularCard.getCardPartDatas(chatMessage);
+    const parts = ModularCard.readModuleCard(chatMessage);
     if (!parts) {
       continue;
     }
@@ -44,7 +44,7 @@ function getTokenUuid(options: D20RollOptions) {
   return null;
 }
 
-async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['data']['skills'], D20RollOptions]): Promise<Roll> {
+async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['skills'], D20RollOptions]): Promise<Roll> {
   const [skillId, options] = args;
   if (options.chatMessage === false) {
     return wrapped(...args);
@@ -52,7 +52,6 @@ async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args:
 
   const lastCheckMessage = getLastCheckMessage();
   if (!game.settings.get(staticValues.moduleName, `captureManualRolls`) || lastCheckMessage == null || lastCheckMessage.checkPart.skill !== skillId) {
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
@@ -81,13 +80,12 @@ async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args:
 
   if (!selectionId) {
     // Nothing found to roll in the modular card, just roll normally
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
-  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
+  await ModularCard.writeModuleCard(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
 
-  const parts = ModularCard.getCardPartDatas(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
+  const parts = ModularCard.readModuleCard(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
   const target = parts.getTypeData(CheckCardPart.instance)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
   if (!target?.roll$) {
     // This should never happen? but just in case.
@@ -97,7 +95,7 @@ async function rollSkill(this: MyActor, wrapped: (...args: any) => any, ...args:
   return UtilsRoll.fromRollData(target.roll$);
 }
 
-async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['data']['abilities'], D20RollOptions]): Promise<Roll> {
+async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['abilities'], D20RollOptions]): Promise<Roll> {
   const [abilityId, options] = args;
   if (options.chatMessage === false) {
     return wrapped(...args);
@@ -105,7 +103,6 @@ async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ..
 
   const lastCheckMessage = getLastCheckMessage();
   if (!game.settings.get(staticValues.moduleName, `captureManualRolls`) || lastCheckMessage == null || lastCheckMessage.checkPart.isSave || lastCheckMessage.checkPart.ability !== abilityId) {
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
@@ -134,13 +131,12 @@ async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ..
 
   if (!selectionId) {
     // Nothing found to roll in the modular card, just roll normally
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
-  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
+  await ModularCard.writeModuleCard(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
 
-  const parts = ModularCard.getCardPartDatas(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
+  const parts = ModularCard.readModuleCard(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
   const target = parts.getTypeData(CheckCardPart.instance)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
   if (!target?.roll$) {
     // This should never happen? but just in case.
@@ -150,7 +146,7 @@ async function rollAbilityTest(this: MyActor, wrapped: (...args: any) => any, ..
   return UtilsRoll.fromRollData(target.roll$);
 }
 
-async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['data']['abilities'], D20RollOptions]): Promise<Roll> {
+async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ...args: [keyof MyActorData['abilities'], D20RollOptions]): Promise<Roll> {
   const [abilityId, options] = args;
   if (options.chatMessage === false) {
     return wrapped(...args);
@@ -158,7 +154,6 @@ async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ..
 
   const lastCheckMessage = getLastCheckMessage();
   if (!game.settings.get(staticValues.moduleName, `captureManualRolls`) || lastCheckMessage == null || !lastCheckMessage.checkPart.isSave || lastCheckMessage.checkPart.ability !== abilityId) {
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
@@ -187,13 +182,12 @@ async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ..
 
   if (!selectionId) {
     // Nothing found to roll in the modular card, just roll normally
-    // TODO custom roll message?
     return wrapped(...args);
   }
 
-  await ModularCard.setCardPartDatas(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
+  await ModularCard.writeModuleCard(lastCheckMessage.chatMessage, lastCheckMessage.modularCard);
 
-  const parts = ModularCard.getCardPartDatas(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
+  const parts = ModularCard.readModuleCard(await UtilsDocument.chatMessageFromUuid(lastCheckMessage.chatMessage.uuid));
   const target = parts.getTypeData(CheckCardPart.instance)?.targetCaches$?.find(t => t.selectionId$ === selectionId);
   if (!target?.roll$) {
     // This should never happen? but just in case.
@@ -205,9 +199,7 @@ async function rollAbilitySave(this: MyActor, wrapped: (...args: any) => any, ..
 
 
 export function registerHooks(): void {
-  UtilsHooks.setup().then(() => {
-    libWrapper.register(staticValues.moduleName, 'CONFIG.Actor.documentClass.prototype.rollSkill', rollSkill, 'MIXED');
-    libWrapper.register(staticValues.moduleName, 'CONFIG.Actor.documentClass.prototype.rollAbilityTest', rollAbilityTest, 'MIXED');
-    libWrapper.register(staticValues.moduleName, 'CONFIG.Actor.documentClass.prototype.rollAbilitySave', rollAbilitySave, 'MIXED');
-  });
+  UtilsLibWrapper.mixed('CONFIG.Actor.documentClass.prototype.rollSkill', rollSkill);
+  UtilsLibWrapper.mixed('CONFIG.Actor.documentClass.prototype.rollAbilityTest', rollAbilityTest);
+  UtilsLibWrapper.mixed('CONFIG.Actor.documentClass.prototype.rollAbilitySave', rollAbilitySave);
 }

@@ -31,7 +31,7 @@ const partialVisibilitySetting: ClientSettings.PartialSettingConfig<string> = {
 
 const partialHidingRollSetting: ClientSettings.PartialSettingConfig<string> = {
   hint: `
-    <b>Hidden</b>: The player does not know if a roll happend.<br/>
+    <b>Hidden</b>: The player does not know if a roll happened.<br/>
     <b>Rolled</b>: The player knows if the GM has rolled or not, but not what was rolled.<br/>
     <b>Show total</b>: The player can see the total result, the individual rolls, bonuses and critical hits/misses are hidden.<br/>
   `,
@@ -62,7 +62,7 @@ function partialRollModeSetting(): ClientSettings.PartialSettingConfig<string> {
   }
 
   return {
-    hint: hintLines.join('<br>'),
+    hint: hintLines.join('<br/>'),
     scope: 'world',
     config: false,
     type: String,
@@ -87,7 +87,7 @@ export class ModuleSettings {
   @RunOnce()
   private static registerSettings(): void {
     game.settings.registerMenu(staticValues.moduleName, 'menu', {
-      // @ts-ignore form contructor has arguments, contact here is incorrect => ignore
+      // @ts-ignore form constructor has arguments, contact here is incorrect => ignore
       type: Nd5aSettingsFormApplication,
       name: "Settings",
       label: "Settings",      
@@ -114,7 +114,7 @@ export class ModuleSettings {
     });
     game.settings.register<string, string, string>(staticValues.moduleName, 'attackHiddenRoll', {
       ...partialHidingRollSetting,
-      name: 'Hidden attack roll behaviour',
+      name: 'Hidden attack roll behavior',
     });
     game.settings.register<string, string, string>(staticValues.moduleName, 'damageVisibility', {
       ...partialVisibilitySetting,
@@ -122,7 +122,7 @@ export class ModuleSettings {
     });
     game.settings.register<string, string, string>(staticValues.moduleName, 'damageHiddenRoll', {
       ...partialHidingRollSetting,
-      name: 'Hidden damage roll behaviour',
+      name: 'Hidden damage roll behavior',
     });
     game.settings.register<string, string, string>(staticValues.moduleName, 'immunityVisibility', {
       ...partialVisibilitySetting,
@@ -134,7 +134,7 @@ export class ModuleSettings {
     });
     game.settings.register<string, string, string>(staticValues.moduleName, 'checkHiddenRoll', {
       ...partialHidingRollSetting,
-      name: 'Hidden skill check and saving throw roll behaviour',
+      name: 'Hidden skill check and saving throw roll behavior',
     });
     game.settings.register<string, string, string>(staticValues.moduleName, 'checkDcVisibility', {
       ...partialVisibilitySetting,
@@ -147,7 +147,7 @@ export class ModuleSettings {
       `,
     });
     game.settings.register<string, string, string>(staticValues.moduleName, 'autoConsumeResources', {
-      name: 'Auto consume resouces (spell slots, item usage, ...)',
+      name: 'Auto consume resources (spell slots, item usage, ...)',
       scope: 'client',
       config: false,
       type: String,
@@ -158,8 +158,8 @@ export class ModuleSettings {
       },
       default: 'detection',
       hint: `
-        <b>Never</b>: Will need to manually click. Not recomended for those who forget a lot.<br>
-        <b>Always</b>: Resouces will be used when the on item use.<br/>
+        <b>Never</b>: Will need to manually click. Not recommended for those who forget a lot.<br>
+        <b>Always</b>: resources will be used when the on item use.<br/>
         <b>Detection</b>: Auto consume after an interaction. Possible interactions:
           <ul>
             <li>Attack rolled</li>
@@ -169,7 +169,7 @@ export class ModuleSettings {
             <li>If the item has non of these, use the same rule as "Always"</li>
           </ul><br/>
         <p>
-          <b>NOTE</b>: You can easly undo the usage and in my experience people will remember the undo button faster than the apply button for manual actions.
+          <b>NOTE</b>: You can easily undo the usage and in my experience people will remember the undo button faster than the apply button for manual actions.
         </p>
       `,
     });

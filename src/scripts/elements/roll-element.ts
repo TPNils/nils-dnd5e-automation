@@ -18,10 +18,10 @@ export interface RollEventData<T> {
       <nd5e-roll-result *if="this.roll?.total != null && (this.readHiddenDisplayType !== 'hidden' || this.hasInteractPermission)"
         [data-roll]="this.roll"
         [data-override-formula]="this.overrideFormula"
-        [data-highlight-total-on-firstTerm]="this.highlightTotalOnFirstTerm"
+        [data-highlight-total-on-first-term]="this.highlightTotalOnFirstTerm"
         [data-display-type]="this.hasReadPermission ? '' : this.readHiddenDisplayType"
         [data-override-max-roll]="this.overrideMaxRoll">
-        <div slot="top">
+        <div slot="{{bonusPosition === 'inside' ? 'top' : 'between'}}">
           <input *if="this.hasInteractPermission"
             class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
             type="text"
@@ -40,7 +40,7 @@ export interface RollEventData<T> {
           </slot>
         </button>
         
-        <input *if="this.showBonus && this.hasInteractPermission"
+        <input *if="(showBonus || bonusPosition === 'outside') && this.hasInteractPermission"
           autofocus
           class="user-bonus" placeholder="{{this.localeBonus}}: {{this.localeRollExample}}"
           type="text"
@@ -50,7 +50,9 @@ export interface RollEventData<T> {
       </div>
     </div>
   `,
-  style: /*css*/`
+  style: scss`
+  @import 'overlay.scss';
+  
   :host {
     display: block;
     font-size: var(--font-size-14, 14px);

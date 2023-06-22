@@ -1,11 +1,12 @@
-import { DocumentListener } from "../../lib/db/document-listener";
-import { UtilsDocument } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { ValueReader } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { ModularCard } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../modular-card-part";
+import { DocumentListener } from "../../../lib/db/document-listener";
+import { UtilsDocument } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { ValueReader } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { ModularCard } from "../../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 
 interface DescriptionCardData {
@@ -25,7 +26,7 @@ DocumentListener.listenSettingValue<boolean>('dnd5e', 'autoCollapseItemCards').l
   html: /*html*/`
   <div class="header" (click)="this.toggleCollapsed()">
     <img [src]="this.image" [title]="this.name" width="36" height="36"/>
-    <h3 class="name">{{this.name}}</h3>
+    <div class="name">{{this.name}}</div>
   </div>
 
   <div class="section description {{this.collapsed ? '' : 'open'}}">
@@ -120,16 +121,21 @@ export class DescriptionCardPart implements ModularCardPart<DescriptionCardData>
   private constructor(){}
   
   public create({item}: ModularCardCreateArgs): DescriptionCardData {
+    const itemData = UtilsFoundry.getSystemData(item);
     return {
       name$: item.name,
       img$: item.img,
-      description$: item.data?.data?.description?.value,
-      materials$: item.data?.data?.materials?.value,
+      description$: itemData?.description?.value,
+      materials$: itemData?.materials?.value,
     };
   }
 
   public refresh(data: DescriptionCardData, args: ModularCardCreateArgs): DescriptionCardData {
     return this.create(args);
+  }
+
+  public refreshVisual(data: DescriptionCardData, args: ModularCardCreateArgs): DescriptionCardData {
+    return this.refresh(data, args);
   }
 
   @RunOnce()

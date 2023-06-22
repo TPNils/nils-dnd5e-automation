@@ -1,30 +1,26 @@
 # Index
 TODO maybe automate as a deploy action?
 
-# Nils' dnd5e automation - FoundryVTT Module
+# Why use Nils' dnd5e automation (Nd5e)
 TODO introduction
 
 ## Installation
 
-### Method 1 (latest version)
-1. TODO register as a module on foundry onceI deem it ready for release
+### Get the latest and greatest
+1. Start up Foundry and click "Install Module" in the "Add-on Modules" tab.
+2. Search for "Nd5e" and click install.
 
-### Method 2 (latest or older versions)
+### Alternative
 1. Start up Foundry and click "Install Module" in the "Add-on Modules" tab.
 2. Paste one of the following into the "Manifest URL" field:
   - _Latest Release:_ `https://github.com/TPNils/nils-dnd5e-automation/releases/download/latest/module.json`
   - _Previous Releases:_ A link to the `module.json` file from any of the [previous releases](https://github.com/TPNils/nils-dnd5e-automation/releases).
 3. Click "Install" and the module should download and appear in your modules list.
 
-URLs with the latest version for previous Foundry VTT editions
-- TODO _Latest 9.x Release_:
-- TODO _Latest 0.8.9 Release_:
-
 ## Compatibility
 
 ### Required Modules
 When you install _Nils' dnd5e automation_ for the first time, you will be prompted to install these along side. _Nils' dnd5e automation_ will not work without them.
-- [FVTT libWrapper](https://github.com/ruipin/fvtt-lib-wrapper#1-fvtt-libwrapper)
 - [socketlib](https://github.com/manuelVo/foundryvtt-socketlib#socketlib)
 
 
@@ -41,6 +37,7 @@ The following modules have been verified as compatible with the latest version o
 - [Dice So Nice](https://gitlab.com/riccisi/foundryvtt-dice-so-nice#installation) <sup>(2.0.0+)</sup>
 - [Dynamic Active Effects](https://gitlab.com/tposney/dae) <sup>(TODO)</sup>
 - [Force Client Settings](https://gitlab.com/kimitsu_desu/force-client-settings#force-client-settings) <sup>(1.0.4+)</sup>
+- [FVTT libWrapper](https://github.com/ruipin/fvtt-lib-wrapper#1-fvtt-libwrapper) <sup>(1.8.0.0+)</sup>
 - [Token Action HUD](https://github.com/Larkinabout/fvtt-token-action-hud-dnd5e#token-action-hud-dd-5eken-action-hud-dnd5e) <sup>Foundry v8, v9 (2.2.3+)</sup>
 - [Token Action HUD Core](https://github.com/Larkinabout/fvtt-token-action-hud-core#token-action-hud-core) <sup>Foundry v10+ (1.2.3+)</sup> + [Token Action HUD D&D 5e](https://github.com/Larkinabout/fvtt-token-action-hud-dnd5e#token-action-hud-dd-5eken-action-hud-dnd5e) <sup>Foundry v10+ (1.2.2+)</sup>
 - TODO verify more interactions, especially other big modules, even if it seems silly that they might cause compatibility issues

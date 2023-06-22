@@ -14,7 +14,7 @@ class Config {
     if (fs.existsSync(configPath)) {
       const file: ConfigJson = fs.readJSONSync(configPath);
       if (file.githubRepository) {
-        response.githubRepository;
+        response.githubRepository = file.githubRepository;
       }
     }
 

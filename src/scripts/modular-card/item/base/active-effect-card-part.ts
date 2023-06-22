@@ -1,15 +1,15 @@
 import { ActiveEffectData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/module.mjs";
-import { IAfterDmlContext, IDmlContext, ITrigger } from "../../lib/db/dml-trigger";
-import { UtilsDocument } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { staticValues } from "../../static-values";
-import { MyActor } from "../../types/fixed-types";
-import { AttackCardData, AttackCardPart } from "./attack-card-part";
-import { CheckCardData, CheckCardPart } from "./check-card-part";
-import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
-import { ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
+import { IAfterDmlContext, IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
+import { UtilsDocument } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { staticValues } from "../../../static-values";
+import { MyActor } from "../../../types/fixed-types";
+import { AttackCardPart } from "./attack-card-part";
+import { CheckCardPart } from "./check-card-part";
+import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
+import { ModularCardCreateArgs, ModularCardPart } from "../../modular-card-part";
 import { StateContext, TargetCallbackData, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
-import { UtilsLog } from "../../utils/utils-log";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
 
 interface TargetCache {
   actorUuid$: string;
@@ -60,12 +60,11 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
 
   public async create({item}: ModularCardCreateArgs): Promise<ActiveEffectCardData> {
     const activeEffects: ActiveEffectData[] = Array.from(item.effects.values())
-      .filter((effectData: ActiveEffect) => !effectData.data.transfer)
-      .map((effect: ActiveEffect) => {
-        const data = deepClone(effect.data);
-        delete data._id;
-        return data;
-      });
+      .map(effect => {
+        effect = (effect as any).clone({}, {keepId: false});
+        return UtilsFoundry.getModelData(effect);
+      })
+      .filter(effectData => !effectData.transfer);
 
     if (activeEffects.length === 0) {
       return null;
@@ -81,7 +80,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
     // since active effects (3 parents deep) have no id => no uuid, we can't really recalculate
     // We need to know which effects are them same and which have been added/removed, can't do that
     // TODO maybe this is solved in foundry v10?
-    //  Also this might be bullshit, I did come to this conclustion around 02h in the morning
+    //  Also this might be bullshit, I did come to this conclusion around 02h in the morning
     return oldData;
   }
 
@@ -112,9 +111,9 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       }
       processedMessages.push(message);
 
-      const activeEffect = message.getTypeData<ActiveEffectCardData>(ActiveEffectCardPart.instance);
-      const attack = message.getTypeData<AttackCardData>(AttackCardPart.instance);
-      const check = message.getTypeData<CheckCardData>(CheckCardPart.instance);
+      const activeEffect = message.getTypeData(ActiveEffectCardPart.instance);
+      const attack = message.getTypeData(AttackCardPart.instance);
+      const check = message.getTypeData(CheckCardPart.instance);
       if (activeEffect == null) {
         continue;
       }
@@ -214,7 +213,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
         }
         const effect = activeEffectCard.activeEffects[i];
         const activeEffectData = deepClone(effect);
-        activeEffectData.origin = null; // TODO
+        activeEffectData.origin = targetEvent.messageCardParts.getItemUuid();
         activeEffectData.flags = activeEffectData.flags ?? {};
         activeEffectData.flags[staticValues.moduleName] = activeEffectData.flags[staticValues.moduleName] ?? {};
         (activeEffectData.flags[staticValues.moduleName] as any).origin = {
@@ -222,7 +221,6 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
           activeEffectIndex: i,
         };
         delete activeEffectData._id;
-        // @ts-ignore
         createActiveEffects.push(new ActiveEffect(activeEffectData, {parent: actor}));
       }
     }
@@ -232,7 +230,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
       await UtilsDocument.bulkDelete(deleteActiveEffectUuids)
     }
     for (const effectDocument of await UtilsDocument.bulkCreate(createActiveEffects)) {
-      const origin = (effectDocument.data.flags[staticValues.moduleName] as any).origin;
+      const origin = (UtilsFoundry.getModelData(effectDocument).flags[staticValues.moduleName] as any).origin;
       createdUuidsByOriginKey.set(`${origin.messageId}/${effectDocument.parent.uuid}/${origin.activeEffectIndex}`, effectDocument.uuid);
     }
     
@@ -292,8 +290,8 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
           appliedStates.add(applied);
           visualState.columns.push({
             key: ActiveEffectCardPart.instance.getType() + '-' + i,
-            label: `<img style="min-width: 16px;width: 16px;min-height: 16px;height: 16px;" src="${activeEffect.icon}">`,
-            rowValue: applied ? `<span style="color: green">✓</span>` : `<span style="color: red">✗</span>`
+            label: `<img style="min-width: 16px;width: 16px;min-height: 16px;height: 16px;" title="${activeEffect.label}" src="${activeEffect.icon}">`,
+            rowValue: applied ? `<span style="color: green" title="Applied">✓</span>` : `<span style="color: red">✗</span>`
           });
         }
         if (appliedStates.size > 1) {
@@ -326,7 +324,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
         const activeEffect = activeEffectPart.activeEffects[i];
         visualState.columns.push({
           key: ActiveEffectCardPart.instance.getType() + '-' + i,
-          label: `<img style="min-width: 16px;width: 16px;min-height: 16px;height: 16px;" src="${activeEffect.icon}">`,
+          label: `<img style="min-width: 16px;width: 16px;min-height: 16px;height: 16px;" title="${activeEffect.label}" src="${activeEffect.icon}">`,
           rowValue: `<span style="color: red">✗</span>`,
         });
       }
@@ -352,7 +350,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     const newSelectedByMessageId = new Map<string, TargetCardData['selected']>();
     const recalcTokens: Array<{selectionId: string, tokenUuid: string, data: ActiveEffectCardData, messageId: string}> = [];
     for (const {newRow, oldRow} of context.rows) {
-      const activeEffect = newRow.allParts.getTypeData<ActiveEffectCardData>(ActiveEffectCardPart.instance);
+      const activeEffect = newRow.allParts.getTypeData(ActiveEffectCardPart.instance);
       if (!activeEffect) {
         continue;
       }

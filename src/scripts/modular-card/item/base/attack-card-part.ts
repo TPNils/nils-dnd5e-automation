@@ -1,19 +1,20 @@
-import { RollD20EventData, RollMode } from "../../elements/roll-d20-element";
-import { ITrigger, IDmlContext, IAfterDmlContext } from "../../lib/db/dml-trigger";
-import { DocumentListener } from "../../lib/db/document-listener";
-import { UtilsDocument, PermissionCheck } from "../../lib/db/utils-document";
-import { RunOnce } from "../../lib/decorator/run-once";
-import { Attribute, Component, OnInit, OnInitParam } from "../../lib/render-engine/component";
-import { UtilsDiceSoNice } from "../../lib/roll/utils-dice-so-nice";
-import { RollData, UtilsRoll } from "../../lib/roll/utils-roll";
-import { UtilsCompare } from "../../lib/utils/utils-compare";
-import { ValueProvider } from "../../provider/value-provider";
-import { staticValues } from "../../static-values";
-import { MyActor } from "../../types/fixed-types";
-import { Action } from "../action";
+import { RollD20EventData, RollMode } from "../../../elements/roll-d20-element";
+import { ITrigger, IDmlContext, IAfterDmlContext } from "../../../lib/db/dml-trigger";
+import { DocumentListener } from "../../../lib/db/document-listener";
+import { UtilsDocument, PermissionCheck } from "../../../lib/db/utils-document";
+import { RunOnce } from "../../../lib/decorator/run-once";
+import { Attribute, Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
+import { UtilsDiceSoNice } from "../../../lib/roll/utils-dice-so-nice";
+import { RollData, UtilsRoll } from "../../../lib/roll/utils-roll";
+import { UtilsCompare } from "../../../lib/utils/utils-compare";
+import { ValueProvider } from "../../../provider/value-provider";
+import { staticValues } from "../../../static-values";
+import { MyActor } from "../../../types/fixed-types";
+import { UtilsFoundry } from "../../../utils/utils-foundry";
+import { Action } from "../../action";
 import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
-import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../modular-card";
-import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../modular-card-part";
+import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
+import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { DamageCardData, DamageCardPart } from "./damage-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
@@ -40,7 +41,7 @@ export interface AttackCardData {
   advantageSources$: Array<{$uuid: string, $name: string, $image: string}>;
   disadvantageSources$: Array<{$uuid: string, $name: string, $image: string}>;
   roll$?: RollData;
-  critTreshold$: number;
+  critThreshold$: number;
   isCrit$?: boolean;
   targetCaches$: TargetCache[]
 }
@@ -50,7 +51,7 @@ export interface AttackCardData {
  * Most attack items only have 1 target.
  * However there are a few with multiple targets and I could not find a written rule to handle those.
  * So I decided that you need to roll an attack for each target based on multiple spells/feats RAW
- * - Ranger (Hunter): Multiattack
+ * - Ranger (Hunter): Multi-attack
  * - Scorching Ray
  * - Eldritch Blast
  */
@@ -66,7 +67,7 @@ export interface AttackCardData {
       [data-roll-mode]="this.part.mode"
       [data-bonus-formula]="this.part.userBonus"
       [data-show-bonus]="this.part.phase !== 'mode-select'"
-      [data-override-max-roll]="this.part.critTreshold$"
+      [data-override-max-roll]="this.part.critThreshold$"
 
       [data-interaction-permission]="this.interactionPermission"
       [data-read-permission]="this.readPermission"
@@ -88,7 +89,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
   //#region actions
   private static actionPermissionCheck = createPermissionCheckAction<{cardParts: ModularCardInstance}>(({cardParts}) => {
     const documents: CreatePermissionCheckArgs['documents'] = [];
-    const part = cardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+    const part = cardParts.getTypeData(AttackCardPart.instance);
     if (part?.actorUuid$) {
       documents.push({uuid: part.actorUuid$, permission: 'OWNER', security: true});
     }
@@ -100,13 +101,13 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
     .build(({messageId, event, cardParts}) => {
-      const part = cardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const part = cardParts.getTypeData(AttackCardPart.instance);
       if (part.userBonus === event.userBonus && part.phase === 'result') {
         return;
       }
       part.userBonus = event.userBonus;
       part.phase = 'result';
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   private static modeChange = new Action<{event: CustomEvent<RollD20EventData<RollMode>>} & ChatPartIdData>('AttackOnModeChange')
     .addSerializer(ItemCardHelpers.getRawSerializer('messageId'))
@@ -114,7 +115,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
     .addEnricher(ItemCardHelpers.getChatEnricher())
     .setPermissionCheck(AttackCardPartComponent.actionPermissionCheck)
     .build(({messageId, cardParts, event}) => {
-      const part = cardParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const part = cardParts.getTypeData(AttackCardPart.instance);
       if (part.mode === event.data) {
         return;
       }
@@ -123,7 +124,7 @@ class AttackCardPartComponent extends BaseCardComponent implements OnInit {
       if (event.quickRoll) {
         part.phase = 'result';
       }
-      return ModularCard.setCardPartDatas(game.messages.get(messageId), cardParts);
+      return ModularCard.writeModuleCard(game.messages.get(messageId), cardParts);
     });
   //#endregion
 
@@ -229,7 +230,7 @@ class AttackTargetComponent extends BaseCardComponent implements OnInit {
         selectionId: this._selectionId,
       })
       .switchMap(({data, selectionId}) => {
-        const targetPart = data.allParts.getTypeData<TargetCardData>(TargetCardPart.instance);
+        const targetPart = data.allParts.getTypeData(TargetCardPart.instance);
         const targetUuid = targetPart?.selected?.find(target => target.selectionId === selectionId)?.tokenUuid;
         const cache = data.part.targetCaches$.find(cache => cache.targetUuid$ === targetUuid);
         return ValueProvider.mergeObject({
@@ -303,27 +304,30 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
       advantageSources$: [],
       disadvantageSources$: [],
       actorUuid$: actor?.uuid,
-      critTreshold$: 20
+      critThreshold$: 20
     };
 
-    let critTreshold = item.data.data.critical?.threshold ?? attack.critTreshold$;
-    const actorDnd5eFlags = actor?.data?.flags?.dnd5e;
+    const itemData = UtilsFoundry.getSystemData(item);
+    const actorSystemData = UtilsFoundry.getSystemData(actor);
+    const actorModelData = UtilsFoundry.getModelData(actor);
+    let critThreshold = itemData.critical?.threshold ?? attack.critThreshold$;
+    const actorDnd5eFlags = actorModelData.flags?.dnd5e;
     if (item.type === 'weapon' && actorDnd5eFlags?.weaponCriticalThreshold != null) {
-      critTreshold = Math.min(critTreshold, actor.data.flags.dnd5e.weaponCriticalThreshold);
+      critThreshold = Math.min(critThreshold, actorDnd5eFlags.weaponCriticalThreshold);
     }
     if (item.type === 'spell' && actorDnd5eFlags?.spellCriticalThreshold != null) {
-      critTreshold = Math.min(critTreshold, actor.data.flags.dnd5e.spellCriticalThreshold);
+      critThreshold = Math.min(critThreshold, actorDnd5eFlags.spellCriticalThreshold);
     }
-    attack.critTreshold$ = critTreshold;
+    attack.critThreshold$ = critThreshold;
 
     {
-      let suffixes = ['all', item.data.data.actionType, item.abilityMod];
+      let suffixes = ['all', itemData.actionType, item.abilityMod];
       if (actor) {
         if (actor.type === 'character') {
           suffixes.push('humanoid');
-        } else if (actor.type === 'npc' && actor.data.data.details?.type) {
-          suffixes.push(actor.data.data.details.type.custom);
-          suffixes.push(actor.data.data.details.type.value);
+        } else if (actor.type === 'npc' && actorSystemData.details?.type) {
+          suffixes.push(actorSystemData.details.type.custom);
+          suffixes.push(actorSystemData.details.type.value);
         }
       }
       suffixes = suffixes.filter(suffix => !!suffix);
@@ -333,10 +337,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         let advantage = false;
         let disadvantage = false;
         for (const suffix of suffixes) {
-          if (getProperty(actor.data._source, `flags.${staticValues.moduleName}.attack.advantage.${suffix}`) > 0) {
+          if (getProperty(actorModelData._source, `flags.${staticValues.moduleName}.attack.advantage.${suffix}`) > 0) {
             advantage = true;
           }
-          if (getProperty(actor.data._source, `flags.${staticValues.moduleName}.attack.disadvantage.${suffix}`) > 0) {
+          if (getProperty(actorModelData._source, `flags.${staticValues.moduleName}.attack.disadvantage.${suffix}`) > 0) {
             disadvantage = true;
           }
         }
@@ -345,24 +349,25 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
           attack.advantageSources$.push({
             $uuid: actor.uuid,
             $image: actor.img,
-            $name: actor.data.name,
+            $name: actorModelData.name,
           });
         }
         if (disadvantage) {
           attack.disadvantageSources$.push({
             $uuid: actor.uuid,
             $image: actor.img,
-            $name: actor.data.name,
+            $name: actorModelData.name,
           });
         }
       }
 
-      for (const effect of actor.getEmbeddedCollection(ActiveEffect.name) as any as Array<ActiveEffect>) {
+      for (const effect of actor.getEmbeddedCollection(ActiveEffect.name) as any as Array<ActiveEffect & {uuid: string, name: string}>) {
+        const effectData = UtilsFoundry.getModelData(effect);
         let advantage = false;
         let disadvantage = false;
   
         for (const suffix of suffixes) {
-          for (const change of effect.data.changes) {
+          for (const change of effectData.changes) {
             if (change.key === `data.flags.${staticValues.moduleName}.attack.advantage.${suffix}`) {
               advantage = true;
             }
@@ -375,14 +380,14 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
         if (advantage) {
           attack.advantageSources$.push({
             $uuid: effect.uuid,
-            $image: effect.data.icon,
+            $image: effectData.icon,
             $name: effect.sourceName ?? effect.name,
           });
         }
         if (disadvantage) {
           attack.disadvantageSources$.push({
             $uuid: effect.uuid,
-            $image: effect.data.icon,
+            $image: effectData.icon,
             $name: effect.sourceName ?? effect.name,
           });
         }
@@ -458,6 +463,10 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
   private getTargetState(context: StateContext): VisualState[] {
     const visualStates: VisualState[] = [];
 
+    if (!context.allMessageParts.hasType(AttackCardPart.instance)) {
+      return visualStates;
+    }
+
     for (const selected of context.selected) {
       visualStates.push({
         selectionId: selected.selectionId,
@@ -507,7 +516,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
       for (const selected of newRow.part.selected) {
         allTargetUuids.add(selected.tokenUuid);
       }
-      for (const target of newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance).targetCaches$) {
+      for (const target of newRow.allParts.getTypeData(AttackCardPart.instance).targetCaches$) {
         cachedTargetUuids.add(target.targetUuid$);
       }
 
@@ -533,7 +542,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
         allTargetUuids.add(selected.tokenUuid);
       }
 
-      const attackPart = newRow.allParts.getTypeData<AttackCardData>(AttackCardPart.instance);
+      const attackPart = newRow.allParts.getTypeData(AttackCardPart.instance);
       const cachedTargetUuids = new Set<string>();
       for (const target of attackPart.targetCaches$) {
         cachedTargetUuids.add(target.targetUuid$);
@@ -541,11 +550,12 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
 
       for (const expectedUuid of allTargetUuids) {
         if (!cachedTargetUuids.has(expectedUuid)) {
-          const actor = (tokens.get(expectedUuid).getActor() as MyActor);
+          const actor = tokens.get(expectedUuid).getActor() as MyActor;
+          const actorData = UtilsFoundry.getSystemData(actor);
           attackPart.targetCaches$.push({
             targetUuid$: expectedUuid,
             actorUuid$: actor.uuid,
-            ac$: actor.data.data.attributes.ac.value,
+            ac$: actorData.attributes.ac.value,
           });
           cachedTargetUuids.add(expectedUuid);
         }
@@ -597,14 +607,14 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
       }
 
       const baseRollResult = newRow.part.roll$.terms[0].results.filter(result => result.active)[0];
-      newRow.part.isCrit$ = baseRollResult?.result >= newRow.part.critTreshold$;
+      newRow.part.isCrit$ = baseRollResult?.result >= newRow.part.critThreshold$;
     }
   }
 
   private setDamageAsCrit(context: IDmlContext<ModularCardTriggerData<AttackCardData>>): void {
     for (const {newRow, oldRow} of context.rows) {
       if (newRow.part.isCrit$ !== oldRow?.part?.isCrit$) {
-        const damagePart = newRow.allParts.getTypeData<DamageCardData>(DamageCardPart.instance);
+        const damagePart = newRow.allParts.getTypeData(DamageCardPart.instance);
         if (damagePart != null) {
           continue;
         }
@@ -626,8 +636,8 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
         if (newRow.part.roll$?.evaluated) {
           const firstRoll = newRow.part.roll$.terms[0].results.find(r => r.active);
           if (firstRoll.result === 20 || targetCache.ac$ <= newRow.part.roll$.total) {
-            // 20 always hits, lower crit treshold does not
-            if (firstRoll.result >= newRow.part.critTreshold$) {
+            // 20 always hits, lower crit threshold does not
+            if (firstRoll.result >= newRow.part.critThreshold$) {
               targetCache.resultType$ = 'critical-hit';
             } else {
               targetCache.resultType$ = 'hit';
@@ -709,7 +719,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
               rollPromises.push(item.rollAttack({
                 advantage: newData.mode === 'advantage',
                 disadvantage: newData.mode === 'disadvantage',
-                critical: newData.critTreshold$,  
+                critical: newData.critThreshold$,  
                 fastForward: true,
                 chatMessage: false,
               }));
@@ -750,7 +760,7 @@ class AttackCardTrigger implements ITrigger<ModularCardTriggerData<AttackCardDat
       }
     }
     
-    UtilsDocument.hasPermissions(showRolls).listenFirst().then(responses => {
+    UtilsDocument.hasPermissions(showRolls).firstPromise().then(responses => {
       const rolls: Roll[] = [];
       for (const response of responses) {
         if (response.result) {

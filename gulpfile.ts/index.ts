@@ -129,12 +129,12 @@ class BuildActions {
 
   static createBuildLess() {
     return function buildLess() {
-      let pipeline = gulp.src(`${buildMeta.getSrcPath()}/**/*.less`)
+      let pipeline = gulp.src(`${buildMeta.getSrcPath()}/styles/**/*.less`)
         .pipe(less())
         .pipe(minifyCss());
         
       for (const dest of buildMeta.getDestPath()) {
-        pipeline = pipeline.pipe(gulp.dest(dest));
+        pipeline = pipeline.pipe(gulp.dest(path.join(dest, 'styles')));
       }
       return pipeline;
     }
@@ -143,12 +143,12 @@ class BuildActions {
   static createBuildSASS() {
     return function buildSASS() {
       let pipeline = gulp
-        .src(`${buildMeta.getSrcPath()}/**/*.scss`)
+        .src(`${buildMeta.getSrcPath()}/styles/**/*.scss`)
         .pipe(sass().on('error', sass.logError))
         .pipe(minifyCss());
         
       for (const dest of buildMeta.getDestPath()) {
-        pipeline = pipeline.pipe(gulp.dest(dest));
+        pipeline = pipeline.pipe(gulp.dest(path.join(dest, 'styles')));
       }
       return pipeline;
     }
@@ -279,8 +279,8 @@ class BuildActions {
       function watch() {
         // Do not watch to build the manifest since it only gets loaded on server start
         gulp.watch('src/**/*.ts', { ignoreInitial: true }, BuildActions.createBuildTS({inlineMapping: true}));
-        gulp.watch('src/**/*.less', { ignoreInitial: true }, BuildActions.createBuildLess());
-        gulp.watch('src/**/*.scss', { ignoreInitial: true }, BuildActions.createBuildSASS());
+        gulp.watch('src/styles/**/*.less', { ignoreInitial: true }, BuildActions.createBuildLess());
+        gulp.watch('src/styles/**/*.scss', { ignoreInitial: true }, BuildActions.createBuildSASS());
         gulp.watch(
           [...copyFiles.map(file => path.join(...file.from)), 'src/*.json'],
           { ignoreInitial: true },
@@ -435,14 +435,14 @@ export function updateExternalManifestForGithub() {
   return git.updateManifestForGithub({source: false, externalManifest: false})
 }
 export const publish = gulp.series(
-  function validateVersion() {args.validateVersion()},
-  function validateCleanRepo() {git.validateCleanRepo()},
-  function updateManifestForGithub() {git.updateManifestForGithub({source: true, externalManifest: false})},
-  function gitCommit() {git.commitNewVersion()},
-  function gitDeleteCurrentVersionTag() {git.deleteVersionTag()},
-  function gitTag() {git.tagCurrentVersion()},
+  function validateVersion() {return args.validateVersion()},
+  function validateCleanRepo() {return git.validateCleanRepo()},
+  function updateManifestForGithub() {return git.updateManifestForGithub({source: true, externalManifest: false})},
+  function gitCommit() {return git.commitNewVersion()},
+  function gitDeleteCurrentVersionTag() {return git.deleteVersionTag()},
+  function gitTag() {return git.tagCurrentVersion()},
 );
 export const reupload = gulp.series(
-  function gitDeleteTag() {git.deleteVersionTag()},
-  function gitTag() {git.tagCurrentVersion()},
+  function gitDeleteTag() {return git.deleteVersionTag()},
+  function gitTag() {return git.tagCurrentVersion()},
 );
