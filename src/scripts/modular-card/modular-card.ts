@@ -200,15 +200,12 @@ export class ModularCardInstance {
       this.inactiveData = ChatMessageAccessPropertyV10.wrap(deepClone(this.inactiveData), message, `flags.${staticValues.moduleName}.modularCardInactiveData`);
       this.meta = ChatMessageAccessPropertyV10.wrap(deepClone(this.meta), message, `flags.${staticValues.moduleName}.modularCardDataMeta`);
     } else if (UtilsFoundry.usesDocumentData(message)) {
-      message.data.update({
-        flags: {
-          [staticValues.moduleName]: {
-            modularCardData: this.data,
-            modularCardInactiveData: this.inactiveData,
-            modularCardDataMeta: this.meta,
-          }
-        }
-      })
+      if (!message.data.flags[staticValues.moduleName]) {
+        message.data.flags[staticValues.moduleName] = {};
+      }
+      (message.data.flags[staticValues.moduleName] as any).modularCardData = this.data;
+      (message.data.flags[staticValues.moduleName] as any).modularCardInactiveData = this.inactiveData;
+      (message.data.flags[staticValues.moduleName] as any).modularCardDataMeta = this.meta;
     }
   }
 
