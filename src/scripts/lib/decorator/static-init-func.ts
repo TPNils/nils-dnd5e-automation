@@ -1,4 +1,6 @@
-export function StaticInitFunc(init: () => any) {
+export function StaticInitFunc(init: () => any)
+export function StaticInitFunc(init: () => Promise<any>, options: {async: true})
+export function StaticInitFunc(init: () => any | Promise<any>, options?: {async: boolean}) {
   return function (target: any, propertyKey: string, descriptor?: PropertyDescriptor) {
     if (descriptor) {
       if (descriptor.configurable === false) {
@@ -14,6 +16,13 @@ export function StaticInitFunc(init: () => any) {
 
     const getFunc = () => {
       const value = init();
+      if (options.async && value instanceof Promise) {
+        return value.then((v) => {
+          Reflect.deleteProperty(target, propertyKey);
+          target[propertyKey] = value;
+          return v;
+        })
+      }
       Reflect.deleteProperty(target, propertyKey);
       target[propertyKey] = value;
       return value;
