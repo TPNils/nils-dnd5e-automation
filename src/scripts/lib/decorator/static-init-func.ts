@@ -16,7 +16,7 @@ export function StaticInitFunc(init: () => any | Promise<any>, options?: {async:
 
     const getFunc = () => {
       const value = init();
-      if (options.async && value instanceof Promise) {
+      if (options?.async && value instanceof Promise) {
         return value.then((v) => {
           Reflect.deleteProperty(target, propertyKey);
           target[propertyKey] = value;
