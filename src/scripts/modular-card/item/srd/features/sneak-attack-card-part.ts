@@ -280,7 +280,7 @@ export class SrdSneakAttackCardPart implements ModularCardPart<SrdSneakAttackCar
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new SrdSneakAttackCardTrigger());
-    Hooks.on(`create${staticValues.code.capitalize()}ModuleCard`, (event: BeforeCreateModuleCardEvent) => {
+    Hooks.on(`${staticValues.code.capitalize()}.createModuleCard`, (event: BeforeCreateModuleCardEvent) => {
       if (SrdSneakAttackCardPart.getSneakItem(event.actor) != null) {
         event.addAfter(DamageCardPart.instance, SrdSneakAttackCardPart.instance);
       }

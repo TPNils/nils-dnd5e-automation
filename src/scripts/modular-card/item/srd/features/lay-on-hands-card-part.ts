@@ -221,7 +221,7 @@ export class SrdLayOnHandsCardPart extends DamageCardPart implements ModularCard
   public registerHooks(): void {
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
     ModularCard.registerModularCardTrigger(this, new SrdLayOnHandsCardTrigger());
-    Hooks.on(`create${staticValues.code.capitalize()}ModuleCard`, (event: BeforeCreateModuleCardEvent) => {
+    Hooks.on(`${staticValues.code.capitalize()}.createModuleCard`, (event: BeforeCreateModuleCardEvent) => {
       if (UtilsItem.matchesItemIdentifier('layOnHands', event.item)) {
         event.replace(DamageCardPart.instance, SrdLayOnHandsCardPart.instance);
       }

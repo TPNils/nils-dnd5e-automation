@@ -18,6 +18,7 @@ import { UtilsFoundry } from "../utils/utils-foundry";
 
 type ModularCardData = {[partType: string]: any};
 interface ModularCardMeta {
+  type?: string;
   created?: {
     actorUuid?: string;
     tokenUuid?: string;
@@ -667,7 +668,7 @@ export class ModularCard {
     createArgs.item = ItemUtils.createUpcastItemByFirstSpellSlot(createArgs.item, createArgs.actor);
 
     const createEvent = new BeforeCreateModuleCardEvent({actor: createArgs.actor, item: createArgs.item, token: createArgs.token});
-    Hooks.callAll(`create${staticValues.code.capitalize()}ModuleCard`, createEvent);
+    Hooks.callAll(`${staticValues.code.capitalize()}.createModuleCard`, createEvent);
     
     const instance = refresh ? refresh.instance.deepClone() : new ModularCardInstance(new ChatMessage());
     const originalTypes = instance.getAllTypes();
