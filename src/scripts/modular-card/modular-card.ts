@@ -18,7 +18,6 @@ import { UtilsFoundry } from "../utils/utils-foundry";
 
 type ModularCardData = {[partType: string]: any};
 interface ModularCardMeta {
-  type?: string;
   created?: {
     actorUuid?: string;
     tokenUuid?: string;
