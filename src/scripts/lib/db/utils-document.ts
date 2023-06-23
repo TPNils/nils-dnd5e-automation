@@ -1,3 +1,4 @@
+import { DocumentModificationOptions } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/document.mjs";
 import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
 import { BaseDocument, MyActor, MyActorData, MyItem } from "../../types/fixed-types";
@@ -644,12 +645,13 @@ export class UtilsDocument {
 
   //#region dml
 
-  public static async bulkCreate(inputs: Iterable<FoundryDocument>): Promise<FoundryDocument[]> {
+  public static async bulkCreate(inputs: Iterable<FoundryDocument>, options?: Omit<DocumentModificationOptions, 'parent' | 'pack'>): Promise<FoundryDocument[]> {
     const createsPerContext = UtilsDocument.groupDocumentsByContext(Array.from(inputs));
 
     const promises: Promise<FoundryDocument[]>[] = [];
     for (const documentContext of createsPerContext) {
-      const options: any = {
+      const dmlOptions: any = {
+        ...options,
         [staticValues.moduleName]: {
           dmlUuid: crypto.randomUUID(),
         },
@@ -659,7 +661,7 @@ export class UtilsDocument {
       const promise = documentContext.documentClass.createDocuments.call(
         documentContext.documentClass,
         documentContext.documents.map(doc => UtilsFoundry.getModelData(doc)),
-        options,
+        dmlOptions,
       );
       promises.push(promise);
       if (documentContext.parent != null) {
