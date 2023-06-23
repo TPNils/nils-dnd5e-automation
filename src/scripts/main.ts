@@ -10,9 +10,11 @@ import { VirtualNodeParser } from "./lib/render-engine/virtual-dom/virtual-node-
 import { UtilsHooks } from "./utils/utils-hooks";
 import { ComponentFoundryConnector } from "./lib/render-engine/component-foundry-connector";
 import { UtilsLibWrapper } from "./utils/utils-lib-wrapper";
+import { UtilsDae } from "./utils/utils-dae";
 
 UtilsHooks.registerHooks();
 UtilsLibWrapper.registerHooks();
+UtilsDae.registerHooks();
 VirtualNodeParser.init();
 registerHooksElement();
 ReusableDiceTerm.registerHooks();
