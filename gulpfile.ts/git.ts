@@ -56,8 +56,8 @@ export class Git {
       throw new Error(chalk.red(`Git remote "${remoteName}" was not detected as a github repo.`));
     }
 
-    const currentVersion = manifest.file.version;
-    let targetVersion = args.getVersion(currentVersion, true);
+    const currentVersion = await args.getCurrentVersion();
+    let targetVersion = await args.getNextVersion(currentVersion, true);
     if (targetVersion == null) {
       targetVersion = currentVersion;
     }
@@ -103,13 +103,13 @@ export class Git {
 
   public async commitNewVersion(): Promise<void> {
     cli.throwError(await cli.execPromise('git add .'), {ignoreOut: true});
-    let newVersion = 'v' + foundryManifest.getManifest().file.version;
+    let newVersion = 'v' + await args.getCurrentVersion();
     cli.throwError(await cli.execPromise(`git commit -m "Updated to ${newVersion}`));
   }
 
   public async deleteVersionTag(version?: string): Promise<void> {
     if (version == null) {
-      version = 'v' + foundryManifest.getManifest().file.version;
+      version = 'v' + await args.getCurrentVersion();
     }
     // Ignore errors
     await cli.execPromise(`git tag -d ${version}`);
@@ -117,9 +117,17 @@ export class Git {
   }
 
   public async tagCurrentVersion(): Promise<void> {
-    let version = 'v' + foundryManifest.getManifest().file.version;
+    let version = 'v' + await args.getCurrentVersion();
     cli.throwError(await cli.execPromise(`git tag -a ${version} -m "Updated to ${version}"`));
     cli.throwError(await cli.execPromise(`git push origin ${version}`), {ignoreOut: true});
+  }
+
+  public async getLatestVersionTag(): Promise<string> {
+    const tagHash = await cli.execPromise('git rev-list --tags --max-count=1');
+    cli.throwError(tagHash);
+    const cmd = await cli.execPromise(`git describe --tags ${tagHash.stdout}`);
+    cli.throwError(cmd);
+    return cmd.stdout.trim();
   }
 
   public async push(): Promise<void> {
