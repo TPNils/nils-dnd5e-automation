@@ -15,6 +15,7 @@ import { ItemUtils } from "./item-utils";
 import { ModularCardComponent } from "./modular-card-component";
 import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { UtilsFoundry } from "../utils/utils-foundry";
+import { DeletedDocumentsCardPart } from "./item/base/deleted-documents-card-part";
 
 type ModularCardData = {[partType: string]: any};
 interface ModularCardMeta {
@@ -175,11 +176,13 @@ class ChatMessageAccessPropertyV10 implements ProxyHandler<any> {
 }
 
 export class ModularCardInstance {
+  private readonly originId: string;
   private data: ModularCardData = {};
   private inactiveData: ModularCardData = {};
   private meta: ModularCardMeta = {};
 
   constructor(private message: ChatMessage) {
+    this.originId = message.id;
     this.data = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
     if (this.data == null) {
       this.data = {};
@@ -207,6 +210,10 @@ export class ModularCardInstance {
       (message.data.flags[staticValues.moduleName] as any).modularCardInactiveData = this.inactiveData;
       (message.data.flags[staticValues.moduleName] as any).modularCardDataMeta = this.meta;
     }
+  }
+
+  public getOriginId(): string {
+    return this.originId;
   }
 
   public hasType<T>(partType: ModularCardPart<T> | string): boolean {
@@ -344,6 +351,14 @@ export class ModularCardInstance {
       }
     }
     return parts;
+  }
+
+  public createFlagData() {
+    return {
+      modularCardData: this.data,
+      modularCardInactiveData: this.inactiveData,
+      modularCardDataMeta: this.meta,
+    }
   }
 
   public deepClone(): ModularCardInstance {
@@ -537,6 +552,7 @@ export class BeforeCreateModuleCardEvent {
       CheckCardPart.instance,
       TargetCardPart.instance,
       ActiveEffectCardPart.instance,
+      DeletedDocumentsCardPart.instance,
       PropertyCardPart.instance,
     ]) {
       resolvedParts.push(standardPart.getType());
@@ -720,19 +736,9 @@ export class ModularCard {
   }
   
   public static createCardData(parts: ModularCardInstance): ChatMessageDataConstructorData {
-    const modularCardDataMeta: ModularCardMeta = {
-      created: {
-        actorUuid: parts.getActorUuid(),
-        itemUuid: parts.getItemUuid(),
-        tokenUuid: parts.getTokenUuid(),
-      }
-    }
     const chatMessageData: ChatMessageDataConstructorData = {
       flags: {
-        [staticValues.moduleName]: {
-          modularCardData: ModularCard.createFlagObject(parts),
-          modularCardDataMeta: modularCardDataMeta,
-        }
+        [staticValues.moduleName]: parts.createFlagData()
       }
     };
 
@@ -808,37 +814,35 @@ export class ModularCard {
     }
   }
   
-  public static async writeBulkModuleCards(updates: Array<{message: ChatMessage, data: ModularCardInstance}>): Promise<void> {
+  public static async writeBulkModuleCards(updates: Array<{message: ChatMessage, data: ModularCardInstance} | ModularCardInstance>): Promise<void> {
     const bulkUpdateRequest: DmlUpdateRequest<any>[] = [];
     for (const update of updates) {
-      if (update.message == null) {
+      let message: ChatMessage;
+      let data: ModularCardInstance;
+      if (update instanceof ModularCardInstance) {
+        message = game.messages.get(update.getOriginId());
+        data = update;
+      }
+      if (message == null) {
         continue;
       }
   
-      const cardsObj = ModularCard.createFlagObject(update.data);
-      const originalCards = update.message.getFlag(staticValues.moduleName, 'modularCardData');
-      if (UtilsCompare.deepEquals(originalCards, cardsObj)) {
+      const flagObj = data.createFlagData();
+      const originalCards: Partial<typeof flagObj> = {};
+      for (const prop in flagObj) {
+        originalCards[prop] = message.getFlag(staticValues.moduleName, prop);
+      }
+      if (UtilsCompare.deepEquals(originalCards, flagObj)) {
         continue;
       }
-      UtilsObject.injectDeleteForDml(originalCards, cardsObj);
-      bulkUpdateRequest.push({document: update.message, rootData: {flags: {[staticValues.moduleName]: {modularCardData: cardsObj}}}});
+      UtilsObject.injectDeleteForDml(originalCards, flagObj);
+      bulkUpdateRequest.push({document: message, rootData: {flags: {[staticValues.moduleName]: flagObj}}});
     }
     return UtilsDocument.bulkUpdate(bulkUpdateRequest);
   }
 
   public static writeModuleCard(message: ChatMessage, data: ModularCardInstance): Promise<void> {
-    return ModularCard.writeBulkModuleCards([{message, data}])
-  }
-
-  private static createFlagObject(data: ModularCardInstance): ModularCardData {
-    const cardsObj: ModularCardData = {};
-    for (const type of data.getAllTypes()) {
-      const typeData = data.getTypeData(type);
-      if (typeData != null) {
-        cardsObj[type.getType()] = typeData;
-      }
-    }
-    return cardsObj;
+    return ModularCard.writeBulkModuleCards([{message, data}]);
   }
 
 }
