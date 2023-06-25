@@ -606,7 +606,9 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
     ModularCard.registerModularCardTrigger(this, new ResourceTrigger());
     UtilsHooks.init().then(() => {
       if (UtilsFoundry.usesDocumentData()) {
-        ModularCard.registerModularCardTrigger(this, new DowngradeConsumtionKeys());
+        ModularCard.registerModularCardTrigger(this, new DowngradeConsumptionKeysToV9());
+      } else if (UtilsFoundry.usesDataModel()) {
+        ModularCard.registerModularCardTrigger(this, new UpdateConsumptionKeysToV10());
       }
     })
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
@@ -709,7 +711,7 @@ class ResourceTrigger implements ITrigger<ModularCardTriggerData<ResourceCardDat
 
 }
 
-class DowngradeConsumtionKeys implements ITrigger<ModularCardTriggerData<ResourceCardData>> {
+class DowngradeConsumptionKeysToV9 implements ITrigger<ModularCardTriggerData<ResourceCardData>> {
   
   //#region upsert
   public beforeUpsert(context: IAfterDmlContext<ModularCardTriggerData<ResourceCardData>>): void {
@@ -717,6 +719,22 @@ class DowngradeConsumtionKeys implements ITrigger<ModularCardTriggerData<Resourc
       for (const consumeResource of newRow.part.consumeResources) {
         if (consumeResource.calc$.path.startsWith('system.')) {
           consumeResource.calc$.path = 'data.' + consumeResource.calc$.path.substring(7)
+        }
+      }
+    }
+  }
+  //#endregion
+
+}
+
+class UpdateConsumptionKeysToV10 implements ITrigger<ModularCardTriggerData<ResourceCardData>> {
+  
+  //#region upsert
+  public beforeUpsert(context: IAfterDmlContext<ModularCardTriggerData<ResourceCardData>>): void {
+    for (const {newRow} of context.rows) {
+      for (const consumeResource of newRow.part.consumeResources) {
+        if (consumeResource.calc$.path.startsWith('data.')) {
+          consumeResource.calc$.path = 'system.' + consumeResource.calc$.path.substring(7)
         }
       }
     }
