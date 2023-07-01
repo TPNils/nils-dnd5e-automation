@@ -5,10 +5,12 @@ import { UtilsFoundry } from "./utils-foundry";
 import { UtilsHooks } from "./utils-hooks";
 
 interface DAE {
+  /** Add fields for auto-completion */
+  addAutoFields(fields: string[]): void;
   /** Get a key+label map of special durations */
   daeSpecialDurations(): Record<string, string>;
   /** Get a DEA flag from the actor (or the token actor) */
-  getFlag(actor: MyActor | TokenDocument, flagId: string);
+  getFlag<T = any>(actor: MyActor | TokenDocument, flagId: string): T;
 }
 
 let daeResolve: () => void;
@@ -16,23 +18,27 @@ const daePromise = new Promise<void>((resolve) => daeResolve = resolve);
 
 export class UtilsDae {
 
-  @StaticInitFunc(async () => {
+  public static async registerSpecialDuration(key: string, label: string): Promise<void> {
     await daePromise;
     if (!UtilsDae.isActive()) {
-      return async (...args: any[]) => {};
+      // If DAE is not active, don't do any interactions with it.
+      return;
+    }
+    UtilsDae.getDae().daeSpecialDurations()[key] = label;
+  }
+
+  public static async addAutocompleteKey(...fields: string[] | Array<string[]>): Promise<void> {
+    await daePromise;
+    if (!UtilsDae.isActive()) {
+      // If DAE is not active, don't do any interactions with it.
+      return;
     }
 
-    return async (key: string, label: string) => UtilsDae.getDae().daeSpecialDurations()[key] = label;
-  }, {async: true})
-  public static async registerSpecialDuration(key: string, label: string): Promise<void> {
-    // TODO idea: when an effect is removed, create a chat message (?) to inform the player
-    //   Probably better a card part to manually undo & redo the delete?
-    //   Functionaly, the component should hold deleted items, allowing to revert the delete
-    throw new Error('Should never get called');
+    UtilsDae.getDae().addAutoFields(fields.deepFlatten());
   }
 
   public static isActive(): boolean {
-    return game.modules.get('dae').active;
+    return game.modules.get('dae')?.active === true;
   }
 
   @StaticInitFunc(() => {

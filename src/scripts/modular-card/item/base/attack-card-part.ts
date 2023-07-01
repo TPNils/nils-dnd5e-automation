@@ -16,8 +16,11 @@ import { ChatPartIdData, ItemCardHelpers } from "../item-card-helpers";
 import { ModularCard, ModularCardInstance, ModularCardTriggerData } from "../../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
-import { DamageCardData, DamageCardPart } from "./damage-card-part";
+import { DamageCardPart } from "./damage-card-part";
 import { StateContext, TargetCardData, TargetCardPart, VisualState } from "./target-card-part";
+import { UtilsDnd5e } from "../../../utils/utils-dnd5e";
+import { UtilsDae } from "../../../utils/utils-dae";
+import { UtilsHooks } from "../../../utils/utils-hooks";
 
 type RollPhase = 'mode-select' | 'result';
 const modeOrder: Array<AttackCardData['mode']> = ['disadvantage', 'normal', 'advantage'];
@@ -443,6 +446,19 @@ export class AttackCardPart implements ModularCardPart<AttackCardData> {
     ModularCard.registerModularCardTrigger(TargetCardPart.instance, new TargetCardTrigger());
     TargetCardPart.instance.registerIntegration({
       getVisualState: context => this.getTargetState(context),
+    });
+
+    // Register DAE auto-complete flags
+    UtilsHooks.init(() => {
+      const suffixes = [
+        'all',
+        "mwak", "rwak", "msak", "rsak",
+        ...UtilsDnd5e.getAbilityKeys(),
+        ...UtilsDnd5e.getCreatureTypeKeys(),
+      ];
+
+      const prefix = UtilsFoundry.usesDataModel() ? 'system' : 'data';
+      UtilsDae.addAutocompleteKey(suffixes.map(suf => `${prefix}.flags.${staticValues.moduleName}.attack.advantage.${suf}`))
     });
   }
 
