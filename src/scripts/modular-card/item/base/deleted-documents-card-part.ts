@@ -34,6 +34,10 @@ export class DeletedDocumentsCardPart implements ModularCardPart<DeletedDocument
     return 'DeletedDocumentsCardPart';
   }
 
+  /**
+   * Deletes the documents passed with their uuid.
+   * Also cache the deleted documents with their modularInstance in memory. No dml happens for the modularInstance.
+   */
   public static async deleteAndCache(operations: Array<{uuids: string[], modularInstance: ModularCardInstance}>): Promise<void> {
     const allUuids = new Set<string>();
     for (const operation of operations) {
@@ -43,19 +47,35 @@ export class DeletedDocumentsCardPart implements ModularCardPart<DeletedDocument
     }
 
     const documents = await UtilsDocument.fromUuid(allUuids);
+    const updateModularInstance: ModularCardInstance[] = [];
     for (const operation of operations) {
+      let dmlInstance: ModularCardInstance;
       for (const uuid of operation.uuids) {
         if (!documents.has(uuid)) {
           continue;
         }
 
-        operation.modularInstance.getTypeData(DeletedDocumentsCardPart.instance)[uuid] = documents.get(uuid);
+        let deletedCache = dmlInstance.getTypeData(DeletedDocumentsCardPart.instance);
+        if (deletedCache == null) {
+          deletedCache = {};
+          dmlInstance.setTypeData(DeletedDocumentsCardPart.instance, deletedCache);
+        }
+
+        deletedCache[uuid] = documents.get(uuid).toObject(true);
+      }
+
+      if (dmlInstance) {
+        updateModularInstance.push(dmlInstance);
       }
     }
 
     await UtilsDocument.bulkDelete(documents.values());
   }
 
+  /**
+   * Undeletes the documents passed with their uuid.
+   * Also clear the cache of their modularInstance in memory. No dml happens for the modularInstance.
+   */
   public static async undelete<T = FoundryDocument>(uuids: string[], modularInstances: ModularCardInstance[]): Promise<Map<string, T>> {
     const undeletedDocuments = new Map<string, T>();
 
@@ -97,6 +117,9 @@ export class DeletedDocumentsCardPart implements ModularCardPart<DeletedDocument
     const createCalls: FoundryDocument[] = [];
     for (const uuid of uuidData) {
       const deletePart = deletedUuidToPart.get(uuid.uuid).getTypeData(DeletedDocumentsCardPart.instance);
+      if (!deletePart) {
+        continue;
+      }
       const document = new CONFIG[uuid.docType].documentClass(deletePart[uuid.uuid], {parent: parentDocuments.get(uuid.parentUuid)});
       createCalls.push(document);
     }
@@ -106,17 +129,12 @@ export class DeletedDocumentsCardPart implements ModularCardPart<DeletedDocument
       undeletedDocuments.set(doc.uuid, doc as T);
     }
 
-    // Clear the deleted entries and save to the DB
-    const updateInstances: ModularCardInstance[] = [];
-    for (const doc of createResponse) {
-      const clone = deletedUuidToPart.get(doc.uuid).deepClone();
-      delete clone.getTypeData(DeletedDocumentsCardPart.instance)[doc.uuid];
-      updateInstances.push(clone);
-    }
-
-    await ModularCard.writeBulkModuleCards(updateInstances)
-    
     // Update the in memory instances
+    for (const doc of createResponse) {
+      const clone = deletedUuidToPart.get(doc.uuid)
+      delete clone.getTypeData(DeletedDocumentsCardPart.instance)[doc.uuid];
+    }
+    
     for (const doc of createResponse) {
       delete deletedUuidToPart.get(doc.uuid).getTypeData(DeletedDocumentsCardPart.instance)[doc.uuid];
     }
