@@ -822,6 +822,9 @@ export class ModularCard {
       if (update instanceof ModularCardInstance) {
         message = game.messages.get(update.getOriginId());
         data = update;
+      } else {
+        message = update.message;
+        data = update.data;
       }
       if (message == null) {
         continue;
