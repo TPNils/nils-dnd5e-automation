@@ -16,6 +16,13 @@ export class UtilsTransformer {
     }
   }
 
+  public static valueToExpression(value: bigint, factory?: typescript.NodeFactory): typescript.BigIntLiteral
+  public static valueToExpression(value: true, factory?: typescript.NodeFactory): typescript.TrueLiteral
+  public static valueToExpression(value: false, factory?: typescript.NodeFactory): typescript.FalseLiteral
+  public static valueToExpression(value: number, factory?: typescript.NodeFactory): typescript.NumericLiteral
+  public static valueToExpression(value: string, factory?: typescript.NodeFactory): typescript.StringLiteral
+  public static valueToExpression(value: any[], factory?: typescript.NodeFactory): typescript.ArrayLiteralExpression
+  public static valueToExpression(value: any, factory?: typescript.NodeFactory): typescript.Expression | null
   public static valueToExpression(value: any, factory: typescript.NodeFactory = typescript.factory): typescript.Expression | null {
     switch (typeof value) {
       case 'bigint': {
