@@ -10,7 +10,7 @@ import { TimeoutError, UtilsPromise } from "../utils/utils-promise";
 import { FoundryDocument, UtilsDocument } from "./utils-document";
 import { StaticInitFunc } from "../decorator/static-init-func";
 
-const thisSessionId = crypto.randomUUID()
+const thisSessionId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : String(Math.random());
 const unsupportedAfterDocuments = [
   FogExploration, // Old document is only available on the client
 ];
@@ -58,21 +58,21 @@ export interface ITrigger<T> {
    * A hook event that fires for every Document type after execution of a creation workflow.
    * This hook only fires for the client who is initiating the creation request.
    * 
-   * The hook provides the committed document instance can be modified, which will trigger another update.
+   * The hook provides the commited document instance can be modified, which will trigger another update.
    */
    create?(context: IAfterDmlContext<T>): void | Promise<void>;
    /**
     * A hook event that fires for every Document type after execution of an update workflow.
     * This hook only fires for the client who is initiating the update request.
     * 
-   * The hook provides the committed document instance can be modified, which will trigger another update.
+   * The hook provides the commited document instance can be modified, which will trigger another update.
     */
    update?(context: IAfterDmlContext<T>): void | Promise<void>;
    /**
     * A hook event that fires for every Document type after execution of an insert or update workflow.
     * This hook only fires for the client who is initiating the insert or update request.
     * 
-    * The hook provides the committed document instance can be modified, which will trigger another update.
+    * The hook provides the commited document instance can be modified, which will trigger another update.
     */
    upsert?(context: IAfterDmlContext<T>): void | Promise<void>;
 
@@ -122,7 +122,7 @@ class MinifierHelper implements Required<{[PropertyKey in keyof ITrigger<any>]: 
   private static functionMap: Map<string, string>;
 
   /**
-   * Get the name of the function (key) translated to the label.
+   * Get the name of the function (key) transated to the label.
    * This is to support minifying
    */
   public static getFunctionMap(): Map<string, string> {
@@ -249,7 +249,7 @@ type OnFoundryTargetToken = (user: User, token: Token, targeted: boolean) => Pro
 
 /**
  * Output the diff when detection a recurring dml
- * Automatically gets activated AFTER the first infinite loop is detected
+ * Automatically gets activated AFTER the first infinit loop is detected
  */
 let outputDiff = false;
 const functionLabelSymbol = Symbol('functionLabel');
@@ -576,7 +576,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
           await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
         } catch (err) {
           if (err instanceof TimeoutError) {
-            ui.notifications.error('An error occurred during the save');
+            ui.notifications.error('An error occured during the save');
             UtilsLog.error(callback[functionLabelSymbol], err);
           } else {
             throw err;
@@ -625,7 +625,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
       } catch (err) {
         if (err instanceof TimeoutError) {
-          ui.notifications.error('An error occurred during the save');
+          ui.notifications.error('An error occured during the save');
           UtilsLog.error(callback[functionLabelSymbol], err);
         } else {
           throw err;
@@ -691,7 +691,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
           } catch (err) {
             if (err instanceof TimeoutError) {
-              ui.notifications.error('An error occurred during the save');
+              ui.notifications.error('An error occured during the save');
               UtilsLog.error(callback[functionLabelSymbol], err);
             } else {
               throw err;
@@ -754,7 +754,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
             await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
           } catch (err) {
             if (err instanceof TimeoutError) {
-              ui.notifications.error('An error occurred during the save');
+              ui.notifications.error('An error occured during the save');
               UtilsLog.error(callback[functionLabelSymbol], err);
             } else {
               throw err;
@@ -792,7 +792,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
         await UtilsPromise.maxDuration(callback(context), maxTriggerDurationMs);
       } catch (err) {
         if (err instanceof TimeoutError) {
-          ui.notifications.error('An error occurred during the save');
+          ui.notifications.error('An error occured during the save');
           UtilsLog.error(callback[functionLabelSymbol], err);
         } else {
           throw err;
@@ -854,7 +854,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   //#region Special usecases
 
-  // There is a bug in foundry when you clear the targets and delete the target as wel, the hooks triggers twice with the same data
+  // There is a bug in foundry when you clear the targets and delete the target aswel, the hooks triggers twice with the same data
   // Also, every 1 target changes fires an event. If you target multiple targets at once, it fires multiple events
   // Buffer solved both issues
   @buffer({bufferTime: 5}) 
