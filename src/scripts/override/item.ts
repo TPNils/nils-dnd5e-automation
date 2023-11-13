@@ -70,7 +70,7 @@ async function displayCard(this: MyItem, wrapped: (...args: any) => any, ...args
     token: token,
   });
 
-  const chatData = ModularCard.createCardData(parts);
+  const chatData = parts.toChatMessageData();
   
   Hooks.callAll("dnd5e.preDisplayCard", this, chatData, options);
 

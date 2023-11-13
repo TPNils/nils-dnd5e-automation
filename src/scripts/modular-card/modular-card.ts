@@ -181,7 +181,10 @@ export class ModularCardInstance {
   private inactiveData: ModularCardData = {};
   private meta: ModularCardMeta = {};
 
-  constructor(private message: ChatMessage) {
+  constructor(private message?: ChatMessage) {
+    if (message == null) {
+      message = new ChatMessage();
+    }
     this.originId = message.id;
     this.data = message.getFlag(staticValues.moduleName, 'modularCardData') as any;
     if (this.data == null) {
@@ -376,6 +379,46 @@ export class ModularCardInstance {
       return clone;
     }
     return new ModularCardInstance(new ChatMessage(this.message.toObject()));
+  }
+  
+  
+  public toChatMessageData(): ChatMessageDataConstructorData {
+    const chatMessageData: ChatMessageDataConstructorData = {
+      flags: {
+        [staticValues.moduleName]: this.createFlagData(),
+      }
+    };
+
+    let rollMode: string = game.settings.get('core', 'rollMode');
+    const rollModeOverride = game.settings.get(staticValues.moduleName, 'forceRollModeItem') as string;
+    if (rollModeOverride !== 'default') {
+      rollMode = rollModeOverride;
+    }
+
+    if (rollMode === 'gmroll' || rollMode === 'private') {
+      chatMessageData.whisper = [game.userId];
+      for (const user of game.users.values()) {
+        if (user.isGM) {
+          chatMessageData.whisper.push(user.id);
+        }
+      }
+    }
+    if (rollMode === 'blindroll' || rollMode === 'blind') {
+      chatMessageData.whisper = [];
+      chatMessageData.blind = true;
+      for (const user of game.users.values()) {
+        if (user.isGM) {
+          chatMessageData.whisper.push(user.id);
+        }
+      }
+    }
+    if (rollMode === 'selfroll' || rollMode === 'self') {
+      chatMessageData.whisper = [game.userId];
+    }
+
+    chatMessageData.speaker = ChatMessage.getSpeaker();
+
+    return chatMessageData;
   }
 }
 
@@ -685,7 +728,7 @@ export class ModularCard {
     const createEvent = new BeforeCreateModuleCardEvent({actor: createArgs.actor, item: createArgs.item, token: createArgs.token});
     Hooks.callAll(`${staticValues.code.capitalize()}.createModuleCard`, createEvent);
     
-    const instance = refresh ? refresh.instance.deepClone() : new ModularCardInstance(new ChatMessage());
+    const instance = refresh ? refresh.instance.deepClone() : new ModularCardInstance();
     const originalTypes = instance.getAllTypes();
     const newTypes = createEvent.getParts();
     for (const cardPart of newTypes) {
@@ -733,45 +776,6 @@ export class ModularCard {
     }
 
     return instance;
-  }
-  
-  public static createCardData(parts: ModularCardInstance): ChatMessageDataConstructorData {
-    const chatMessageData: ChatMessageDataConstructorData = {
-      flags: {
-        [staticValues.moduleName]: parts.createFlagData()
-      }
-    };
-
-    let rollMode: string = game.settings.get('core', 'rollMode');
-    const rollModeOverride = game.settings.get(staticValues.moduleName, 'forceRollModeItem') as string;
-    if (rollModeOverride !== 'default') {
-      rollMode = rollModeOverride;
-    }
-
-    if (rollMode === 'gmroll' || rollMode === 'private') {
-      chatMessageData.whisper = [game.userId];
-      for (const user of game.users.values()) {
-        if (user.isGM) {
-          chatMessageData.whisper.push(user.id);
-        }
-      }
-    }
-    if (rollMode === 'blindroll' || rollMode === 'blind') {
-      chatMessageData.whisper = [];
-      chatMessageData.blind = true;
-      for (const user of game.users.values()) {
-        if (user.isGM) {
-          chatMessageData.whisper.push(user.id);
-        }
-      }
-    }
-    if (rollMode === 'selfroll' || rollMode === 'self') {
-      chatMessageData.whisper = [game.userId];
-    }
-
-    chatMessageData.speaker = ChatMessage.getSpeaker();
-
-    return chatMessageData;
   }
   
   @RunOnce()
