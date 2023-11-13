@@ -529,9 +529,10 @@ export class BeforeCreateModuleCardEvent {
   public readonly actor?: MyActor;
   public readonly token?: TokenDocument;
 
-  private addActions: ModularCardInitAdd[] = [];
-  private add(addPart: ModularCardPart | ModularCardPart[], ...inputPositions: Array<ModularCardInitPosition<ModularCardPart | string> | ModularCardInitPosition<ModularCardPart | string>[]>): void {
-    addPart = (Array.isArray(addPart) ? addPart : [addPart]);
+  private addActionsByType = new Map<string, ModularCardInitAdd>();
+  private add(addParts: ModularCardPart | ModularCardPart[], ...inputPositions: Array<ModularCardInitPosition<ModularCardPart | string> | ModularCardInitPosition<ModularCardPart | string>[]>): void {
+    addParts = (Array.isArray(addParts) ? addParts : [addParts]);
+
     const positions: ModularCardInitPosition<ModularCardPart | string>[] = [];
     for (const position of inputPositions.deepFlatten()) {
       const refType = typeof position.reference === 'string' ? position.reference : position.reference.getType();
@@ -541,22 +542,31 @@ export class BeforeCreateModuleCardEvent {
         positions.push(position);
       }
     }
-    for (let i = 0; i < addPart.length; i++) {
-      if (ModularCard.getTypeHandler(addPart[i].getType()) == null) {
-        UtilsLog.error(new Error(`${addPart[i].getType()} has not been registered, it won't be added to the card.`));
-        continue;
+
+    for (const part of addParts) {
+      // Re-add removed parts
+      this.removed.delete(part.getType());
+    }
+
+    for (const part of addParts) {
+      // Remove invalid parts (but add them to addActionsByType so the order can be calculated)
+      if (ModularCard.getTypeHandler(part.getType()) == null) {
+        this.remove(part);
+        UtilsLog.error(new Error(`${part.getType()} has not been registered, it won't be added to the card.`));
       }
-      if (i === 0) {
-        this.addActions.push({
-          addPart: addPart[i],
-          position: positions,
-        });
-      } else {
-        this.addActions.push({
-          addPart: addPart[i],
-          position: [{type: 'after', reference: addPart[0]}],
-        });
-      }
+    }
+
+    if (addParts.length > 0 && !this.addActionsByType.has(addParts[0].getType())) {
+      this.addActionsByType.set(addParts[0].getType(), {
+        addPart: addParts[0],
+        position: positions,
+      });
+    }
+    for (let i = 1; i < addParts.length; i++) {
+      this.addActionsByType.set(addParts[i].getType(), {
+        addPart: addParts[i],
+        position: [{type: 'after', reference: addParts[0]}],
+      });
     }
   }
 
@@ -584,20 +594,7 @@ export class BeforeCreateModuleCardEvent {
 
   public getParts(): ModularCardPart[] {
     const resolvedParts: Array<string> = [];
-    for (const standardPart of [
-      DescriptionCardPart.instance,
-      SpellLevelCardPart.instance,
-      AttackCardPart.instance,
-      DamageCardPart.instance,
-      OtherCardPart.instance,
-      TemplateCardPart.instance,
-      ResourceCardPart.instance,
-      CheckCardPart.instance,
-      TargetCardPart.instance,
-      ActiveEffectCardPart.instance,
-      DeletedDocumentsCardPart.instance,
-      PropertyCardPart.instance,
-    ]) {
+    for (const standardPart of BeforeCreateModuleCardEvent.getStandardParts()) {
       resolvedParts.push(standardPart.getType());
     }
 
@@ -606,7 +603,7 @@ export class BeforeCreateModuleCardEvent {
       reference: TemplateCardPart.instance.getType()
     };
 
-    let pendingAddActions = this.addActions;
+    let pendingAddActions = Array.from(this.addActionsByType.values());
     while (pendingAddActions.length > 0) {
       const processing = pendingAddActions;
       pendingAddActions = [];
@@ -683,6 +680,23 @@ export class BeforeCreateModuleCardEvent {
     return resolvedParts
       .filter(typeName => whitelistTypes.has(typeName))
       .map(typeName => ModularCard.getTypeHandler(typeName));
+  }
+
+  public static getStandardParts(): ModularCardPart[] {
+    return [
+      DescriptionCardPart.instance,
+      SpellLevelCardPart.instance,
+      AttackCardPart.instance,
+      DamageCardPart.instance,
+      OtherCardPart.instance,
+      TemplateCardPart.instance,
+      ResourceCardPart.instance,
+      CheckCardPart.instance,
+      TargetCardPart.instance,
+      ActiveEffectCardPart.instance,
+      DeletedDocumentsCardPart.instance,
+      PropertyCardPart.instance,
+    ];
   }
 }
 
