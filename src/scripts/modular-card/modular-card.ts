@@ -640,46 +640,7 @@ export class BeforeCreateModuleCardEvent {
       }
     }
 
-    // Try to detect conflicts, only 1 ModularCardPart per type is allowed
-    // If you extend a ModularCardPart, that part is both itself and the extended part (= 2 different types or more)
-    const handlerMetas: Array<{type: ModularCardPart, extendedTypes: string[]}> = []
-    for (const resolvedPart of resolvedParts) {
-      const type = ModularCard.getTypeHandler(resolvedPart);
-      handlerMetas.push({
-        type: type,
-        extendedTypes: getExtendedTypes(type),
-      });
-    }
-    // Prioritize the handlers with the least extends if there is a conflict
-    handlerMetas.sort((a, b) => a.extendedTypes.length - b.extendedTypes.length);
-    
-    const whitelistTypes = new Set<string>()
-    for (const handlerMeta of handlerMetas) {
-      const conflicts: string[] = [];
-      for (const extendedType of handlerMeta.extendedTypes) {
-        if (whitelistTypes.has(extendedType)) {
-          conflicts.push(extendedType);
-        }
-      }
-
-      if (conflicts.length > 0) {
-        UtilsLog.buildError(
-          'Detected conflicts for',
-          {color: 'grey', message: handlerMeta.type.getType()},
-          'with the other original type(s)',
-          {color: 'grey', message: conflicts.join(', ')},
-          `. When you extend other types, you will need to remove the originals from that message during the event create${staticValues.code.capitalize()}ModuleCard`
-          )();
-      } else {
-        for (const extendedType of handlerMeta.extendedTypes) {
-          whitelistTypes.add(extendedType);
-        }
-      }
-    }
-
-    return resolvedParts
-      .filter(typeName => whitelistTypes.has(typeName))
-      .map(typeName => ModularCard.getTypeHandler(typeName));
+    return resolvedParts.map(typeName => ModularCard.getTypeHandler(typeName));
   }
 
   public static getStandardParts(): ModularCardPart[] {
