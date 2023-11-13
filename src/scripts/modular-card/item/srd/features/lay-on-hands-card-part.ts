@@ -7,11 +7,12 @@ import { staticValues } from "../../../../static-values";
 import { UtilsFoundry } from "../../../../utils/utils-foundry";
 import { UtilsItem } from "../../../../utils/utils-item";
 import { Action } from "../../../action";
-import { ModularCardInstance, ModularCard, BeforeCreateModuleCardEvent, ModularCardTriggerData } from "../../../modular-card";
+import { ModularCardInstance, ModularCard, ModularCardTriggerData } from "../../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, ModularCardPart, PermissionResponse, ModularCardCreateArgs, HtmlContext } from "../../../modular-card-part";
 import { DamageCardData, DamageCardPart, ResourceCardPart, TargetCardPart } from "../../base/index";
 import { BaseCardComponent } from "../../base/base-card-component";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
+import { BeforeCreateModuleCardEvent } from "../../../events/before-create-module-card-event";
 
 
 export interface SrdLayOnHandsCardData extends DamageCardData {

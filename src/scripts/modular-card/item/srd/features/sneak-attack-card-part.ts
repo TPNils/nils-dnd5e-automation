@@ -12,11 +12,12 @@ import { DamageType, MyActor, MyItem } from "../../../../types/fixed-types";
 import { UtilsFoundry } from "../../../../utils/utils-foundry";
 import { UtilsItem } from "../../../../utils/utils-item";
 import { Action } from "../../../action";
-import { ModularCardInstance, ModularCard, BeforeCreateModuleCardEvent, ModularCardTriggerData } from "../../../modular-card";
+import { ModularCardInstance, ModularCard, ModularCardTriggerData } from "../../../modular-card";
 import { createPermissionCheckAction, CreatePermissionCheckArgs, PermissionResponse, ModularCardPart, ModularCardCreateArgs, HtmlContext } from "../../../modular-card-part";
 import { ManualDamageSource, DamageCardPart } from "../../base/index";
 import { BaseCardComponent } from "../../base/base-card-component";
 import { ChatPartIdData, ItemCardHelpers } from "../../item-card-helpers";
+import { BeforeCreateModuleCardEvent } from "../../../events/before-create-module-card-event";
 
 
 export interface SrdSneakAttackCardData {
