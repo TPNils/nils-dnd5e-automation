@@ -1,7 +1,7 @@
 import { staticValues } from "../../static-values";
 import { MyItem, MyActor } from "../../types/fixed-types";
 import { UtilsLog } from "../../utils/utils-log";
-import { TemplateCardPart, DescriptionCardPart, SpellLevelCardPart, AttackCardPart, DamageCardPart, OtherCardPart, ResourceCardPart, CheckCardPart, TargetCardPart, ActiveEffectCardPart, DeletedDocumentsCardPart, PropertyCardPart } from "../item/base";
+import { TemplateCardPart, DescriptionCardPart, SpellLevelCardPart, AttackCardPart, DamageCardPart, OtherCardPart, ResourceCardPart, CheckCardPart, TargetCardPart, ActiveEffectCardPart, DeletedDocumentsCardPart, PropertyCardPart } from "../item/base/index";
 import { ModularCard } from "../modular-card";
 import { ModularCardCreateArgs, ModularCardPart } from "../modular-card-part";
 
