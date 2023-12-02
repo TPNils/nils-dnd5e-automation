@@ -3,10 +3,6 @@ import { DmlUpdateRequest, FoundryDocument, UtilsDocument } from "./utils-docume
 
 import { UtilsLog } from "../../utils/utils-log";
 
-const currentTransactionSymbol = Symbol('Current transaction');
-const proxyWrappedSymbol = Symbol('proxyWrappedSymbol');
-const globalsSymbol = Symbol('globals');
-
 interface ActionCallback<T> {
   promise: Promise<T>;
   resolve: (value: T) => void;
