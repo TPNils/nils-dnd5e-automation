@@ -252,11 +252,12 @@ export class Transaction {
 
   private static createCallback<T = any>(): ActionCallback<T> {
     const cb: Partial<ActionCallback<T>> = {
-      promise: new Promise<T>((resolve, reject) => {
-        cb.resolve = resolve;
-        cb.reject = reject;
-      })
     };
+
+    cb.promise = new Promise<T>((resolve, reject) => {
+      cb.resolve = resolve;
+      cb.reject = reject;
+    });
 
     return cb as ActionCallback<T>;
   }
