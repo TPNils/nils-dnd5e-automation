@@ -11,7 +11,9 @@ import { UtilsHooks } from "./utils/utils-hooks";
 import { ComponentFoundryConnector } from "./lib/render-engine/component-foundry-connector";
 import { UtilsLibWrapper } from "./utils/utils-lib-wrapper";
 import { UtilsDae } from "./utils/utils-dae";
+import { Transaction } from "./lib/db/transaction";
 
+Transaction.init();
 UtilsHooks.registerHooks();
 UtilsLibWrapper.registerHooks();
 UtilsDae.registerHooks();
