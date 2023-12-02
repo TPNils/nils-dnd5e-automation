@@ -1,5 +1,6 @@
 import { DocumentModificationOptions } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/document.mjs";
 import { DmlUpdateRequest, FoundryDocument, UtilsDocument } from "./utils-document";
+
 import { UtilsLog } from "../../utils/utils-log";
 
 const currentTransactionSymbol = Symbol('Current transaction');
@@ -14,27 +15,27 @@ interface ActionCallback<T> {
 
 /** TODO Should probably still implement in the future */
 type NotImplementedOptions = 'deleteAll' | 'isUndo' | 'recursive' | 'diff' | 'renderSheet' | 'render' | 'temporary' | 'index' | 'indexFields' | 'noHook' | 'keepId' | 'keepEmbeddedIds';
-type DmlOptions = {[key: string]: any;} & Omit<DocumentModificationOptions, 'parent' | 'pack' | NotImplementedOptions>;
+type DmlOptions = {[key: string]: any;} & Omit<DocumentModificationOptions, NotImplementedOptions>;
 
 interface InsertAction<T = any> {
   type: 'insert';
   cb: ActionCallback<T>;
   dmlData: Iterable<FoundryDocument>;
-  options: DmlOptions;
+  options: Readonly<DmlOptions>;
 }
 
 interface UpdateAction<T = any> {
   type: 'update';
   cb: ActionCallback<T>;
   dmlData: Iterable<FoundryDocument>;
-  options: DmlOptions;
+  options: Readonly<DmlOptions>;
 }
 
 interface DeleteAction<T = any> {
   type: 'delete';
   cb: ActionCallback<T>;
   uuids: Iterable<string>;
-  options: DmlOptions;
+  options: Readonly<DmlOptions>;
 }
 
 type ActionQueueItem<T = any> = InsertAction<T> | UpdateAction<T> | DeleteAction<T>;
@@ -117,12 +118,12 @@ export class Transaction {
     return null;
   }
 
-  public insert(inputs: Iterable<FoundryDocument>, options?: Omit<DocumentModificationOptions, 'parent' | 'pack'>): Promise<void> {
+  public insert(inputs: Iterable<FoundryDocument>, options?: DmlOptions): Promise<void> {
     const action: InsertAction = {
       type: 'insert',
       cb: Transaction.createCallback(),
       dmlData: inputs,
-      options: {},
+      options: options ?? {},
     }
     this.actionQueue.push(action);
     this.processActionQueue();
@@ -130,12 +131,12 @@ export class Transaction {
     return action.cb.promise;
   }
 
-  public update(inputs: Iterable<FoundryDocument>): Promise<void> {
+  public update(inputs: Iterable<FoundryDocument>, options?: DmlOptions): Promise<void> {
     const action: UpdateAction = {
       type: 'update',
       cb: Transaction.createCallback(),
       dmlData: inputs,
-      options: {},
+      options: options ?? {},
     }
     this.actionQueue.push(action);
     this.processActionQueue();
@@ -143,7 +144,7 @@ export class Transaction {
     return action.cb.promise;
   }
 
-  public delete(inputs: Iterable<string | FoundryDocument> | string | FoundryDocument): Promise<void> {
+  public delete(inputs: Iterable<string | FoundryDocument> | string | FoundryDocument, options?: DmlOptions): Promise<void> {
     if (typeof inputs === 'string' || !Transaction.isIterable(inputs)) {
       inputs = [inputs];
     }
@@ -152,7 +153,7 @@ export class Transaction {
       type: 'delete',
       cb: Transaction.createCallback(),
       uuids: new DeleteIterableWrapper(inputs),
-      options: {},
+      options: options ?? {},
     }
     this.actionQueue.push(action);
     this.processActionQueue();
