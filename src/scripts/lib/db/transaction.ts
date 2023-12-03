@@ -8,76 +8,44 @@ interface ActionCallback<T> {
   resolve: (value: T) => void;
   reject: (reason?: any) => void;
 }
+interface DocumentsByContext<T = FoundryDocument> {
+  contextKey: string;
+  documentClass: typeof foundry.abstract.Document;
+  parent?: FoundryDocument;
+  pack?: string;
+  documents: Array<T>;
+}
 
 /** TODO Should probably still implement in the future */
 type NotImplementedOptions = 'deleteAll' | 'isUndo' | 'recursive' | 'diff' | 'renderSheet' | 'render' | 'temporary' | 'index' | 'indexFields' | 'noHook' | 'keepId' | 'keepEmbeddedIds';
 type DmlOptions = {[key: string]: any;} & Omit<DocumentModificationOptions, NotImplementedOptions>;
+type ActionStage = 'pending' | 'beforeFinished' | 'middleFinished';
 
 interface InsertAction<T = any> {
   type: 'insert';
+  stage: ActionStage;
   cb: ActionCallback<T>;
-  dmlData: Iterable<FoundryDocument>;
+  dmlData: DocumentsByContext<FoundryDocument>;
   options: Readonly<DmlOptions>;
 }
 
 interface UpdateAction<T = any> {
   type: 'update';
+  stage: ActionStage;
   cb: ActionCallback<T>;
-  dmlData: Iterable<FoundryDocument>;
+  dmlData: DocumentsByContext<FoundryDocument>;
   options: Readonly<DmlOptions>;
 }
 
 interface DeleteAction<T = any> {
   type: 'delete';
+  stage: ActionStage;
   cb: ActionCallback<T>;
-  uuids: Iterable<string>;
+  dmlData: DocumentsByContext<string>;
   options: Readonly<DmlOptions>;
 }
 
 type ActionQueueItem<T = any> = InsertAction<T> | UpdateAction<T> | DeleteAction<T>;
-
-class DeleteIterableWrapper implements Iterable<string> {
-
-  constructor(private readonly delegate: Iterable<string | FoundryDocument>) {}
-
-  [Symbol.iterator](): Iterator<string, any, undefined> {
-    return new DeleteIteratorWrapper(this.delegate[Symbol.iterator]());
-  }
-
-}
-
-class DeleteIteratorWrapper implements Iterator<string, any, undefined> {
-  
-  constructor(private readonly delegate: Iterator<string | FoundryDocument, any, undefined>) {}
-
-  public next(...args: [] | [undefined]): IteratorResult<string, any> {
-    return this.convert(this.delegate.next(...args));
-  }
-
-  public return?(value?: any): IteratorResult<string, any> {
-    return this.convert(this.delegate.return(value));
-  }
-
-  public throw?(e?: any): IteratorResult<string, any> {
-    return this.convert(this.delegate.throw(e));
-  }
-  
-  private convert(delegateResult: IteratorResult<string | FoundryDocument, any>): IteratorResult<string, any> {
-    if (delegateResult.value instanceof foundry.abstract.Document) {
-      const result: IteratorResult<string, any> = {
-        value: (delegateResult.value as FoundryDocument).uuid,
-        done: delegateResult.done,
-      }
-      if (!('done' in delegateResult)) {
-        delete result.done;
-      }
-      return result;
-    }
-
-    return delegateResult as IteratorResult<string, any>;
-  }
-
-}
 
 export class Transaction {
 
@@ -115,46 +83,133 @@ export class Transaction {
   }
 
   public insert(inputs: Iterable<FoundryDocument>, options?: DmlOptions): Promise<void> {
-    const action: InsertAction = {
-      type: 'insert',
-      cb: Transaction.createCallback(),
-      dmlData: inputs,
-      options: options ?? {},
-    }
-    this.actionQueue.push(action);
-    this.processActionQueue();
+    const actions: InsertAction[] = [];
+    for (const doc of inputs) {
+      const contextKey = `${doc.documentName}/${doc.parent?.uuid}/${doc.pack}`;
+      if (actions.length === 0 || actions[actions.length - 1].dmlData.contextKey !== contextKey) {
+        actions.push({
+          type: 'insert',
+          stage: 'pending',
+          cb: Transaction.createCallback(),
+          dmlData: {
+            contextKey: contextKey,
+            documentClass: CONFIG[doc.documentName].documentClass,
+            parent: doc.parent,
+            pack: doc.pack,
+            documents: [],
+          },
+          options: options ?? {},
+        });
+      }
 
-    return action.cb.promise;
+      actions[actions.length - 1].dmlData.documents.push(doc)
+    }
+    
+    if (actions.length > 0) {
+      const promises: Promise<any>[] = [];
+      for (const action of actions) {
+        this.actionQueue.push(action);
+        promises.push(action.cb.promise);
+      }
+      this.processActionQueue();
+      return Promise.all(promises).then();
+    }
+
+    return Promise.resolve();
   }
 
   public update(inputs: Iterable<FoundryDocument>, options?: DmlOptions): Promise<void> {
-    const action: UpdateAction = {
-      type: 'update',
-      cb: Transaction.createCallback(),
-      dmlData: inputs,
-      options: options ?? {},
-    }
-    this.actionQueue.push(action);
-    this.processActionQueue();
+    const actions: UpdateAction[] = [];
+    for (const doc of inputs) {
+      const contextKey = `${doc.documentName}/${doc.parent?.uuid}/${doc.pack}`;
+      if (actions.length === 0 || actions[actions.length - 1].dmlData.contextKey !== contextKey) {
+        actions.push({
+          type: 'update',
+          stage: 'pending',
+          cb: Transaction.createCallback(),
+          dmlData: {
+            contextKey: contextKey,
+            documentClass: CONFIG[doc.documentName].documentClass,
+            parent: doc.parent,
+            pack: doc.pack,
+            documents: [],
+          },
+          options: options ?? {},
+        });
+      }
 
-    return action.cb.promise;
+      actions[actions.length - 1].dmlData.documents.push(doc)
+    }
+    
+    if (actions.length > 0) {
+      const promises: Promise<any>[] = [];
+      for (const action of actions) {
+        this.actionQueue.push(action);
+        promises.push(action.cb.promise);
+      }
+      this.processActionQueue();
+      return Promise.all(promises).then();
+    }
+
+    return Promise.resolve();
   }
 
-  public delete(inputs: Iterable<string | FoundryDocument> | string | FoundryDocument, options?: DmlOptions): Promise<void> {
+  public async delete(inputs: Iterable<string | FoundryDocument> | string | FoundryDocument, options?: DmlOptions): Promise<void> {
     if (typeof inputs === 'string' || !Transaction.isIterable(inputs)) {
       inputs = [inputs];
     }
 
-    const action: DeleteAction = {
-      type: 'delete',
-      cb: Transaction.createCallback(),
-      uuids: new DeleteIterableWrapper(inputs),
-      options: options ?? {},
+    const uuids: string[] = [];
+    const documentsByUuid = new Map<string, FoundryDocument>();
+    for (const input of inputs) {
+      if (typeof input === 'string') {
+        uuids.push(input);
+      } else {
+        documentsByUuid.set(input.uuid, input);
+      }
     }
-    this.actionQueue.push(action);
-    this.processActionQueue();
 
-    return action.cb.promise;
+    if (uuids.length > 0) {
+      for (const [uuid, document] of (await this.queryByUuid(uuids)).entries()) {
+        documentsByUuid.set(uuid, document);
+      }
+    }
+
+    const actions: DeleteAction[] = [];
+    for (const input of inputs) {
+      const doc = typeof input === 'string' ? documentsByUuid.get(input) : input;
+
+      const contextKey = `${doc.documentName}/${doc.parent?.uuid}/${doc.pack}`;
+      if (actions.length === 0 || actions[actions.length - 1].dmlData.contextKey !== contextKey) {
+        actions.push({
+          type: 'delete',
+          stage: 'pending',
+          cb: Transaction.createCallback(),
+          dmlData: {
+            contextKey: contextKey,
+            documentClass: CONFIG[doc.documentName].documentClass,
+            parent: doc.parent,
+            pack: doc.pack,
+            documents: [],
+          },
+          options: options ?? {},
+        });
+      }
+
+      actions[actions.length - 1].dmlData.documents.push(doc.uuid)
+    }
+    
+    if (actions.length > 0) {
+      const promises: Promise<any>[] = [];
+      for (const action of actions) {
+        this.actionQueue.push(action);
+        promises.push(action.cb.promise);
+      }
+      this.processActionQueue();
+      return Promise.all(promises).then();
+    }
+
+    return Promise.resolve();
   }
 
   // dmls that have happened in this transaction but not yet committed to the database
@@ -174,7 +229,8 @@ export class Transaction {
         const pending = this.actionQueue;
         this.actionQueue = [];
 
-        for (let i = 0; i < pending.length; i++) {
+        let i = 0
+        pendingLoop: for (; i < pending.length; i++) {
           const action = pending[i];
 
           // TODO regarding calling the trigger hooks
@@ -187,7 +243,7 @@ export class Transaction {
           //  1) Foundry before (excl DmlTrigger)
           //  2) DmlTrigger before
           //  3) Save within this transaction
-          //  4) DmlTrigger afterSave (new hook + needs clearer name) => used for only other dml actions
+          //  4) DmlTrigger middle (new hook + needs clearer name) => used for only other dml actions
           //    <on any error so far, everything can be rolled back>
           //  5) commit to Foundry DB
           //  6) Foundry after (excl DmlTrigger)
@@ -199,6 +255,8 @@ export class Transaction {
           //   + the order within DmlTrigger won't change
           //   + the only change in the Foundry order is that DmlTrigger is now the last hook
 
+          // TODO error catching
+          // TODO currently implemented based on V9, check compatibility
           switch (action.type) {
             case 'insert': {
               break;
@@ -210,13 +268,15 @@ export class Transaction {
               break;
             }
           }
-          
+
           // If new actions are added, they should get processed first
           if (this.actionQueue.length > 0) {
-            for (i++; i < pending.length; i++) {
-              this.actionQueue.push(pending[i])
-            }
+            break;
           }
+        }
+          
+        for (i++; i < pending.length; i++) {
+          this.actionQueue.push(pending[i])
         }
       }
     } finally {
