@@ -98,7 +98,7 @@ export class Transaction {
             pack: doc.pack,
             documents: [],
           },
-          options: options ?? {},
+          options: deepClone(options) ?? {},
         });
       }
 
@@ -134,7 +134,7 @@ export class Transaction {
             pack: doc.pack,
             documents: [],
           },
-          options: options ?? {},
+          options: deepClone(options) ?? {},
         });
       }
 
@@ -192,7 +192,7 @@ export class Transaction {
             pack: doc.pack,
             documents: [],
           },
-          options: options ?? {},
+          options: deepClone(options) ?? {},
         });
       }
 
