@@ -53,22 +53,35 @@ type ActionQueueItem<T = any> = InsertAction<T> | UpdateAction<T> | DeleteAction
 
 export class Transaction {
 
-  private constructor() {}
+  public readonly uuid: string;
+  private constructor(uuid: string) {
+    Object.defineProperty(this, 'uuid', {
+      configurable: false,
+      value: uuid,
+      writable: false,
+    });
+  }
 
   public static init() {
     
   }
 
+  private static ongoingTransactionsByUuid = new Map<string, Transaction>();
   public static execute<T extends (transaction: Transaction) => any>(fn: T): ReturnType<T> {
-    const transaction = new Transaction();
+    const transaction = new Transaction(`User.${game.userId}.Transaction.${foundry.utils.randomID()}`);
+    Transaction.ongoingTransactionsByUuid.set(transaction.uuid, transaction);
     let result: any;
     try {
-      result = fn(new Transaction());
+      result = fn(transaction);
       if (result instanceof Promise) {
-        result.finally(() => transaction.commit());
+        result.finally(() => {
+          Transaction.ongoingTransactionsByUuid.delete(transaction.uuid);
+          transaction.commit();
+        });
       }
     } finally {
       if (!(result instanceof Promise)) {
+        Transaction.ongoingTransactionsByUuid.delete(transaction.uuid);
         transaction.commit();
       }
     }
