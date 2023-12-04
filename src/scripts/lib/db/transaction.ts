@@ -18,7 +18,11 @@ interface DocumentsByContext<T = FoundryDocument> {
 
 /** TODO Should probably still implement in the future */
 type NotImplementedOptions = 'deleteAll' | 'isUndo' | 'recursive' | 'diff' | 'renderSheet' | 'render' | 'temporary' | 'index' | 'indexFields' | 'noHook' | 'keepId' | 'keepEmbeddedIds';
-type DmlOptions = {[key: string]: any;} & Omit<DocumentModificationOptions, NotImplementedOptions>;
+type DmlBaseOptions = {[key: string]: any;} & Pick<DocumentModificationOptions, 'noHook' | 'render' | 'recursive'>;
+type DmlInsertOptions = DmlBaseOptions & Omit<Pick<DocumentModificationOptions, 'keepId' | 'keepEmbeddedIds' | 'temporary' | 'renderSheet'>, NotImplementedOptions>;
+type DmlUpdateOptions = DmlBaseOptions & Omit<Pick<DocumentModificationOptions, 'diff'>, NotImplementedOptions>;
+type DmlDeleteOptions = DmlBaseOptions & Omit<Pick<DocumentModificationOptions, 'deleteAll'>, NotImplementedOptions>;
+type QueryOptions = {[key: string]: any;} & Omit<Pick<DocumentModificationOptions, 'index' | 'indexFields'>, NotImplementedOptions>;
 type ActionStage = 'pending' | 'beforeFinished' | 'middleFinished';
 
 interface InsertAction<T = any> {
@@ -26,7 +30,7 @@ interface InsertAction<T = any> {
   stage: ActionStage;
   cb: ActionCallback<T>;
   dmlData: DocumentsByContext<FoundryDocument>;
-  options: Readonly<DmlOptions>;
+  options: Readonly<DmlInsertOptions>;
 }
 
 interface UpdateAction<T = any> {
@@ -34,7 +38,7 @@ interface UpdateAction<T = any> {
   stage: ActionStage;
   cb: ActionCallback<T>;
   dmlData: DocumentsByContext<FoundryDocument>;
-  options: Readonly<DmlOptions>;
+  options: Readonly<DmlUpdateOptions>;
 }
 
 interface DeleteAction<T = any> {
@@ -42,7 +46,7 @@ interface DeleteAction<T = any> {
   stage: ActionStage;
   cb: ActionCallback<T>;
   dmlData: DocumentsByContext<string>;
-  options: Readonly<DmlOptions>;
+  options: Readonly<DmlDeleteOptions>;
 }
 
 type ActionQueueItem<T = any> = InsertAction<T> | UpdateAction<T> | DeleteAction<T>;
@@ -72,9 +76,9 @@ export class Transaction {
     return result;
   }
 
-  public queryByUuid(inputUuid: string, options?: DmlOptions): Promise<FoundryDocument>
-  public queryByUuid(inputUuid: Iterable<string>, options?: DmlOptions): Promise<Map<string, FoundryDocument>>
-  public queryByUuid(inputUuid: string | Iterable<string>, options?: DmlOptions): Promise<FoundryDocument> | Promise<Map<string, FoundryDocument>> {
+  public queryByUuid(inputUuid: string, options?: QueryOptions): Promise<FoundryDocument>
+  public queryByUuid(inputUuid: Iterable<string>, options?: QueryOptions): Promise<Map<string, FoundryDocument>>
+  public queryByUuid(inputUuid: string | Iterable<string>, options?: QueryOptions): Promise<FoundryDocument> | Promise<Map<string, FoundryDocument>> {
     // TODO needs to wait if there is an action queued for that uuid
     //   can resolve without a queue otherwise
 
@@ -82,7 +86,7 @@ export class Transaction {
     return null;
   }
 
-  public insert(inputs: Iterable<FoundryDocument>, options?: DmlOptions): Promise<void> {
+  public insert(inputs: Iterable<FoundryDocument>, options?: DmlInsertOptions): Promise<void> {
     const actions: InsertAction[] = [];
     for (const doc of inputs) {
       const contextKey = `${doc.documentName}/${doc.parent?.uuid}/${doc.pack}`;
@@ -118,7 +122,7 @@ export class Transaction {
     return Promise.resolve();
   }
 
-  public update(inputs: Iterable<FoundryDocument>, options?: DmlOptions): Promise<void> {
+  public update(inputs: Iterable<FoundryDocument>, options?: DmlUpdateOptions): Promise<void> {
     const actions: UpdateAction[] = [];
     for (const doc of inputs) {
       const contextKey = `${doc.documentName}/${doc.parent?.uuid}/${doc.pack}`;
@@ -154,7 +158,7 @@ export class Transaction {
     return Promise.resolve();
   }
 
-  public async delete(inputs: Iterable<string | FoundryDocument> | string | FoundryDocument, options?: DmlOptions): Promise<void> {
+  public async delete(inputs: Iterable<string | FoundryDocument> | string | FoundryDocument, options?: DmlDeleteOptions): Promise<void> {
     if (typeof inputs === 'string' || !Transaction.isIterable(inputs)) {
       inputs = [inputs];
     }
