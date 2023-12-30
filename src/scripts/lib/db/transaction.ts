@@ -99,7 +99,7 @@ export class Transaction {
     return null;
   }
 
-  public insert(inputs: Iterable<FoundryDocument>, options?: DmlInsertOptions): Promise<void> {
+  public async insert(inputs: Iterable<FoundryDocument>, options: DmlInsertOptions = {}): Promise<void> {
     const actions: InsertAction[] = [];
     for (const doc of inputs) {
       const contextKey = `${doc.documentName}/${doc.parent?.uuid}/${doc.pack}`;
@@ -115,7 +115,7 @@ export class Transaction {
             pack: doc.pack,
             documents: [],
           },
-          options: deepClone(options) ?? {},
+          options: deepClone(options),
         });
       }
 
@@ -129,13 +129,11 @@ export class Transaction {
         promises.push(action.cb.promise);
       }
       this.processActionQueue();
-      return Promise.all(promises).then();
+      await Promise.all(promises);
     }
-
-    return Promise.resolve();
   }
 
-  public update(inputs: Iterable<FoundryDocument>, options?: DmlUpdateOptions): Promise<void> {
+  public async update(inputs: Iterable<FoundryDocument>, options: DmlUpdateOptions = {}): Promise<void> {
     const actions: UpdateAction[] = [];
     for (const doc of inputs) {
       const contextKey = `${doc.documentName}/${doc.parent?.uuid}/${doc.pack}`;
@@ -151,7 +149,7 @@ export class Transaction {
             pack: doc.pack,
             documents: [],
           },
-          options: deepClone(options) ?? {},
+          options: deepClone(options),
         });
       }
 
@@ -165,13 +163,11 @@ export class Transaction {
         promises.push(action.cb.promise);
       }
       this.processActionQueue();
-      return Promise.all(promises).then();
+      await Promise.all(promises)
     }
-
-    return Promise.resolve();
   }
 
-  public async delete(inputs: Iterable<string | FoundryDocument> | string | FoundryDocument, options?: DmlDeleteOptions): Promise<void> {
+  public async delete(inputs: Iterable<string | FoundryDocument> | string | FoundryDocument, options: DmlDeleteOptions = {}): Promise<void> {
     if (typeof inputs === 'string' || !Transaction.isIterable(inputs)) {
       inputs = [inputs];
     }
@@ -209,7 +205,7 @@ export class Transaction {
             pack: doc.pack,
             documents: [],
           },
-          options: deepClone(options) ?? {},
+          options: deepClone(options),
         });
       }
 
@@ -223,10 +219,8 @@ export class Transaction {
         promises.push(action.cb.promise);
       }
       this.processActionQueue();
-      return Promise.all(promises).then();
+      await Promise.all(promises)
     }
-
-    return Promise.resolve();
   }
 
   // dmls that have happened in this transaction but not yet committed to the database
