@@ -69,7 +69,6 @@ export interface AttackCardData {
       [data-label]="this.overrideRollLabel"
       [data-roll-mode]="this.part.mode"
       [data-bonus-formula]="this.part.userBonus"
-      [data-show-bonus]="this.part.phase !== 'mode-select'"
       [data-override-max-roll]="this.part.critThreshold$"
 
       [data-interaction-permission]="this.interactionPermission"

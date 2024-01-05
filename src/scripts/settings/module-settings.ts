@@ -1,12 +1,11 @@
 import { DocumentListener } from "../lib/db/document-listener";
-import { PermissionCheckHandler, UtilsDocument } from "../lib/db/utils-document";
+import { FoundryDocument, PermissionCheckHandler, UtilsDocument } from "../lib/db/utils-document";
 import { RunOnce } from "../lib/decorator/run-once";
 import { ValueProvider } from "../provider/value-provider";
 import { staticValues } from "../static-values";
 import { MyActor } from "../types/fixed-types";
 import { UtilsFoundry } from "../utils/utils-foundry";
 import { UtilsHooks } from "../utils/utils-hooks";
-import { UtilsLog } from "../utils/utils-log";
 import { Nd5aSettingsFormApplication, SettingsComponent } from "./settings-component";
 import { SettingsItemComponent } from "./settings-item-component";
 
@@ -281,6 +280,22 @@ export class ModuleSettings {
 
   @RunOnce()
   private static registerCustomPermissions(): void {
+    function findActorUuid(document: FoundryDocument): string | null {
+      let actorUuid: string | null = null;
+      while (document) {
+        // Unlinked token permissions are wonky
+        if (document instanceof TokenDocument && document.actor instanceof Actor) {
+          return document.actor.uuid;
+        }
+        if (document instanceof Actor) {
+          actorUuid = document.uuid;
+          break;
+        }
+        document = document.parent;
+      }
+      return actorUuid;
+    }
+
     for (const permission of [
       {permissionName: `${staticValues.code}ReadItemName`, setting: 'itemNameVisibility'},
       {permissionName: `${staticValues.code}ReadItemImage`, setting: 'itemImageVisibility'},
@@ -304,15 +319,7 @@ export class ModuleSettings {
             return UtilsDocument.getPermissionHandler('Observer').sync(args);
           }
           case 'player': {
-            let actorUuid: string;
-            let loopingDocument = args.document;
-            while (loopingDocument) {
-              if (loopingDocument instanceof Actor) {
-                actorUuid = loopingDocument.uuid;
-                break;
-              }
-              loopingDocument = loopingDocument.parent;
-            }
+            let actorUuid = findActorUuid(args.document);
             if (!actorUuid) {
               return false;
             }
@@ -324,15 +331,7 @@ export class ModuleSettings {
             return false;
           }
           default: /* playerOrPermission */ {
-            let actorUuid: string;
-            let loopingDocument = args.document;
-            while (loopingDocument) {
-              if (loopingDocument instanceof Actor) {
-                actorUuid = loopingDocument.uuid;
-                break;
-              }
-              loopingDocument = loopingDocument.parent;
-            }
+            let actorUuid = findActorUuid(args.document);
             if (!actorUuid) {
               return false;
             }
@@ -355,15 +354,7 @@ export class ModuleSettings {
               return UtilsDocument.getPermissionHandler('Observer').async(args);
             }
             case 'player': {
-              let actorUuid: string;
-              let loopingDocument = args.document;
-              while (loopingDocument) {
-                if (loopingDocument instanceof Actor) {
-                  actorUuid = loopingDocument.uuid;
-                  break;
-                }
-                loopingDocument = loopingDocument.parent;
-              }
+              let actorUuid = findActorUuid(args.document);
               if (!actorUuid) {
                 return new ValueProvider(false);
               }
@@ -375,15 +366,7 @@ export class ModuleSettings {
               return new ValueProvider(false);
             }
             default: /* playerOrPermission */ {
-              let actorUuid: string;
-              let loopingDocument = args.document;
-              while (loopingDocument) {
-                if (loopingDocument instanceof Actor) {
-                  actorUuid = loopingDocument.uuid;
-                  break;
-                }
-                loopingDocument = loopingDocument.parent;
-              }
+              let actorUuid = findActorUuid(args.document);
               if (!actorUuid) {
                 return new ValueProvider(false);
               }

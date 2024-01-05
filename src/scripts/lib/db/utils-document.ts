@@ -1,9 +1,8 @@
 import { DocumentModificationOptions } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/document.mjs";
 import { ValueProvider, ValueReader } from "../../provider/value-provider";
 import { staticValues } from "../../static-values";
-import { BaseDocument, MyActor, MyActorData, MyItem } from "../../types/fixed-types";
+import { BaseDocument, MyActor, MyItem } from "../../types/fixed-types";
 import { UtilsFoundry } from "../../utils/utils-foundry";
-import { UtilsLog } from "../../utils/utils-log";
 import { DocumentListener } from "./document-listener";
 
 export type FoundryDocument = foundry.abstract.Document<any, FoundryDocument> & {uuid: string};
@@ -72,12 +71,16 @@ for (const perm of Object.keys(UtilsFoundry.getUserRoles())) {
     }
   }
 }
-for (const perm of Object.keys(UtilsFoundry.getDocumentPermissions())) {
-  const level = UtilsFoundry.getDocumentPermissions()[perm];
+for (const [perm, level] of Object.entries(UtilsFoundry.getDocumentPermissions())) {
   const syncHandler: PermissionCheckHandler['sync'] = ({document, user}) => {
     let doc = document;
     while (doc != null) {
-      if (doc.getUserLevel(user) >= level) {
+      let userLevel = doc.getUserLevel(user);
+      // Unlinked token permissions are wonky
+      if (userLevel == null && doc instanceof TokenDocument && doc.actor instanceof Actor) {
+        userLevel = (doc.actor as any as FoundryDocument).getUserLevel(user);
+      }
+      if (userLevel >= level) {
         return true;
       }
       doc = doc.parent;
