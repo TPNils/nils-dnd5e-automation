@@ -38,6 +38,14 @@ const chatRendered = new Promise<void>(async (resolve) => {
   observer.observe(document, { childList: true, subtree: true });
 });
 
+const afterDocumentInit = new Promise<void>(async (resolve) => {
+  await init;
+  if (UtilsFoundry.getSystemVersion() >= new Version(11)) {
+    return UtilsHooks.setup();
+  }
+  return UtilsHooks.ready();
+});
+
 export class UtilsHooks {
 
   /**
@@ -64,7 +72,7 @@ export class UtilsHooks {
   }
   /**
    * A hook event that fires when Foundry has finished initializing but before the game state has been set up.
-   * Fires before any Documents, UI applications, or the Canvas have been initialized.
+   * Fires before any Documents (only V10 or lower), UI applications, or the Canvas have been initialized.
    */
   public static setup(): Promise<void>
   public static setup<T>(then: () => T): Promise<T>
@@ -73,6 +81,18 @@ export class UtilsHooks {
       return setup.then(then);
     }
     return setup;
+  }
+  /**
+   * V10 and before = ready
+   * V11 = setup
+   */
+  public static documentsInit(): Promise<void>
+  public static documentsInit<T>(then: () => T): Promise<T>
+  public static documentsInit(then?: () => any): Promise<void> {
+    if (then) {
+      return afterDocumentInit.then(then);
+    }
+    return afterDocumentInit;
   }
   /**
    * A hook event that fires when the game is fully ready.

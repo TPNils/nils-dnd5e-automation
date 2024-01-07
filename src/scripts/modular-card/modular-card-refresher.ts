@@ -40,7 +40,7 @@ export class ModularCardRefresher {
   @RunOnce()
   public static registerHooks(): void {
     // On initial document load, listen to the latest X messages
-    UtilsHooks.ready(() => {
+    UtilsHooks.documentsInit(() => {
       for (let i = Math.max(0, game.messages.contents.length - ModularCardRefresher.maxListeners); i < game.messages.contents.length; i++) {
         ModularCardRefresher.addUuid(game.messages.contents[i].uuid);
       }
