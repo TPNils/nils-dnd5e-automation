@@ -140,8 +140,13 @@ export interface FoundryManifestJsonV10 extends Omit<FoundryManifestJsonV8, 'nam
     /** Systems that this Package supports, all of them optional */
     systems?: Array<FoundryRelationship<'system'>>;
     /** Packages that are required for base functionality */
-    requires?: Array<FoundryRelationship>;
+    requires?: Array<FoundryRelationship<'module'>>;
+    /** V11 and up */
+    recommends?: Array<FoundryRelationship<'module'>>;
+    /** V11 and up */
     conflicts?: Array<FoundryRelationship>;
+    /** V11 and up */
+    flags?: FoundryFlags;
   }
   exclusive: boolean;
 }
@@ -187,39 +192,39 @@ class FoundryManifest {
   }
 
   private static toV11(input: FoundryManifestJsonFile): FoundryManifestJsonV11 {
-    const v10: Partial<FoundryManifestJsonV11> = {};
-    v10.authors = input.authors;
+    const v11: Partial<FoundryManifestJsonV11> = {};
+    v11.authors = input.authors;
     if (input.author) {
-      if (v10.authors == null) {
-        v10.authors = [];
+      if (v11.authors == null) {
+        v11.authors = [];
       }
       input.authors!.push({name: input.author})
     }
-    v10.bugs = input.bugs;
-    v10.changelog = input.changelog;
+    v11.bugs = input.bugs;
+    v11.changelog = input.changelog;
     if (input.compatibility) {
-      v10.compatibility = input.compatibility;
+      v11.compatibility = input.compatibility;
     } else {
-      v10.compatibility = {
+      v11.compatibility = {
         minimum: input.minimumCoreVersion,
         verified: input.compatibleCoreVersion,
       };
     }
-    v10.description = input.description;
-    v10.download = input.download;
-    v10.esmodules = input.esmodules;
-    v10.flags = input.flags;
-    v10.id = input.id ?? input.name;
-    v10.languages = input.languages;
-    v10.license = input.license;
-    v10.manifest = input.manifest;
+    v11.description = input.description;
+    v11.download = input.download;
+    v11.esmodules = input.esmodules;
+    v11.flags = input.flags;
+    v11.id = input.id ?? input.name;
+    v11.languages = input.languages;
+    v11.license = input.license;
+    v11.manifest = input.manifest;
     if (input.packs) {
-      v10.packs = [];
+      v11.packs = [];
       for (const pack of input.packs) {
         if (pack.type != null) {
-          v10.packs.push(pack);
+          v11.packs.push(pack);
         } else {
-          v10.packs.push({
+          v11.packs.push({
             name: pack.name,
             label: pack.label,
             path: pack.path,
@@ -231,13 +236,17 @@ class FoundryManifest {
         }
       }
     }
-    v10.protected = input.protected;
-    v10.readme = input.readme;
-    const relationshipRequiredById = new Map<string, FoundryRelationship>();
+    v11.protected = input.protected;
+    v11.readme = input.readme;
+    const relationshipRequiredById = new Map<string, FoundryRelationship<'module'>>();
     const relationshipSystemsById = new Map<string, FoundryRelationship<'system'>>();
     if (input.dependencies) {
       for (const module of input.dependencies) {
-        relationshipRequiredById.set(module.name, {id: module.name, type: module.type, manifest: module.manifest});
+        if (module.type === 'system') {
+          relationshipSystemsById.set(module.name, {id: module.name, type: module.type, manifest: module.manifest});
+        } else {
+          relationshipRequiredById.set(module.name, {id: module.name, type: module.type, manifest: module.manifest});
+        }
       }
     }
     if (input.system) {
@@ -247,7 +256,11 @@ class FoundryManifest {
     }
     if (input.relationships?.requires) {
       for (const required of input.relationships.requires) {
-        relationshipRequiredById.set(required.id, required);
+        if ((required.type as string) === 'system') {
+          relationshipSystemsById.set(required.id, required as any as FoundryRelationship<'system'>);
+        } else {
+          relationshipRequiredById.set(required.id, required);
+        }
       }
     }
     if (input.relationships?.systems) {
@@ -255,20 +268,17 @@ class FoundryManifest {
         relationshipSystemsById.set(system.id, system);
       }
     }
-    v10.relationships = {
-      requires: Array.from(relationshipRequiredById.values()),
-      systems: Array.from(relationshipSystemsById.values()),
-      conflicts: input.relationships?.conflicts,
-      recommends: input.relationships?.recommends,
-    };
-    v10.scripts = input.scripts;
-    v10.socket = input.socket;
-    v10.styles = input.styles;
-    v10.title = input.title;
-    v10.url = input.url;
-    v10.version = input.version;
+    v11.relationships = input.relationships == null ? {} : input.relationships;
+    v11.relationships.requires = Array.from(relationshipRequiredById.values());
+    v11.relationships.systems = Array.from(relationshipSystemsById.values());
+    v11.scripts = input.scripts;
+    v11.socket = input.socket;
+    v11.styles = input.styles;
+    v11.title = input.title;
+    v11.url = input.url;
+    v11.version = input.version;
 
-    return v10 as FoundryManifestJsonV10;
+    return v11 as FoundryManifestJsonV10;
   }
 
   private static injectV9(input: FoundryManifestJsonV10): FoundryManifestJsonV10 & FoundryManifestJsonV8 {
