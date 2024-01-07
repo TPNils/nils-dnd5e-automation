@@ -244,7 +244,7 @@ export class RollD20Element implements OnInit {
   @Attribute({name: 'data-roll-mode', dataType: 'string'})
   public set setRollMode(value: RollMode) {
     value = value.toLowerCase() as RollMode;
-    if (this._roll == null || !rollModeOrder.includes(value)) {
+    if (!rollModeOrder.includes(value)) {
       return;
     }
     this.rollMode = value;
