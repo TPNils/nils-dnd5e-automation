@@ -17,6 +17,7 @@ import { ModularCardCreateArgs, ModularCardPart } from "./modular-card-part";
 import { UtilsFoundry } from "../utils/utils-foundry";
 import { DeletedDocumentsCardPart } from "./item/base/deleted-documents-card-part";
 import { BeforeCreateModuleCardEvent } from "./events/before-create-module-card-event";
+import { UtilsHooks } from "../utils/utils-hooks";
 
 type ModularCardData = {[partType: string]: any};
 interface ModularCardMeta {
@@ -594,7 +595,7 @@ export class ModularCard {
     DmlTrigger.registerTrigger(new ChatMessageTrigger());
     
     // - Keep scrollbar at the bottom
-    Hooks.on('renderChatLog', () => {
+    UtilsHooks.chatRendered(() => {
       const log = document.querySelector("#chat-log");
       let isAtBottom = Math.abs(log.scrollHeight - (log.scrollTop + log.getBoundingClientRect().height)) < 2;
       const scrollToBottom = () => (ui.chat as any).scrollBottom();
