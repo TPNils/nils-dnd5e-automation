@@ -185,46 +185,48 @@ class FoundryManifest {
 
       this.manifest = {
         type: type,
-        file: FoundryManifest.toV11(json),
+        file: FoundryManifest.toLatestVersion(json),
       }
     }
     return this.manifest;
   }
 
-  private static toV11(input: FoundryManifestJsonFile): FoundryManifestJsonV11 {
-    const v11: Partial<FoundryManifestJsonV11> = {};
-    v11.authors = input.authors;
+  private static toLatestVersion(input: FoundryManifestJsonFile): FoundryManifestJsonV11 {
+    const latest: Partial<FoundryManifestJsonFile> = JSON.parse(JSON.stringify(input));
+
+    // Migrate deprecated fields from input to
+    latest.authors = input.authors;
     if (input.author) {
-      if (v11.authors == null) {
-        v11.authors = [];
+      if (latest.authors == null) {
+        latest.authors = [];
       }
       input.authors!.push({name: input.author})
     }
-    v11.bugs = input.bugs;
-    v11.changelog = input.changelog;
+    latest.bugs = input.bugs;
+    latest.changelog = input.changelog;
     if (input.compatibility) {
-      v11.compatibility = input.compatibility;
+      latest.compatibility = input.compatibility;
     } else {
-      v11.compatibility = {
+      latest.compatibility = {
         minimum: input.minimumCoreVersion,
         verified: input.compatibleCoreVersion,
       };
     }
-    v11.description = input.description;
-    v11.download = input.download;
-    v11.esmodules = input.esmodules;
-    v11.flags = input.flags;
-    v11.id = input.id ?? input.name;
-    v11.languages = input.languages;
-    v11.license = input.license;
-    v11.manifest = input.manifest;
+    latest.description = input.description;
+    latest.download = input.download;
+    latest.esmodules = input.esmodules;
+    latest.flags = input.flags;
+    latest.id = input.id ?? input.name;
+    latest.languages = input.languages;
+    latest.license = input.license;
+    latest.manifest = input.manifest;
     if (input.packs) {
-      v11.packs = [];
+      latest.packs = new Array<any>();
       for (const pack of input.packs) {
         if (pack.type != null) {
-          v11.packs.push(pack);
+          latest.packs.push(pack);
         } else {
-          v11.packs.push({
+          latest.packs.push({
             name: pack.name,
             label: pack.label,
             path: pack.path,
@@ -236,8 +238,8 @@ class FoundryManifest {
         }
       }
     }
-    v11.protected = input.protected;
-    v11.readme = input.readme;
+    latest.protected = input.protected;
+    latest.readme = input.readme;
     const relationshipRequiredById = new Map<string, FoundryRelationship<'module'>>();
     const relationshipSystemsById = new Map<string, FoundryRelationship<'system'>>();
     if (input.dependencies) {
@@ -268,17 +270,27 @@ class FoundryManifest {
         relationshipSystemsById.set(system.id, system);
       }
     }
-    v11.relationships = input.relationships == null ? {} : input.relationships;
-    v11.relationships.requires = Array.from(relationshipRequiredById.values());
-    v11.relationships.systems = Array.from(relationshipSystemsById.values());
-    v11.scripts = input.scripts;
-    v11.socket = input.socket;
-    v11.styles = input.styles;
-    v11.title = input.title;
-    v11.url = input.url;
-    v11.version = input.version;
+    if (latest.relationships == null) {
+      latest.relationships = {};
+    }
+    latest.relationships.requires = Array.from(relationshipRequiredById.values());
+    latest.relationships.systems = Array.from(relationshipSystemsById.values());
+    latest.scripts = input.scripts;
+    latest.socket = input.socket;
+    latest.styles = input.styles;
+    latest.title = input.title;
+    latest.url = input.url;
+    latest.version = input.version;
+    
+    // Delete deprecated fields from latest version
+    delete latest.name;
+    delete latest.author;
+    delete latest.minimumCoreVersion;
+    delete latest.compatibleCoreVersion;
+    delete latest.system;
+    delete latest.dependencies;
 
-    return v11 as FoundryManifestJsonV10;
+    return latest as any;
   }
 
   private static injectV9(input: FoundryManifestJsonV10): FoundryManifestJsonV10 & FoundryManifestJsonV8 {
