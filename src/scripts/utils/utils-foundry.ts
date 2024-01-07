@@ -88,7 +88,12 @@ export class UtilsFoundry {
     throw new Error('Nothing found, have they deprecated the CONST var?');
   }
 
-  public static getGameVersion(): Version {
+  public static getGameVersion(options?: {async?: false}): Version;
+  public static getGameVersion(options: {async: true}): Promise<Version>;
+  public static getGameVersion(options: {async?: boolean} = {}): Version | Promise<Version> {
+    if (options.async) {
+      return UtilsHooks.init().then(() => UtilsFoundry.getGameVersion({async: false}));
+    }
     let version: string;
     if (typeof game.version === 'string') {
       version = game.version
@@ -105,7 +110,6 @@ export class UtilsFoundry {
       }
       throw new Error('Nothing found, have they deprecated the version var?');
     }
-
 
     return Version.fromString(version);
   }
