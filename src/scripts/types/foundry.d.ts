@@ -25,14 +25,23 @@ declare global {
 class DataModelCls<DATA, PARENT extends foundry.abstract.Document<any, any> = foundry.abstract.Document<any, any>> {
   constructor(data?: DATA, options?: {parent?: any, strict?: boolean, [key: string]: any});
 
-  readonly _source: DATA;
+  readonly _source: Readonly<DATA>;
   readonly parent: PARENT;
   readonly flags: Record<string, Record<string, any>>;
+  readonly schema: SchemaField;
+  readonly invalid: boolean;
 
   /** Update with a DML */
   public update(diff: DeepPartial<DATA>, options?: any);
   /** Update the source data locally without a DML */
   public updateSource(diff: DeepPartial<DATA>, options?: any);
+  /**
+   * Copy and transform the DataModel into a plain object.
+   * Draw the values of the extracted object from the data source (by default) otherwise from its transformed values.
+   * @param {boolean} [source=true]     Draw values from the underlying data source rather than transformed values
+   * @returns {object}                  The extracted primitive object
+   */
+  public toObject(source: boolean=true): object;
 }
 
 /** Since foundry V10 */

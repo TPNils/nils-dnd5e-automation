@@ -1,6 +1,6 @@
 import { DataModel } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/abstract/module.mjs";
 import { staticValues } from "../../static-values";
-import { UtilsFoundry } from "../../utils/utils-foundry";
+import { UtilsFoundry, Version } from "../../utils/utils-foundry";
 import { UtilsLog } from "../../utils/utils-log";
 import { buffer } from "../decorator/buffer";
 import { RunOnce } from "../decorator/run-once";
@@ -9,6 +9,7 @@ import { UtilsCompare } from "../utils/utils-compare";
 import { TimeoutError, UtilsPromise } from "../utils/utils-promise";
 import { FoundryDocument, UtilsDocument } from "./utils-document";
 import { StaticInitFunc } from "../decorator/static-init-func";
+import { UtilsLibWrapper } from "../../utils/utils-lib-wrapper";
 
 const thisSessionId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : String(Math.random());
 const unsupportedAfterDocuments = [
@@ -269,7 +270,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       throw new Error(`Incompatible document types. Expected ${this.documentName} but got ${trigger.type.documentName}`)
     }
     
-    Wrapper.initOldValueInjector();
+    Wrapper.initOldDataInjector();
     if (!this.isInit) {
       this.init();
     }
@@ -400,37 +401,55 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
 
   private static oldDocumentSymbol = Symbol('old document');
   @RunOnce()
-  private static initOldValueInjector(): void {
-    // @ts-ignore
-    const originalFunction: Function = ClientDatabaseBackend.prototype._postUpdateDocumentCallbacks;
-    // @ts-ignore
-    ClientDatabaseBackend.prototype._postUpdateDocumentCallbacks = function (...args: any[]): void {
-      const collection = args[0];
-      let canInject = true;
-      for (const unsupportedAfterDocument of unsupportedAfterDocuments) {
-        if (game.collections.get(unsupportedAfterDocument.documentName) === collection) {
-          canInject = false;
-          break;
+  private static async initOldDataInjector(): Promise<void> {
+    if (await UtilsFoundry.getGameVersion({async: true}) >= new Version(10)) {
+      UtilsLibWrapper.wrapper('foundry.abstract.DataModel.prototype.updateSource', function (this: DataModel<{_id?: string}> & {uuid: string}, original, ...args: any[]): void {
+        if (this._source._id == null) {
+          return original.call(this, ...args);
         }
-      }
-      if (canInject) {
-        const results: any[] = args[1];
-        const options: any = args[2].options;
-  
-        const oldDocuments: {[uuid: string]: FoundryDocument} = {};
-        for (const result of results) {
-          const currentDocument = collection.get(result._id);
-          if (currentDocument == null) {
-            // Found 1 instance, can happen when updating fog of war. Not really sure what to do with this though...
-            UtilsLog.error('missing currentDocument for some reason?', collection, result);
-            continue;
+        const [changes, options] = args;
+
+        // updateSource can be called for multiple reasons, but if there is a DML, there are always options
+        // There can also be options without a dml, but I consider this unfortunate necessary overhead.
+        if (options) {
+          if (options[Wrapper.oldDocumentSymbol] == null) {
+            options[Wrapper.oldDocumentSymbol] = {};
           }
-          oldDocuments[currentDocument.uuid] = new currentDocument.constructor(currentDocument.toObject(true), {parent: currentDocument.parent, pack: currentDocument.pack});
+  
+          options[Wrapper.oldDocumentSymbol][this.uuid] = this.toObject(true);
         }
-        
-        options[Wrapper.oldDocumentSymbol] = oldDocuments;
-      }
-      return originalFunction.call(this, ...args);
+
+        return original.call(this, ...args);
+      });
+    } else {
+      UtilsLibWrapper.wrapper('ClientDatabaseBackend.prototype._postUpdateDocumentCallbacks', function (original, ...args: any[]): void {
+        const collection = args[0];
+        let canInject = true;
+        for (const unsupportedAfterDocument of unsupportedAfterDocuments) {
+          if (game.collections.get(unsupportedAfterDocument.documentName) === collection) {
+            canInject = false;
+            break;
+          }
+        }
+        if (canInject) {
+          const results: any[] = args[1];
+          const options: any = args[2].options;
+    
+          const oldDocuments: {[uuid: string]: FoundryDocument} = {};
+          for (const result of results) {
+            const currentDocument = collection.get(result._id);
+            if (currentDocument == null) {
+              // Found 1 instance, can happen when updating fog of war. Not really sure what to do with this though...
+              UtilsLog.error('missing currentDocument for some reason?', collection, result);
+              continue;
+            }
+            oldDocuments[currentDocument.uuid] = currentDocument.toObject(true);
+          }
+          
+          options[Wrapper.oldDocumentSymbol] = oldDocuments;
+        }
+        return original.call(this, ...args);
+      });
     }
   }
 
@@ -654,9 +673,9 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
       const modifiedData = mergeObject(document.toObject(true), change, {inplace: false});
       const modifiedDocument = new document.constructor(modifiedData, {parent: document.parent, pack: document.pack});
       let documentSnapshot = new document.constructor(modifiedDocument.toObject(true), {parent: document.parent, pack: document.pack});
-      const oldDocument = this.extractOldValue(document as any, options);
+      const oldDocument = new document.constructor(this.extractOldData(document as any, options), {parent: document.parent, pack: document.pack});
       if (oldDocument === undefined) {
-        // See injector (initOldValueInjector) for more info
+        // See injector (initOldDataInjector) for more info
         return;
       }
       const originalDiff = UtilsCompare.findDiff(
@@ -808,7 +827,7 @@ class Wrapper<T extends foundry.abstract.Document<any, any>> {
     }
   }
   
-  private extractOldValue(document: {uuid: string}, options: any): T {
+  private extractOldData(document: {uuid: string}, options: any): object {
     return options[Wrapper.oldDocumentSymbol]?.[document.uuid];
   }
 
