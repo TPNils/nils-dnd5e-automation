@@ -367,7 +367,7 @@ export class UtilsDocument {
     return new MaybePromise(UtilsDocument.fromUuidInternal(uuids, options as any)).then(response => {
       for (let document of response.values()) {
         if (document.documentName === (TokenDocument as any).documentName) {
-          document = (document as TokenDocument).getActor();
+          document = (document as TokenDocument).actor
           response.set(document.uuid, document);
         }
         if (document.documentName !== (Actor as any).documentName) {

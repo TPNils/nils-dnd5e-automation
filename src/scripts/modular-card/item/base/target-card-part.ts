@@ -913,7 +913,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
           const token = tokenMap.get(selected.tokenUuid);
           cache.set(token.uuid, {
             tokenUuid: token.uuid,
-            actorUuid: (token.getActor() as MyActor)?.uuid,
+            actorUuid: (token.actor as MyActor)?.uuid,
             name: UtilsFoundry.getModelData(token).name,
             nameVisibleAnyone: [CONST.TOKEN_DISPLAY_MODES.HOVER, CONST.TOKEN_DISPLAY_MODES.ALWAYS as number].includes(UtilsFoundry.getModelData(token).displayName),
             img: UtilsFoundry.usesDataModel(token) ? (token as any).texture.src : token.data.img,

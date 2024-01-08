@@ -565,7 +565,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
 
       for (const expectedUuid of allTargetUuids) {
         if (!cachedTargetUuids.has(expectedUuid)) {
-          const actor = tokens.get(expectedUuid).getActor() as MyActor;
+          const actor = tokens.get(expectedUuid).actor as MyActor;
           const actorData = UtilsFoundry.getSystemData(actor);
           attackPart.targetCaches$.push({
             targetUuid$: expectedUuid,

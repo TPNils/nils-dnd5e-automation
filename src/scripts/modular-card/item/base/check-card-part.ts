@@ -351,7 +351,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
 
       for (const selected of allSelected) {
         if (!cachedBySelectionId.has(selected.selectionId)) {
-          const actor = (tokens.get(selected.tokenUuid).getActor() as MyActor);
+          const actor = (tokens.get(selected.tokenUuid).actor as MyActor);
           const targetCache: TargetCache = {
             targetUuid$: selected.tokenUuid,
             selectionId$: selected.selectionId,
@@ -465,7 +465,7 @@ class CheckCardTrigger implements ITrigger<ModularCardTriggerData<CheckCardData>
 
         if (shouldModifyRoll) {
           // Get the token actor which might be different than the "root" actor
-          let actor: MyActor = await (await UtilsDocument.tokenFromUuid(target.targetUuid$))?.getActor();
+          let actor: MyActor = await (await UtilsDocument.tokenFromUuid(target.targetUuid$))?.actor;
           if (!actor && target.actorUuid$ !== target.targetUuid$) {
             actor = await UtilsDocument.actorFromUuid(target.actorUuid$);
           }

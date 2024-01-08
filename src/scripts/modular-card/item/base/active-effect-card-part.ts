@@ -159,7 +159,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
     let actorsByTokenUuid = new Map<string, MyActor>();
     let applySmartStateByActor = this.smartApplyActors(targetEvents.map(event => event.messageCardParts));
     for (const token of tokenDocuments.values()) {
-      const actor = token.getActor() as MyActor;
+      const actor = token.actor as MyActor;
       actorsByTokenUuid.set(token.uuid, actor);
     }
     const allRelevantActiveEffectUuids = new Set<string>();
@@ -180,7 +180,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
     const createActiveEffects: ActiveEffect[] = [];
     const deleteActiveEffectUuids = new Set<string>();
     for (const targetEvent of targetEvents) {
-      const actor = tokenDocuments.get(targetEvent.selected.tokenUuid)?.getActor() as MyActor;
+      const actor = tokenDocuments.get(targetEvent.selected.tokenUuid)?.actor as MyActor;
       if (!actor || processedActorUuids.has(actor.uuid)) {
         continue;
       }
@@ -235,7 +235,7 @@ export class ActiveEffectCardPart implements ModularCardPart<ActiveEffectCardDat
     }
     
     for (const targetEvent of targetEvents) {
-      const actor = tokenDocuments.get(targetEvent.selected.tokenUuid)?.getActor() as MyActor;
+      const actor = tokenDocuments.get(targetEvent.selected.tokenUuid)?.actor as MyActor;
       if (!actor || processedActorUuids.has(actor.uuid)) {
         continue;
       }
@@ -389,7 +389,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     const tokenDocuments = await UtilsDocument.tokenFromUuid(fetchTokenUuids);
     const tokenUuidsByActorUuid = new Map<string, string[]>();
     for (const token of tokenDocuments.values()) {
-      const actor: MyActor = token.getActor();
+      const actor: MyActor = token.actor;
       if (!tokenUuidsByActorUuid.has(actor.uuid)) {
         tokenUuidsByActorUuid.set(actor.uuid, []);
       }
@@ -397,7 +397,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
     }
     const recalcedActorUuids = new Set<string>();
     for (const recalcToken of recalcTokens) {
-      const actor: MyActor = tokenDocuments.get(recalcToken.tokenUuid).getActor();
+      const actor: MyActor = tokenDocuments.get(recalcToken.tokenUuid).actor;
       if (recalcedActorUuids.has(actor.uuid)) {
         continue;
       }

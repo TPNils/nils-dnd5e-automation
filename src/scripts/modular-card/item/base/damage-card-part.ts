@@ -601,7 +601,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     const tokenDocuments = await UtilsDocument.tokenFromUuid(targetEvents.map(d => d.selected.tokenUuid));
     let tokenHpSnapshot = new Map<string, {hp: number; failedDeathSaves: number; maxHp: number; tempHp: number}>();
     for (const token of tokenDocuments.values()) {
-      const actorData = UtilsFoundry.getSystemData(token.getActor() as MyActor);
+      const actorData = UtilsFoundry.getSystemData(token.actor as MyActor);
       tokenHpSnapshot.set(token.uuid, {
         hp: actorData.attributes.hp.value,
         failedDeathSaves: actorData.attributes.death?.failure,
@@ -707,7 +707,7 @@ export class DamageCardPart implements ModularCardPart<DamageCardData> {
     const updateActors: DmlUpdateRequest<MyActor>[] = [];
     for (const [uuid, tokenHp] of tokenHpSnapshot.entries()) {
       const token = tokenDocuments.get(uuid);
-      const actor = token.getActor() as MyActor;
+      const actor = token.actor as MyActor;
       const actorData = UtilsFoundry.getSystemData(actor);
       const hpDiff = tokenHp.hp - actorData.attributes.hp.value;
       const tempHpDiff = tokenHp.tempHp - actorData.attributes.hp.temp;
@@ -839,7 +839,7 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
 
     for (const recalcToken of recalcTokens) {
       const token = tokenMap.get(recalcToken.tokenUuid);
-      const actor = (token.getActor() as MyActor);
+      const actor: MyActor = token.actor;
       if (!token) {
         continue;
       }
