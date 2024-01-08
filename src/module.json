@@ -4,7 +4,7 @@
   "version": "2.2.3-beta",
   "compatibility": {
     "minimum": "0.8.9",
-    "verified": "11"
+    "verified": "11.315"
   },
   "description": "",
   "authors": [
@@ -32,10 +32,6 @@
   "relationships": {
     "requires": [
       {
-        "id": "dnd5e",
-        "type": "system"
-      },
-      {
         "id": "socketlib",
         "type": "module"
       }
@@ -44,9 +40,36 @@
       {
         "id": "lib-wrapper",
         "type": "module"
+      },
+      {
+        "id": "dice-so-nice",
+        "type": "module"
+      },
+      {
+        "id": "dae",
+        "type": "module"
       }
     ],
-    "systems": []
+    "conflicts": [
+      {
+        "id": "midi-qol",
+        "type": "module"
+      },
+      {
+        "id": "mre-dnd5e",
+        "type": "module"
+      },
+      {
+        "id": "ready-set-roll-5e",
+        "type": "module"
+      }
+    ],
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system"
+      }
+    ]
   },
   "socket": true
 }

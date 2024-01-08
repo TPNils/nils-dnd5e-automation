@@ -141,19 +141,15 @@ export interface FoundryManifestJsonV10 extends Omit<FoundryManifestJsonV8, 'nam
     systems?: Array<FoundryRelationship<'system'>>;
     /** Packages that are required for base functionality */
     requires?: Array<FoundryRelationship<'module'>>;
-    /** V11 and up */
-    recommends?: Array<FoundryRelationship<'module'>>;
-    /** V11 and up */
-    conflicts?: Array<FoundryRelationship>;
-    /** V11 and up */
-    flags?: FoundryFlags;
   }
   exclusive: boolean;
 }
 
 export interface FoundryManifestJsonV11 extends Omit<FoundryManifestJsonV10, 'relationships'> {
   relationships: FoundryManifestJsonV10['relationships'] & {
-    recommends?: Array<FoundryRelationship>;
+    recommends?: Array<FoundryRelationship<'module'>>;
+    conflicts?: Array<FoundryRelationship>;
+    flags?: FoundryFlags;
   },
 }
 
