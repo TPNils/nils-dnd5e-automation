@@ -104,8 +104,8 @@ class Args {
   }
 
   private static sortVersions(a: string, b: string): number {
-    const aRgx = this.versionMatch.exec(a);
-    const bRgx  = this.versionMatch.exec(b);
+    const aRgx = Args.versionMatch.exec(a);
+    const bRgx  = Args.versionMatch.exec(b);
 
     for (let i = 1, diff = 0; i < aRgx.length - 1; i++) {
       diff = (!!aRgx[i] ? Number(aRgx[i]) : 0) - (!!bRgx[i] ? Number(bRgx[i]) : 0);
