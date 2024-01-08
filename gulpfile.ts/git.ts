@@ -12,47 +12,59 @@ export class Git {
     if (!manifest) {
       throw new Error(chalk.red('Manifest JSON not found in the ./src folder'));
     }
-    let remoteName: string;
-    {
-      const out = await cli.execPromise('git remote');
-      if (out.stdout) {
-        const lines = out.stdout.split('\n');
-        if (lines.length === 1) {
-          remoteName = lines[0];
-        }
+
+    let githubRepository: string;
+
+    // Try to detect the github repo in a github action
+    if (githubRepository == null) {
+      const out = await cli.execPromise('echo "${{github.repository}}"');
+      if (out.stdout?.trim() != '"${{github.repository}}"') {
+        githubRepository = out.stdout?.trim().replace(/^"/, "").replace(/"$/, "")
       }
     }
-    if (remoteName == null) {
-      // Find the correct remote
-      const out = await cli.execPromise('git branch -vv --no-color');
-      if (out.stdout) {
-        const rgx = /^\* [^\s]+ +[0-9a-fA-F]+ \[([^\/]+)\//;
-        for (const line of out.stdout.split('\n')) {
-          const match = rgx.exec(line);
-          if (match) {
-            remoteName = match[1];
+
+    if (githubRepository == null) {
+      let remoteName: string;
+      {
+        const out = await cli.execPromise('git remote');
+        if (out.stdout) {
+          const lines = out.stdout.split('\n');
+          if (lines.length === 1) {
+            remoteName = lines[0];
+          }
+        }
+      }
+      if (remoteName == null) {
+        // Find the correct remote
+        const out = await cli.execPromise('git branch -vv --no-color');
+        if (out.stdout) {
+          const rgx = /^\* [^\s]+ +[0-9a-fA-F]+ \[([^\/]+)\//;
+          for (const line of out.stdout.split('\n')) {
+            const match = rgx.exec(line);
+            if (match) {
+              remoteName = match[1];
+            }
+          }
+        }
+      }
+
+      if (remoteName != null) {
+        const remoteUrl = await cli.execPromise(`git remote get-url --push "${remoteName.replace(/"/g, '\\"')}"`);
+        cli.throwIfError(remoteUrl);
+        const sshRgx = /^git@github\.com:(.*)\.git$/i.exec(remoteUrl.stdout.trim());
+        if (sshRgx) {
+          githubRepository = sshRgx[1];
+        } else {
+          const httpRgx = /^https?:\/\/github\.com\/(.*)\.git$/i.exec(remoteUrl.stdout.trim());
+          if (httpRgx) {
+            githubRepository = httpRgx[1];
           }
         }
       }
     }
-
-    if (remoteName == null) {
-      throw new Error(chalk.red('Could not find the remote git url.'));
-    }
-    const remoteUrl = await cli.execPromise(`git remote get-url --push "${remoteName.replace(/"/g, '\\"')}"`);
-    cli.throwIfError(remoteUrl);
-    let githubRepository: string;
-    const sshRgx = /^git@github\.com:(.*)\.git$/i.exec(remoteUrl.stdout.trim());
-    if (sshRgx) {
-      githubRepository = sshRgx[1];
-    } else {
-      const httpRgx = /^https?:\/\/github\.com\/(.*)\.git$/i.exec(remoteUrl.stdout.trim());
-      if (httpRgx) {
-        githubRepository = httpRgx[1];
-      }
-    }
+    
     if (githubRepository == null) {
-      throw new Error(chalk.red(`Git remote "${remoteName}" was not detected as a github repo.`));
+      throw new Error(chalk.red(`Git no github repository found.`));
     }
 
     const currentVersion = await args.getCurrentVersion();
