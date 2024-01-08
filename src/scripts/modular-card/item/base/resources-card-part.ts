@@ -27,7 +27,8 @@ export interface ResourceCardData {
       path: string;
       calcChange: number;
       appliedChange: number;
-    }
+    };
+    origin?: string;
   }[];
   calc$: {
     actorUuid: string;
@@ -447,23 +448,8 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
     };
     const itemData = UtilsFoundry.getSystemData(item);
     
-    // TODO this is currently hard coded, would be nice if it could be extended
     // Consume actor resources
     if (actor) {
-      const spellSlot = item.type === "spell" && itemData.level > 0 && ItemCardHelpers.spellUpcastModes.includes(itemData.preparation.mode);
-      if (spellSlot) {
-        let spellPropertyName = itemData.preparation.mode === "pact" ? "pact" : `spell${itemData.level}`;
-        data.consumeResources.push({
-          consumeResourcesAction: 'auto',
-          calc$: {
-            uuid: actor.uuid,
-            path: `system.spells.${spellPropertyName}.value`,
-            calcChange: 1,
-            appliedChange: 0,
-          }
-        });
-      }
-      
       switch (itemData.consume?.type) {
         case 'attribute': {
           if (itemData.consume.target && itemData.consume.amount > 0) {

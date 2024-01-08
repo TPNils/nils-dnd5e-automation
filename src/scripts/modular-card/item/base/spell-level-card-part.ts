@@ -1,4 +1,4 @@
-import { IAfterDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
+import { IAfterDmlContext, IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
 import { DocumentListener } from "../../../lib/db/document-listener";
 import { FoundryDocument, UtilsDocument } from "../../../lib/db/utils-document";
 import { RunOnce } from "../../../lib/decorator/run-once";
@@ -13,6 +13,7 @@ import { ItemUtils } from "../../item-utils";
 import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../../modular-card";
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction, PermissionResponse } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
+import { ResourceCardData, ResourceCardPart } from "./resources-card-part";
 
 export interface SpellLevelCardData {
   selectedLevel: number | 'pact';
@@ -217,7 +218,7 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
 
     return {
       selectedLevel: selectedLevel,
-      selectedLevelNr: itemData.level,
+      selectedLevelNr: selectedLevel === 'pact' ? actorData.spells.pact.value : selectedLevel,
       calc$: {
         actorUuid: actor.uuid,
         itemUuid: item.uuid,
@@ -266,6 +267,55 @@ export class SpellLevelCardPart implements ModularCardPart<SpellLevelCardData> {
 
 class SpellLevelCardTrigger implements ITrigger<ModularCardTriggerData<SpellLevelCardData>> {
 
+  //#region beforeUpsert
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<SpellLevelCardData>>): boolean | void {
+    this.calcResource(context);
+  }
+
+  private calcResource(context: IDmlContext<ModularCardTriggerData<SpellLevelCardData>>): void {
+    for (const {newRow, oldRow} of context.rows) {
+      if (newRow.part.selectedLevel === oldRow?.part?.selectedLevel) {
+        continue;
+      }
+      if (!newRow.allParts.hasType(ResourceCardPart.instance)) {
+        continue;
+      }
+
+      const resourcePart = newRow.allParts.getTypeData(ResourceCardPart.instance);
+      let spellResource: ResourceCardData['consumeResources'][number];
+      for (const resource of resourcePart.consumeResources) {
+        if (resource.origin === SpellLevelCardPart.instance.getType()) {
+          spellResource = resource;
+          break;
+        } else if (resource.origin == null && resource.calc$.path.match(/spells\.([1-9]|pact)\.value/)) {
+          // fallback, v2.3.0 and lower did not have an origin
+          spellResource = resource;
+          break;
+        }
+      }
+
+      if (spellResource == null) {
+        spellResource = {
+          consumeResourcesAction: 'auto',
+          calc$: {
+            uuid: newRow.allParts.getActorUuid(),
+            path: ``,
+            calcChange: 1,
+            appliedChange: 0,
+          }
+        }
+        resourcePart.consumeResources.push(spellResource);
+      }
+      
+      const spellPart = newRow.allParts.getTypeData(SpellLevelCardPart.instance);
+      let spellPropertyName = spellPart.selectedLevel === "pact" ? "pact" : `spell${spellPart.selectedLevel}`;
+      spellResource.calc$.path = `system.spells.${spellPropertyName}.value`
+      spellResource.origin = SpellLevelCardPart.instance.getType();
+    }
+  }
+  //#endregion
+
+  //#region update
   public async update(context: IAfterDmlContext<ModularCardTriggerData<SpellLevelCardData>>): Promise<void> {
     await this.refreshOnLevelChange(context);
   }
@@ -333,5 +383,6 @@ class SpellLevelCardTrigger implements ITrigger<ModularCardTriggerData<SpellLeve
     }
     await Promise.all(promises);
   }
+  //#endregion
 
 }
