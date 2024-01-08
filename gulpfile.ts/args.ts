@@ -12,7 +12,7 @@ export interface Version {
 }
 
 class Args {
-  private readonly versionMatch = /^v?(\d{1,})(?:\.(\d{1,})(?:\.(\d{1,})(-.+)?)?)?$/;
+  private static readonly versionMatch = /^v?(\d{1,})(?:\.(\d{1,})(?:\.(\d{1,})(-.+)?)?)?$/;
   /** @type {{u?: string; update?: string;}} */
   private args: {
     u?: string; update?: string;
@@ -24,7 +24,7 @@ class Args {
       git.getLatestVersionTag(),
       foundryManifest.getManifest().file.version,
     ]);
-    const latestVersion = versions.filter(v => !!v).sort(this.sortVersions)[versions.length - 1];
+    const latestVersion = versions.filter(v => !!v).sort(Args.sortVersions)[versions.length - 1];
     if (latestVersion.startsWith('v')) {
       return latestVersion.substring(1)
     }
@@ -47,11 +47,11 @@ class Args {
   
     let targetVersion: string;
   
-    if (this.versionMatch.test(version)) {
+    if (Args.versionMatch.test(version)) {
       targetVersion = version;
     } else {
       targetVersion = currentVersion.replace(
-        this.versionMatch,
+        Args.versionMatch,
         (substring, major, minor, patch, addon) => {
           let target: string | null = null;
           if (version.toLowerCase() === 'major') {
@@ -103,7 +103,7 @@ class Args {
     return null;
   }
 
-  public sortVersions(a: string, b: string): number {
+  private static sortVersions(a: string, b: string): number {
     const aRgx = this.versionMatch.exec(a);
     const bRgx  = this.versionMatch.exec(b);
 
