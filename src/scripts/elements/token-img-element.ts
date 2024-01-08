@@ -1,10 +1,10 @@
 import { DocumentListener } from "../lib/db/document-listener";
 import { RunOnce } from "../lib/decorator/run-once";
+import { StaticInitFunc } from "../lib/decorator/static-init-func";
 import { AsyncAttribute, Component, OnInit, OnInitParam } from "../lib/render-engine/component";
 import { ValueProvider, ValueReader } from "../provider/value-provider";
 import { staticValues } from "../static-values";
-import { UtilsFoundry } from "../utils/utils-foundry";
-import { UtilsLog } from "../utils/utils-log";
+import { UtilsFoundry, Version } from "../utils/utils-foundry";
 
 @Component({
   tag: TokenImgElement.selector(),
@@ -74,7 +74,7 @@ export class TokenImgElement implements OnInit {
         continue;
       }
       // @ts-ignore
-      canvasToken._onHoverIn(null, {hoverOutOthers: false});
+      canvasToken._onHoverIn(TokenImgElement.getHoverEvent(), {hoverOutOthers: false});
     }
   }
 
@@ -90,12 +90,23 @@ export class TokenImgElement implements OnInit {
         continue;
       }
       // @ts-ignore
-      canvasToken._onHoverOut(null, {hoverOutOthers: false});
+      canvasToken._onHoverOut(TokenImgElement.getHoverEvent(), {hoverOutOthers: false});
     }
   }
 
   @RunOnce()
   public static registerHooks(): void {
+    UtilsFoundry.getGameVersion({async: true}).then(v => {
+      if (v >= new Version(11)) {
+        // @ts-ignore
+        TokenImgElement.getHoverEvent = () => new PIXI.FederatedEvent();
+      }
+    });
+  }
+
+  private static getHoverEvent(): PIXI.InteractionEvent {
+    // V10 and lower
+    return null;
   }
 
 }
