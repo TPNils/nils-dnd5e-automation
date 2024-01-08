@@ -40,8 +40,7 @@ export class Git {
       throw new Error(chalk.red('Could not find the remote git url.'));
     }
     const remoteUrl = await cli.execPromise(`git remote get-url --push "${remoteName.replace(/"/g, '\\"')}"`);
-    cli.throwError(remoteUrl);
-    console.log({out: remoteUrl.stdout.trim()})
+    cli.throwIfError(remoteUrl);
     let githubRepository: string;
     const sshRgx = /^git@github\.com:(.*)\.git$/i.exec(remoteUrl.stdout.trim());
     if (sshRgx) {
@@ -95,16 +94,16 @@ export class Git {
 
   public async validateCleanRepo(): Promise<void> {
     const cmd = await cli.execPromise('git status --porcelain');
-    cli.throwError(cmd);
+    cli.throwIfError(cmd);
     if (typeof cmd.stdout === 'string' && cmd.stdout.length > 0) {
       throw new Error("You must first commit your pending changes");
     }
   }
 
   public async commitNewVersion(): Promise<void> {
-    cli.throwError(await cli.execPromise('git add .'), {ignoreOut: true});
+    cli.throwIfError(await cli.execPromise('git add .'), {ignoreOut: true});
     let newVersion = 'v' + await args.getCurrentVersion();
-    cli.throwError(await cli.execPromise(`git commit -m "Updated to ${newVersion}`));
+    cli.throwIfError(await cli.execPromise(`git commit -m "Updated to ${newVersion}`));
   }
 
   public async deleteVersionTag(version?: string): Promise<void> {
@@ -118,20 +117,20 @@ export class Git {
 
   public async tagCurrentVersion(): Promise<void> {
     let version = 'v' + await args.getCurrentVersion();
-    cli.throwError(await cli.execPromise(`git tag -a ${version} -m "Updated to ${version}"`));
-    cli.throwError(await cli.execPromise(`git push origin ${version}`), {ignoreOut: true});
+    cli.throwIfError(await cli.execPromise(`git tag -a ${version} -m "Updated to ${version}"`));
+    cli.throwIfError(await cli.execPromise(`git push origin ${version}`), {ignoreOut: true});
   }
 
   public async getLatestVersionTag(): Promise<string> {
     const tagHash = await cli.execPromise('git rev-list --tags --max-count=1');
-    cli.throwError(tagHash);
+    cli.throwIfError(tagHash);
     const cmd = await cli.execPromise(`git describe --tags ${tagHash.stdout}`);
-    cli.throwError(cmd);
+    cli.throwIfError(cmd);
     return cmd.stdout.trim();
   }
 
   public async push(): Promise<void> {
-    cli.throwError(await cli.execPromise(`git push`));
+    cli.throwIfError(await cli.execPromise(`git push`));
   }
 
   public async gitMoveTag() {
