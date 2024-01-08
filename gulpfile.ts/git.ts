@@ -17,12 +17,8 @@ export class Git {
     let githubRepository: string;
 
     // Try to detect the github repo in a github action
-    console.log('githubContext', githubContext)
-    if (githubContext.repo.repo) {
-      const out = await cli.execPromise('echo "${{github.repository}}"');
-      if (out.stdout?.trim() != '"${{github.repository}}"') {
-        githubRepository = out.stdout?.trim().replace(/^"/, "").replace(/"$/, "")
-      }
+    if (githubContext.payload?.repository?.full_name) {
+      githubRepository = githubContext.payload?.repository?.full_name;
     }
 
     if (githubRepository == null) {
