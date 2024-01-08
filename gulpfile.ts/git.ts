@@ -1,6 +1,7 @@
 import * as fs from 'fs-extra';
 import * as chalk from 'chalk';
 import * as stringify from 'json-stringify-pretty-compact';
+import { context as githubContext } from '@actions/github';
 import { foundryManifest } from './foundry-manifest';
 import { cli } from './cli';
 import { args } from './args';
@@ -16,7 +17,8 @@ export class Git {
     let githubRepository: string;
 
     // Try to detect the github repo in a github action
-    if (githubRepository == null) {
+    console.log('githubContext', githubContext)
+    if (githubContext.repo.repo) {
       const out = await cli.execPromise('echo "${{github.repository}}"');
       if (out.stdout?.trim() != '"${{github.repository}}"') {
         githubRepository = out.stdout?.trim().replace(/^"/, "").replace(/"$/, "")
