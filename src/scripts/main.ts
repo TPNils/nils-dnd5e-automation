@@ -11,6 +11,7 @@ import { UtilsHooks } from "./utils/utils-hooks";
 import { ComponentFoundryConnector } from "./lib/render-engine/component-foundry-connector";
 import { UtilsLibWrapper } from "./utils/utils-lib-wrapper";
 import { UtilsDae } from "./utils/utils-dae";
+import { UtilsFoundry } from "./utils/utils-foundry";
 
 UtilsHooks.registerHooks();
 UtilsLibWrapper.registerHooks();
@@ -27,13 +28,15 @@ ComponentFoundryConnector.registerHooks();
 
 Hooks.on('init', () => {
   const hbsFiles: string[] = [];
+  const moduleData = UtilsFoundry.getModelData(game.modules.get(staticValues.moduleName));
+
   if (game.modules.has(staticValues.moduleName)) {
-    const files = game.modules.get(staticValues.moduleName).data.flags?.hbsFiles;
+    const files = moduleData.flags?.hbsFiles;
     if (Array.isArray(files)) {
       hbsFiles.push(...files.map(f => `modules/${staticValues.moduleName}/${f}`));
     }
   } else if (game.system.id === staticValues.moduleName) {
-    const files = game.system.data.flags?.hbsFiles;
+    const files = moduleData.flags?.hbsFiles;
     if (Array.isArray(files)) {
       hbsFiles.push(...files.map(f => `systems/${staticValues.moduleName}/${f}`));
     }
