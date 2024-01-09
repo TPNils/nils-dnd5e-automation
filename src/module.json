@@ -1,7 +1,7 @@
 {
   "id": "nils-dnd5e-automation",
   "title": "Nils' dnd5e automation (Nd5e)",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "compatibility": {
     "minimum": "0.8.9",
     "verified": "11.315"
@@ -14,7 +14,7 @@
   ],
   "url": "https://github.com/TPNils/nils-dnd5e-automation",
   "manifest": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/latest/module.json",
-  "download": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/v2.3.0/module.zip",
+  "download": "https://github.com/TPNils/nils-dnd5e-automation/releases/download/v2.3.1/module.zip",
   "bugs": "https://github.com/TPNils/nils-dnd5e-automation/issues",
   "flags": {
     "allowBugReporter": true
