@@ -15,15 +15,13 @@ const setup = new Promise<void>((resolve) => setupResolve = resolve);
 let readyResolve: HookResolve;
 const ready = new Promise<void>((resolve) => readyResolve = resolve);
 
-let chatRenderedResolve: HookResolve;
-
 const chatRendered = new Promise<void>(async (resolve) => {
   await init;
   const observer = new MutationObserver((mutationsList, observer) => {
     for (const mutation of mutationsList) {
       for (const addedNode of Array.from(mutation.addedNodes)) {
         if (addedNode instanceof Element) {
-          const queryNode = addedNode.matches(`#chat`) ? addedNode : addedNode.querySelector(`#chat`);
+          const queryNode = addedNode.matches(`#chat-log`) ? addedNode : addedNode.querySelector(`#chat-log`);
           if (queryNode instanceof HTMLElement) {
             resolve();
             observer.disconnect();
@@ -139,7 +137,6 @@ export class UtilsHooks {
         chatRendered.then(readyResolve);
       }
     });
-    Hooks.once('init', chatRenderedResolve);
   }
 
 }
