@@ -186,13 +186,13 @@ class SettingListener<T> extends ValueReader<T> {
     const originalSetItem = clientStorage.setItem;
     clientStorage.setItem = function(this: Storage, ...args: any[]) {
       getCallbackSettingKeyTrigger().callbackChange(args[0], args[1]);
-      return originalSetItem.apply(this, ...args);
+      return originalSetItem.apply(this, args);
     }
     
     const originalRemoveItem = clientStorage.removeItem;
     clientStorage.removeItem = function(this: Storage, ...args: any[]) {
       getCallbackSettingKeyTrigger().callbackChange(args[0], null);
-      return originalRemoveItem.apply(this, ...args);
+      return originalRemoveItem.apply(this, args);
     }
   }
 
