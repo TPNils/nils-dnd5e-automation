@@ -368,7 +368,6 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
             } else {
               state = 'partial-applied';
             }
-            UtilsLog.debug('translateUsage', resource, ResourceCardComponent.translateUsage(resource))
             return {
               ...resource,
               label: ResourceCardComponent.translateUsage(resource),
