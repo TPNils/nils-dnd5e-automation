@@ -1,4 +1,4 @@
-import { IAfterDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
+import { IAfterDmlContext, IDmlContext, ITrigger } from "../../../lib/db/dml-trigger";
 import { DmlUpdateRequest, UtilsDocument } from "../../../lib/db/utils-document";
 import { RunOnce } from "../../../lib/decorator/run-once";
 import { Component, OnInit, OnInitParam } from "../../../lib/render-engine/component";
@@ -16,6 +16,7 @@ import { CheckCardPart } from "./check-card-part";
 import { DamageCardPart } from "./damage-card-part";
 import { OtherCardPart } from "./other-card-part";
 import { TemplateCardPart } from "./template-card-part";
+import { UtilsLog } from "../../../utils/utils-log";
 
 type AutoConsumeAfter = 'never' | 'init' | 'attack' | 'damage' | 'other-formula' | 'check' | 'template-placed';
 
@@ -28,7 +29,7 @@ export interface ResourceCardData {
       calcChange: number;
       appliedChange: number;
     };
-    origin?: string;
+    origin: string;
   }[];
   calc$: {
     actorUuid: string;
@@ -367,6 +368,7 @@ export class ResourceCardComponent extends BaseCardComponent implements OnInit {
             } else {
               state = 'partial-applied';
             }
+            UtilsLog.debug('translateUsage', resource, ResourceCardComponent.translateUsage(resource))
             return {
               ...resource,
               label: ResourceCardComponent.translateUsage(resource),
@@ -461,7 +463,8 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
                 path: propertyPath,
                 calcChange: itemData.consume.amount,
                 appliedChange: 0,
-              }
+              },
+              origin: this.getType(),
             });
           }
           break;
@@ -484,7 +487,8 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
                 path: propertyPath,
                 calcChange: itemData.consume.amount,
                 appliedChange: 0,
-              }
+              },
+              origin: this.getType(),
             });
           }
           break;
@@ -500,7 +504,8 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
                 path: propertyPath,
                 calcChange: itemData.consume.amount,
                 appliedChange: 0,
-              }
+              },
+              origin: this.getType(),
             });
           }
           break;
@@ -516,7 +521,8 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
             path: propertyPath,
             calcChange: 1,
             appliedChange: 0,
-          }
+          },
+          origin: this.getType(),
         });
       }
     }
@@ -525,77 +531,18 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
   }
 
   public refresh(data: ResourceCardData, args: ModularCardCreateArgs): ResourceCardData {
-    const originalResourcesByKey = new Map<string, ResourceCardData['consumeResources'][0]>();
-    for (const resource of data.consumeResources) {
-      originalResourcesByKey.set(`${resource.calc$.uuid}-${resource.calc$.path}`, resource);
-    }
-
-    const newData = this.create(args);
-    const newKeys = new Set<string>();
-    const spellKeyRegex = /^data|system\.spells\.(?:pact|spell[0-9]+)\.value$/;
-    let spellResource: ResourceCardData['consumeResources'][number];
-    for (const resource of newData.consumeResources) {
-      if (spellKeyRegex.exec(resource.calc$.path)) {
-        spellResource = resource;
-      }
-      const key = `${resource.calc$.uuid}-${resource.calc$.path}`;
-      newKeys.add(key);
-      const original = originalResourcesByKey.get(key);
-      if (original) {
-        resource.calc$.appliedChange += original.calc$.appliedChange;
-      }
-    }
-
-    const originalSpellResources: ResourceCardData['consumeResources'] = [];
-    for (const [key, resource] of originalResourcesByKey.entries()) {
-      if (!newKeys.has(key)) {
-        let action = resource.consumeResourcesAction;
-        if (spellResource && spellKeyRegex.exec(resource.calc$.path)) {
-          originalSpellResources.push(resource);
-          continue;
-        }
-        newData.consumeResources.push({
-          consumeResourcesAction: action,
-          calc$: {
-            ...resource.calc$,
-            calcChange: 0,
-          }
-        });
-      }
-    }
-
-    let originalSpellAction: ResourceCardData['consumeResources'][number]['consumeResourcesAction'] = 'undo';
-    for (const originalSpellResource of originalSpellResources) {
-      if (originalSpellResource.calc$.calcChange !== 0) {
-        originalSpellAction = originalSpellResource.consumeResourcesAction;
-      }
-
-      newData.consumeResources.push({
-        consumeResourcesAction: 'undo',
-        calc$: {
-          ...originalSpellResource.calc$, // Undo old spell slot
-          calcChange: 0,
-        }
-      });
-    }
-
-    // Transfer input from old spell to new
-    if (spellResource) {
-      spellResource.consumeResourcesAction = originalSpellAction;
-    }
-
-    return newData;
+    return data;
   }
 
   @RunOnce()
   public registerHooks(): void {
-    ModularCard.registerModularCardTrigger(this, new ResourceTrigger());
     UtilsHooks.init().then(() => {
       if (UtilsFoundry.usesDocumentData()) {
         ModularCard.registerModularCardTrigger(this, new DowngradeConsumptionKeysToV9());
       } else if (UtilsFoundry.usesDataModel()) {
         ModularCard.registerModularCardTrigger(this, new UpdateConsumptionKeysToV10());
       }
+      ModularCard.registerModularCardTrigger(this, new ResourceTrigger());
     })
     ModularCard.registerModularCardPart(staticValues.moduleName, this);
   }
@@ -613,6 +560,23 @@ export class ResourceCardPart implements ModularCardPart<ResourceCardData> {
 }
 
 class ResourceTrigger implements ITrigger<ModularCardTriggerData<ResourceCardData>> {
+
+  //#region 
+  public beforeUpsert(context: IDmlContext<ModularCardTriggerData<ResourceCardData>>): boolean | void {
+    this.cleanup(context);
+  }
+
+  private cleanup(context: IDmlContext<ModularCardTriggerData<ResourceCardData>>): void {
+    for (const {newRow} of context.rows) {
+      const consumeResources: ResourceCardData['consumeResources'] = [];
+      for (const resource of newRow.part.consumeResources) {
+        if (resource.calc$.appliedChange !== 0 || resource.calc$.calcChange !== 0) {
+          consumeResources.push(resource);
+        }
+      }
+      newRow.part.consumeResources = consumeResources;
+    }
+  }
   
   //#region upsert
   public async upsert(context: IAfterDmlContext<ModularCardTriggerData<ResourceCardData>>) {

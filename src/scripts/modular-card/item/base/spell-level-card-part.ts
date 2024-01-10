@@ -14,6 +14,7 @@ import { ModularCard, ModularCardTriggerData, ModularCardInstance } from "../../
 import { ModularCardPart, ModularCardCreateArgs, CreatePermissionCheckArgs, HtmlContext, createPermissionCheckAction, PermissionResponse } from "../../modular-card-part";
 import { BaseCardComponent } from "./base-card-component";
 import { ResourceCardData, ResourceCardPart } from "./resources-card-part";
+import { UtilsLog } from "../../../utils/utils-log";
 
 export interface SpellLevelCardData {
   selectedLevel: number | 'pact';
@@ -282,35 +283,44 @@ class SpellLevelCardTrigger implements ITrigger<ModularCardTriggerData<SpellLeve
       }
 
       const resourcePart = newRow.allParts.getTypeData(ResourceCardPart.instance);
-      let spellResource: ResourceCardData['consumeResources'][number];
+      let spellResources: ResourceCardData['consumeResources'] = [];
       for (const resource of resourcePart.consumeResources) {
         if (resource.origin === SpellLevelCardPart.instance.getType()) {
-          spellResource = resource;
-          break;
-        } else if (resource.origin == null && resource.calc$.path.match(/spells\.([1-9]|pact)\.value/)) {
+          spellResources.push(resource);
+        } else if (resource.origin == null && resource.calc$.path.match(/spells\.(spell[1-9]|pact)\.value/)) {
           // fallback, v2.3.0 and lower did not have an origin
-          spellResource = resource;
-          break;
+          spellResources.push(resource);
         }
       }
 
-      if (spellResource == null) {
-        spellResource = {
+      const spellPart = newRow.allParts.getTypeData(SpellLevelCardPart.instance);
+      let spellPropertyName = spellPart.selectedLevel === "pact" ? "pact" : `spell${spellPart.selectedLevel}`;
+      if (spellResources.length === 0) {
+        spellResources.push({
           consumeResourcesAction: 'auto',
           calc$: {
             uuid: newRow.allParts.getActorUuid(),
-            path: ``,
+            path: `system.spells.${spellPropertyName}.value`,
             calcChange: 1,
             appliedChange: 0,
-          }
+          },
+          origin: SpellLevelCardPart.instance.getType(),
+        });
+        resourcePart.consumeResources.push(spellResources[0]);
+      } else {
+        spellResources[0].calc$.calcChange = 1;
+        spellResources[0].calc$.path = `system.spells.${spellPropertyName}.value`;
+        for (let i = 1; i < spellResources.length; i++) {
+          spellResources[i].calc$.calcChange = 0;
+          spellResources[i].consumeResourcesAction = 'undo';
         }
-        resourcePart.consumeResources.push(spellResource);
       }
       
-      const spellPart = newRow.allParts.getTypeData(SpellLevelCardPart.instance);
-      let spellPropertyName = spellPart.selectedLevel === "pact" ? "pact" : `spell${spellPart.selectedLevel}`;
-      spellResource.calc$.path = `system.spells.${spellPropertyName}.value`
-      spellResource.origin = SpellLevelCardPart.instance.getType();
+      // const spellPart = newRow.allParts.getTypeData(SpellLevelCardPart.instance);
+      // let spellPropertyName = spellPart.selectedLevel === "pact" ? "pact" : `spell${spellPart.selectedLevel}`;
+      // TODO the proxy wrapper is weird where it sets "path" not on "calc$" but on "spellResource" on the message instance
+      // spellResource.calc$.path = `system.spells.${spellPropertyName}.value`;
+      // spellResource.origin = SpellLevelCardPart.instance.getType();
     }
   }
   //#endregion
