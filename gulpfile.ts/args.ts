@@ -24,7 +24,7 @@ class Args {
       git.getLatestVersionTag(),
       foundryManifest.getManifest().file.version,
     ]);
-    const latestVersion = versions.filter(v => !!v).sort(Args.sortVersions)[versions.length - 1];
+    const latestVersion = versions.filter(v => !!v).sort(this.sortVersions)[versions.length - 1];
     if (latestVersion.startsWith('v')) {
       return latestVersion.substring(1)
     }
@@ -103,7 +103,7 @@ class Args {
     return null;
   }
 
-  private static sortVersions(a: string, b: string): number {
+  public sortVersions(a: string, b: string): number {
     const aRgx = Args.versionMatch.exec(a);
     const bRgx  = Args.versionMatch.exec(b);
 

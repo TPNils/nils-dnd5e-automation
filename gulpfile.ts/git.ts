@@ -132,11 +132,21 @@ export class Git {
   }
 
   public async getLatestVersionTag(): Promise<string> {
-    const tagHash = await cli.execPromise('git rev-list --tags --max-count=1');
+    const tagHash = await cli.execPromise('git show-ref --tags');
     cli.throwIfError(tagHash);
-    const cmd = await cli.execPromise(`git describe --tags ${tagHash.stdout}`);
-    cli.throwIfError(cmd);
-    return cmd.stdout.trim();
+    const rgx = /refs\/tags\/(.*)/g;
+    let match: RegExpExecArray;
+    const versions = [];
+    while (match = rgx.exec(tagHash.stdout)) {
+      if (args.parseVersion(match[1]) != null) {
+        versions.push(match[1]);
+      }
+    }
+    if (versions.length == null) {
+      return 'v0.0.0';
+    }
+    versions.sort(args.sortVersions);
+    return versions[versions.length - 1];
   }
 
   public async push(): Promise<void> {
