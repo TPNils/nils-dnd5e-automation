@@ -176,7 +176,7 @@ export class SrdSneakAttackComponent extends BaseCardComponent implements OnInit
       } else {
         const usedSneakFlag = game.combat.getFlag(staticValues.moduleName, 'usedSneak') as {[turnKey: string]: Array<{source: string;}>} ?? {};
         const source = `${this.messageId}/${SrdSneakAttackCardPart.instance.getType()}`;
-        const key = `${part.createdCombatRound.combatantId}/${part.calc$.actorUuid.replace('.', '/')}`;
+        const key = `${part.createdCombatRound.combatantId}/${part.createdCombatRound.round}/${part.createdCombatRound.turn}/${part.calc$.actorUuid.replace('.', '/')}`;
         if (!usedSneakFlag[key]) {
           this.usedInCombat = false;
         } else {
@@ -443,7 +443,7 @@ class SrdSneakAttackCardTrigger implements ITrigger<ModularCardTriggerData<SrdSn
         } else {
           usedSneakFlag = deepClone(usedSneakFlag);
         }
-        const key = `${newRow.part.createdCombatRound.combatantId}/${newRow.part.calc$.actorUuid.replace('.', '/')}`;
+        const key = `${newRow.part.createdCombatRound.combatantId}/${newRow.part.createdCombatRound.round}/${newRow.part.createdCombatRound.turn}/${newRow.part.calc$.actorUuid.replace('.', '/')}`;
         usedSneakFlag[key] = usedSneakFlag[key] ?? [];
 
         const source = `${newRow.messageId}/${SrdSneakAttackCardPart.instance.getType()}`;
