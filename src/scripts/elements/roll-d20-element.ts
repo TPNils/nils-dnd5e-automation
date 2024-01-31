@@ -48,15 +48,15 @@ const dedupeEventData = (oldValue: RollD20EventData<string>, newValue: RollD20Ev
               {{ this.rollModeLabel }}
             </div>
             <div class="label-icon">
-              <svg class="advantage-icon" *if="this.rollMode === 'advantage'">
+              <svg class="advantage-icon" *if="this.rollMode === 'advantage' && this.hasReadPermission">
                 <use class="d20" xlink:href="/modules/${staticValues.moduleName}/assets/icons/d20.svg#d20"/>
                 <use class="arrow-up" xlink:href="/modules/${staticValues.moduleName}/assets/icons/arrow-up.svg#arrow-up"  width=".9em" height=".9em"></use>
               </svg>
-              <svg class="disadvantage-icon" *if="this.rollMode === 'disadvantage'">
+              <svg class="disadvantage-icon" *if="this.rollMode === 'disadvantage' && this.hasReadPermission">
                 <use class="d20" xlink:href="/modules/${staticValues.moduleName}/assets/icons/d20.svg#d20"/>
                 <use class="arrow-down" xlink:href="/modules/${staticValues.moduleName}/assets/icons/arrow-up.svg#arrow-up"  width=".9em" height=".9em"></use>
               </svg>
-              <svg class="normal-mode-icon" *if="this.rollMode === 'normal'">
+              <svg class="normal-mode-icon" *if="this.rollMode === 'normal' || !this.hasReadPermission">
                 <use class="d20" xlink:href="/modules/${staticValues.moduleName}/assets/icons/d20.svg#d20"/>
               </svg>
             </div>
