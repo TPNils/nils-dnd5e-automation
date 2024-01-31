@@ -1126,7 +1126,8 @@ class DamageCardTrigger implements ITrigger<ModularCardTriggerData<DamageCardDat
               }
             })
           } else {
-            return UtilsRoll.createDamageRoll(UtilsRoll.mergeRolls(...rollRolls).terms, {critical: newRow.part.mode === 'critical'}).roll({async: true});
+            const roll = await UtilsRoll.createDamageRoll(UtilsRoll.mergeRolls(...rollRolls).terms, {critical: newRow.part.mode === 'critical'});
+            return roll.roll({async: true});
           }
         }
 

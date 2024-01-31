@@ -1,4 +1,5 @@
 import { DamageType, MyItemData } from "../../types/fixed-types";
+import { UtilsLog } from "../../utils/utils-log";
 import { ReusableDiceTerm } from "./reusable-dice-term";
 
 const validDamageTypes: DamageType[] = ['' /* none */, 'acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder', 'healing', 'temphp'];
@@ -407,8 +408,8 @@ export class UtilsRoll {
     return roll;
   }
 
-  public static createDamageRoll(roll: string | RollTerm[], options: DamageRollOptions = {}): Roll {
-    const DamageRoll = CONFIG.Dice.rolls.find(a => a.name === 'DamageRoll') as typeof Roll;
+  public static async createDamageRoll(roll: string | RollTerm[], options: DamageRollOptions = {}): Promise<Roll> {
+    const DamageRoll = CONFIG.Dice.rolls.find(a => a.name === 'DamageRoll') as typeof Roll & {configureDamage: () => void};
     // Whats the point of having this damage roll? If someone else adds custom crit rules I still need to implement them.
     // You can use damageRoll, but that always rolls the dice which I can't use since it doesn't HAVE to be rolled
     options = {
@@ -416,15 +417,23 @@ export class UtilsRoll {
       powerfulCritical: game.settings.get("dnd5e", "criticalDamageMaxDice") === true,
       ...options
     }
-    let dmgRoll: Roll;
-    if (Array.isArray(roll)) {
-      dmgRoll = new DamageRoll('0', {}, options) as Roll & {configureDamage: () => void};
-      dmgRoll.terms = roll;
-      (dmgRoll as Roll & {configureDamage: () => void}).configureDamage();
-    } else {
-      dmgRoll = new DamageRoll(roll, {}, options);
+    
+    if (typeof roll === 'string') {
+      roll = new Roll(roll).terms;
     }
-    return dmgRoll;
+
+    // DamageRoll does not multiply all terms correctly for a crit
+    for (let i = 0; i < roll.length; i++) {
+      const term = roll[i];
+      if (term.isDeterministic) {
+        const result = (await term.evaluate({async: true})).total;
+        if (typeof result === 'number') {
+          roll[i] = new NumericTerm({number: result, options: term.options});
+        }
+      }
+    }
+
+    return new DamageRoll(Roll.getFormula(roll), {}, options);
   }
 
   /**
