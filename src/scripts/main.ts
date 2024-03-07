@@ -1,3 +1,4 @@
+import './utils/utils-log';
 import { registerHooks as registerHtmlHooks } from "./global-html-listener";
 import { registerHooks as registerOverrideHooks } from "./override/index.js";
 import { provider } from "./provider/provider";
@@ -12,7 +13,6 @@ import { ComponentFoundryConnector } from "./lib/render-engine/component-foundry
 import { UtilsLibWrapper } from "./utils/utils-lib-wrapper";
 import { UtilsDae } from "./utils/utils-dae";
 import { UtilsFoundry } from "./utils/utils-foundry";
-import './utils/utils-log';
 
 UtilsHooks.registerHooks();
 UtilsLibWrapper.registerHooks();
