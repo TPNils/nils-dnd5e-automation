@@ -646,19 +646,6 @@ export class TargetCardPart implements ModularCardPart<TargetCardData> {
     
     target.selected = uuidsToSelected(selectedTargets.map(t => t.uuid));
 
-    if (itemData.target?.value > 0 && ['ally', 'creature', 'enemy', 'object'].includes(itemData.target?.type)) {
-      // Should not be any units, if units is specified, assume its in a radius
-      if ([''].includes(itemData.target?.units)) {
-        target.calc$.expectedTargets = itemData.target?.value;
-      }
-    } else if (['', null].includes(itemData.target?.type)) {
-      // Target None => probably not configured
-      // This is also home some dnd5e compendium weapons are configured
-      if (item.hasAttack || item.hasDamage) {
-        target.calc$.expectedTargets = 1;
-      }
-    }
-
     return target;
   }
 
@@ -704,7 +691,24 @@ class TargetCardTrigger implements ITrigger<ModularCardTriggerData<TargetCardDat
 
   //#region beforeUpsert
   public beforeUpsert(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): boolean | void {
+    this.calcExpectedTargets(context);
     this.calcAutoChangeTarget(context);
+  }
+
+  private calcExpectedTargets(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): void {
+    for (const {newRow} of context.rows) {
+
+      if (newRow.part.calc$.targetDefinition?.value > 0 && ['ally', 'creature', 'enemy', 'object'].includes(newRow.part.calc$.targetDefinition?.type)) {
+        // Should not be any units, if units is specified, assume its in a radius
+        if ([''].includes(newRow.part.calc$.targetDefinition?.units)) {
+          newRow.part.calc$.expectedTargets = newRow.part.calc$.targetDefinition?.value;
+        }
+      }
+
+      if (!newRow.part.calc$.expectedTargets && (newRow.allParts.hasType(AttackCardPart.instance) || newRow.allParts.hasType(DamageCardPart.instance) || newRow.allParts.hasType(CheckCardPart.instance))) {
+        newRow.part.calc$.expectedTargets = 1;
+      }
+    }
   }
 
   private calcAutoChangeTarget(context: IDmlContext<ModularCardTriggerData<TargetCardData>>): void {
