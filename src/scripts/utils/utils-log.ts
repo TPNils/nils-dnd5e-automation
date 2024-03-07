@@ -1,4 +1,5 @@
 import { staticValues } from "../static-values";
+import { UtilsLibWrapper } from "./utils-lib-wrapper";
 
 export type FormattedString = string | {
   message: string;
@@ -8,6 +9,13 @@ export type FormattedString = string | {
 const resetFormat: Required<Omit<FormattedString, 'message'>> = {
   color: 'reset',
 }
+
+UtilsLibWrapper.mixed('console.groupCollapsed', function groupCollapsed(original, ...label: any[]) {
+  if (typeof label[0] === 'string' && label[0].startsWith('Foundry VTT |')) {
+    return console.group.apply(this, label);
+  }
+  return original.apply(this, label);
+});
 
 export class UtilsLog {
 
